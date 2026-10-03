@@ -1,0 +1,187 @@
+# OTT내비(ottnavi) TECH — 설계 결정과 함정
+
+이 문서는 [PRD](./PRD.md), [ERD](./ERD.md), [backend.md](../.claude/rules/backend.md), [frontend.md](../.claude/rules/frontend.md), [api-contract.md](../.claude/rules/api-contract.md)에 **없는** 설계 결정과 검증 중 발견한 함정만 다룬다. 요구사항·스키마·코딩 규칙·스택 목록은 위 문서가 기준이고, 여기서는 반복하지 않는다.
+
+- 근거 우선순위: PRD 11절 확정 → PRD 본문 → ERD → rules → [기획서](./proposal_v6.md).
+- 출처 표기: `R`=PRD, `E`=ERD, `rules`, `P`=기획서, `c7`=context7 확인, `web`=공식 문서 확인, `도출`=문서 근거 없이 이 문서에서 정한 설계.
+- PRD 11절의 결정 필요 항목은 `R11-번호`로, 이 문서가 올린 결정 필요 항목은 `T-번호`로 참조한다. T 항목은 7절이 단일 출처다.
+- 저장소 상태(2026-10-03): 빌드·설정·CI 파일 모두 미생성. 버전은 rules·PRD 부록 A를 따른다.
+
+---
+
+## 1. 계산 엔진 (FR-12·13)
+
+> 결정 현황: T-1~T-8 확정, T-9 결정 필요(7절).
+
+계산 규칙의 정의는 R FR-12와 P 5절이 기준이다. `ExactSolver`와 `GreedySolver`는 `PlanSolver` 하나를 구현하고(rules), 배정 규칙과 비교기는 공유한다. 두 구현의 차이는 "구독 조합을 고르는 방법"뿐이다.
+
+**목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 상품 ID 집합 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
+
+**배정 규칙(고정).**
+- 정렬: 우선순위 높은 순 → 필요 분 짧은 순 → `watchUnitId` 순(마지막 기준은 도출).
+- 볼 수 있는 가장 이른 달부터 남은 시청 시간에 채운다. 한 달보다 긴 시즌은 같은 서비스가 연속 커버되는 달에 나눠 배정하고 다 본 달에 점수를 준다. 3개월 안에 끝나지 않으면 배정하지 않는다(도출).
+- 번들은 상품 하나로 다루고 "모름"은 커버로 세지 않는다(R). 쿠팡플레이 포함 여부(R11-13)는 입력 단계 필터로 받아 엔진은 바뀌지 않는다.
+
+**정확해 → 그리디 전환.**
+- 정확해: 달마다 예산 이하 상품 부분집합을 만들고, 지배 조합(비용이 같거나 높은데 커버 집합이 부분집합인 것, FREE 서비스만 추가 커버하는 것)을 제거한 뒤 3개월을 중첩 순회한다. MVP(STANDARD 단품 7개)는 달마다 최대 128, 3개월 최대 약 210만 평가이고, 평가 1회는 O(n log n)이다. 2단계에서 상품 수 P가 늘면 2^P로 커진다.
+- 그리디: 0번째 달부터 앞선 달을 고정하고 목적함수 증가가 가장 큰 조합 하나를 고른다(P5).
+- 전환: 정확해 기본, **후보 조합 수가 상한을 넘으면 그리디**로 대체한다(T-4 확정). 상한 값은 R11-30 측정 후 정한다. 선택된 알고리즘은 `plan.algorithm`에 남는다(E).
+- 이유 코드는 `NO_PROVIDER` → `UNKNOWN` → `BUDGET`(그 서비스가 어느 달에도 선택되지 않음, 도출) → `TIME`(선택된 달은 있으나 시간 부족, 도출) 순으로 첫 번째로 맞는 것을 쓴다.
+
+**`input_hash` 캐시.** 정규화한 입력(정렬된 단위·상품·가격, 예산, 시청 분, `data_as_of`)의 SHA-256을 키로 Redis `planCalc` 캐시에 결과를 둔다(도출). 가격과 `data_as_of`가 키에 들어가므로 별도 무효화가 필요 없다. 캐시가 맞아도 DRAFT 저장은 항상 한다. FR-13 측정은 같은 `input_hash`로 두 Solver를 돌려 `calc_run`에 남기고, 계산 시간은 3회 중앙값으로 본다(도출).
+
+---
+
+## 2. 플랜 저장 흐름 (FR-12·14, R11-7 확정)
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT: calculate
+  DRAFT --> DRAFT: 재계산(기존 DRAFT와 하위 행 삭제 후 생성)
+  DRAFT --> ACTIVE: activate(data_as_of가 최신 수집 이후일 때만)
+  ACTIVE --> ARCHIVED: 새 플랜 저장 또는 매월 재계산
+  [*] --> ACTIVE: 매월 재계산(DRAFT 없이, previous_plan_id 연결)
+```
+
+**계산(`calculatePlan`).** 입력 수집(readOnly) → 엔진 실행(트랜잭션 밖, CPU만) → 쓰기 트랜잭션 순이다. 쓰기 트랜잭션은 다음 순서다.
+1. `user_setting` 행을 `PESSIMISTIC_WRITE`로 잠가 같은 사용자의 동시 계산을 직렬화한다(도출). 없으면 더블 클릭 시 `UNIQUE(user_id) WHERE status='DRAFT'` 위반이 난다.
+2. 기존 DRAFT를 벌크 JPQL 한 문장으로 삭제한다. 하위 행은 FK `ON DELETE CASCADE`가 지운다(T-1 확정). 이 삭제는 트랜잭션에서 엔티티를 읽기 전 첫 동작이다.
+3. 새 DRAFT와 하위 행, `calc_run`을 저장한다.
+
+**저장(`activatePlan`)과 409 규칙.**
+1. DRAFT를 잠그고 존재·소유자를 확인한다. 없으면 404 `PLAN_DRAFT_NOT_FOUND`(제안).
+2. `data_as_of`가 최신 수집 완료 시각(수집 Job의 마지막 COMPLETED 종료 시각, `BATCH_JOB_EXECUTION` 조회, 도출)보다 이르면 **409 `PLAN_DRAFT_STALE`**(제안)로 막는다.
+   - 이 기준은 수집이 매일 돌기 때문에 대부분의 DRAFT가 다음 날이면 막힌다.
+   - MVP 대응: 프론트가 409 `PLAN_DRAFT_STALE`을 받으면 자동으로 재계산을 요청해 새 결과를 보여준다(도출).
+   - 2단계 개선 후보: 판정 기준을 좁히는 안은 T-9(결정 필요).
+3. **함정: 기존 ACTIVE를 ARCHIVED로 바꾸고 명시적으로 flush한 뒤** DRAFT를 ACTIVE로 바꾸고 `previous_plan_id`를 연결한다. 부분 유니크 인덱스 `UNIQUE(user_id) WHERE status='ACTIVE'`는 문장마다 검사되므로, Hibernate의 UPDATE 순서에 맡기면 ACTIVE가 잠시 두 개가 되어 위반이 난다.
+4. 이번 달 가입 상품이 있으면 SUBSCRIBE_GUIDE outbox 행을 만든다(1회 판정 조건은 R11-17).
+
+**대상 범위.** 매월 재계산, 변경 알림, 월초 알림은 `status = ACTIVE`만 읽는다. DRAFT는 어떤 배치도 읽지 않는다(R FR-14). 매월 재계산은 새 ACTIVE 생성 → 이전 ACTIVE ARCHIVED → `previous_plan_id` 연결 → `change_summary` 기록을 한 트랜잭션으로 하며, 3번의 flush 순서를 그대로 지킨다.
+
+신규 오류 코드 제안(`docs/api/error-codes.md` 작성 시 등록): `PLAN_DRAFT_STALE`(409), `PLAN_DRAFT_NOT_FOUND`(404), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409).
+
+---
+
+## 3. 배치 (FR-18·20)
+
+**비동기 202와 중복 실행 409.**
+- 관리자 실행 API는 `TaskExecutor`를 가진 `JobOperator`로 Job을 비동기 시작하고 즉시 **202 + `jobExecutionId`**를 반환한다(c7 Batch 6). Cloudtype HTTP 타임아웃(무료 1분, Hobby 1분 또는 5분은 공식 페이지끼리 불일치)과 무관하게 동작한다(T-6 종결).
+- 식별 파라미터는 `targetDate`(LocalDate) + `tier`(DAILY/WEEKLY)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
+- GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
+
+**중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(예: `POST /api/admin/collect/{executionId}/recover`, 제안).
+
+**Reader 페이지 밀림.** `JpaPagingItemReader`로 읽는 중 같은 Step이 갱신하는 컬럼(예: `fetched_at`)으로 필터하면 행을 건너뛴다. 필터는 Job 파라미터의 고정 기준 시각을 쓰고 정렬은 `id` 순으로 한다(도출).
+
+**TMDB 호출 제한.**
+- Bucket4j **로컬(인메모리) 버킷** 하나를 TMDB 클라이언트 앞에 두고, 한도는 TMDB 안내 "초당 약 40회 범위"(web) 아래로 `app.tmdb.rate-limit.*`에 둔다. Redis 분산 버킷을 쓰지 않는 이유: 단일 인스턴스이고, TMDB 호출마다 Redis 연산을 쓰면 Redis Cloud 무료 초당 100 ops(2차 자료)를 수집이 다 써 버린다(도출). 다중 인스턴스가 되면 Redis 버킷으로 바꾼다.
+- 429·5xx는 Feign `ErrorDecoder`에서 재시도 가능 예외로 바꾸고 `Retryer`로 지수 백오프하며, `Retry-After`가 있으면 우선한다(도출). 타임아웃은 `spring.cloud.openfeign.client.config.tmdb.*`로 클라이언트별 설정한다(c7).
+- 공개 검색의 TMDB 단건 수집도 같은 버킷을 지나므로, 공개 요청 제한의 단건 수집 버킷(R FR-05, 한도 R11-12)이 먼저 걸리게 둔다. 이 버킷은 Redis 장애 시 fail-closed, 일반 공개 버킷은 fail-open이다(도출).
+
+**GitHub Actions cron 제약(web).** cron은 UTC 기준, 최소 간격 5분, 매시 정각에는 지연될 수 있고, 공개 저장소는 60일 무활동 시 예약 워크플로가 꺼진다. 대응: 정각을 피한 분(예: `17 18 * * *` = KST 03:17, 도출), KST로 환산한 월초 cron, `workflow_dispatch` 수동 실행 병행.
+
+**무료 기간과 Hobby 전환 이후(도출).**
+- 무료 기간(B1 ~ MVP 배포 전): Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다(사용자 실사용 확인). 그래서 GitHub Actions cron은 끄고, 서버를 대시보드에서 켠 뒤 관리자 API로 수집을 수동 실행한다. Supabase가 1주 비활성으로 일시정지되면 대시보드에서 재개한다.
+- Hobby 전환 이후: cron을 켠다. 매일 수집이 Supabase 1주 비활성 일시정지를 막는 효과는 이 시기부터만 있다.
+- Actions는 수집 → 재계산 → 월초 알림 **생성**만 트리거하고 발송은 앱 스케줄러가 한다(R11-5).
+
+---
+
+## 4. 인증 (FR-06·17)
+
+```mermaid
+sequenceDiagram
+  participant B as 브라우저
+  participant V as Vercel /api
+  participant S as Spring Security
+  participant G as Google
+  B->>V: GET /api/oauth2/authorization/google
+  V->>S: 전달(x-forwarded-host = Vercel 도메인)
+  S-->>B: 302 Google(redirect_uri = https://{프론트}/api/login/oauth2/code/google)
+  B->>G: 로그인·동의
+  G-->>B: 302 redirect_uri?code=...
+  B->>V: GET /api/login/oauth2/code/google
+  V->>S: 전달 → code 교환, users 조회·생성
+  S-->>B: Set-Cookie RT(HttpOnly, Secure, SameSite=Lax, Path=/api/auth) + 302 /auth/callback
+  B->>V: POST /api/auth/refresh(쿠키)
+  S-->>B: 200 { accessToken } (회전 시 새 RT 쿠키)
+```
+
+- 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다.
+- **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
+- RT 서버 측 저장은 R11-21 미결정이다. `RefreshTokenStore` 인터페이스로 "Redis 저장 + 회전·폐기"와 "서명 검증만" 구현을 교체 가능하게 둔다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
+- 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
+- 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출).
+
+**IP 헤더 신뢰 문제.**
+- `server.forward-headers-strategy=framework`를 쓴다. Cloudtype은 Boot가 인식하는 클라우드가 아니라 기본값이 `NONE`이다(c7). `native`는 컨테이너가 신뢰 프록시를 판정해 Vercel 같은 공인 IP 프록시 헤더를 무시할 수 있어 기각했다(도출, 배포 스모크로 확인).
+- FRAMEWORK는 헤더를 조건 없이 신뢰한다. Cloudtype 주소로 직접 들어와 `X-Forwarded-For`를 위조하면 요청 제한을 우회한다 → 오리진 비밀 헤더 검사로 막는다(T-8 확정).
+- 클라이언트 IP는 `x-real-ip` 1순위, 없으면 `x-forwarded-for` 첫 값(Vercel이 둘 다 방문자 IP로 채움, web). Cloudtype 진입점이 홉을 덧붙일 수 있어서다(도출). Vercel이 클라이언트가 보낸 `X-Forwarded-For`를 덮어쓰는지는 확인 불가이므로 배포 스모크에서 실제 헤더를 로그로 확인한다.
+
+---
+
+## 5. 알림 outbox (FR-15·16, R11-5 확정)
+
+- **`next_attempt_at` 임대.** 상태는 ERD의 PENDING / SENT / FAILED만 쓴다. "처리 중" 상태 대신 점유 시 `next_attempt_at = now + 임대 시간`, `attempt_count + 1`로 기록한다(도출). 발송 중 앱이 죽어도 임대가 끝나면 다시 집힌다. 실패 시 `next_attempt_at`을 백오프 시각으로, 최대 시도 도달 시 FAILED. 최대 횟수·간격은 `app.notification.*` 설정 키(값 미정).
+- **처리 3단계.** ① 짧은 트랜잭션: `status=PENDING and next_attempt_at <= now`를 `id` 순 N건 `@Lock(PESSIMISTIC_WRITE)` + `jakarta.persistence.lock.timeout = -2`로 조회해 임대 기록 ② 트랜잭션 밖 발송 ③ 짧은 트랜잭션: 결과 기록.
+- **SKIP LOCKED.** lock timeout `-2`는 Hibernate에서 `UPGRADE_SKIPLOCKED` → PostgreSQL `SKIP LOCKED`가 된다(c7). PostgreSQL 방언은 `PESSIMISTIC_WRITE`를 `for no key update`로 그린다는 근거가 main 브랜치 기준이라, 7.4의 실제 SQL을 통합 테스트 로그로 확인한다.
+- 기본 발송은 `@Scheduled` 1분 + ShedLock(`usingDbTime()`), 가입 안내는 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`로 같은 ①~③을 행 하나에 적용한다. AFTER_COMMIT 리스너 안의 DB 쓰기는 새 트랜잭션이 필요하므로 ①·③을 `REQUIRES_NEW`로 둔다(도출). 즉시 발송이 실패해도 PENDING이 남아 스케줄러가 재시도한다.
+- 전달 보장은 최소 1회다. `dedupe_key`는 중복 **생성**을 막고, 발송 성공 직후 ③ 전 종료 시의 중복 **발송**은 허용 범위로 본다(도출). 탈퇴와 점유가 겹치면 메일 1건이 나갈 수 있어 발송 직전 행 존재를 재확인한다(도출).
+- 메일은 발송 포트 하나 + SMTP·HTTPS 메일 API 구현체 둘로 두고 `app.mail.provider`로 고른다(R11-11 수용). SMTP는 `mail.smtp.connectiontimeout`·`timeout`·`writetimeout`을 반드시 설정한다(c7: 미설정 시 무기한 대기).
+
+---
+
+## 6. 호환성 함정
+
+| 함정 | 대응 | 근거 |
+|---|---|---|
+| Boot 4는 `spring-boot-starter-flyway`가 없으면 Flyway가 돌지 않는다. PostgreSQL은 `flyway-database-postgresql`도 필요 | 의존성 체크리스트에 명시 | web, c7 |
+| Boot 4의 `spring-boot-starter-batch`는 메모리(resourceless) 모드다. DB 이력은 `spring-boot-starter-batch-jdbc` 필요 | 위와 같음. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false` | web, c7 |
+| orval v8 기본 HTTP 클라이언트가 fetch라 axios mutator·인터셉터가 동작하지 않음 | `output.httpClient: 'axios'` 명시 | c7 |
+| Vercel external rewrite는 2026-04-06 이후 프로젝트에서 upstream `Cache-Control`을 따라 CDN 캐시 | 백엔드 `/api/**` 기본 `no-store` + `x-vercel-enable-rewrite-caching: 0`, 스모크로 응답 헤더 확인(T-8 확정) | web |
+| `vercel.json` rewrite 순서: SPA 대체를 먼저 두면 API가 `index.html`을 받음 | `/api/:path*` → SPA 대체 순서 | 도출 |
+| Jackson 2·3 혼재: Boot 4는 `tools.jackson.*`, jjwt-jackson은 Jackson 2(`com.fasterxml`) 의존 | jjwt-jackson은 런타임 스코프, 앱 직렬화는 Jackson 3만. 어노테이션은 `com.fasterxml.jackson.annotation` 유지 | web, c7 |
+| Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |
+| `@Modifying`의 `flushAutomatically`·`clearAutomatically` 기본 `false`, 벌크 연산은 1차 캐시를 갱신하지 않음 | 두 값 `true`, 벌크를 트랜잭션 첫 동작으로 | c7 |
+| 부분 유니크 인덱스와 UPDATE 순서 | ARCHIVED 전환 후 명시 flush(2절) | 도출 |
+| Batch chunk 안 TMDB 호출이 DB 연결을 점유해 풀(약 5) 고갈 | T-2 확정: 배치 예외 인정, 작은 chunk | rules 충돌 |
+| `@MockBean` 제거 | `@MockitoBean` | web |
+| Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
+| WireMock 기본 아티팩트가 Jetty 11 | Jetty 충돌 시 `wiremock-jetty12` | c7 |
+| MSW `worker.start()` 전 렌더링 시 경쟁 상태 | await 후 렌더링 | c7 |
+| Vite 8·Vitest 4는 Node 20.19+ 또는 22.12+ | CI Node 버전 고정 | c7 |
+| Spring Cloud OpenFeign은 feature-complete | T-3 확정: 유지 | c7 |
+| Redis Cloud 무료 30MB·초당 100 ops | TMDB 버킷 로컬화, 요청 한도(R11-12) 산정 시 반영, `INFO commandstats`로 실측 | 2차 자료 |
+| Supabase 무료 500MB에 `BATCH_*` 누적. Transaction 풀러 6543은 prepared statement 미지원 | Session 5432 사용, 배치 이력 정리 기준은 2단계 O4 | web |
+| Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(기획서의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수동 실행(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
+| Loki4j 최신 라인의 Logback 요구 버전과 Boot 관리 Logback 미대조 | 3단계 도입 시 대조 | c7(부분) |
+| Gemini 무료 등급 입력은 제품 개선에 사용됨 | 개인정보를 프롬프트에 넣지 않음 | web |
+
+---
+
+## 7. 결정 필요 (단일 출처)
+
+T-1~T-8은 확정(2026-10-03), T-9는 결정 필요다. PRD 11절 항목은 PRD가 단일 출처다.
+
+- [x] **T-1. DRAFT 덮어쓰기·탈퇴 시 하위 행 삭제 방식** (E "FK ON DELETE CASCADE 또는 서비스 로직", R FR-07·12) — **확정(2026-10-03)**: 권장안 채택. FK `ON DELETE CASCADE` + JPA cascade 삭제 미사용 + 벌크 JPQL 삭제.
+  - **채택안: PostgreSQL FK `ON DELETE CASCADE`. JPA 엔티티에는 cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`)를 걸지 않고, plan 삭제는 벌크 JPQL 한 문장으로 한다.**
+  - 적용 범위: `plan_month`·`plan_item` → plan, `plan_month_product` → plan_month, `plan_assignment` → plan_item·plan_month(두 경로 모두)는 CASCADE. `calc_run.plan_id`는 SET NULL(E). `plan.previous_plan_id`는 SET NULL(제안: 자기참조 삭제 순서 문제 방지). 사용자 소유 테이블(`user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `notification_outbox`)의 `user_id`는 CASCADE(탈퇴). 마스터 데이터를 가리키는 FK는 NO ACTION 유지.
+  - 근거: ① 파생 삭제·JPA cascade는 엔티티를 모두 읽어 한 건씩 지운다(c7 Spring Data JPA). ② 벌크 JPQL·`deleteAllInBatch`는 JPA cascade와 콜백을 따르지 않으므로(c7) DB cascade가 없으면 벌크 삭제가 FK 위반으로 실패한다. 즉 "JPA cascade 없음 + 벌크 삭제" 전제에서는 DB cascade나 자식 선삭제 중 하나가 반드시 필요하다. ③ 로컬·Testcontainers·Supabase 모두 PostgreSQL이라 동작 차이가 없다. ④ 탈퇴도 `users` 행 하나 삭제로 정리되고 `calc_run`은 `plan_id`만 NULL이 된다.
+  - 리스크와 대응: **1차 캐시 불일치** → `@Modifying(flushAutomatically = true, clearAutomatically = true)`, 삭제를 트랜잭션 첫 동작으로. **보이지 않는 삭제** → 자식 `@ManyToOne`에 `@OnDelete(action = OnDeleteAction.CASCADE)` 표기(Hibernate가 자식 DELETE를 내지 않음, c7), Flyway 주석, Testcontainers 테스트("재계산 후 이전 DRAFT 하위 4개 테이블 0행", "탈퇴 후 `calc_run.plan_id` NULL")로 고정. `ddl-auto=validate`가 FK 동작을 검사한다는 근거는 없다. **참조 컬럼 인덱스** → PostgreSQL은 자동 생성하지 않으므로(c7) 유니크 선두가 아닌 `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴용 각 `user_id`에 인덱스 추가. **outbox 점유와 탈퇴 경합** → 5절 재확인. Redis(RT·캐시)는 탈퇴 서비스가 별도 삭제. `watch_unit` 6개월 삭제가 ARCHIVED 플랜 참조에 막히는 문제는 별개로 2단계 O4에서 정한다.
+  - 대안 B(애플리케이션 벌크 삭제): FK는 NO ACTION, 자식부터 JPQL 벌크 삭제(`plan_assignment` → `plan_month_product` → `plan_item` → `plan_month` → `plan`, 서브쿼리 조건). 삭제가 코드에 드러나지만 DRAFT 교체 5문장·탈퇴 10문장 이상이고 자식 테이블이 늘 때마다 수정해야 한다(빠뜨리면 FK 위반으로 실패하므로 조용한 잔존은 없음).
+  - 대안 C(JPA `CascadeType.REMOVE` + 양방향 `@OneToMany`): 기각 권장. 한 건씩 삭제되고 rules의 "단방향 기본"과 맞지 않는다.
+  - 깨지는 조건: PostgreSQL 외 DB로 이전, 행 단위 감사 로그·생명주기 콜백 필요. ERD 삭제 정책 문구 확정과 위 인덱스 추가는 아래 "ERD 반영 필요"에 남긴다.
+- [x] **T-2. 수집 chunk 안 TMDB 호출과 "외부 호출은 트랜잭션 밖"(rules) 충돌.** — **확정(2026-10-03)**: 수집 배치에 한해 예외 인정, 작은 chunk, 짧은 Feign 타임아웃, 풀 사용량 지표. `spring.datasource.connection-fetch=lazy`(web)는 측정 후 검토. 대안(기각): Tasklet이 트랜잭션 밖에서 응답을 모아 임시 저장하고 chunk는 DB만 쓰기(구현량 증가).
+- [x] **T-3. OpenFeign.** — **확정(2026-10-03)**: 유지. feature-complete이며 새 프로젝트는 HTTP Service Clients를 고려하라는 안내가 있으나(c7), 스택 확정 사항이고 Boot 4.1 호환이 확인됐다. 깨지는 조건: 이후 Boot 버전에서 호환 단절.
+- [x] **T-4. 운영 경로 알고리즘.** — **확정(2026-10-03)**: 정확해 기본 + 후보 수 상한 초과 시 그리디(1절). 상한 값은 R11-30 측정 후 정한다.
+- [x] **T-5. CI 명세 대조 방식.** — **확정(2026-10-03)**: 새 도구 없이 테스트 코드에서 `/v3/api-docs.yaml`을 받아 `docs/api/openapi.yaml`과 YAML 파싱으로 경로·operationId·스키마·required·enum을 비교(`servers`, `info.version`, `example` 제외).
+- [x] **T-6. Cloudtype Hobby HTTP 타임아웃.** — **종결(2026-10-03)**: 영향 없음. `cloudtype.io/pricing`은 1분, `cloudtype.co.kr/pricing`은 5분으로 불일치하지만(web) 장시간 작업은 모두 202 비동기다. 동기 계산 API 시간은 R11-30 측정 때 확인한다.
+- [x] **T-7. JWT 수명.** — **확정(2026-10-03)**: Access Token 30분, Refresh Token 14일, Refresh Token은 재발급 때 회전한다. 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl` 설정 키로 둔다. `JWT_SECRET`은 256비트 이상(미달 시 `WeakKeyException`, c7).
+- [x] **T-8. Vercel 경유 강제와 캐시 헤더.** — **확정(2026-10-03)**: ①②를 모두 채택해 함께 적용한다. ① Vercel이 rewrite 시 오리진 비밀 헤더 `x-origin-secret`(값은 `ORIGIN_SECRET`)을 붙이고 백엔드가 상수 시간 비교로 검사(web) ② `/api/**` 기본 `Cache-Control: no-store` + Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`). 공개 조회 CDN 캐시는 필요해질 때 별도로 연다.
+- [ ] **T-9. 오래된 DRAFT 판정 기준 (2단계 개선).** 현재 기준(2절 저장 규칙 2번: `data_as_of`가 마지막 수집 완료 시각보다 이르면 409)은 수집이 매일 돌아 대부분의 DRAFT가 다음 날 막힌다. MVP는 프론트가 409를 받으면 자동 재계산한다(2절). 개선 후보: DRAFT에 포함된 시청 단위의 `availability_change` 또는 사용한 상품의 가격 변경이 `data_as_of` 이후에 있을 때만 차단. 판단 필요: 판정 쿼리 비용, 변경 이력 보존 범위(`availability_change`가 판정 기간 동안 남아 있는지), 놓친 변경이 결과를 틀리게 만드는 경우의 허용 여부.
+
+### ERD 반영 필요 (T-1 확정에 따름, ERD는 이번에 고치지 않음)
+
+- [ ] 삭제 정책 문구 확정: "FK `ON DELETE CASCADE` 또는 서비스 로직" → FK `ON DELETE CASCADE`. 적용 범위는 T-1의 목록을 따른다(`calc_run.plan_id`·`plan.previous_plan_id`는 SET NULL, 마스터 FK는 NO ACTION).
+- [ ] 참조 컬럼 인덱스 추가: `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴 대상 테이블(`user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `notification_outbox`) 중 유니크 선두가 아닌 `user_id`.
