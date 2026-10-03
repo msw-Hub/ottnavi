@@ -1,6 +1,6 @@
 # OTT내비(ottnavi) ERD
 
-초안 v0.2 · 2026-10-03 · PostgreSQL 15+ (Supabase) · Spring Data JPA + Flyway
+초안 v0.3 · 2026-10-03 · PostgreSQL 15+ (Supabase) · Spring Data JPA + Flyway
 
 서비스 테이블 24개를 다섯 영역으로 나눴다. 라이브러리가 관리하는 테이블(`BATCH_*`, `shedlock`)은 이 숫자에서 뺐다. 모든 테이블은 내부 대리키(`id BIGINT`)를 기본키로 쓰고, TMDB 값은 매핑 컬럼과 유니크 제약으로 보관한다. 영화와 드라마 시즌은 `watch_unit`(시청 단위)으로 통일해 찜, 제공 상태, 계산이 모두 이 테이블을 기준으로 동작한다.
 
@@ -358,7 +358,7 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| plan | id, user_id FK, previous_plan_id FK NULL, status, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT도 하나: `UNIQUE(user_id) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK ON DELETE CASCADE 또는 서비스 로직). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost |
+| plan | id, user_id FK, previous_plan_id FK NULL, status, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT도 하나: `UNIQUE(user_id) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost |
 | plan_month | id, plan_id FK, month_index, month, confirmed, cost | `UNIQUE(plan_id, month_index)`. month_index 0은 확정(이번 달), 1·2는 예상 |
 | plan_month_product | id, plan_month_id FK, product_id FK, applied_price, price_source | 그 달에 구독할 상품. price_source = ADMIN / USER_OVERRIDE / ALREADY_PAID / FREE. 가격 스냅샷이라 이후 가격 변경에 영향받지 않음. 가입·해지 안내는 인접 월을 비교해 도출 |
 | plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천 |
@@ -371,7 +371,7 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| notification_outbox | id, user_id FK, type, dedupe_key UK, payload JSONB, status, attempt_count, next_attempt_at, sent_at, last_error | type = SUBSCRIBE_GUIDE / MONTHLY / PLAN_CHANGE. status = PENDING / SENT / FAILED. 인덱스 (status, next_attempt_at). 발송 이력 조회(FR-16)도 이 테이블. dedupe_key 예: `MONTHLY:{userId}:2026-11` |
+| notification_outbox | id, user_id FK, type, dedupe_key UK, payload JSONB, status, attempt_count, next_attempt_at, sent_at, last_error | type = SUBSCRIBE_GUIDE / MONTHLY / PLAN_CHANGE. status = PENDING / SENT / FAILED. 인덱스 (status, next_attempt_at), user_id(탈퇴 삭제용). 발송 이력 조회(FR-16)도 이 테이블. dedupe_key 예: `MONTHLY:{userId}:2026-11` |
 | BATCH_* (Spring Batch) | 라이브러리 관리 | 수집 실행 이력. 생성 스크립트만 Flyway에 추가. 관리자 화면(FR-20)이 읽기 전용으로 조회 |
 | shedlock | 라이브러리 관리 | @Scheduled 작업 락. 생성 스크립트만 Flyway에 추가 |
 
@@ -392,4 +392,23 @@ erDiagram
 - **서비스 단위 집계 저장.** 원본(시청 단위 × 제공처) 대신 서비스 단위로 집계해 저장한다. 조회 성능을 위한 판단이다. 광고형 판정에 필요한 정보는 tier 플래그로 유지한다.
 - **요금제와 번들을 상품으로 통일.** 사용자 구독, 금액 수정, 플랜이 모두 `product_id` 하나만 참조한다. 단품과 번들을 구분하는 분기가 사라진다.
 - **계산 결과는 스냅샷.** 가격과 조건을 플랜에 복사해 저장하므로, 이후 가격이 바뀌어도 과거 결과는 변하지 않는다. 재계산은 새 플랜을 만들고 이전 플랜과 연결한다.
-- **삭제 정책.** 사용자가 탈퇴하면 C·D·E 영역의 사용자 행을 삭제한다(FK ON DELETE CASCADE 또는 서비스 로직). calc_run은 통계용으로 남기고 plan_id만 NULL로 바꾼다.
+- **삭제 정책.** FK `ON DELETE CASCADE`로 DB가 하위 행을 지운다(확정, TECH T-1). 사용자가 탈퇴하면 `users` 행 하나를 지워 C·D·E 영역의 사용자 행이 함께 삭제되고, DRAFT를 덮어쓸 때도 같은 규칙을 쓴다. calc_run은 통계용으로 남기고 plan_id만 NULL로 바꾼다. JPA 엔티티에는 cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`)를 걸지 않고 plan 삭제는 벌크 JPQL로 한다. FK 동작은 Flyway 스크립트가 기준이고(`ddl-auto=validate`는 FK의 ON DELETE까지 검사하지 않는다), Testcontainers 테스트로 고정한다.
+
+**FK 삭제 동작**
+
+| 자식 FK | 부모 | 동작 |
+|---|---|---|
+| plan_month.plan_id, plan_item.plan_id | plan | CASCADE |
+| plan_month_product.plan_month_id | plan_month | CASCADE |
+| plan_assignment.plan_item_id, plan_assignment.plan_month_id | plan_item, plan_month | CASCADE (두 경로 모두) |
+| calc_run.plan_id | plan | SET NULL (통계용으로 남김) |
+| plan.previous_plan_id | plan | SET NULL (자기참조 삭제 순서 문제 방지) |
+| user_setting, user_subscription, user_price_override, wishlist_item, plan, notification_outbox의 user_id | users | CASCADE (탈퇴) |
+| 마스터 데이터를 가리키는 FK(watch_unit, ott_service, subscription_product 등) | — | NO ACTION 유지 |
+
+**참조 컬럼 인덱스.** PostgreSQL은 FK를 거는 쪽(자식) 컬럼에 인덱스를 자동으로 만들지 않아, 삭제 때 자식 테이블 전체를 훑지 않도록 아래를 추가한다. 유니크 인덱스의 선두 컬럼으로 이미 덮이는 FK(plan_month·plan_item의 plan_id, plan_assignment의 plan_item_id, user_subscription·user_price_override·wishlist_item의 user_id)는 따로 만들지 않는다.
+- `plan_month_product(plan_month_id)`, `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`
+- `plan(user_id)`: 유니크 인덱스가 ACTIVE·DRAFT 행에만 걸려 ARCHIVED 행은 덮이지 않는다.
+- `notification_outbox(user_id)`
+
+**벌크 삭제 전제.** 벌크 JPQL은 1차 캐시를 갱신하지 않으므로 서비스는 `@Modifying(flushAutomatically = true, clearAutomatically = true)`로 삭제하고 트랜잭션의 첫 동작으로 둔다(TECH 6절). Redis의 Refresh Token과 캐시는 DB cascade 대상이 아니라 탈퇴 서비스가 별도로 지운다.

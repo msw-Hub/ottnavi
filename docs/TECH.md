@@ -2,10 +2,10 @@
 
 이 문서는 [PRD](./PRD.md), [ERD](./ERD.md), [backend.md](../.claude/rules/backend.md), [frontend.md](../.claude/rules/frontend.md), [api-contract.md](../.claude/rules/api-contract.md)에 **없는** 설계 결정과 검증 중 발견한 함정만 다룬다. 요구사항·스키마·코딩 규칙·스택 목록은 위 문서가 기준이고, 여기서는 반복하지 않는다.
 
-- 근거 우선순위: PRD 11절 확정 → PRD 본문 → ERD → rules → [기획서](./proposal_v6.md).
-- 출처 표기: `R`=PRD, `E`=ERD, `rules`, `P`=기획서, `c7`=context7 확인, `web`=공식 문서 확인, `도출`=문서 근거 없이 이 문서에서 정한 설계.
+- 근거 우선순위: PRD 11절 확정 → PRD 본문 → ERD → rules. [기획서](./proposal_v6.md)는 v7 요약본이라 근거로 쓰지 않는다.
+- 출처 표기: `R`=PRD, `E`=ERD, `rules`, `c7`=context7 확인, `web`=공식 문서 확인, `도출`=문서 근거 없이 이 문서에서 정한 설계.
 - PRD 11절의 결정 필요 항목은 `R11-번호`로, 이 문서가 올린 결정 필요 항목은 `T-번호`로 참조한다. T 항목은 7절이 단일 출처다.
-- 저장소 상태(2026-10-03): 빌드·설정·CI 파일 모두 미생성. 버전은 rules·PRD 부록 A를 따른다.
+- 저장소 상태(2026-10-03): 빌드·설정·CI 파일 모두 미생성. 스택은 rules를 따르고, 확인한 버전은 6절에 적는다.
 
 ---
 
@@ -13,7 +13,7 @@
 
 > 결정 현황: T-1~T-8 확정, T-9 결정 필요(7절).
 
-계산 규칙의 정의는 R FR-12와 P 5절이 기준이다. `ExactSolver`와 `GreedySolver`는 `PlanSolver` 하나를 구현하고(rules), 배정 규칙과 비교기는 공유한다. 두 구현의 차이는 "구독 조합을 고르는 방법"뿐이다.
+계산 규칙의 정의는 R 5.4(FR-12)가 기준이다. `ExactSolver`와 `GreedySolver`는 `PlanSolver` 하나를 구현하고(rules), 배정 규칙과 비교기는 공유한다. 두 구현의 차이는 "구독 조합을 고르는 방법"뿐이다.
 
 **목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 상품 ID 집합 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
 
@@ -24,7 +24,7 @@
 
 **정확해 → 그리디 전환.**
 - 정확해: 달마다 예산 이하 상품 부분집합을 만들고, 지배 조합(비용이 같거나 높은데 커버 집합이 부분집합인 것, FREE 서비스만 추가 커버하는 것)을 제거한 뒤 3개월을 중첩 순회한다. MVP(STANDARD 단품 7개)는 달마다 최대 128, 3개월 최대 약 210만 평가이고, 평가 1회는 O(n log n)이다. 2단계에서 상품 수 P가 늘면 2^P로 커진다.
-- 그리디: 0번째 달부터 앞선 달을 고정하고 목적함수 증가가 가장 큰 조합 하나를 고른다(P5).
+- 그리디: 0번째 달부터 앞선 달을 고정하고 목적함수 증가가 가장 큰 조합 하나를 고른다(R 5.4).
 - 전환: 정확해 기본, **후보 조합 수가 상한을 넘으면 그리디**로 대체한다(T-4 확정). 상한 값은 R11-30 측정 후 정한다. 선택된 알고리즘은 `plan.algorithm`에 남는다(E).
 - 이유 코드는 `NO_PROVIDER` → `UNKNOWN` → `BUDGET`(그 서비스가 어느 달에도 선택되지 않음, 도출) → `TIME`(선택된 달은 있으나 시간 부족, 도출) 순으로 첫 번째로 맞는 것을 쓴다.
 
@@ -82,9 +82,12 @@ stateDiagram-v2
 **GitHub Actions cron 제약(web).** cron은 UTC 기준, 최소 간격 5분, 매시 정각에는 지연될 수 있고, 공개 저장소는 60일 무활동 시 예약 워크플로가 꺼진다. 대응: 정각을 피한 분(예: `17 18 * * *` = KST 03:17, 도출), KST로 환산한 월초 cron, `workflow_dispatch` 수동 실행 병행.
 
 **무료 기간과 Hobby 전환 이후(도출).**
-- 무료 기간(B1 ~ MVP 배포 전): Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다(사용자 실사용 확인). 그래서 GitHub Actions cron은 끄고, 서버를 대시보드에서 켠 뒤 관리자 API로 수집을 수동 실행한다. Supabase가 1주 비활성으로 일시정지되면 대시보드에서 재개한다.
+- 무료 기간(B1 ~ MVP 배포 전): Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다(사용자 실사용 확인). 그래서 GitHub Actions cron은 끈다. `main` 병합은 배포 때만 하므로 MVP 배포 전 Cloudtype에는 수집 코드가 없고, 첫 전체 수집과 성능 실측은 로컬 환경에서 하며 운영 DB 적재는 MVP 배포 때 한다. Supabase가 1주 비활성으로 일시정지되면 대시보드에서 재개한다.
+- 수집 → 재계산 → 월초 알림 생성의 연결(도출): GitHub Actions는 수집 시작만 호출하고(202), 백엔드가 수집 Job 완료 시점(Spring Batch Job 리스너)에 재계산을 이어 붙이고 월초 알림 생성은 재계산 완료 뒤에 이어 붙인다. 워크플로가 비동기 수집의 완료 시점을 알 필요가 없다.
+- 로컬 프로필(`local`)에서만 수집 실행 API의 `targetDate`를 직접 지정할 수 있다(같은 날 재실행 409를 피해 재계산 흐름을 재현하는 용도). 운영 프로필에서는 허용하지 않는다.
 - Hobby 전환 이후: cron을 켠다. 매일 수집이 Supabase 1주 비활성 일시정지를 막는 효과는 이 시기부터만 있다.
 - Actions는 수집 → 재계산 → 월초 알림 **생성**만 트리거하고 발송은 앱 스케줄러가 한다(R11-5).
+- **cron은 Vercel을 거치지 않고 Cloudtype 주소로 직접 호출한다(도출).** 백엔드가 Vercel 경유 요청만 받도록 오리진 비밀 헤더를 검사하므로(T-8), 워크플로가 `x-origin-secret`(저장소 시크릿 `ORIGIN_SECRET`)과 `Authorization: Bearer`(`ADMIN_BATCH_TOKEN`)를 함께 보낸다. 그래서 Vercel의 응답 시간 제한이나 캐시와 무관하다.
 
 ---
 
@@ -140,6 +143,7 @@ sequenceDiagram
 | Boot 4의 `spring-boot-starter-batch`는 메모리(resourceless) 모드다. DB 이력은 `spring-boot-starter-batch-jdbc` 필요 | 위와 같음. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false` | web, c7 |
 | orval v8 기본 HTTP 클라이언트가 fetch라 axios mutator·인터셉터가 동작하지 않음 | `output.httpClient: 'axios'` 명시 | c7 |
 | Vercel external rewrite는 2026-04-06 이후 프로젝트에서 upstream `Cache-Control`을 따라 CDN 캐시 | 백엔드 `/api/**` 기본 `no-store` + `x-vercel-enable-rewrite-caching: 0`, 스모크로 응답 헤더 확인(T-8 확정) | web |
+| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes` + `rewrites` 동시 사용 시 적용 순서가 불명확 | `routes[].transforms`로 환경 변수 `ORIGIN_SECRET`을 요청 헤더에 주입. 순서는 얇은 배포 Task에서 실측(ROADMAP R-17) | web(부분) |
 | `vercel.json` rewrite 순서: SPA 대체를 먼저 두면 API가 `index.html`을 받음 | `/api/:path*` → SPA 대체 순서 | 도출 |
 | Jackson 2·3 혼재: Boot 4는 `tools.jackson.*`, jjwt-jackson은 Jackson 2(`com.fasterxml`) 의존 | jjwt-jackson은 런타임 스코프, 앱 직렬화는 Jackson 3만. 어노테이션은 `com.fasterxml.jackson.annotation` 유지 | web, c7 |
 | Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |
@@ -154,7 +158,7 @@ sequenceDiagram
 | Spring Cloud OpenFeign은 feature-complete | T-3 확정: 유지 | c7 |
 | Redis Cloud 무료 30MB·초당 100 ops | TMDB 버킷 로컬화, 요청 한도(R11-12) 산정 시 반영, `INFO commandstats`로 실측 | 2차 자료 |
 | Supabase 무료 500MB에 `BATCH_*` 누적. Transaction 풀러 6543은 prepared statement 미지원 | Session 5432 사용, 배치 이력 정리 기준은 2단계 O4 | web |
-| Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(기획서의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수동 실행(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
+| Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(초기 기획의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수집은 로컬에서 실측, 운영 적재는 MVP 배포 때(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
 | Loki4j 최신 라인의 Logback 요구 버전과 Boot 관리 Logback 미대조 | 3단계 도입 시 대조 | c7(부분) |
 | Gemini 무료 등급 입력은 제품 개선에 사용됨 | 개인정보를 프롬프트에 넣지 않음 | web |
 
@@ -171,17 +175,17 @@ T-1~T-8은 확정(2026-10-03), T-9는 결정 필요다. PRD 11절 항목은 PRD�
   - 리스크와 대응: **1차 캐시 불일치** → `@Modifying(flushAutomatically = true, clearAutomatically = true)`, 삭제를 트랜잭션 첫 동작으로. **보이지 않는 삭제** → 자식 `@ManyToOne`에 `@OnDelete(action = OnDeleteAction.CASCADE)` 표기(Hibernate가 자식 DELETE를 내지 않음, c7), Flyway 주석, Testcontainers 테스트("재계산 후 이전 DRAFT 하위 4개 테이블 0행", "탈퇴 후 `calc_run.plan_id` NULL")로 고정. `ddl-auto=validate`가 FK 동작을 검사한다는 근거는 없다. **참조 컬럼 인덱스** → PostgreSQL은 자동 생성하지 않으므로(c7) 유니크 선두가 아닌 `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴용 각 `user_id`에 인덱스 추가. **outbox 점유와 탈퇴 경합** → 5절 재확인. Redis(RT·캐시)는 탈퇴 서비스가 별도 삭제. `watch_unit` 6개월 삭제가 ARCHIVED 플랜 참조에 막히는 문제는 별개로 2단계 O4에서 정한다.
   - 대안 B(애플리케이션 벌크 삭제): FK는 NO ACTION, 자식부터 JPQL 벌크 삭제(`plan_assignment` → `plan_month_product` → `plan_item` → `plan_month` → `plan`, 서브쿼리 조건). 삭제가 코드에 드러나지만 DRAFT 교체 5문장·탈퇴 10문장 이상이고 자식 테이블이 늘 때마다 수정해야 한다(빠뜨리면 FK 위반으로 실패하므로 조용한 잔존은 없음).
   - 대안 C(JPA `CascadeType.REMOVE` + 양방향 `@OneToMany`): 기각 권장. 한 건씩 삭제되고 rules의 "단방향 기본"과 맞지 않는다.
-  - 깨지는 조건: PostgreSQL 외 DB로 이전, 행 단위 감사 로그·생명주기 콜백 필요. ERD 삭제 정책 문구 확정과 위 인덱스 추가는 아래 "ERD 반영 필요"에 남긴다.
+  - 깨지는 조건: PostgreSQL 외 DB로 이전, 행 단위 감사 로그·생명주기 콜백 필요. ERD 삭제 정책 문구 확정과 위 인덱스 추가는 ERD v0.3에 반영했다.
 - [x] **T-2. 수집 chunk 안 TMDB 호출과 "외부 호출은 트랜잭션 밖"(rules) 충돌.** — **확정(2026-10-03)**: 수집 배치에 한해 예외 인정, 작은 chunk, 짧은 Feign 타임아웃, 풀 사용량 지표. `spring.datasource.connection-fetch=lazy`(web)는 측정 후 검토. 대안(기각): Tasklet이 트랜잭션 밖에서 응답을 모아 임시 저장하고 chunk는 DB만 쓰기(구현량 증가).
 - [x] **T-3. OpenFeign.** — **확정(2026-10-03)**: 유지. feature-complete이며 새 프로젝트는 HTTP Service Clients를 고려하라는 안내가 있으나(c7), 스택 확정 사항이고 Boot 4.1 호환이 확인됐다. 깨지는 조건: 이후 Boot 버전에서 호환 단절.
-- [x] **T-4. 운영 경로 알고리즘.** — **확정(2026-10-03)**: 정확해 기본 + 후보 수 상한 초과 시 그리디(1절). 상한 값은 R11-30 측정 후 정한다.
-- [x] **T-5. CI 명세 대조 방식.** — **확정(2026-10-03)**: 새 도구 없이 테스트 코드에서 `/v3/api-docs.yaml`을 받아 `docs/api/openapi.yaml`과 YAML 파싱으로 경로·operationId·스키마·required·enum을 비교(`servers`, `info.version`, `example` 제외).
+- [x] **T-4. 운영 경로 알고리즘.** — **확정(2026-10-03)**: 정확해 기본 + 후보 수 상한 초과 시 그리디(1절). 상한 값은 R11-30 측정 후 정한다. 운영 계산은 선택된 알고리즘 하나만 돌리고 `plan.algorithm`에 남긴다. 두 알고리즘을 같은 `input_hash`로 비교하는 `calc_run` 기록은 FR-13 측정 경로(테스트 세트, 관리자 측정)에서만 만든다.
+- [x] **T-5. CI 명세 대조 방식.** — **확정(2026-10-03)**: 새 도구 없이 테스트 코드에서 `/v3/api-docs.yaml`을 받아 `docs/api/openapi.yaml`과 YAML 파싱으로 경로·operationId·스키마·required·enum을 비교(`servers`, `info.version`, `example` 제외). 아직 구현하지 않은 API는 `openapi.yaml`에 `x-planned: true`(이름은 제안)를 달아 두고 이 표시가 있는 operation은 대조에서 제외한다. 계약 초안을 별도 파일로 나누지 않으므로 orval 생성 원천은 `openapi.yaml` 하나다.
 - [x] **T-6. Cloudtype Hobby HTTP 타임아웃.** — **종결(2026-10-03)**: 영향 없음. `cloudtype.io/pricing`은 1분, `cloudtype.co.kr/pricing`은 5분으로 불일치하지만(web) 장시간 작업은 모두 202 비동기다. 동기 계산 API 시간은 R11-30 측정 때 확인한다.
 - [x] **T-7. JWT 수명.** — **확정(2026-10-03)**: Access Token 30분, Refresh Token 14일, Refresh Token은 재발급 때 회전한다. 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl` 설정 키로 둔다. `JWT_SECRET`은 256비트 이상(미달 시 `WeakKeyException`, c7).
-- [x] **T-8. Vercel 경유 강제와 캐시 헤더.** — **확정(2026-10-03)**: ①②를 모두 채택해 함께 적용한다. ① Vercel이 rewrite 시 오리진 비밀 헤더 `x-origin-secret`(값은 `ORIGIN_SECRET`)을 붙이고 백엔드가 상수 시간 비교로 검사(web) ② `/api/**` 기본 `Cache-Control: no-store` + Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`). 공개 조회 CDN 캐시는 필요해질 때 별도로 연다.
+- [x] **T-8. Vercel 경유 강제와 캐시 헤더.** — **확정(2026-10-03)**: ①②를 모두 채택해 함께 적용한다. ① Vercel이 `/api` 요청에 오리진 비밀 헤더 `x-origin-secret`(값은 `ORIGIN_SECRET`)을 붙이고 백엔드가 상수 시간 비교로 검사한다. 주입 방식은 `vercel.json`의 `routes[].transforms`(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`)이다(web: vercel.com/docs/project-configuration/vercel-json). `routes`는 `rewrites`와 함께 쓸 수 있지만 둘의 적용 순서는 문서로 확정되지 않아 얇은 배포 Task에서 실측한다(ROADMAP R-17). cron은 이 검사를 Cloudtype 직접 호출로 통과한다(3절) ② `/api/**` 기본 `Cache-Control: no-store` + Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`). 공개 조회 CDN 캐시는 필요해질 때 별도로 연다.
 - [ ] **T-9. 오래된 DRAFT 판정 기준 (2단계 개선).** 현재 기준(2절 저장 규칙 2번: `data_as_of`가 마지막 수집 완료 시각보다 이르면 409)은 수집이 매일 돌아 대부분의 DRAFT가 다음 날 막힌다. MVP는 프론트가 409를 받으면 자동 재계산한다(2절). 개선 후보: DRAFT에 포함된 시청 단위의 `availability_change` 또는 사용한 상품의 가격 변경이 `data_as_of` 이후에 있을 때만 차단. 판단 필요: 판정 쿼리 비용, 변경 이력 보존 범위(`availability_change`가 판정 기간 동안 남아 있는지), 놓친 변경이 결과를 틀리게 만드는 경우의 허용 여부.
 
-### ERD 반영 필요 (T-1 확정에 따름, ERD는 이번에 고치지 않음)
+### ERD 반영 (T-1 확정에 따름, ERD v0.3에 반영 완료)
 
-- [ ] 삭제 정책 문구 확정: "FK `ON DELETE CASCADE` 또는 서비스 로직" → FK `ON DELETE CASCADE`. 적용 범위는 T-1의 목록을 따른다(`calc_run.plan_id`·`plan.previous_plan_id`는 SET NULL, 마스터 FK는 NO ACTION).
-- [ ] 참조 컬럼 인덱스 추가: `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴 대상 테이블(`user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `notification_outbox`) 중 유니크 선두가 아닌 `user_id`.
+- [x] 삭제 정책 문구 확정: "FK `ON DELETE CASCADE` 또는 서비스 로직" → FK `ON DELETE CASCADE`. 적용 범위는 T-1의 목록을 따른다(`calc_run.plan_id`·`plan.previous_plan_id`는 SET NULL, 마스터 FK는 NO ACTION).
+- [x] 참조 컬럼 인덱스 추가: `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴 대상 테이블(`user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `notification_outbox`) 중 유니크 선두가 아닌 `user_id`.
