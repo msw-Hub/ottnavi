@@ -14,7 +14,7 @@ Task별 별도 파일은 만들지 않는다. 소스 코드와 설정 파일은 
 로드맵의 Task에는 실제 파일·모듈·명령어가 들어가므로, 작성 전에 스택을 **도구로 직접** 확인한다.
 
 1. `Glob`으로 `backend/**/build.gradle*`, `frontend/package.json`, `infra/docker-compose*.yml`, `.env.example`, `vercel.json` 등을 찾아 `Read`한다. 없으면 "미생성"으로 간주하고 해당 생성 작업을 Phase 1 Task에 넣는다.
-2. PRD의 기술 스택 요약과 `.claude/rules/*.md`(backend, frontend, api-contract)를 대조한다. 불일치는 임의로 고르지 말고 "리스크 및 확인 필요"에 올린다.
+2. `docs/TECH.md`(설계 결정과 호환성 함정)와 `.claude/rules/*.md`(backend, frontend, api-contract)를 대조한다. 불일치는 임의로 고르지 말고 "리스크 및 확인 필요"에 올린다.
 3. Task에 라이브러리 설정·API를 구체적으로 적어야 하면 context7(`resolve-library-id` → `query-docs`)로 현재 문서를 확인한다. 확인하지 못한 것을 확인됐다고 쓰지 않는다.
 
 ## 1. 분석 방법론 (4단계)
@@ -41,6 +41,8 @@ Phase 자체와 순서는 고정이다. 추가하거나 생략하지 않는다. 
 - **중복 최소화**: 공통 컴포넌트·타입은 Phase 2에서 한 번만 정의해 3~4단계에서 재사용한다.
 - **빠른 피드백**: Phase 1~2만으로도 앱의 전체 플로우를 목업으로 눈으로 확인할 수 있어야 한다.
 - **위험한 작업은 일찍**: PRD가 일찍 착수하라고 한 항목(계산 엔진, 얇은 배포 경로 등)은 PRD의 순서를 존중해 앞쪽 Task에 둔다.
+- **UI 선행**: PRD 9절 "UI 선행 순서"를 따른다. MVP는 목업 승인 이후에 사용자·플랜·알림 영역 DB 마이그레이션을 두고, 2단계 이후 기능은 화면 목업 → 계약 → 백엔드 → 연결 순서로 Task를 배치한다.
+- **개발 환경 4종**: 로컬(도커는 PostgreSQL·Redis만, 백엔드·프론트는 호스트 실행), 테스트(Testcontainers), 얇은 배포(배포 경로 검증용, 개발 환경이 아님), 운영을 구분해 Task의 검증 절차에 어느 환경인지 적는다.
 
 ## 3. 프로세스
 
