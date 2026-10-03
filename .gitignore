@@ -1,0 +1,20 @@
+# Claude Code 로컬 설정 (개인 경로 포함)
+.claude/settings.local.json
+
+# 환경 변수·비밀 값 (이름만 담은 .env.example은 올린다)
+.env
+.env.*
+!.env.example
+
+# 빌드·의존성
+node_modules/
+build/
+.gradle/
+dist/
+
+# IDE·OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
