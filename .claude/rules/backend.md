@@ -22,7 +22,7 @@ paths:
 - public 메서드 위에는 `/** 한 줄 요약 */` 형태의 Javadoc을 한국어로 붙인다. 매개변수 설명이 필요하면 `@param`으로 추가한다.
 - 필드 옆에 도메인 의미가 명확하지 않은 경우 한국어로 짧게 부연한다 (예: `private Integer billingDay; // 결제일, 기본 1일`).
 - 관련 있는 핸들러/메서드 여러 개를 묶을 때는 구분용 한 줄 주석으로 섹션을 나눈다 (예: `// TMDB 연동 예외`).
-- 계산 엔진의 규칙(목적함수 우선순위, 배정 규칙, 기본 러닝타임 등)을 구현한 곳에는 기획서의 어느 규칙인지 주석으로 남긴다.
+- 계산 엔진의 규칙(목적함수 우선순위, 배정 규칙, 기본 러닝타임 등)을 구현한 곳에는 PRD 5.4의 어느 규칙인지 주석으로 남긴다.
 - 그 외 공용 주석 원칙(왜 설명, 죽은 코드 처리, 강조 키워드 등)은 User instructions를 따른다.
 
 ## 코딩 스타일
@@ -32,7 +32,7 @@ paths:
 - Swagger 문서화가 필요하면 `@Tag`를 붙이고, 문서 어노테이션이 많아지면 별도 인터페이스(`XxxControllerInterface`)로
   분리해서 `@Override`로 구현한다 — 컨트롤러 본체는 로직에만 집중시키기 위함.
 - 예외는 컨트롤러에서 직접 잡지 않고 `GlobalExceptionHandler`로 위임, 성공 응답만 `CommonResponse.success(data)`로 감싼다.
-- 공개 API는 `/api/public/**`, 로그인 필요 API는 `/api/**`, 관리자 API는 `/api/admin/**`로 경로를 나눈다. 보안 설정과 요청 제한이 이 경로 규칙에 의존한다.
+- 공개 API는 `/api/public/**`, 로그인 필요 API는 `/api/**`, 관리자 API는 `/api/admin/**`로 경로를 나눈다. 보안 설정과 요청 제한이 이 경로 규칙에 의존한다. 단 인증 경로(`/api/auth/**`, `/api/oauth2/**`, `/api/login/**`)는 이 3분류의 예외다. 로그인 시작·콜백·재발급·로그아웃은 보안 설정에서 따로 허용하고, 요청 제한도 공개 API와 같은 버킷을 적용한다.
 - 안 쓰는 엔드포인트는 주석으로 남기지 않고 삭제한다. 기록은 git 이력에 남고, 주석 처리된 엔드포인트는 OpenAPI 계약과 실제 코드의 차이를 만든다.
 
 **API 계약 (OpenAPI)**
@@ -133,11 +133,11 @@ paths:
 
 - **언어/프레임워크**: Java 17, Spring Boot 4.1, Gradle
 - **DB/ORM**: PostgreSQL(Supabase), Spring Data JPA, Flyway, QueryDSL(필요할 때만, `io.github.openfeign.querydsl`)
-- **인증**: Spring Security, OAuth2 Client(Google), JWT(jjwt). Refresh Token은 Redis에 저장
+- **인증**: Spring Security, OAuth2 Client(Google), JWT(jjwt). Refresh Token 저장은 Redis(TTL)를 잠정 기준으로 하며, 확정은 PRD 11절 21번 결정을 따른다
 - **캐시/요청 제한**: Redis(Lettuce), Spring Cache, Bucket4j
 - **외부 연동**: Spring Cloud OpenFeign(2025.1.2 이상, 클라이언트별 timeout 개별 설정)
 - **배치/락**: Spring Batch 6(JDBC JobRepository), ShedLock(JDBC)
-- **메일**: Spring Mail + Gmail SMTP, Thymeleaf 템플릿 (2단계)
+- **메일**: Spring Mail + Gmail SMTP를 잠정 기준으로 하고(Cloudtype 발신 가능 여부는 PRD 11절 11번 결정 전), 발송은 SMTP·HTTPS 메일 API 구현체를 교체할 수 있게 인터페이스로 분리한다. Thymeleaf 템플릿 (2단계)
 - **LLM**: Spring AI 2.0 + Gemini 무료 등급, 관리자 기능 전용 (3단계)
 - **모니터링**: Spring Actuator, Micrometer(OTLP) + Loki4j → Grafana Cloud
 - **API 문서**: springdoc-openapi

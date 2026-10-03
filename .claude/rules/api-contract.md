@@ -14,6 +14,7 @@ paths:
 2. **프론트 코드를 다시 생성한다.** `frontend`에서 `npm run api:generate`를 실행해 타입·훅·목업을 갱신하고, 타입 오류가 나는 화면을 고친다.
 3. **백엔드를 구현한다.** 컨트롤러와 DTO를 계약에 맞춘다.
 4. **CI에서 확인한다.** springdoc이 생성한 명세와 `openapi.yaml`이 다르면 CI가 실패한다. 어느 쪽이 맞는지 판단해 한쪽을 고친다.
+5. **아직 구현하지 않은 API에는 `x-planned: true`를 단다.** UI 선행 개발에서는 목업을 위해 백엔드보다 먼저 계약에 API를 넣는다. 이 operation은 CI 대조에서 제외되고(`x-planned` 이름은 제안), orval은 계속 `openapi.yaml` 하나로 생성한다. 백엔드 구현이 끝나는 PR에서 이 표시를 지운다. 표시를 지우지 않으면 구현과의 대조가 빠지므로 PR 체크리스트에 넣는다.
 
 - 계약 변경과 그에 따른 코드 변경은 같은 커밋(또는 같은 PR)에 담는다.
 - **호환을 깨는 변경**(필드 삭제·이름 변경, 타입 변경, 필수값 추가, 경로 변경)은 커밋 메시지와 PR 설명에 명시하고, 영향받는 화면과 API를 함께 적는다.
@@ -24,6 +25,7 @@ paths:
 - 공개 API: `/api/public/**` — 로그인 없이 호출, 요청 제한 적용
 - 회원 API: `/api/**` — Access Token 필요
 - 관리자 API: `/api/admin/**` — ADMIN 역할 필요
+- 인증 API: `/api/auth/**`, `/api/oauth2/**`, `/api/login/**` — 위 3분류의 예외. 보안 설정에서 따로 허용한다
 - 경로는 소문자 kebab-case 복수형 명사를 쓴다 (`/api/wishlist-items`, `/api/admin/products`).
 - 동작이 CRUD로 표현되지 않으면 하위 경로에 동사를 둔다 (`POST /api/plans/calculate`, `POST /api/admin/collect/run`).
 - 작품은 외부에 TMDB 기준으로 노출한다: `/api/public/titles/{mediaType}/{tmdbId}`. 내부 `id`는 경로에 쓰지 않는다.
@@ -34,7 +36,7 @@ paths:
 - 모든 operation에 `operationId`를 붙인다. orval이 이 값으로 함수와 훅 이름을 만든다 (`searchTitles` → `useSearchTitles`).
 - 형식은 camelCase `동사 + 대상`이다: `searchTitles`, `getTitleDetail`, `getMySettings`, `updateMySettings`, `calculatePlan`, `getCurrentPlan`.
 - 한 번 정한 `operationId`는 함부로 바꾸지 않는다. 바꾸면 프론트의 훅 이름이 모두 바뀐다.
-- `tags`는 도메인 단위로 붙인다: `catalog`, `user`, `wishlist`, `product`, `plan`, `admin`. orval이 태그별로 파일을 나눈다.
+- `tags`는 도메인 단위로 붙인다: `catalog`, `user`, `wishlist`, `product`, `plan`, `auth`(`/api/auth/**` 로그인·재발급·로그아웃), `notification`(2단계), `admin`. orval이 태그별로 파일을 나눈다.
 
 ## 데이터 형식
 

@@ -33,6 +33,8 @@
 2. **Merge commit**으로 병합한다(이력 보존). 병합 직후 운영 배포가 자동으로 실행된다.
 3. 배포 후 스모크 테스트(로그인, 검색, 계산·저장)를 확인하고 `main`에 태그를 단다.
 
+- **1주차 얇은 배포(B1)도 같은 흐름이다.** 얇은 배포 Task를 `feature/*` → `develop` PR로 합친 뒤 `develop` → `main` PR(merge commit)을 열어 병합하면 그것이 첫 배포다. `backend-deploy.yml`은 `main` push에서 실행되고, 이 병합 때 Vercel Production도 함께 배포된다. 이 용도로 `main` 직접 커밋이나 `develop` 수동 배포 예외를 두지 않는다. 이때는 위 1번의 "해당 단계 완료 기준"을 "얇은 배포 Task의 완료 기준"으로 읽는다.
+
 **긴급 수정 (hotfix)**
 1. `main`에서 `hotfix/*`를 만든다.
 2. 수정 후 `main` 대상 PR을 열어 병합한다(Merge commit). 운영 배포가 실행된다.
