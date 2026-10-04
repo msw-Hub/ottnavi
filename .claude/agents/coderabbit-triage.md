@@ -41,8 +41,8 @@ N=<PR 번호>
 "$GH" pr view $N --json state,baseRefName,headRefName,headRefOid,mergeStateStatus --jq '"state=\(.state) base=\(.baseRefName) head=\(.headRefName) oid=\(.headRefOid[0:7]) merge=\(.mergeStateStatus)"'
 "$GH" pr checks $N
 
-# (2) 인라인 지적. 코멘트 하나에 지적이 여러 개 들어 있을 수 있으므로 "줄 전체가 굵은 글씨"인 제목마다 한 건으로 센다
-"$GH" api repos/$R/pulls/$N/comments --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | . as $c | (.body|split("\n")) as $L | (($c.body | capture("Addressed in commit (?<h>[0-9a-f]+)")? | .h) // "-") as $addr | ($L | to_entries | map(select(.value|test("^[*][*].+[*][*]$"))) | map(.key)) as $idx | $idx[] as $i | ($L[$i:] | (map(test("^(<details|```)"))|index(true)) as $j | .[0:($j // length)] | map(select(length>0)) | join(" ")) as $t | "[\($c.path):\($c.original_line // $c.line)] 코드래빗표시=\($addr) | \($L[0] | gsub("[_|]";"") | .[0:48]) | \($t[0:260])"'
+# (2) 인라인 지적. 코멘트 하나에 지적이 여러 개일 수 있어 "줄 전체가 굵은 글씨"인 제목마다 한 건으로 센다. 심각도 배지는 그 지적 바로 앞의 배지 줄, 본문은 다음 제목·배지 줄·코드 블록·<details 직전까지만 쓴다
+"$GH" api repos/$R/pulls/$N/comments --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | . as $c | (.body|split("\n")) as $L | (($c.body | capture("Addressed in commit (?<h>[0-9a-f]+)")? | .h) // "-") as $addr | ($L | to_entries | map(select(.value|test("^[*][*].+[*][*]$"))) | map(.key)) as $idx | $idx[] as $i | ([$L[0:$i][] | select(test("^_.+_ [|] _.+_ [|] _.+_$"))] | last // $L[0]) as $badge | ($L[$i+1:] | (map(test("^(<details|```|[*][*].+[*][*]$|_.+_ [|] _.+_ [|] _.+_$)")) | index(true)) as $j | .[0:($j // length)] | map(select(length>0))) as $rest | ([$L[$i]] + $rest | join(" ")) as $t | "[\($c.path):\($c.original_line // $c.line)] 코드래빗표시=\($addr) | \($badge | gsub("[_|]";"") | .[0:48]) | \($t[0:260])"'
 
 # (3) 리뷰 본문에만 있는 지적(Nitpick, 범위 밖). 첫 섹션만 자르고 Prompt 블록은 버린다
 "$GH" api repos/$R/pulls/$N/reviews --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | .body' | awk '
@@ -89,4 +89,5 @@ PR #N · state=… · base←head · 체크: …
 - 사용자 판단이 필요한 것: …
 ```
 - 표 밖에 원문을 붙이지 않는다. 지적이 없으면 "미해결 지적 없음"과 근거(체크 상태, 마지막 리뷰 문장)만 쓴다.
+- 표의 `위치`는 항상 **저장소 기준 상대 경로**(`.claude/rules/git.md:68`처럼)로 쓴다. `/c/Users/...` 같은 절대 경로를 쓰지 않는다.
 - 판단이 갈리는 지적은 `판단 보류`로 두고, 메인이 결정할 수 있게 선택지를 1줄로 적는다.
