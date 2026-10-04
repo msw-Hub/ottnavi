@@ -11,7 +11,7 @@
 | 참고만 | `docs/proposal_v6.md`(v7 요약본, 세부 근거로 쓰지 않음) |
 
 **저장소 상태 (2026-10-04 확인).**
-- 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. 보호 규칙은 아직 걸지 않았다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010 병합 뒤에 지정).
+- 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. `main`·`develop`에는 보호 규칙(ruleset `protect-main-develop`)이 걸려 있어 직접 푸시할 수 없고 PR로만 합친다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`).
 - 생성됨: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
 - 미생성: `backend/src/main/resources/application-{local,prod}.yml`(Task 016).
 - PR은 `gh` CLI로 만들고, 병합 방식은 Squash다. PR마다 CodeRabbit이 자동 리뷰한다(`develop` 대상, 한국어, 생성 파일 제외). 자동 수정(Autofix·Autopilot)은 쓰지 않는다.
@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 9/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 12/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 9/105 | |
+| 합계 | | 12/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -140,7 +140,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 ### 4.2 공통 규칙
 
 **브랜치(git.md).**
-- 초기 세팅 중 Task 006·007·011·017(일부)과 문서는 `main`에 직접 커밋했고(2026-10-04), 그 뒤 `develop`을 만들어 푸시했다. 남은 Task 009·010은 2026-10-04 사용자 결정으로 `main` 직접 커밋 예외를 쓰지 않고 `feature/*` 브랜치와 `develop` 대상 PR로 진행한다. Task 008도 같은 방식(PR #1)으로 진행했다.
+- 초기 세팅 중 Task 006·007·011·017(일부)과 문서는 `main`에 직접 커밋했고(2026-10-04), 그 뒤 `develop`을 만들어 푸시했다. 이후 Task 008(PR #1)·009(PR #4)·010(PR #6)은 2026-10-04 사용자 결정으로 `main` 직접 커밋 예외를 쓰지 않고 `feature/*` 브랜치와 `develop` 대상 PR로 진행했다.
 - 이후 모든 개발 Task는 `develop`에서 `feature/{작업ID}-{설명}`을 만들어 `develop` 대상 PR로 합친다(squash). 그래서 모든 feature Task는 Task 012를 전제로 한다(체인의 첫 Task에만 선행으로 표기).
 - `develop` → `main`은 배포 Task에서만 merge commit으로 합친다: 첫 배포(021), MVP(095), 2단계(102), 3단계(105). `main` 직접 커밋이나 `develop` 수동 배포 예외는 두지 않는다.
 - cron 워크플로는 기본 브랜치(`main`) 기준으로 실행된다. 그래서 워크플로를 만드는 Task는 PR·로컬 수준으로 검증하고, 실제 실행 확인은 `main`에 병합하는 배포 Task의 완료 기준에 둔다.
@@ -205,7 +205,27 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 9/23
+### 4.6 백엔드 메모리 예산과 측정 지점 (Task 003 조사 반영)
+
+운영비 기조는 "저예산(절약할수록 좋음)"이고 Cloudtype 구독 메모리는 512MB당 월 6,600원이다. 필요한 메모리는 추측하지 않고 **측정으로 정한다**. 아래 수치는 일반적인 추정이며 실측값이 아니다.
+
+- **전제**: 무료 메모리(프리티어 1GB, 매일 꺼짐)와 구독 메모리는 따로 쓰고 한 서비스에 합쳐지지 않는다. 운영 서비스의 메모리 상한은 **구독한 양**뿐이다. Task 022 시험 서비스처럼 임시로 쓰는 서비스는 무료 리소스에 둔다.
+- **추정**: Spring Boot 4(JPA·Security·Redis·Batch·Feign 등 의존성 전체)는 힙 150~300MB, 메타스페이스 100~150MB, 스레드·코드 캐시·네이티브 50~100MB로 컨테이너 전체가 약 400~600MB다. 서비스 목록 API만 있는 첫 배포는 부하가 작지만 기동 메모리는 의존성에 좌우된다.
+- **JVM 옵션 원칙**(Task 016의 `prod` 프로필과 실행 옵션에서 정한다): 힙은 컨테이너 한도의 약 50~60%로 제한하고 메타스페이스·스레드 스택·GC를 줄인다. 운영에서 불필요한 기능(springdoc UI 등)은 `prod`에서 끈다. Tomcat 스레드 수와 연결 풀(약 5)을 제한한다.
+- **설계 원칙**: 수집·재계산은 chunk 단위로 처리하고 전체를 메모리에 올리지 않는다(Spring Batch). 계산 엔진은 후보 조합 수 상한(R11-30)으로 메모리·시간 상한을 함께 정한다. 대량 조회는 페이징·프로젝션을 쓴다. 새 의존성은 필요한지 한 번 더 본다.
+
+| 측정 지점 | Task | 확인할 것 |
+|---|---|---|
+| 첫 배포 | 021 | 기동 직후와 API 호출 후 사용량(무료 1GB 기준 기본 사용량) |
+| 엔진 완성 | 040 | 최악 입력·후보 상한 근처의 힙 사용량 |
+| 첫 전체 수집 | 048 | 수집 사이클의 최대 사용량, DB 용량(Supabase 500MB 한도 대비) |
+| MVP 배포 직전 | 092 | 운영 구성으로 다시 측정해 구독 메모리 단위 확정 |
+| 성능 측정 | 100 | `mem_limit: 512m` 컨테이너에서 계산·수집·조회 부하로 OOM 여부 최종 판정 |
+
+- 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
+- 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
+
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 12/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -222,26 +242,36 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 세 문서가 `main`에 커밋돼 있음을 확인했다(2026-10-03, `git log`).
   - ERD 보정은 F1 이후 Task 032에서 한다.
 
-#### Task 002: 외부 서비스 계정 생성과 API 키 발급으로 연동 준비 ⬜
+#### Task 002: 외부 서비스 계정 생성과 API 키 발급으로 연동 준비 ✅
 - 태그: [H] · PRD: H2 · 선행: 없음
 - 구현 사항
-  - [ ] TMDB API 키(비영리 용도)
-  - [ ] Google Cloud OAuth 클라이언트. 로컬 리다이렉트 URI는 `http://localhost:5173/api/login/oauth2/code/google`처럼 TECH 4절 경로 규칙에 맞추고(포트는 Vite 설정 확인 후), 운영 URI는 Task 092에서 추가
-  - [ ] Supabase 프로젝트(Session Pooler 5432), Redis Cloud 무료 DB, Cloudtype(무료), Vercel, GitHub 저장소 권한
-  - [ ] SMTP 시험용 메일 발신 계정(Gmail 앱 비밀번호). HTTPS 메일 API 키는 Task 022에서 SMTP 시험이 실패할 때만 발급한다(순환 의존 방지)
-  - [ ] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
+  - [x] TMDB API 키(비영리 용도)
+  - [x] Google Cloud OAuth 클라이언트. 로컬 리다이렉트 URI는 `http://localhost:5173/api/login/oauth2/code/google`처럼 TECH 4절 경로 규칙에 맞추고(포트는 Vite 설정 확인 후), 운영 URI는 Task 092에서 추가
+  - [x] Supabase 프로젝트(Session Pooler 5432), Redis Cloud 무료 DB, Cloudtype(무료), Vercel, GitHub 저장소 권한
+  - [x] SMTP 시험용 메일 발신 계정(Gmail 앱 비밀번호). HTTPS 메일 API 키는 Task 022에서 SMTP 시험이 실패할 때만 발급한다(순환 의존 방지)
+  - [x] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
 - 완료 기준
   - V-H: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록했고, 저장소·채팅에 키가 없음을 확인했다.
+- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/PHASE1_HUMAN_TASKS.md`의 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
 
-#### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ⬜
+#### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ✅
 - 태그: [H] · PRD: H2, R11-27 · 선행: 없음
 - 구현 사항
-  - [ ] TMDB 약관: 비영리, 승인 로고·고지문, 6개월 보관, JustWatch 출처 표기 조건
-  - [ ] 7개 서비스 해지 예약 정책(R11-27, 안내 문구에만 영향)
-  - [ ] Cloudtype 무료·Hobby 조건, Supabase(500MB, 7일 비활성 일시정지)·Redis Cloud(30MB, 초당 100 ops) 한도
-  - [ ] Cloudtype 무료 플랜에서 운영 서비스 외에 서비스를 하나 더 만들 수 있는지(개수 제한). Task 022 SMTP 시험용 일회성 서비스의 전제다(R-15)
+  - [x] TMDB 약관: 비영리, 승인 로고·고지문, 6개월 보관, JustWatch 출처 표기 조건
+  - [x] 7개 서비스 해지 예약 정책(R11-27, 안내 문구에만 영향)
+  - [x] Cloudtype 무료·Hobby 조건, Supabase(500MB, 7일 비활성 일시정지)·Redis Cloud(30MB, 초당 100 ops) 한도
+  - [x] Cloudtype 무료 플랜에서 운영 서비스 외에 서비스를 하나 더 만들 수 있는지(개수 제한). Task 022 SMTP 시험용 일회성 서비스의 전제다(R-15)
 - 완료 기준
   - V-H: 항목별 출처 URL·날짜·결론을 기록했고, R11-27 결과를 10.2에 반영할지 사용자가 판단했다. 서비스 추가가 불가능하면 Task 022 진행 방식을 사용자에게 올렸다.
+- 기록: 2026-10-05 완료. 항목별 출처 URL·확인일·원문 인용은 **`docs/TASK003_POLICY_PRICING.md`** 에 정리했다(확인됨 / 사용자 제공 / 2차 자료 / 모름으로 확인 수준을 표시). 결론 요약:
+  - **TMDB 약관**(`themoviedb.org/api-terms-of-use`, 최종 수정 2023-10-20): 무료 API는 비상업 용도이고 상업 이용은 별도 서면 계약이 필요하다(**수익화 금지**). 고지 문구와 로고를 About에 넣고, TMDB 정보는 6개월을 넘겨 캐시하지 않는다(PRD FR-18과 일치). JustWatch 출처 표기는 약관이 아니라 Watch Providers API 문서(`developer.themoviedb.org/reference/movie-watch-providers`)에 있다.
+  - **7개 서비스 해지 예약 정책(R11-27 확정)**: 모든 서비스가 직접 결제 시 결제 주기·잔여 기간 종료까지 이용할 수 있는 예약 해지다. 앱스토어·통신사·제휴사 결제는 결제처의 정책이 적용된다. 확인 근거는 넷플릭스(해지 안내), 디즈니+(이용 약관 2절 c항), Apple TV+(약관 I절, 이용 종료일은 구독 관리 화면의 만료일), 티빙(유료이용약관 제8·12~15조, 2026-08-03 시행), 웨이브(결제 약관 제8조 제3항), 왓챠(이용약관 제15조 제2항), 쿠팡(와우 FAQ, 이용 약관 제9·10조, 패스 FAQ)이다. **모르는 부분**은 쿠팡 와우 해지와 패스의 관계(FAQ끼리 불일치)와 와우 없이 패스를 단독 구독할 수 있는지이고, 단정하지 않고 계정 화면에서 확인하도록 안내한다. 화면 안내 문구 초안은 정리 문서에 있다.
+  - **Cloudtype**(`cloudtype.io/ko/pricing`, 사용자 제공 스크린샷): 프리티어 무료(카드 등록 필요), 하비 월 6,600원부터, 프로 월 22,000원부터. 리소스 요금은 메모리 512MB 6,600원, CPU 1 vCPU 6,600원, 디스크 10GB 6,600원, 추가 트래픽 100GB 13,200원(월, VAT 포함). HTTP 타임아웃 프리티어 1분·하비 5분. 동시실행은 서비스 수(프리티어 4개, 하비 5개, 512MB당 +1). **무료 메모리와 구독 메모리는 따로 쓰고 서비스를 배포할 때 리소스를 고른다.** 커스텀 이미지 배포는 프로 전용이다. 운영비 기조는 "저예산(절약할수록 좋음)"이다.
+  - **서비스 추가 가능 여부(R-15)**: 가능하다. 프리티어 동시실행 4개라 운영 서비스 외에 Task 022의 일회성 SMTP 시험 서비스를 무료 리소스로 만들 수 있다.
+  - **Supabase 무료**(공식 문서): DB 500MB(초과 시 읽기 전용), 7일 비활성이면 일시정지(정지 후 1년까지 복구, 경고 이메일 약 1주 전). Egress에 외부 서버가 받는 DB 결과가 포함되는지는 문서에 없어 **모름**이다(대시보드 사용량으로 확인).
+  - **Redis Cloud 무료**(공식 문서·지원 문서 원문): 30MB, 계정당 1개, 동시 연결 30개, 월 5GB, 100 ops/sec, CIDR 규칙 1개. **14일 연속 Redis 명령이 없으면 DB와 데이터가 영구 삭제되고 복구되지 않는다**(콘솔 접속은 활동이 아님, 경고 이메일은 보장되지 않음). 이 정책은 "평가 서비스 이용약관"에 정의돼 있고 지원 문서는 무료 DB를 운영 워크로드에 권장하지 않는다.
+  - **R11-27**은 PRD 11절 27번을 확정으로 바꾸고 10.2 표에서 뺐다.
+  - 후속 반영: TECH T-6(하비 5분), Task 020(R-12, Redis 생존 확인), Task 022(무료 리소스), 4.6(메모리 예산과 측정 지점), Task 021·040·048·100(측정 항목).
 
 #### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ⬜
 - 태그: [H] · PRD: H2, FR-18, FR-19 · 선행: 002
@@ -255,7 +285,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 005: 도메인 ottnavi.shop 갱신 가격 확인 후 구매로 운영 주소 확보 ⬜
 - 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: 2026-10-29(B8 착수 전)
 - 구현 사항
-  - [ ] 등록업체별 첫해·**갱신 가격** 비교, 월 운영비 1만원 이내(Hobby 6,600원 포함) 확인
+  - [ ] 등록업체별 첫해·**갱신 가격** 비교, 도메인 월 환산 비용을 Cloudtype 구독료(512MB당 월 6,600원)와 합쳐 저예산 범위인지 확인(고정 상한은 두지 않는다)
   - [ ] 구매. DNS 연결은 Task 092
 - 완료 기준
   - V-H: 업체·첫해·갱신 가격·구매일을 기록했다.
@@ -311,7 +341,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] (제안) `main` 대상 PR에서만 `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 있으면 실패하는 한 단계를 `frontend-ci`에 넣는다. `develop` PR은 통과해야 하므로 `github.base_ref == 'main'`일 때만 실행한다(Task 021의 사람 확인을 자동으로도 막는 이중 안전장치). 넣을지는 Task 010 계획에서 사용자가 정한다
 - 완료 기준
   - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 이 Task의 PR(`develop` 대상)에서 확인하고, 그 실행 링크를 Task 012 `기록:`에 남긴다(첫 푸시는 이미 끝났다).
-- 기록: 2026-10-04 완료(브랜치 `feature/b0-ci-skeleton`). `backend-ci`(JDK 17 temurin, `gradle/actions/setup-gradle`, `./gradlew build`)와 `frontend-ci`(Node 24, `npm ci`·`lint`·`format:check`·`test`·`build`)를 만들었다. Node 22(npm 10)는 `npm ci`가 `Missing: msw@2.15.0`으로 실패해(vitest 선택적 peer `msw ^2`와 설치된 msw 3 불일치, npm 11은 통과) 로컬과 같은 Node 24로 맞췄다. 트리거는 `develop`·`main` 대상 PR과 두 브랜치 push이고 경로 필터·단어 트리거는 쓰지 않았다(필수 검사 미보고 방지). 같은 ref의 중복 실행은 `concurrency`로 취소한다. `main` 대상 PR에서만 `vercel.json`의 `REPLACE_BACKEND_HOST` 잔존 시 실패하는 단계를 넣었다(사용자 결정). `backend/gradlew`가 git에 실행 권한 없이(100644) 올라가 있어 러너에서 `chmod +x gradlew` 단계를 둔다. 로컬에서 `gradlew build`, 프론트 `npm ci`·`lint`·`format:check`·`test`·`build`(각 종료 코드 0)와 YAML 문법을 확인했다. **GitHub Actions 실행 성공 확인은 이 Task의 PR에서 하고 링크를 Task 012 `기록:`에 남긴다.** CD(`backend-deploy.yml`)는 `main` push + `workflow_dispatch`로 Task 020·021에서 만든다.
+- 기록: 2026-10-04 완료(브랜치 `feature/b0-ci-skeleton`). `backend-ci`(JDK 17 temurin, `gradle/actions/setup-gradle`, `./gradlew build`)와 `frontend-ci`(Node 24, `npm ci`·`lint`·`format:check`·`test`·`build`)를 만들었다. Node 22(npm 10)는 `npm ci`가 `Missing: msw@2.15.0`으로 실패해(vitest 선택적 peer `msw ^2`와 설치된 msw 3 불일치, npm 11은 통과) 로컬과 같은 Node 24로 맞췄다. 트리거는 `develop`·`main` 대상 PR과 두 브랜치 push이고 경로 필터·단어 트리거는 쓰지 않았다(필수 검사 미보고 방지). 같은 ref의 중복 실행은 `concurrency`로 취소한다. `main` 대상 PR에서만 `vercel.json`의 `REPLACE_BACKEND_HOST` 잔존 시 실패하는 단계를 넣었다(사용자 결정). `backend/gradlew`가 git에 실행 권한 없이(100644) 올라가 있어 러너에서 `chmod +x gradlew` 단계를 둔다. 로컬에서 `gradlew build`, 프론트 `npm ci`·`lint`·`format:check`·`test`·`build`(각 종료 코드 0)와 YAML 문법을 확인했다. **GitHub Actions 실행은 이 Task의 PR #6에서 확인했다(두 워크플로 성공, 실행 링크는 Task 012 `기록:`).** CD(`backend-deploy.yml`)는 `main` push + `workflow_dispatch`로 Task 020·021에서 만든다.
 
 #### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ✅
 - 태그: [B] · PRD: F1 선행 준비 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
@@ -322,17 +352,17 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 지금 쓸 수 있는 검사 도구로 OpenAPI 3 문법 검사를 통과한다(예: `npx @redocly/cli lint docs/api/openapi.yaml`, 도구는 제안). orval 생성 확인은 Task 017에서 한다.
 - 기록: 2026-10-04 완료(커밋 `4eeca03`, `main` 직접 커밋). OpenAPI 3.0.3(`nullable` 표기 때문), `redocly lint` 에러 0건(경고 11건: 미사용 컴포넌트 10건, `info.license` 1건. operation이 생기면 미사용 경고는 사라진다). `ProblemDetail`의 `fieldErrors`(필드 오류 목록) 구조는 제안값이다. springdoc이 생성하는 버전과 다르면 Task 023의 계약 대조 테스트에서 맞춘다.
 
-#### Task 012: develop 브랜치 생성과 보호 규칙 설정으로 작업 흐름 고정 ⬜
+#### Task 012: develop 브랜치 생성과 보호 규칙 설정으로 작업 흐름 고정 ✅
 - 태그: [H] · PRD: — (git.md) · 선행: 006~011
 - 구현 사항
   - [x] 미커밋 문서(1절 저장소 상태)와 초기 세팅 커밋을 `origin/main`에 푸시
   - [x] `main`에서 `develop`을 만들어 푸시. 기본 브랜치는 `main` 유지
-  - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
+  - [x] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
   - [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬
 - 완료 기준
   - Task 010의 `develop` 대상 PR에서 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 첫 푸시는 이미 끝났고 `frontend-ci`의 `test`는 Task 017에서 `vitest run`으로 구성됐다.
   - V-H: 보호 규칙 설정을 기록했고, `develop` 직접 푸시가 거부되는 것을 확인했다.
-- 기록(진행 중, 2026-10-04): `main`·`develop`을 `origin`에 푸시했고 기본 브랜치는 `main`이다. 저장소는 공개이고 Settings → Advanced Security에서 Secret Protection·Push protection이 켜져 있음을 확인했다. 남은 것은 보호 규칙(Rulesets 또는 Branches)과 `develop` 직접 푸시 거부 확인이며, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010을 병합해 워크플로가 한 번 실행된 뒤에 지정한다. CI 경로 필터는 쓰지 않는 쪽을 권장한다(필수 검사가 보고되지 않아 PR이 막히는 것을 피함).
+- 기록: 2026-10-04 완료. `main`·`develop`을 `origin`에 푸시했고 기본 브랜치는 `main`이다. 저장소는 공개이고 Settings → Advanced Security에서 Secret Protection·Push protection이 켜져 있음을 확인했다. 보호 규칙은 Rulesets의 `protect-main-develop`(id 24456595, Enforcement: Active, 대상 `refs/heads/main`·`refs/heads/develop`, bypass 없음)이고 규칙은 삭제 금지(`deletion`), 강제 푸시 금지(`non_fast_forward`), PR 필수(`pull_request`, 승인 0, 병합 방식은 Merge·Squash·Rebase 모두 허용), 필수 상태 검사(`required_status_checks`: `backend-ci`·`frontend-ci`, GitHub Actions 통합, `strict`는 꺼서 "병합 전 최신 브랜치" 조건은 두지 않음)다. CI 경로 필터는 쓰지 않았다(필수 검사가 보고되지 않아 PR이 막히는 것을 피함). `develop` 직접 푸시 거부 확인: 규칙 설정 전에는 확인용 빈 커밋 `acabfaa`(`chore: 보호 규칙 확인용`)가 그대로 푸시돼 규칙이 없음을 알았고, 설정 후에는 `remote: error: GH013: Repository rule violations found ... Changes must be made through a pull request.`로 거부됐다(`gh api`로 규칙 내용도 확인). 원격 `develop`에는 빈 커밋 `acabfaa`가 남아 있다(파일 변경 없음, 강제 푸시로 지우지 않고 그대로 둠). Task 010 PR #6의 Actions 실행: `backend-ci` run `37195614998`, `frontend-ci` run `37195615009` 성공(처음 실패한 `37194586850`은 Node 22의 `npm ci` 오류, Task 010 `기록:` 참고).
 
 #### Task 013: Claude Code 플러그인 3종 설치로 작업 보조 도구 준비 ✅
 - 태그: [H] · PRD: — · 선행: 없음
@@ -349,10 +379,10 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: F0, B1 · 선행: 012(009 포함) · 기한: 2026-10-07(R-17)
 - 구현 사항
   - [ ] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
-  - [ ] 빌드 명령·Node 버전을 CI와 같게
+  - [ ] 빌드 명령·Node 버전을 CI와 같게(Node **24**. CI를 24로 맞춘 이유는 Task 010 `기록:` 참고, Node 22(npm 10)는 `npm ci`가 실패한다)
   - [ ] R-17 실측: Task 009의 `vercel.json`(`routes` 단일 형식, 혼용하지 않음)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
 - 완료 기준
-  - V-H: 설정값을 기록했고, `develop` 푸시로 미리보기 URL의 루트 페이지가 열린다.
+  - V-H: 설정값을 기록했고, PR(또는 `feature/*` 브랜치 푸시)로 생긴 미리보기 URL의 루트 페이지가 열린다. `develop`은 보호 규칙(Task 012) 때문에 직접 푸시할 수 없다.
   - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
 
 #### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
@@ -424,8 +454,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: B1, H2 · 선행: 002, 015, 019 · 기한: 2026-10-12(R-12)
 - 관련: 10.3 R-12, TECH 3절, T-8
 - 구현 사항
-  - [ ] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다
-  - [ ] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분
+  - [ ] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다. **하비는 커스텀 이미지 배포·이미지 저장소 연결이 프로 전용이라 쓸 수 없으므로**, Cloudtype이 저장소에서 직접 빌드(Dockerfile·빌드팩)하고 GitHub Actions는 그 배포를 트리거하는 방식이 전제다(Task 003 `기록:`). 빌드시간은 하비 월 500분, 프리티어 월 200분이다
+  - [ ] Task 002에서 만든 **Redis Cloud 무료 DB가 아직 살아 있는지 확인**한다(14일 동안 Redis 명령이 없으면 삭제됨, Task 003 `기록:`). 삭제됐거나 곧 쓸 계획이 없으면 필요할 때 다시 만든다
+  - [ ] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분. 서비스를 배포할 때 사용할 리소스(무료/구독)를 고른다(무료 메모리와 구독 메모리는 따로 쓰고 합산되지 않는다, Task 003 `기록:`)
   - [ ] Cloudtype 환경 변수 등록(Task 015 위치표의 Cloudtype 항목, 이름만 기록). 첫 배포 기동에 필요 없는 값(Google OAuth, TMDB, 메일 등)은 Task 092 최종 점검 때 채워도 된다
   - [ ] GitHub Actions secrets에 Cloudtype 배포 토큰(R-12 이름)과 백엔드 주소 등록
 - 완료 기준
@@ -443,13 +474,14 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-DEPLOY "헤더·경로"(Vercel Production URL 기준): `/api/public/ott-services`가 200 `CommonResponse`, `no-store`, 캐시 적중 없음, Cloudtype 직접 호출 거부, 로그에 방문자 IP.
   - `기록:` `routes` 단일 형식에서의 실제 적용 순서(미리보기 배포 성공 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
   - `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 남아 있지 않다(`Select-String -Path frontend/vercel.json -Pattern REPLACE_BACKEND_HOST`가 아무것도 찾지 못함). Task 009가 남긴 자리표시값이 운영 배포로 새지 않게 하는 확인이다(Task 009 PR의 코드래빗 Major 지적에 대한 대응).
+  - 기동 직후와 서비스 목록 API 호출 후의 **메모리 사용량**(Cloudtype 대시보드)을 `기록:`에 남긴다(메모리 예산의 기본 사용량, 4.6). 무료 1GB 한도에서 측정한 값이라 512MB에서의 동작은 보장하지 않는다.
 
 #### Task 022: Cloudtype SMTP 외부 발신 테스트로 메일 방식 결정 근거 확보 ⬜
 - 태그: [B] · PRD: B1, R11-11 · 선행: 002, 003, 006, 015, 016 · 기한: 2026-10-14
 - 관련: 10.3 R-15(해소)
 - 구현 사항
   - [ ] `develop`에서 만든 시험 브랜치(제안: `feature/b1-smtp-trial`)에 최소 발신 코드를 둔다. 이 브랜치는 병합하지 않는다
-  - [ ] 운영 서비스와 분리된 일회성 Cloudtype 서비스로 시험 브랜치를 배포해 SMTP 587 발신 시험(무료 플랜 서비스 추가 가능 여부는 Task 003 기록 확인)
+  - [ ] 운영 서비스와 분리된 일회성 Cloudtype 서비스로 시험 브랜치를 배포해 SMTP 587 발신 시험(Task 003 결과: 프리티어 동시실행이 4개라 서비스 추가가 가능하다. 시험 서비스는 **무료 리소스**로 만들어 운영 서비스의 구독 메모리와 분리한다)
   - [ ] 연결·읽기·쓰기 타임아웃 설정 상태로 시험(TECH 5절)
   - [ ] 실패 시에만 HTTPS 메일 API(예: Resend, Brevo) 하나의 키를 발급하고(Task 002에서 옮김) 같은 시험
   - [ ] 시험 후 일회성 서비스와 시험 브랜치 삭제
@@ -635,6 +667,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 정답 입력·기대 결과 세트(예산·찜·구독 상태 조합). Task 065가 같은 세트를 쓰도록 위치를 정한다(제안: `backend/src/main/resources/engine-benchmark/`)
   - [ ] 입력 정규화와 `input_hash`(SHA-256) 계산기(정렬된 단위·상품·가격, 예산, 시청 분, `data_as_of`)
   - [ ] 두 Solver 점수·비용 차이와 계산 시간(3회 중앙값) 비교 테스트, 최악 입력(단품 7개, 큰 찜) 탐색 시간 측정
+  - [ ] 최악 입력과 후보 상한 근처에서 **힙 사용량**을 함께 기록한다(메모리 예산 측정 지점, 4.6)
 - 완료 기준
   - V-B: 정답 세트 전체 통과. 비교 결과표(점수 차, 비용 차, 시간)와 R11-30 잠정 상한 근거를 `기록:`에 남겼다. `calc_run` 기록은 Task 065.
 
@@ -712,7 +745,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: B3, R11-25, R11-26 · 선행: 045, 044 · 기한: 2026-10-21
 - 구현 사항
   - [ ] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
-  - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`), Redis ops 측정(R11-26)
+  - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`, Supabase 무료 한도 500MB와 비교, 인덱스·WAL 포함), Redis ops 측정(R11-26). 수집 사이클의 **최대 힙·메모리 사용량**도 기록한다(메모리 예산 측정 지점, 4.6)
   - [ ] 실측 러닝타임 중앙값으로 기본값 보정안(R11-25). 중단되면 Task 045 복구 API로 이어서 실행
 - 완료 기준
   - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다.
@@ -1107,7 +1140,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 092: MVP 운영 인프라 전환과 도메인 연결로 공개 준비 ⬜
 - 태그: [H] · PRD: B8·F8, R11-3, R11-4 · 선행: 005, 067 · 기한: 2026-11-04
 - 구현 사항
-  - [ ] Cloudtype Hobby(월 6,600원) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
+  - [ ] Cloudtype Hobby(512MB당 월 6,600원, 메모리는 실측 후 결정) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
   - [ ] `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` 확정, Google OAuth 운영 리다이렉트 URI(`https://{도메인}/api/login/oauth2/code/google`)·승인된 출처 추가
   - [ ] 운영 환경 변수 최종 점검(Task 015 위치표, Task 020 등록분). 첫 배포 때 미룬 Google OAuth·TMDB·메일 값을 채운다
 - 완료 기준
@@ -1177,6 +1210,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 측정용 백엔드 컨테이너를 `cpus`·`mem_limit` 고정으로 추가(제안: `infra/docker-compose.yml`의 `profiles: [perf]` 또는 별도 compose 파일)
   - [ ] `infra/k6/` 스크립트(플랜 계산, 검색, 상세), 전후 각 3회 중앙값, 최악 입력(예산·찜 상한) 탐색 시간
   - [ ] 개선(캐시, 쿼리, 인덱스) 후 재측정. 배포 환경은 스모크만
+  - [ ] **메모리 최종 판정**: 측정용 컨테이너에 `mem_limit: 512m`을 걸고 계산·수집·조회 부하에서 OOM 없이 도는지 확인해 구독 메모리 단위(512MB당 월 6,600원)를 판단한다(4.6)
 - 완료 기준
   - 전후 비교표를 기록했고 R11-29·30 확정안을 사용자에게 올렸다.
 
@@ -1192,7 +1226,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `develop` → `main` merge commit, V-DEPLOY
   - [ ] cron 확인(이관분): tier별 두 수집 cron(Task 077)의 실행 기록, 수집 완료 뒤 백엔드가 이어서 실행한 재계산(Task 069, SCR-16 재계산 대상 플랜 수)과 월초 알림 생성(Task 073)의 기록
-  - [ ] 2단계 확인: 월초 알림 수신, 변경 내역, 독점 목록, 번들 계산, 탈퇴. 운영비 청구서(월 1만원 이내)
+  - [ ] 2단계 확인: 월초 알림 수신, 변경 내역, 독점 목록, 번들 계산, 탈퇴. 운영비 청구서(저예산 유지 확인)
   - [ ] `v0.2.0` 태그
 - 완료 기준
   - V-H: 항목별 결과를 기록했다.
@@ -1242,7 +1276,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 | R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **2026-10-29** | 066, 073 |
 | R-5 | 운영 ADMIN 역할 지정 방법. 추천안(미확정): DB 직접 수정. 대안(환경 변수 관리자 이메일 목록)이 채택되면 Task 054에 구현이 늘어나므로 054 착수(2026-10-22) 전에 정하는 편이 안전하다 | **2026-11-04** (Task 095 전) | 095 (대안 채택 시 054) |
 
-해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결). 10.3 참고.
+해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정). 10.3 참고.
 
 ### 10.2 PRD 11절 결정 필요·작업 중·보류 항목
 
@@ -1266,7 +1300,6 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R11-24 | SCR-16 알림 상태는 2단계부터(재계산 대상 플랜 수도 2단계 Task 069·070에서 채움) | 결정 필요 | 2026-10-22 (F6 전) | 061, 070, 071, 074 |
 | R11-25 | 러닝타임 기본값 실측 보정 | 작업 중 | 첫 전체 수집 후(2026-10-21) | 042, 048 |
 | R11-26 | TV 시즌 호출량과 배치 분할 | 작업 중 | 첫 전체 수집 후(2026-10-21) | 043, 044, 048 |
-| R11-27 | 7개 서비스 해지 예약 정책 | 작업 중 | H2(2026-10-07) | 003 |
 | R11-28 | QueryDSL 도입 시 Boot 4.1·Hibernate 7 호환 버전 | 보류 | 도입 시점 | — |
 | R11-29 | 계산·공개 조회 응답 시간 목표 | 보류 | k6 측정 후 | 100 |
 | R11-30 | 예산·찜 상한, 그리디 전환 후보 수 상한 | 보류(잠정값은 10.1) | 엔진·k6 측정 후 | 039, 040, 056, 076, 100 |
