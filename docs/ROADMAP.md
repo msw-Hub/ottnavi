@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 14/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 15/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 14/105 | |
+| 합계 | | 15/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 14/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 15/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -417,20 +417,37 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
 - 기록: 2026-10-05 완료. GitHub 저장소 `msw-Hub/ottnavi`를 Vercel에 연결했고 **Root Directory는 `frontend`**, **Production Branch는 기본값 `main`**(Environments의 Production에서 확인, 저장소 기본 브랜치가 `main`이라 자동 지정), **Node.js Version은 24.x**(CI와 동일, 기본값으로 설정돼 있음), 프리셋은 Vite로 자동 인식돼 `npm run build`·출력 `dist`가 기본값으로 들어갔다. 연결 직후 `main`(커밋 `23fe649`)이 Production으로 먼저 배포됐는데, 이때 `main`에는 `vercel.json`이 없었다(`vercel.json`은 PR #4로 `develop`에만 병합됨). **R-17 실측**은 PR #7의 미리보기(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)로 했다: 빌드(`vite build`, 21개 모듈)가 `Build Completed`·`Deployment completed`로 끝났고 `vercel.json` 검증 오류는 없었다. `routes` 단일 형식이 설정 오류 없이 배포됐고, `ORIGIN_SECRET` 환경 변수가 없어도 배포는 실패하지 않았다(Task 015에서 등록). 미리보기 루트 페이지(`/`)가 열린다. `/api`(슬래시 없음)는 프록시 규칙 `^/api/(.*)$`에 걸리지 않아 SPA 화면이 나오는 것이 정상이고, `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트 `REPLACE_BACKEND_HOST`로 프록시 시도, 요청 처리 지역 `icn1`)가 나와 `/api` 프록시가 SPA 대체보다 먼저 적용됨을 확인했다. 혼용(`routes`+`rewrites`)은 시험하지 않았다. 빌드 로그의 `engines` 경고(새 메이저 Node가 나오면 자동 상향될 수 있다는 안내)는 정상이다. `/api` 프록시 동작과 헤더 주입의 실제 확인은 Task 021이다.
 
-#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
+#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ✅
 - 태그: [H] · PRD: 6절 보안 · 선행: 002, 014
 - 관련: TECH 3절(cron 직접 호출), 4절, T-7, T-8
 - 범위: 준비 구간에는 GitHub·Vercel·로컬만 등록한다. Cloudtype 서비스 생성·환경 변수 등록·배포 토큰(R-12)은 Task 020에서 한다.
 - 구현 사항
-  - [ ] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
+  - [x] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
     - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`(cron이 Cloudtype 직접 호출 시 사용)을 지금 등록. Cloudtype 백엔드 주소·배포 토큰은 Task 020
     - Vercel 환경 변수: `ORIGIN_SECRET`(`routes[].transforms`가 읽음)을 **Production과 Preview 환경 모두**에 등록(Task 094의 미리보기 확인이 Preview 값을 쓴다)
     - Cloudtype 환경 변수(Task 020에서 등록): DB, Redis, TMDB, Google OAuth, `JWT_SECRET`, `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL`, 메일
     - 로컬: `.env`(커밋 금지)
-  - [ ] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
-  - [ ] 노출 시 재발급 절차 한 줄씩
+  - [x] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
+  - [x] 노출 시 재발급 절차 한 줄씩
 - 완료 기준
   - V-H: 저장 위치표와 GitHub·Vercel(Production·Preview)·로컬 등록일을 기록했고, 저장소에 비밀 값이 없음을 확인했다.
+- 기록: 2026-10-05 완료(값은 어디에도 적지 않는다).
+  - **저장 위치표**
+
+    | 변수 | 비밀번호 관리자 | GitHub Actions secrets | Vercel | 로컬 `.env` | Cloudtype(Task 020) |
+    |---|---|---|---|---|---|
+    | `ORIGIN_SECRET` | ✅ | ✅ | ✅ Production·Preview(사용자 보고) | ✅ | 같은 값 등록 |
+    | `ADMIN_BATCH_TOKEN` | ✅ 개발용·운영용 | ✅ (운영용) | — | ✅ (개발용) | 운영용 등록 |
+    | `JWT_SECRET` | ✅ 개발용·운영용 | — | — | ✅ (개발용) | 운영용 등록 |
+    | 운영 DB(Supabase)·Redis(Redis Cloud) 접속 정보 | ✅ | — | — | **넣지 않음**(비움) | 등록 |
+    | TMDB·Google OAuth·메일 | ✅ | — | — | ✅ | 등록 |
+
+  - **등록 결과**
+    - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 2026-10-05 05:39(KST)에 등록했다. `gh secret list`로 이름과 등록 시각을 확인했다(값은 볼 수 없다).
+    - Vercel: `ORIGIN_SECRET`을 등록했다(사용자 보고). 실수로 삭제한 뒤 다시 등록하려 하자 "이미 존재한다"는 응답이 와 변수가 남아 있음을 확인했다. Production·Preview 적용 범위와 GitHub secrets와 같은 값인지는 이 Task에서 직접 확인하지 못했고 Task 021(`/api` 프록시 헤더 주입)과 Task 094(미리보기)에서 검증한다.
+    - 로컬 `.env`: 저장소 루트에 만들었다. `.gitignore:8`에 걸려 추적되지 않고 추적되는 env 파일은 `.env.example`뿐이다. 변수 이름은 `.env.example`과 같다. `JWT_SECRET`·`ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 각각 44자(32바이트 Base64, 256비트)이고 서로 다른 값이다.
+  - **정리한 점**: `.env`에 운영 Supabase·Redis Cloud 접속 정보(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`)가 들어 있어 비웠다(`DB_NAME`, `DB_PORT`, `REDIS_PORT`도 비어 있음). 비워 두면 docker compose·로컬 프로필이 로컬 기본값을 쓴다. 이를 두면 `bootRun`·Flyway가 운영 DB에 붙을 수 있고, compose가 `--env-file .env`로 읽으면 로컬 PostgreSQL 컨테이너가 Supabase 계정으로 만들어진다.
+  - **저장소 검사**: `git grep -i -E "secret|password|token"`(`docs/`, `.env.example` 제외) 결과에 비밀 값은 없다(변수 이름, 설명 문구, `vercel.json`의 `$ORIGIN_SECRET` 참조, compose의 로컬 기본값 `ottnavi`뿐). `git status`에 `.env`는 나타나지 않는다.
 
 #### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 006, 008, 012 · 브랜치: `feature/b0-backend-setup`
