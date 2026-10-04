@@ -23,6 +23,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/ERD.md` | 스키마·상태값·삭제 정책 |
 | `docs/TECH.md` | rules에 없는 설계 결정과 함정(`T-N`, 계산 엔진·플랜 저장·배치·인증·outbox·호환성) |
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
+| `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
 | `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. 지금은 골격(`paths: {}`)이고 operation은 Task 019·031부터 추가된다 |
 | `docs/PHASE1_HUMAN_TASKS.md` | Phase 1의 사람 작업 `[H]` 체크리스트와 완료 기록 |
@@ -78,7 +79,7 @@ cd frontend; npm run api:generate                                      # openapi
 
 - **Git**: `main`·`develop`에는 직접 커밋하지 않는다(`develop`은 2026-10-04에 생성됐고, 초기 세팅 Task 006·007·011·017 일부만 그 전에 `main`에 직접 커밋했다). 새 작업은 브랜치부터 확인하고, feature는 `develop`에서, hotfix는 `main`에서 `{종류}/{작업ID}-{설명}`으로 만든다(문서만 고쳐도 `feature/docs-*`). **커밋·푸시·PR·병합·태그·브랜치 삭제는 사용자가 요청할 때만** 한다. 커밋 scope는 `backend|frontend|docs|infra|ci`. 커밋에 Claude 서명(`Co-Authored-By`)은 넣지 않는다(`/git-commit` 스킬 규칙).
 - **PR**: `gh pr create --base develop`으로 만든다(base를 안 쓰면 `main`이 잡힌다). 병합은 Squash. `/git-pr`·`/git-review` 같은 일부 스킬은 `disable-model-invocation`이라 사용자가 직접 호출해야 한다. PR마다 CodeRabbit이 자동 리뷰하며(`.coderabbit.yaml`), **Autofix·Autopilot은 누르지 않는다**.
-- 보호 규칙(`main`·`develop`)은 아직 걸지 않았다. 필수 검사 `backend-ci`·`frontend-ci`는 Task 010 병합 뒤에 지정한다(Task 012).
+- 보호 규칙(ruleset `protect-main-develop`)이 `main`·`develop`에 걸려 있다(Task 012): 직접 푸시·삭제·강제 푸시 금지, PR 필수(승인 0), 필수 검사 `backend-ci`·`frontend-ci`. 문서만 고쳐도 PR이 필요하다.
 - **Flyway**: 스키마는 마이그레이션으로만 바꾼다. 병합된 파일은 고치지 않고 새 버전을 추가한다(MVP는 V1~V7 번호가 Task에 배정됨, ROADMAP 4.2).
 - **외부 호출(TMDB·메일·LLM)은 트랜잭션 밖**에서 한다(수집 배치만 예외, TECH T-2).
 - **버전 함정**: Spring Boot 4.1은 Jackson 3(`tools.jackson.*`), `@MockitoBean`, `spring-boot-starter-flyway`·`spring-boot-starter-batch-jdbc` 필요, orval은 `httpClient: 'axios'` 명시 필요, msw 3은 `onUnhandledRequest`가 아니라 `onUnhandledFrame`, TypeScript 6은 `baseUrl` 없이 `paths`만 쓴다. 전체 목록은 TECH 6절.
