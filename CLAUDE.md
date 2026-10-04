@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 저장소 현황
 
-- **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)은 아직 없고, 백엔드는 의존성이 `webmvc`뿐이라 도메인 코드가 없다(Task 016 이후). 도메인 패키지·계약 operation도 아직 없다.
+- **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)도 있다. 백엔드는 의존성이 `webmvc`뿐이라 도메인 코드가 없다(Task 016 이후). 도메인 패키지·계약 operation도 아직 없다.
 - 진행 상황과 다음 Task는 `docs/ROADMAP.md`(5단계 Phase, 105개 Task)가 기준이다. 새 작업 전에 해당 Task의 선행·완료 기준을 확인한다. 사용자가 직접 하는 `[H]` Task는 `docs/PHASE1_HUMAN_TASKS.md`에 체크리스트로 따로 있다.
 - Task 진행은 쉬림프 태스크 매니저(MCP)로 추적한다. 데이터는 `shrimp_data/`(git 제외)에 있고, 경로는 `.claude/settings.local.json`의 `SHRIMP_DATA_DIR`이 정한다(`.mcp.json`이 `${SHRIMP_DATA_DIR}`로 참조). 로드맵이 기준이고 쉬림프는 보조다.
 - 사용자 전역 규칙(`~/.claude/CLAUDE.md`)이 적용된다: 주석·로그·에러 메시지·UI 문자열은 한국어, 식별자는 영어, 커밋은 한국어 Conventional Commits, 터미널 명령은 PowerShell 기준(Windows 11), 탐색 → 계획 제시 → 승인 → 구현 순서.
