@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 13/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 14/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 13/105 | |
+| 합계 | | 14/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 13/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 14/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -273,14 +273,44 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - **R11-27**은 PRD 11절 27번을 확정으로 바꾸고 10.2 표에서 뺐다.
   - 후속 반영: TECH T-6(하비 5분), Task 020(R-12, Redis 생존 확인), Task 022(무료 리소스), 4.6(메모리 예산과 측정 지점), Task 021·040·048·100(측정 항목).
 
-#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ⬜
+#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ✅
 - 태그: [H] · PRD: H2, FR-18, FR-19 · 선행: 002
 - 구현 사항
-  - [ ] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
-  - [ ] 7개 서비스 STANDARD 단품 월 가격과 조사일
-  - [ ] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
+  - [x] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
+  - [x] 7개 서비스 STANDARD 단품 월 가격과 조사일
+  - [x] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
 - 완료 기준
   - V-H: 매핑표·가격표(출처, 조사일)와 매핑되지 않은 KR 제공처 목록을 기록했다.
+- 기록: 2026-10-05 완료. TMDB `watch/providers/{movie,tv}?watch_region=KR&language=ko-KR`를 조회했다(v4 Read Access Token을 `Authorization: Bearer` 헤더로 보냄. 이 토큰은 `api_key` 쿼리로는 401). 영화·TV 목록의 ID는 같다.
+  - **매핑표(Task 033 `tmdb_provider` 시드 입력값)**
+
+    | 서비스 | provider_id | TMDB 원본 라벨 | tier | 비고 |
+    |---|---|---|---|---|
+    | Netflix | 8 | Netflix | STANDARD | |
+    | Netflix 광고형 | 1796 | Netflix Standard with Ads | AD | MVP에서 사용하지 않음(O3) |
+    | Disney+ | 337 | Disney Plus | STANDARD | 광고형 별도 ID 없음 |
+    | TVING | 1883 | TVING | STANDARD | 광고형 별도 ID 없음 |
+    | Watcha | 97 | Watcha | STANDARD | |
+    | wavve | 356 | wavve | STANDARD | 광고형 별도 ID 없음 |
+    | Coupang Play | 1881 | Coupang Play | STANDARD | **TV 목록에만 있고 영화 목록에는 없다**(TMDB 쪽 누락 가능, 수집 결과로 재확인) |
+    | Apple TV+ | 350 | Apple TV | STANDARD | 라벨이 "Apple TV"이나 구독형이다 |
+
+    광고형 라벨이 따로 있는 것은 Netflix(1796)뿐이다. 나머지 서비스의 광고형 요금제는 TMDB에서 STANDARD와 구분되지 않는다.
+  - **가격표(Task 061 관리자 입력값, 조사일 2026-10-05, 표시 가격 그대로)**
+
+    | 서비스 | STANDARD 요금제 | 월 가격(원) | 출처 | 확인 수준 |
+    |---|---|---|---|---|
+    | Netflix | 스탠다드 | 13,500 | help.netflix.com/ko/node/24926 | 공식. 기준일 표기 없음, "지역에 따라 세금이 추가될 수 있음" 안내 |
+    | Disney+ | 스탠다드 | 9,900 (부가세 포함) | disneyplus.com/ko-kr/commerce/plans | 공식(사용자가 화면에서 확인) |
+    | TVING | 스탠다드 | 13,500 | tving.com/bill/subscription/plan | 공식 |
+    | Watcha | 베이직 | 7,900 | 공식 정리 페이지 없음, 결제 화면에서 직접 확인 | 직접 확인 |
+    | wavve | 스탠다드 | 10,900 | wavve.com/voucher/?voucher-type=wavve | 공식 |
+    | Coupang Play | 와우 멤버십(광고 포함) | 7,890 | namu.wiki 쿠팡플레이 문서(요금제 표) | **비공식**. 쿠팡플레이는 와우 회원만 볼 수 있어 와우 월 요금이 곧 이용 비용이다. 광고 없는 시청은 프리미엄 패스 3,900 추가(합계 11,790) |
+    | Apple TV+ | 단일 | 6,500 | apple.com/kr/apple-tv | 공식 |
+
+    STANDARD 기준은 광고 없는 요금제가 원칙이지만 Coupang Play는 TMDB에 ID가 하나뿐이고 가격이 와우 7,890 하나로 정해져 7,890을 쓴다(2026-10-05 사용자 결정). Watcha는 베이직만 있어 이를 STANDARD로 쓴다. 와우 이용자의 해지 안내는 R11-27 결론을 따르며 "와우–패스 관계"는 TASK003에서 모름으로 둔 그대로다.
+  - **O3 참고 자료(MVP는 STANDARD 단품만이라 사용하지 않는다. O3 착수 때 다시 확인)**: Netflix 광고형 7,000·프리미엄 17,000. TVING 광고형 스탠다드 5,500·베이직 9,500. wavve 광고형 스탠다드 5,500·베이직 7,900. 번들(조사일 2026-10-05): 티빙+웨이브 더블 스탠다드 15,000, 티빙+웨이브 더블 광고형 스탠다드 7,000, 웨이브+티빙 더블 베이직 13,500, 디즈니+티빙 스탠다드 18,000(부가세 포함), 디즈니+티빙+웨이브 스탠다드 21,500(부가세 포함). 쿠팡 패스: 프리미엄 3,900, 스포츠 12,400(와우 회원가, 일반 회원가 19,300).
+  - **매핑되지 않은 KR 제공처 31개**: 7개 서비스 밖이다. 이 중 국내 구독 후보로 볼 만한 것은 Amazon Prime Video(119), Google Play Movies(3)이며 둘 다 범위 밖이다. 나머지는 해외 소규모·다큐·독립영화 서비스다(상위 30개: JustWatch TV 2285, GuideDoc 100, Curiosity Stream 190, DOCSVILLE 475, Plex 538, WOW Presents Plus 546, Magellan TV 551, BroadwayHD 554, Filmzie 559, Dekkoo 444, True Story 567, DocAlliance Films 569, Hoichoi 315, Eventive 677, Cultpix 692, Takflix 1771, Sun Nxt 309, Crunchyroll 283, Jolt Film 2330, FOUND TV 2478, MUBI 11, Bloodstream 2555, MovieMe 2565, KableOne 2603, CaixaForum+ 2620, Artiflix 2623, Artify 2685, Pijama Films 2765, Filmtap 2782. 표시 우선순위 순).
 
 #### Task 005: 도메인 ottnavi.shop 1년 구매로 운영 주소 확보 ⬜
 - 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: Task 092 착수 직전, 2026-11-04 이전(1년 사용 기간이 구매일부터 시작하므로 구매를 미룬다. 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소를 쓴다)

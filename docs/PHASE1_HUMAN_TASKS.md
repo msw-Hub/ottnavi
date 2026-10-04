@@ -11,7 +11,7 @@
 | 1 | 002 외부 계정·키 발급 | 없음 | — | **완료(2026-10-05)**. 004·015·020·022의 전제 |
 | 1 | 003 약관·운영 정책 조사 | 없음 | — | **완료(2026-10-05)**. 결과는 `docs/TASK003_POLICY_PRICING.md` |
 | 1 | 005 도메인 구매 | 없음 | Task 092 직전(1년 사용 기간을 늦추려고 미룸) | 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소 사용 |
-| 2 | 004 KR 제공처 ID·요금표 조사 | 002 | — | 033 시드, 061 입력값 |
+| 2 | 004 KR 제공처 ID·요금표 조사 | 002 | — | **완료(2026-10-05)**. 033 시드, 061 입력값 |
 | 3 | 012 `develop` 생성·보호 규칙 | 코드 Task 006~011 완료 | — | **완료(2026-10-04)** |
 | 4 | 014 Vercel 연결 | 012 (009 포함) | 2026-10-07 | **완료(2026-10-05)**. 015·020의 전제 |
 | 5 | 015 비밀 값 정리·등록 | 002, 014 | — | |
@@ -127,26 +127,29 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 ### 완료 기준(V-H)
 항목별 **출처 URL·확인 날짜·결론**을 ROADMAP Task 003 `기록:`에 남긴다. R11-27 결과를 PRD 10.2에 반영할지 판단한다. 서비스 추가가 불가능하면 Task 022를 어떻게 진행할지 Claude에게 알려 협의한다.
 
-## Task 004: KR 제공처 ID 확정과 요금표 조사 (선행: 002)
-**목적**: 백엔드 시드(Task 033)와 관리자 가격 입력(Task 061)에 쓸 값을 만든다.
+## Task 004: KR 제공처 ID 확정과 요금표 조사 — 완료(2026-10-05, 선행: 002)
+**목적**: 백엔드 시드(Task 033)와 관리자 가격 입력(Task 061)에 쓸 값을 만든다. 결과는 ROADMAP Task 004 `기록:`에 있다.
 
 ### 할 일
-- [ ] **TMDB KR 제공처 목록 조회**: Task 002의 TMDB 키로 한국 제공처 목록을 받는다. 키는 현재 세션에만 두고 명령 히스토리에 남기지 않는다.
+- [x] **TMDB KR 제공처 목록 조회**: Task 002의 TMDB 토큰으로 한국 제공처 목록을 받는다. 토큰은 `Read-Host` 입력창에 붙여 넣어 현재 세션에만 두고, 명령어나 채팅에 적지 않는다.
   ```powershell
-  # 키를 입력받아 현재 세션에서만 사용(세션 종료 시 사라짐)
-  $env:TMDB_API_KEY = Read-Host "TMDB API 키"
-  Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/movie?watch_region=KR&api_key=$env:TMDB_API_KEY" | ConvertTo-Json -Depth 5 > $env:TEMP\tmdb-kr-movie.json
-  Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/tv?watch_region=KR&api_key=$env:TMDB_API_KEY" | ConvertTo-Json -Depth 5 > $env:TEMP\tmdb-kr-tv.json
-  Remove-Item Env:TMDB_API_KEY
+  # 안내 문구만 따옴표 안에 쓰고, 토큰은 실행 후 나오는 입력창에 붙여 넣는다(세션 종료 시 사라짐)
+  $env:TMDB_TOKEN = Read-Host "TMDB Read Access Token 입력"
+  $h = @{ Authorization = "Bearer $env:TMDB_TOKEN" }
+  foreach ($t in "movie","tv") {
+    Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/$t`?watch_region=KR&language=ko-KR" -Headers $h |
+      ConvertTo-Json -Depth 5 | Out-File "$env:TEMP\tmdb-kr-$t.json" -Encoding utf8
+  }
+  Remove-Item Env:\TMDB_TOKEN
   ```
-  결과 파일은 저장소 밖(임시 폴더)에 둔다.
-- [ ] **매핑표 작성**: 7개 서비스 각각의 `provider_id`, TMDB 원본 라벨, tier(STANDARD/AD) 판정(광고형 요금제 라벨이 따로 있으면 AD로 구분)을 표로 만든다.
-- [ ] **요금표 조사**: 7개 서비스의 STANDARD 단품 월 가격과 조사일을 공식 요금 페이지에서 확인한다.
-- [ ] **매핑되지 않은 KR 제공처 목록**을 따로 적는다(7개 밖의 제공처).
-- [ ] 매핑표는 Task 033 시드 입력값으로, 가격표는 Task 061 관리자 입력값으로 넘긴다(표 형태로 Claude에게 전달).
+  `eyJ`로 시작하는 긴 값(v4 Read Access Token)은 `api_key` 쿼리가 아니라 `Authorization: Bearer` 헤더로 보낸다(쿼리로 보내면 401). `>` 대신 `Out-File -Encoding utf8`을 쓰는 것은 PowerShell 5.1의 `>`가 UTF-16으로 저장해 한글이 깨지기 때문이다. 결과 파일은 저장소 밖(임시 폴더)에 두고 끝나면 지운다.
+- [x] **매핑표 작성**: 7개 서비스 각각의 `provider_id`, TMDB 원본 라벨, tier(STANDARD/AD) 판정(광고형 요금제 라벨이 따로 있으면 AD로 구분)을 표로 만든다.
+- [x] **요금표 조사**: 7개 서비스의 STANDARD 단품 월 가격과 조사일을 공식 요금 페이지에서 확인한다.
+- [x] **매핑되지 않은 KR 제공처 목록**을 따로 적는다(7개 밖의 제공처).
+- [x] 매핑표는 Task 033 시드 입력값으로, 가격표는 Task 061 관리자 입력값으로 넘긴다(표 형태로 Claude에게 전달).
 
 ### 완료 기준(V-H)
-매핑표·가격표(**출처, 조사일**)와 매핑되지 않은 KR 제공처 목록을 ROADMAP Task 004 `기록:`에 남긴다.
+매핑표·가격표(**출처, 조사일**)와 매핑되지 않은 KR 제공처 목록을 ROADMAP Task 004 `기록:`에 남긴다. (완료)
 
 ## Task 005: 도메인 `ottnavi.shop` 구매 (구매 시점: Task 092 직전)
 **목적**: 운영 주소를 확보한다. DNS 연결은 Task 092에서 한다.
