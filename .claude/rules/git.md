@@ -59,6 +59,15 @@
 - `main`, `develop`: 직접 푸시 금지, PR 필수, CI 통과 필수, 강제 푸시·삭제 금지.
 - 1인 개발이라 리뷰 승인 필수는 두지 않는다.
 
+## PR과 자동 리뷰
+
+- PR은 `gh` CLI로 만든다(`gh pr create --base develop`). base를 지정하지 않으면 기본 브랜치(`main`)가 잡히므로 반드시 `--base develop`을 쓴다.
+- PR 자동 리뷰는 CodeRabbit을 쓴다. 설정은 루트 `.coderabbit.yaml`이다: `develop` 대상 PR 리뷰(`base_branches`), 한국어(`ko-KR`), 생성 파일 제외(`path_filters`). 코멘트의 제목·안내문은 영어로 나온다.
+- CodeRabbit의 **Autofix·Autopilot 체크박스는 누르지 않는다.** PR 브랜치에 자동으로 커밋을 올려 "커밋·푸시는 사용자가 요청할 때만" 규칙과 어긋난다. 지적은 사람이 판단해 직접 반영한다.
+- 푸시할 때마다 재리뷰가 돌고 시간당 포함된 리뷰 수에 한도가 있으므로(확인 시점 10건), 커밋을 모아서 푸시한다.
+- 병합은 사용자가 요청할 때 Squash로 한다(`gh pr merge --squash`). 병합 후 브랜치 삭제는 별도로 요청받았을 때만 한다.
+- 문서만 고치는 작업도 `feature/docs-*` 브랜치와 PR로 한다.
+
 ## 배포·CI와의 연결
 
 - `backend-ci.yml`, `frontend-ci.yml`: `develop`·`main` 대상 PR과 두 브랜치 push에서 실행한다.
