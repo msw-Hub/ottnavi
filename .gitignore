@@ -1,6 +1,9 @@
 # Claude Code 로컬 설정 (개인 경로 포함)
 .claude/settings.local.json
 
+# 쉬림프 태스크 매니저 데이터 (상태가 수시로 바뀌고, 기준은 docs/ROADMAP.md)
+shrimp_data/
+
 # 환경 변수·비밀 값 (이름만 담은 .env.example은 올린다)
 .env
 .env.*
@@ -11,6 +14,9 @@ node_modules/
 build/
 .gradle/
 dist/
+
+# Playwright MCP가 만드는 스냅샷·콘솔 로그
+.playwright-mcp/
 
 # IDE·OS
 .idea/
