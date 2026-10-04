@@ -26,6 +26,9 @@
 - [ ] Supabase 프로젝트(Session Pooler 5432), Redis Cloud 무료 DB, Cloudtype(무료), Vercel, GitHub 저장소 권한
 - [ ] SMTP 시험용 발신 계정(Gmail 앱 비밀번호). HTTPS 메일 API 키는 Task 022의 SMTP 시험이 실패할 때만 발급
 - [ ] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud는 Task 096에서 발급
+- **버전 주의**: 로컬 compose(`infra/docker-compose.yml`)가 PostgreSQL 17.6, Redis 8.6이므로 운영도 같은 버전으로 만든다.
+  - Supabase: 프로젝트를 만든 뒤 SQL 편집기에서 `SHOW server_version;`으로 17.6인지 확인한다(다르면 알려서 로컬 이미지를 맞춘다).
+  - Redis Cloud: 데이터베이스 생성 때 버전 선택지(7.4, 8.2, 8.4, 8.6)에서 **8.6**을 고른다.
 - **완료 기준(V-H)**: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록. 저장소·채팅에 키가 없음을 확인
 
 ## Task 003: 약관·운영 정책 조사
@@ -47,10 +50,10 @@
 - **완료 기준(V-H)**: 업체·첫해·갱신 가격·구매일 기록
 
 ## Task 012: `develop` 브랜치 생성과 보호 규칙 설정 (선행: 코드 Task 006~011)
-- [ ] 미커밋 문서와 초기 세팅 커밋을 `origin/main`에 푸시
-- [ ] `main`에서 `develop` 생성·푸시. 기본 브랜치는 `main` 유지
+- [x] 미커밋 문서와 초기 세팅 커밋을 `origin/main`에 푸시 (2026-10-04)
+- [x] `main`에서 `develop` 생성·푸시. 기본 브랜치는 `main` 유지 (2026-10-04)
 - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수 없음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부 결정
-- [ ] Secret scanning·push protection 사용 가능 여부 확인 후 켬
+- [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬 (2026-10-04, 공개 저장소. Settings → Advanced Security에서 Secret Protection·Push protection 모두 켜져 있음을 확인)
 - **완료 기준**: 첫 푸시로 두 워크플로 성공(실행 링크 기록, Task 010 검증 이관분). 보호 규칙 기록, `develop` 직접 푸시 거부 확인
 
 ## Task 014: Vercel 프로젝트 연결과 Production Branch 설정 (선행: 012, 기한 2026-10-07)
@@ -78,6 +81,10 @@
 - **완료 기준(V-H)**: 서비스 이름·생성일, 등록한 변수 이름 목록(값 제외), R-12 결정 기록, 10.3 R-12 갱신
 
 ---
+
+## 완료한 설정 기록 (Task 번호 밖의 작업)
+- **GitHub CLI(`gh`)**: 설치와 `gh auth login` 완료(2026-10-04). PR 생성에 쓴다.
+- **CodeRabbit**: 저장소에 연결했고 루트 `.coderabbit.yaml`로 `develop` 대상 PR 리뷰·한국어·생성 파일 제외를 설정했다(PR #1에서 동작 확인). Autofix·Autopilot은 쓰지 않는다. 만약 켜져 있다면 코멘트 속 Coding task 화면에서 Autopilot을 끈다.
 
 ## 사용자가 직접 실행하는 Git/배포 작업 (Claude는 요청 시에만)
 - Task 012의 푸시·브랜치 보호
