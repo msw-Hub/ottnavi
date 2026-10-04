@@ -10,10 +10,11 @@
 | 갱신 중인 근거 | PRD 11절 4·5번·FR-18, TECH 3·4절, `api-contract.md`는 3판의 사용자 결정(R-14, R-20, R-21)에 맞춰 다른 작업자가 갱신 중이다. 이 로드맵은 갱신된 내용을 전제로 적었다 |
 | 참고만 | `docs/proposal_v6.md`(v7 요약본, 세부 근거로 쓰지 않음) |
 
-**저장소 상태 (2026-10-03 확인).**
-- git 저장소이고 `main`에 커밋 3개가 있다: `28d2874 chore: 저장소 초기 설정 추가`, `f167699 chore: Claude 작업 규칙·에이전트·스킬 추가`, `52a3841 docs: 기획안·PRD·ERD·TECH 문서 추가`. `develop` 브랜치와 원격 추적 브랜치는 없다.
-- 커밋되지 않은 변경: `docs/PRD.md`, `docs/TECH.md`, `docs/ERD.md`, `.claude/rules/*.md`, `.claude/agents/*.md` 수정, `docs/ROADMAP.md`, `.claude/agents/roadmap-reviewer.md`, `.claude/settings.json`(플러그인 활성화) 신규. 초기 세팅 커밋(Task 012 전)에 함께 넣는다.
-- 미생성: `backend/`, `frontend/`, `infra/`, `.github/`, `docs/api/`, `.env.example`, `vercel.json`, 모든 빌드·설정 파일. 이 문서의 코드·설정 경로는 모두 **신규**다.
+**저장소 상태 (2026-10-04 확인).**
+- 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. 보호 규칙은 아직 걸지 않았다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010 병합 뒤에 지정).
+- 생성됨: `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
+- 미생성: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/src/main/resources/application-{local,prod}.yml`(Task 016).
+- PR은 `gh` CLI로 만들고, 병합 방식은 Squash다. PR마다 CodeRabbit이 자동 리뷰한다(`develop` 대상, 한국어, 생성 파일 제외). 자동 수정(Autofix·Autopilot)은 쓰지 않는다.
 - 플러그인: `feature-dev`, `frontend-design`, `skill-creator`(claude-plugins-official)가 프로젝트 범위로 설치돼 있고 `.claude/settings.json`의 `enabledPlugins`에 켜져 있다(`~/.claude/plugins/installed_plugins.json`, 2026-10-03 확인, Task 013).
 
 **기술 스택 확인 결과.**
@@ -40,18 +41,20 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 2/22 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 0/15 | ⬜ 대기 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 7/23 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 2/105 | |
+| 합계 | | 7/105 | |
+
+- Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
 ---
 
 ## 3. PRD 단계와 Phase 매핑
 
-Phase 번호는 작업의 **성격**에 따른 분류이고 시간 순서와 꼭 같지는 않다. 그래서 선행 Task가 뒤 Phase에 있을 수 있다(예: 얇은 배포 Task 019가 Phase 2의 공통 응답 Task 023를 선행으로 둔다). PRD 9절 "위험한 작업은 일찍"에 따라 계산 엔진(B2, Phase 3)은 1주차에 골격과 함께 착수하고, MVP 배포(B8·F8, Phase 5)는 2단계 작업(Phase 4)보다 먼저 한다. 실제 착수 순서는 3.2를 따른다.
+Phase 번호는 작업의 **성격**에 따른 분류이고 시간 순서와 꼭 같지는 않다. 그래서 선행 Task가 뒤 Phase에 있을 수 있다(예: 얇은 배포 Task 019가 공통 응답 Task 023을 선행으로 둔다. 이 경우는 Task 023을 Phase 1로 옮겨 해소했다). PRD 9절 "위험한 작업은 일찍"에 따라 계산 엔진(B2, Phase 3)은 1주차에 골격과 함께 착수하고, MVP 배포(B8·F8, Phase 5)는 2단계 작업(Phase 4)보다 먼저 한다. 실제 착수 순서는 3.2를 따른다.
 
 **UI 선행 순서(PRD 9절).**
 - MVP: 전체 화면 목업(F1, Task 027~029) → 목업 승인과 화면 결정(Task 030) → OpenAPI 초안(Task 031) → ERD 보정(Task 032) → 작품·상품 영역(A·B, Task 033)과 사용자·플랜·알림 영역(C·D·E, Task 034) 마이그레이션. 1주차 얇은 배포에 필요한 V1(`ott_service`, Task 019)만 예외로 먼저 만든다.
@@ -137,7 +140,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 ### 4.2 공통 규칙
 
 **브랜치(git.md).**
-- 초기 세팅 Task(006~011)와 미커밋 문서는 `main`에 직접 커밋하고, 직후 Task 012에서 `develop`을 만든다.
+- 초기 세팅 중 Task 006·007·011·017(일부)과 문서는 `main`에 직접 커밋했고(2026-10-04), 그 뒤 `develop`을 만들어 푸시했다. 남은 Task 009·010은 2026-10-04 사용자 결정으로 `main` 직접 커밋 예외를 쓰지 않고 `feature/*` 브랜치와 `develop` 대상 PR로 진행한다. Task 008도 같은 방식(PR #1)으로 진행했다.
 - 이후 모든 개발 Task는 `develop`에서 `feature/{작업ID}-{설명}`을 만들어 `develop` 대상 PR로 합친다(squash). 그래서 모든 feature Task는 Task 012를 전제로 한다(체인의 첫 Task에만 선행으로 표기).
 - `develop` → `main`은 배포 Task에서만 merge commit으로 합친다: 첫 배포(021), MVP(095), 2단계(102), 3단계(105). `main` 직접 커밋이나 `develop` 수동 배포 예외는 두지 않는다.
 - cron 워크플로는 기본 브랜치(`main`) 기준으로 실행된다. 그래서 워크플로를 만드는 Task는 PR·로컬 수준으로 검증하고, 실제 실행 확인은 `main`에 병합하는 배포 Task의 완료 기준에 둔다.
@@ -202,7 +205,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 2/22
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 7/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -257,7 +260,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-H: 업체·첫해·갱신 가격·구매일을 기록했다.
 
-#### Task 006: 백엔드 Gradle 프로젝트 골격 생성으로 빌드 기반 마련 ⬜
+#### Task 006: 백엔드 Gradle 프로젝트 골격 생성으로 빌드 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `backend/settings.gradle`, `backend/build.gradle`, Gradle wrapper(`gradlew.bat` 포함). Java 17, Spring Boot 4.1
@@ -265,8 +268,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 패키지(`global`, `infra`, `engine`, `collect`, `admin`, 도메인)는 실제 클래스가 생길 때 만든다
 - 완료 기준
   - V-B: `.\gradlew.bat build`가 성공한다.
+- 기록: 2026-10-04 완료(커밋 `23fe649`, `main` 직접 커밋). Spring Boot 4.1.1, Gradle 래퍼 9.7.1, Java 17. `.\gradlew.bat build` 통과, 메인 클래스 `com.ottnavi.OttnaviApplication`(패키지 루트 `com.ottnavi`). 설정 파일은 `application.yml`로 통일했다(Initializr 기본값 `application.properties`를 바꿈). 의존성은 `starter-webmvc`와 테스트 기본뿐이고 나머지는 Task 016에서 추가한다.
 
-#### Task 007: 프론트 Vite 프로젝트 골격 생성으로 빌드 기반 마련 ⬜
+#### Task 007: 프론트 Vite 프로젝트 골격 생성으로 빌드 기반 마련 ✅
 - 태그: [F] · PRD: F0 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `frontend/` Vite + React + TypeScript 템플릿(npm), `package-lock.json` 커밋
@@ -274,18 +278,20 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 스크립트 `dev`, `build`, `lint`, `test` 자리(도구 구성은 Task 017)
 - 완료 기준
   - `npm run build` 성공, V-F: 루트(`/`)가 에러 없이 로드된다.
+- 기록: 2026-10-04 완료(커밋 `5093728`에 Task 017과 함께 포함, `main` 직접 커밋). Vite 8.3, React 19, TypeScript 6.0. `engines.node`는 `^20.19.0 || >=22.12.0`. `npm run build` 통과, 목업 모드 V-F에서 콘솔 에러 0건. `test` 스크립트는 Task 017에서 no-op을 `vitest run`으로 교체했다.
 
-#### Task 008: 로컬 Docker Compose와 .env.example 작성으로 실행 환경 통일 ⬜
-- 태그: [B] · PRD: B0 · 선행: 006 · 브랜치: `main` 직접 커밋(초기 세팅)
+#### Task 008: 로컬 Docker Compose와 .env.example 작성으로 실행 환경 통일 ✅
+- 태그: [B] · PRD: B0 · 선행: 006 · 브랜치: `feature/b0-local-env`(PR #1. `develop`을 먼저 만들기로 해서 `main` 직접 커밋 예외를 쓰지 않았다)
 - 구현 사항
-  - [ ] `infra/docker-compose.yml`: PostgreSQL(15+)·Redis만, 볼륨, 헬스체크(4.1 ①). 백엔드 컨테이너는 k6용으로 Task 100에서 추가
+  - [x] `infra/docker-compose.yml`: PostgreSQL 17.6·Redis 8.6만, 볼륨, 헬스체크(4.1 ①). 운영(Supabase·Redis Cloud)과 같은 버전에 맞췄다. 백엔드 컨테이너는 k6용으로 Task 100에서 추가
   - [ ] 루트 `.env.example`: 이름만 둔다. `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL`, `JWT_SECRET`, `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, DB·Redis·TMDB·Google OAuth·메일 변수. 프론트는 `VITE_USE_MOCK`만
   - [ ] `.gitignore`가 `.env`·`.env.*`를 막는지 확인
 - 완료 기준
   - `docker compose -f infra/docker-compose.yml up -d` 후 두 컨테이너가 healthy이고 `psql`·`redis-cli` 접속이 된다.
+- 기록: 2026-10-04 완료(PR #1, 스쿼시 커밋 `667efd4`). `postgres:17.6-alpine`(`NULLS NOT DISTINCT` 동작 확인), `redis:8.6-alpine`(8.6.7, `SET ... EX`·`TTL` 확인). 접속 정보는 환경 변수 + 로컬 전용 기본값(`ottnavi`)이고 포트는 `127.0.0.1`에만 공개한다. compose는 `.env`를 `infra/` 기준으로 찾으므로 루트 `.env`를 쓰려면 `--env-file .env`를 붙인다. `.env.example`은 이름만 담았고 `.gitignore`(`.env`·`.env.*` 차단, `!.env.example` 예외)를 확인했다. Redis는 Redis Cloud에서 8.6으로 생성해야 로컬과 맞는다(Task 002).
 
 #### Task 009: vercel.json 초안 작성으로 /api 프록시·비밀 헤더·SPA 라우팅 준비 ⬜
-- 태그: [F] · PRD: F0 · 선행: 007 · 브랜치: `main` 직접 커밋(초기 세팅)
+- 태그: [F] · PRD: F0 · 선행: 007 · 브랜치: `feature/f0-vercel-json`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 관련: TECH T-8, TECH 6절(rewrite 순서·캐시·`routes`+`rewrites`)
 - 구현 사항
   - [ ] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
@@ -295,32 +301,34 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - JSON 문법이 유효하다. `routes`·`rewrites` 혼용 허용 여부는 Task 014(미리보기 배포), 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
 
 #### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ⬜
-- 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `main` 직접 커밋(초기 세팅)
+- 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `feature/b0-ci-skeleton`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 구현 사항
   - [ ] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
-  - [ ] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 no-op(`package.json`의 `test` 스크립트가 아무것도 실행하지 않고 성공)으로 둔다
+  - [ ] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 `npm run test`(Task 017에서 `vitest run`으로 구성됨)를 실행한다. 추가로 `format:check`(Prettier)를 넣을지는 이 Task에서 정한다
   - [ ] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
 - 완료 기준
-  - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 첫 푸시를 하는 Task 012에서 확인한다.
+  - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 이 Task의 PR(`develop` 대상)에서 확인하고, 그 실행 링크를 Task 012 `기록:`에 남긴다(첫 푸시는 이미 끝났다).
 
-#### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ⬜
+#### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ✅
 - 태그: [B] · PRD: F1 선행 준비 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `docs/api/openapi.yaml`: `servers`(`/api`), `paths: {}`, `bearerAuth`, `tags`(catalog, user, wishlist, product, plan, auth, notification, admin — api-contract.md), 공통 `ProblemDetail`(`errorCode` 확장)·페이지네이션 스키마
   - [ ] `docs/api/error-codes.md`: 공통 코드(`VALIDATION_FAILED`, `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMIT_EXCEEDED`, `INTERNAL_ERROR`, `EXTERNAL_API_ERROR`, `TITLE_NOT_FOUND`)와 TECH 신규 코드(`PLAN_DRAFT_STALE`, `PLAN_DRAFT_NOT_FOUND`, `BATCH_ALREADY_RUNNING`, `BATCH_ALREADY_COMPLETED`). 열: HTTP 상태, 의미, 화면 메시지
 - 완료 기준
   - 지금 쓸 수 있는 검사 도구로 OpenAPI 3 문법 검사를 통과한다(예: `npx @redocly/cli lint docs/api/openapi.yaml`, 도구는 제안). orval 생성 확인은 Task 017에서 한다.
+- 기록: 2026-10-04 완료(커밋 `4eeca03`, `main` 직접 커밋). OpenAPI 3.0.3(`nullable` 표기 때문), `redocly lint` 에러 0건(경고 11건: 미사용 컴포넌트 10건, `info.license` 1건. operation이 생기면 미사용 경고는 사라진다). `ProblemDetail`의 `fieldErrors`(필드 오류 목록) 구조는 제안값이다. springdoc이 생성하는 버전과 다르면 Task 023의 계약 대조 테스트에서 맞춘다.
 
 #### Task 012: develop 브랜치 생성과 보호 규칙 설정으로 작업 흐름 고정 ⬜
 - 태그: [H] · PRD: — (git.md) · 선행: 006~011
 - 구현 사항
-  - [ ] 미커밋 문서(1절 저장소 상태)와 초기 세팅 커밋을 `origin/main`에 푸시
-  - [ ] `main`에서 `develop`을 만들어 푸시. 기본 브랜치는 `main` 유지
+  - [x] 미커밋 문서(1절 저장소 상태)와 초기 세팅 커밋을 `origin/main`에 푸시
+  - [x] `main`에서 `develop`을 만들어 푸시. 기본 브랜치는 `main` 유지
   - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
-  - [ ] Secret scanning·push protection 사용 가능 여부 확인 후 켬
+  - [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬
 - 완료 기준
   - 첫 푸시로 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 이 시점 `frontend-ci`의 `test`는 no-op이고 실제 테스트 실행은 Task 017부터다.
   - V-H: 보호 규칙 설정을 기록했고, `develop` 직접 푸시가 거부되는 것을 확인했다.
+- 기록(진행 중, 2026-10-04): `main`·`develop`을 `origin`에 푸시했고 기본 브랜치는 `main`이다. 저장소는 공개이고 Settings → Advanced Security에서 Secret Protection·Push protection이 켜져 있음을 확인했다. 남은 것은 보호 규칙(Rulesets 또는 Branches)과 `develop` 직접 푸시 거부 확인이며, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010을 병합해 워크플로가 한 번 실행된 뒤에 지정한다. CI 경로 필터는 쓰지 않는 쪽을 권장한다(필수 검사가 보고되지 않아 PR이 막히는 것을 피함).
 
 #### Task 013: Claude Code 플러그인 3종 설치로 작업 보조 도구 준비 ✅
 - 태그: [H] · PRD: — · 선행: 없음
@@ -374,8 +382,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: Testcontainers로 컨텍스트 로드 테스트가 통과한다.
   - V-API: local 프로필 기동 시 Flyway·Batch·Security 관련 오류가 없고 기본 로그인 폼·생성 비밀번호가 나오지 않는다.
 
-#### Task 017: 프론트 개발 도구와 API 생성 파이프라인 구성으로 목업 개발 준비 ⬜
-- 태그: [F] · PRD: F0 · 선행: 007, 011, 012 · 브랜치: `feature/f0-frontend-setup`
+#### Task 017: 프론트 개발 도구와 API 생성 파이프라인 구성으로 목업 개발 준비 ✅
+- 태그: [F] · PRD: F0 · 선행: 007, 011, 012 · 브랜치: `feature/f0-frontend-setup`(실제로는 `develop` 생성 전에 진행해 커밋 `5093728`에 `main` 직접 커밋으로 들어갔고, `@hookform/resolvers` 추가분만 PR #1에 담겼다)
 - 구현 사항
   - [ ] Tailwind v4, shadcn/ui(`src/components/ui/`), React Router, TanStack Query, Zustand, React Hook Form·Zod, ESLint·Prettier, Vitest·RTL
   - [ ] `frontend/orval.config.ts`: 입력 `../docs/api/openapi.yaml` 하나(초안 파일 없음, `x-planned` operation도 생성 대상, 4.2), 출력 `src/api/generated/`, `react-query`, **`httpClient: 'axios'`** + `override.mutator`(`src/api/http.ts`), MSW 생성
@@ -384,6 +392,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - `npm run api:generate`·`lint`·`test`·`build`가 성공한다(Task 011 계약 골격의 생성 확인 포함).
   - V-F: 목업 모드에서 루트가 로드되고 콘솔 에러가 0건이다.
+- 기록: 2026-10-04 완료. `api:generate`·`lint`·`test`·`build`·`format:check` 통과, 목업 모드 V-F 콘솔 에러 0건. 계약이 `paths: {}`여도 `api:generate`는 에러 없이 끝나지만 타입 11개만 생성되고 훅·핸들러는 만들어지지 않는다. 임시 계약(조회 1개·등록 1개)으로 `orval` 8.39와 `msw` 3.0 호환(생성·타입 검사·런타임 가로채기)을 확인한 뒤 임시 파일은 지웠다. `src/mocks/handlers.ts`는 operation이 생기는 Task 019·031에서 채운다. `@hookform/resolvers` 5.9.1을 함께 설치했다. 템플릿 CSS 정리(`#root`·템플릿 변수·다크 모드 충돌)는 Task 018, 디자인 토큰 정리는 Task 037에서 한다.
 
 #### Task 018: 라우트·레이아웃·라우트 가드 골격 구현으로 전체 화면 뼈대 마련 ⬜
 - 태그: [F] · PRD: F0~F1, FR-06, FR-17 · 선행: 017 · 브랜치: `feature/f0-routes-layout`
@@ -395,7 +404,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-F: 모든 경로가 로드되고 콘솔 에러가 0건이다.
 
 #### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ⬜
-- 태그: [B] · PRD: B1 · 선행: 016, 023(Phase 2), 011 · 브랜치: `feature/b1-ott-services`
+- 태그: [B] · PRD: B1 · 선행: 016, 023, 011 · 브랜치: `feature/b1-ott-services`
 - 관련: TECH T-8, TECH 4절 IP 헤더
 - 구현 사항
   - [ ] `db/migration/V1__create_ott_service.sql`: `ott_service`와 7개 서비스 시드(쿠팡플레이 `data_quality = INSUFFICIENT`), `provider/domain/OttService` 엔티티·리포지토리
@@ -442,16 +451,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-H: 성공·실패, 오류 메시지, 시험일, 일회성 서비스 삭제를 기록했고 사용자가 R11-11을 결정했다.
 
----
-
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 0/15
-
-**목표.**
-- 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
-- F1 목업으로 전체 흐름을 확정하고(Phase 1~2만으로 목업 흐름 확인 가능) OpenAPI 초안 → ERD 보정 → 스키마 순으로 고정한다.
-
 #### Task 023: 공통 응답·예외 처리와 계약 대조 테스트 구현으로 API 형식 통일 ⬜
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-common-response`
+- 이동: 원래 Phase 2였으나 Task 019(서비스 목록 API)의 선행이라 2026-10-04 사용자 결정으로 Phase 1로 옮겼다. 번호는 그대로다.
 - 관련: api-contract.md 공통 응답, backend.md 예외 처리, TECH T-5
 - 구현 사항
   - [ ] `global/common/CommonResponse`(record), `BaseTimeEntity`
@@ -461,6 +463,14 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: 예외 유형별 응답 테스트와 계약 대조 테스트가 통과한다. `x-planned: true` operation을 하나 둔 계약으로 제외 동작을 확인하는 테스트를 포함한다.
   - V-API: 없는 경로·잘못된 요청에 `application/problem+json`과 `errorCode`가 온다.
+
+---
+
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 0/14
+
+**목표.**
+- 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
+- F1 목업으로 전체 흐름을 확정하고(Phase 1~2만으로 목업 흐름 확인 가능) OpenAPI 초안 → ERD 보정 → 스키마 순으로 고정한다.
 
 #### Task 024: Redis·캐시·Feign 공통 설정 구성으로 외부 연동 기반 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-redis-feign-config`
