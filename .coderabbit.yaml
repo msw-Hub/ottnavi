@@ -9,7 +9,6 @@ reviews:
   path_filters:
     - "!frontend/src/api/generated/**" # orval 생성물(재생성하면 덮어써진다)
     - "!frontend/public/mockServiceWorker.js" # MSW CLI가 생성·갱신
-    - "!frontend/src/components/ui/**" # shadcn 원본(수정하지 않는 규칙, frontend.md)
     - "!backend/gradle/wrapper/**" # Gradle 래퍼(jar·properties)
     - "!backend/gradlew" # Gradle 래퍼 스크립트
     - "!backend/gradlew.bat"
