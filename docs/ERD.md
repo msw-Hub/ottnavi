@@ -1,6 +1,6 @@
 # OTT내비(ottnavi) ERD
 
-초안 v0.3 · 2026-10-03 · PostgreSQL 15+ (Supabase) · Spring Data JPA + Flyway
+초안 v0.3 · 2026-10-03 · PostgreSQL 15+ (Supabase 17.6, 로컬 compose도 17.6) · Spring Data JPA + Flyway
 
 서비스 테이블 24개를 다섯 영역으로 나눴다. 라이브러리가 관리하는 테이블(`BATCH_*`, `shedlock`)은 이 숫자에서 뺐다. 모든 테이블은 내부 대리키(`id BIGINT`)를 기본키로 쓰고, TMDB 값은 매핑 컬럼과 유니크 제약으로 보관한다. 영화와 드라마 시즌은 `watch_unit`(시청 단위)으로 통일해 찜, 제공 상태, 계산이 모두 이 테이블을 기준으로 동작한다.
 

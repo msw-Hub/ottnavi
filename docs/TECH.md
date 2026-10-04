@@ -5,7 +5,7 @@
 - 근거 우선순위: PRD 11절 확정 → PRD 본문 → ERD → rules. [기획서](./proposal_v6.md)는 v7 요약본이라 근거로 쓰지 않는다.
 - 출처 표기: `R`=PRD, `E`=ERD, `rules`, `c7`=context7 확인, `web`=공식 문서 확인, `도출`=문서 근거 없이 이 문서에서 정한 설계.
 - PRD 11절의 결정 필요 항목은 `R11-번호`로, 이 문서가 올린 결정 필요 항목은 `T-번호`로 참조한다. T 항목은 7절이 단일 출처다.
-- 저장소 상태(2026-10-03): 빌드·설정·CI 파일 모두 미생성. 스택은 rules를 따르고, 확인한 버전은 6절에 적는다.
+- 저장소 상태(2026-10-04): `backend/`·`frontend/`·`docs/api/`·`infra/` 골격이 생겼고 CI(`.github/workflows/`)와 `vercel.json`은 아직 없다. 스택은 rules를 따르고, 확인한 버전은 6절에 적는다.
 
 ---
 
@@ -143,7 +143,7 @@ sequenceDiagram
 | Boot 4의 `spring-boot-starter-batch`는 메모리(resourceless) 모드다. DB 이력은 `spring-boot-starter-batch-jdbc` 필요 | 위와 같음. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false` | web, c7 |
 | orval v8 기본 HTTP 클라이언트가 fetch라 axios mutator·인터셉터가 동작하지 않음 | `output.httpClient: 'axios'` 명시 | c7 |
 | Vercel external rewrite는 2026-04-06 이후 프로젝트에서 upstream `Cache-Control`을 따라 CDN 캐시 | 백엔드 `/api/**` 기본 `no-store` + `x-vercel-enable-rewrite-caching: 0`, 스모크로 응답 헤더 확인(T-8 확정) | web |
-| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes` + `rewrites` 동시 사용 시 적용 순서가 불명확 | `routes[].transforms`로 환경 변수 `ORIGIN_SECRET`을 요청 헤더에 주입. 순서는 얇은 배포 Task에서 실측(ROADMAP R-17) | web(부분) |
+| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes`와 `rewrites`·`headers`는 함께 쓸 수 없는 것으로 보임(Vercel CLI 소스: 함께 정의하면 스키마 검증 실패, 배포 실측은 아님) | `routes` 단일 형식으로 작성하고 `transforms`(`type: request.headers`, `op: set`, `target.key`, `args: "$ORIGIN_SECRET"`, `env: ["ORIGIN_SECRET"]`)로 주입. 공식 `@vercel/config`가 만든 JSON과 같고 `routesSchema` 검증 통과. 캐시 비활성화는 `respectOriginCacheControl: false`. 실제 동작은 Task 021에서 확인(ROADMAP R-17) | c7, 실측(Task 009) |
 | `vercel.json` rewrite 순서: SPA 대체를 먼저 두면 API가 `index.html`을 받음 | `/api/:path*` → SPA 대체 순서 | 도출 |
 | Jackson 2·3 혼재: Boot 4는 `tools.jackson.*`, jjwt-jackson은 Jackson 2(`com.fasterxml`) 의존 | jjwt-jackson은 런타임 스코프, 앱 직렬화는 Jackson 3만. 어노테이션은 `com.fasterxml.jackson.annotation` 유지 | web, c7 |
 | Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |
@@ -161,6 +161,14 @@ sequenceDiagram
 | Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(초기 기획의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수집은 로컬에서 실측, 운영 적재는 MVP 배포 때(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
 | Loki4j 최신 라인의 Logback 요구 버전과 Boot 관리 Logback 미대조 | 3단계 도입 시 대조 | c7(부분) |
 | Gemini 무료 등급 입력은 제품 개선에 사용됨 | 개인정보를 프롬프트에 넣지 않음 | web |
+| `msw` 3에서 `worker.start()`·`server.listen()`의 `onUnhandledRequest`가 `onUnhandledFrame`으로 바뀜(설치된 타입 정의로 확인). `orval` 8.39와는 생성·타입 검사·런타임 모두 호환 확인 | `onUnhandledFrame: 'bypass'`(브라우저), 테스트 서버는 `'error'` | 실측(Task 017) |
+| TypeScript 6에서 `baseUrl` 없이 `paths`만으로 `@/*` 별칭이 동작함(`baseUrl`을 넣어 본 적은 없고 deprecated 여부는 문서로 확인하지 못함) | `tsconfig.json`·`tsconfig.app.json` 양쪽에 `paths`, `vite.config.ts`에 같은 별칭 | 실측(Task 017) |
+| Vite 8의 설정 로더(`configLoader: native`)는 `vite.config.ts`의 `__dirname`을 경고함 | `import.meta.dirname` 사용(Node 20.11+) | 실측(Task 017) |
+| shadcn Nova 프리셋은 `clsx`·`tailwind-merge` 대신 `cn` 패키지(`shadcn-ui/cn`)를 `utils.ts`·컴포넌트가 import함. `shadcn` CLI는 `package.json`에 Tailwind가 없으면 "Tailwind 미설치"로 중단됨 | `cn`을 그대로 사용, Tailwind를 `dependencies`에 둔 뒤 `init` | 실측(Task 017) |
+| `shadcn` 패키지의 하위 의존성(`braces` 등)에 `npm audit` 높음 7건이 나오지만 CLI 개발 도구 쪽이라 번들에는 들어가지 않음. `npm audit fix --force`는 `shadcn@1.0.0`으로 내려 `index.css`의 `shadcn/tailwind.css` import가 깨질 수 있음 | 강제 수정하지 않고 `shadcn` 새 버전을 기다림 | 실측(Task 017) |
+| 설치된 Vitest는 5.0.3이고 이 문서의 위 줄은 "Vitest 4"로 적혀 있음. Vitest 5의 Node 요구 버전은 확인하지 못함 | Vite 8 기준(Node 20.19+/22.12+)을 유지 | 실측(Task 017) |
+| `docker compose -f infra/docker-compose.yml`은 `.env`를 compose 파일이 있는 `infra/` 기준으로 찾아 루트 `.env`를 읽지 않음 | compose에 로컬 전용 기본값을 두고, 루트 `.env`가 필요하면 `--env-file .env`. DB·Redis 포트는 `127.0.0.1`에만 공개 | 도출(Task 008) |
+| CodeRabbit은 기본값으로 기본 브랜치(`main`) 대상 PR만 자동 리뷰해 `develop` 대상 PR은 건너뜀. 코멘트 틀(제목·안내문)은 `language: ko-KR`에서도 영어로 나옴 | `.coderabbit.yaml`의 `reviews.auto_review.base_branches`에 `develop` 추가. Autopilot·Autofix 체크박스는 누르지 않음 | c7, 실측 |
 
 ---
 

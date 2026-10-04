@@ -120,7 +120,8 @@ paths:
 ## 개발 환경
 
 - Java 17, Spring Boot 4.1 (Spring Framework 7, Spring Security 7, Hibernate 7, Jackson 3)
-- 로컬 개발은 `infra/docker-compose.yml`의 PostgreSQL, Redis를 쓴다. 프로필은 `local` / `prod`로 나눈다.
+- 로컬 개발은 `infra/docker-compose.yml`의 PostgreSQL 17.6, Redis 8.6을 쓴다(운영 Supabase·Redis Cloud와 같은 버전). 접속 정보는 `DB_NAME`·`DB_USERNAME`·`DB_PASSWORD`·`DB_PORT`·`REDIS_PORT` 변수로 바꿀 수 있고, 없으면 로컬 전용 기본값(`ottnavi`)을 쓴다. 포트는 `127.0.0.1`에만 열린다. 프로필은 `local` / `prod`로 나눈다.
+- 설정 파일은 YAML로 통일한다: `application.yml`, `application-local.yml`, `application-prod.yml`(`.properties`와 섞지 않는다. 둘이 함께 있으면 같은 키는 properties가 우선한다). 로컬 DB 접속 값은 `application-local.yml`에 compose와 같은 기본값을 `${DB_USERNAME:ottnavi}` 형태로 둬서 `.env` 없이도 실행되게 한다.
 - production 환경변수는 하드코딩하지 않고 `${ENV_VAR}` 형태로 주입한다 (DB 접속 정보, OAuth 클라이언트 키,
   JWT 시크릿, TMDB API 키, 관리자 배치 토큰, SMTP 계정 등). 필요한 변수 이름은 루트 `.env.example`에 함께 추가한다.
 - 운영 DB(Supabase)는 Session Pooler(포트 5432) 주소로 접속하고, 연결 풀 크기는 약 5로 제한한다.
