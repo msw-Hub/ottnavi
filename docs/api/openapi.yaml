@@ -1,0 +1,182 @@
+openapi: 3.0.3
+info:
+  title: OTT내비 API
+  description: |
+    OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
+    - 아직 구현하지 않은 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시한다(Task 031).
+    - 성공 응답은 `CommonResponse` 래퍼, 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+  version: 0.1.0
+servers:
+  - url: /api
+    description: 상대 경로. 배포는 Vercel rewrite, 로컬은 Vite proxy가 백엔드로 전달한다
+tags:
+  - name: catalog
+    description: 작품 검색·상세 (공개)
+  - name: user
+    description: 내 설정·구독 상태 (`/api/me/**`)
+  - name: wishlist
+    description: 찜·우선순위·시청 체크
+  - name: product
+    description: OTT 서비스·상품·가격
+  - name: plan
+    description: 플랜 계산·저장·조회
+  - name: auth
+    description: 로그인·재발급·로그아웃 (`/api/auth/**`)
+  - name: notification
+    description: 알림 설정·이력 (2단계)
+  - name: admin
+    description: 관리자 (수집·매핑·상품·가격)
+paths: {}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access Token(JWT). Refresh Token은 HttpOnly 쿠키로 관리되며 계약에 노출하지 않는다.
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: 페이지 번호(0부터)
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: 페이지 크기(기본 20, 최대 100)
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: 요청 값 오류. `errorCode`는 `VALIDATION_FAILED`이며 `fieldErrors`에 필드별 오류가 담긴다
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Unauthorized:
+      description: 인증 필요 또는 Access Token 만료. `errorCode`는 `UNAUTHORIZED`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Forbidden:
+      description: 권한 없음. `errorCode`는 `FORBIDDEN`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    TooManyRequests:
+      description: 요청 제한 초과(비로그인 공개 API). `errorCode`는 `RATE_LIMIT_EXCEEDED`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    InternalError:
+      description: 서버 내부 오류. `errorCode`는 `INTERNAL_ERROR`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    BadGateway:
+      description: 외부 API(TMDB 등) 호출 실패. `errorCode`는 `EXTERNAL_API_ERROR`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+  schemas:
+    ProblemDetail:
+      type: object
+      description: RFC 9457 ProblemDetail에 `errorCode`를 확장한 오류 응답. 코드 목록은 `docs/api/error-codes.md`
+      required:
+        - title
+        - status
+        - errorCode
+      properties:
+        type:
+          type: string
+          description: 오류 유형 URI. 기본값 `about:blank`
+        title:
+          type: string
+          description: HTTP 상태 문구
+        status:
+          type: integer
+          format: int32
+          description: HTTP 상태 코드
+        detail:
+          type: string
+          description: 사람이 읽는 오류 설명(한국어)
+        instance:
+          type: string
+          description: 오류가 발생한 요청 경로
+        errorCode:
+          type: string
+          description: SCREAMING_SNAKE_CASE 오류 코드. 프론트가 한국어 메시지로 매핑한다
+        fieldErrors:
+          type: array
+          description: '`VALIDATION_FAILED`일 때의 필드별 오류 목록(제안)'
+          items:
+            $ref: '#/components/schemas/FieldError'
+      example:
+        type: about:blank
+        title: Not Found
+        status: 404
+        detail: 작품을 찾을 수 없습니다.
+        instance: /api/public/titles/movie/999
+        errorCode: TITLE_NOT_FOUND
+    FieldError:
+      type: object
+      required:
+        - field
+        - message
+      properties:
+        field:
+          type: string
+          description: 오류가 난 요청 필드명
+        message:
+          type: string
+          description: 필드 오류 메시지(한국어)
+      example:
+        field: monthlyBudget
+        message: 0 이상이어야 합니다.
+    PageMeta:
+      type: object
+      description: |
+        페이지네이션 응답 `data`의 공통 필드. Spring `Page`를 그대로 직렬화하지 않는다.
+        실제 응답 스키마는 이 스키마와 `content` 배열을 `allOf`로 합쳐 응답별로 정의한다.
+      required:
+        - page
+        - size
+        - totalElements
+        - totalPages
+      properties:
+        page:
+          type: integer
+          format: int32
+          description: 현재 페이지(0부터)
+        size:
+          type: integer
+          format: int32
+          description: 페이지 크기
+        totalElements:
+          type: integer
+          format: int64
+          description: 전체 건수
+        totalPages:
+          type: integer
+          format: int32
+          description: 전체 페이지 수
+      example:
+        page: 0
+        size: 20
+        totalElements: 135
+        totalPages: 7
