@@ -23,7 +23,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.6-alpine # 운영(Redis Cloud)과 같은 8.6에 맞춘다
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
