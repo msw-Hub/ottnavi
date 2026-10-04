@@ -61,7 +61,10 @@ cd backend; .\gradlew.bat build                                        # 백엔�
 cd backend; .\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"   # 단일 테스트 (클래스·메서드 이름으로 바꿔 쓴다)
 cd backend; .\gradlew.bat bootRun --args="--spring.profiles.active=local"   # 실행 (localhost:8080). local 프로필은 Task 016에서 만든다
 cd frontend; npm run dev                                               # 프론트 (VITE_USE_MOCK=true면 MSW 목업, frontend/.env.local에 둔다)
-cd frontend; npm run lint; npm run format:check; npm run test; npm run build   # 프론트 검증 4종(모두 통과 상태 유지)
+cd frontend; npm run lint                                              # 프론트 검증 4종은 각각 따로 실행해 종료 코드를 확인한다(모두 통과 상태 유지).
+cd frontend; npm run format:check                                      # PowerShell에서 ;로 이으면 앞 명령의 실패가 뒤 명령 성공에 가려진다
+cd frontend; npm run test
+cd frontend; npm run build
 cd frontend; npx vitest run src/path/to.test.tsx                       # 프론트 단일 테스트 파일
 cd frontend; npm run api:generate                                      # openapi.yaml → orval 생성
 ```
