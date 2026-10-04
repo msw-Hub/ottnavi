@@ -1,0 +1,20 @@
+{
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "https://REPLACE_BACKEND_HOST/api/$1",
+      "respectOriginCacheControl": false,
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": { "key": "x-origin-secret" },
+          "args": "$ORIGIN_SECRET",
+          "env": ["ORIGIN_SECRET"]
+        }
+      ]
+    },
+    { "handle": "filesystem" },
+    { "src": "^/(.*)$", "dest": "/index.html" }
+  ]
+}
