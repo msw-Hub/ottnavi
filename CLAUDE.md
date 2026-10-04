@@ -31,7 +31,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `.claude/rules/api-contract.md` | OpenAPI 계약 변경 절차, 응답·오류·페이지네이션 형식 |
 | `.claude/rules/git.md` | 브랜치·커밋·병합 규칙 |
 
-`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)가, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
+`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage)가, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
 
 ## 목표 아키텍처 (big picture)
 
@@ -61,7 +61,10 @@ cd backend; .\gradlew.bat build                                        # 백엔�
 cd backend; .\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"   # 단일 테스트 (클래스·메서드 이름으로 바꿔 쓴다)
 cd backend; .\gradlew.bat bootRun --args="--spring.profiles.active=local"   # 실행 (localhost:8080). local 프로필은 Task 016에서 만든다
 cd frontend; npm run dev                                               # 프론트 (VITE_USE_MOCK=true면 MSW 목업, frontend/.env.local에 둔다)
-cd frontend; npm run lint; npm run format:check; npm run test; npm run build   # 프론트 검증 4종(모두 통과 상태 유지)
+cd frontend; npm run lint                                              # 프론트 검증 4종은 각각 따로 실행해 종료 코드를 확인한다(모두 통과 상태 유지).
+cd frontend; npm run format:check                                      # PowerShell에서 ;로 이으면 앞 명령의 실패가 뒤 명령 성공에 가려진다
+cd frontend; npm run test
+cd frontend; npm run build
 cd frontend; npx vitest run src/path/to.test.tsx                       # 프론트 단일 테스트 파일
 cd frontend; npm run api:generate                                      # openapi.yaml → orval 생성
 ```
