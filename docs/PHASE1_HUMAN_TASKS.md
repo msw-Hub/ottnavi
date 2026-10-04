@@ -11,15 +11,15 @@
 | 1 | 002 외부 계정·키 발급 | 없음 | — | **완료(2026-10-05)**. 004·015·020·022의 전제 |
 | 1 | 003 약관·운영 정책 조사 | 없음 | — | **완료(2026-10-05)**. 결과는 `docs/TASK003_POLICY_PRICING.md` |
 | 1 | 005 도메인 구매 | 없음 | Task 092 직전(1년 사용 기간을 늦추려고 미룸) | 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소 사용 |
-| 2 | 004 KR 제공처 ID·요금표 조사 | 002 | — | 033 시드, 061 입력값 |
+| 2 | 004 KR 제공처 ID·요금표 조사 | 002 | — | **완료(2026-10-05)**. 033 시드, 061 입력값 |
 | 3 | 012 `develop` 생성·보호 규칙 | 코드 Task 006~011 완료 | — | **완료(2026-10-04)** |
 | 4 | 014 Vercel 연결 | 012 (009 포함) | 2026-10-07 | **완료(2026-10-05)**. 015·020의 전제 |
-| 5 | 015 비밀 값 정리·등록 | 002, 014 | — | |
+| 5 | 015 비밀 값 정리·등록 | 002, 014 | — | **완료(2026-10-05)**. 020의 전제 |
 | 6 | 020 Cloudtype 서비스·토큰 | 002, 015, 019(코드) | 2026-10-12 | 021(배포)의 전제 |
 
 코드 Task와의 연결: 006~011 → **012** → 016·017 착수 / 019 완료 → **020** → 021.
 
-**지금 바로 착수할 수 있는 것**: 014. 기한이 가까운 것은 **014(10-07)**, **020(10-12)** 이다. 002·003은 완료했다. 005(도메인 구매)는 1년 사용 기간을 늦추려고 Task 092 직전까지 미룬다.
+**지금 바로 착수할 수 있는 것**: 없음(남은 사람 작업은 020과 005뿐). 기한이 가까운 것은 **020(10-12)** 이다. 002·003·004·012·014·015는 완료했다. 005(도메인 구매)는 1년 사용 기간을 늦추려고 Task 092 직전까지 미룬다.
 
 ---
 
@@ -127,26 +127,29 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 ### 완료 기준(V-H)
 항목별 **출처 URL·확인 날짜·결론**을 ROADMAP Task 003 `기록:`에 남긴다. R11-27 결과를 PRD 10.2에 반영할지 판단한다. 서비스 추가가 불가능하면 Task 022를 어떻게 진행할지 Claude에게 알려 협의한다.
 
-## Task 004: KR 제공처 ID 확정과 요금표 조사 (선행: 002)
-**목적**: 백엔드 시드(Task 033)와 관리자 가격 입력(Task 061)에 쓸 값을 만든다.
+## Task 004: KR 제공처 ID 확정과 요금표 조사 — 완료(2026-10-05, 선행: 002)
+**목적**: 백엔드 시드(Task 033)와 관리자 가격 입력(Task 061)에 쓸 값을 만든다. 결과는 ROADMAP Task 004 `기록:`에 있다.
 
 ### 할 일
-- [ ] **TMDB KR 제공처 목록 조회**: Task 002의 TMDB 키로 한국 제공처 목록을 받는다. 키는 현재 세션에만 두고 명령 히스토리에 남기지 않는다.
+- [x] **TMDB KR 제공처 목록 조회**: Task 002의 TMDB 토큰으로 한국 제공처 목록을 받는다. 토큰은 `Read-Host` 입력창에 붙여 넣어 현재 세션에만 두고, 명령어나 채팅에 적지 않는다.
   ```powershell
-  # 키를 입력받아 현재 세션에서만 사용(세션 종료 시 사라짐)
-  $env:TMDB_API_KEY = Read-Host "TMDB API 키"
-  Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/movie?watch_region=KR&api_key=$env:TMDB_API_KEY" | ConvertTo-Json -Depth 5 > $env:TEMP\tmdb-kr-movie.json
-  Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/tv?watch_region=KR&api_key=$env:TMDB_API_KEY" | ConvertTo-Json -Depth 5 > $env:TEMP\tmdb-kr-tv.json
-  Remove-Item Env:TMDB_API_KEY
+  # 안내 문구만 따옴표 안에 쓰고, 토큰은 실행 후 나오는 입력창에 붙여 넣는다(세션 종료 시 사라짐)
+  $env:TMDB_TOKEN = Read-Host "TMDB Read Access Token 입력"
+  $h = @{ Authorization = "Bearer $env:TMDB_TOKEN" }
+  foreach ($t in "movie","tv") {
+    Invoke-RestMethod "https://api.themoviedb.org/3/watch/providers/$t`?watch_region=KR&language=ko-KR" -Headers $h |
+      ConvertTo-Json -Depth 5 | Out-File "$env:TEMP\tmdb-kr-$t.json" -Encoding utf8
+  }
+  Remove-Item Env:\TMDB_TOKEN
   ```
-  결과 파일은 저장소 밖(임시 폴더)에 둔다.
-- [ ] **매핑표 작성**: 7개 서비스 각각의 `provider_id`, TMDB 원본 라벨, tier(STANDARD/AD) 판정(광고형 요금제 라벨이 따로 있으면 AD로 구분)을 표로 만든다.
-- [ ] **요금표 조사**: 7개 서비스의 STANDARD 단품 월 가격과 조사일을 공식 요금 페이지에서 확인한다.
-- [ ] **매핑되지 않은 KR 제공처 목록**을 따로 적는다(7개 밖의 제공처).
-- [ ] 매핑표는 Task 033 시드 입력값으로, 가격표는 Task 061 관리자 입력값으로 넘긴다(표 형태로 Claude에게 전달).
+  `eyJ`로 시작하는 긴 값(v4 Read Access Token)은 `api_key` 쿼리가 아니라 `Authorization: Bearer` 헤더로 보낸다(쿼리로 보내면 401). `>` 대신 `Out-File -Encoding utf8`을 쓰는 것은 PowerShell 5.1의 `>`가 UTF-16으로 저장해 한글이 깨지기 때문이다. 결과 파일은 저장소 밖(임시 폴더)에 두고 끝나면 지운다.
+- [x] **매핑표 작성**: 7개 서비스 각각의 `provider_id`, TMDB 원본 라벨, tier(STANDARD/AD) 판정(광고형 요금제 라벨이 따로 있으면 AD로 구분)을 표로 만든다.
+- [x] **요금표 조사**: 7개 서비스의 STANDARD 단품 월 가격과 조사일을 공식 요금 페이지에서 확인한다.
+- [x] **매핑되지 않은 KR 제공처 목록**을 따로 적는다(7개 밖의 제공처).
+- [x] 매핑표는 Task 033 시드 입력값으로, 가격표는 Task 061 관리자 입력값으로 넘긴다(표 형태로 Claude에게 전달).
 
 ### 완료 기준(V-H)
-매핑표·가격표(**출처, 조사일**)와 매핑되지 않은 KR 제공처 목록을 ROADMAP Task 004 `기록:`에 남긴다.
+매핑표·가격표(**출처, 조사일**)와 매핑되지 않은 KR 제공처 목록을 ROADMAP Task 004 `기록:`에 남긴다. (완료)
 
 ## Task 005: 도메인 `ottnavi.shop` 구매 (구매 시점: Task 092 직전)
 **목적**: 운영 주소를 확보한다. DNS 연결은 Task 092에서 한다.
@@ -194,28 +197,28 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 - 어느 쪽이든 PRD 10.3 R-17을 갱신한다.
 - **완료 (2026-10-05)**: Root Directory `frontend`, Production Branch `main`(기본값), Node 24.x(기본값)를 확인했다. PR #7의 미리보기가 `vercel.json` 오류 없이 배포됐고 루트 페이지가 열린다. `/api/public/ott-services`는 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 프록시 규칙이 SPA 대체보다 먼저 적용됨을 확인했다(`/api`는 슬래시가 없어 규칙에 걸리지 않으므로 SPA 화면이 나오는 것이 정상). 상세 기록은 ROADMAP Task 014 `기록:`.
 
-## Task 015: 비밀 값 저장 위치 정리와 등록 (선행: 002, 014)
+## Task 015: 비밀 값 저장 위치 정리와 등록 — 완료(2026-10-05, 선행: 002, 014)
 **범위**: GitHub·Vercel·로컬만. Cloudtype은 Task 020. 위 "비밀 값 보관 규칙"의 표가 저장 위치표의 기본이다.
 
 ### 할 일
-- [ ] **저장 위치표 확정**: 위 표를 확인하고 달라지는 항목이 있으면 고친다(값 제외, 이름만). Cloudtype 항목은 표에만 적고 등록은 Task 020에서 한다.
-- [ ] **난수 생성**(위 "난수 만드는 법"): `JWT_SECRET`(256비트 이상), `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 각각 따로 만들어 비밀번호 관리자에 먼저 저장한다. 개발용·운영용 `JWT_SECRET`·`ADMIN_BATCH_TOKEN`은 서로 다른 값이다.
-- [ ] **GitHub Actions secrets 등록**: 저장소 → Settings → Secrets and variables → Actions → New repository secret
+- [x] **저장 위치표 확정**: 위 표를 확인하고 달라지는 항목이 있으면 고친다(값 제외, 이름만). Cloudtype 항목은 표에만 적고 등록은 Task 020에서 한다.
+- [x] **난수 생성**(위 "난수 만드는 법"): `JWT_SECRET`(256비트 이상), `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 각각 따로 만들어 비밀번호 관리자에 먼저 저장한다. 개발용·운영용 `JWT_SECRET`·`ADMIN_BATCH_TOKEN`은 서로 다른 값이다.
+- [x] **GitHub Actions secrets 등록**: 저장소 → Settings → Secrets and variables → Actions → New repository secret
   - `ADMIN_BATCH_TOKEN`
   - `ORIGIN_SECRET`
   - (Cloudtype 백엔드 주소·배포 토큰은 Task 020)
   - 등록 후에는 값을 다시 볼 수 없다. 틀리면 같은 이름으로 덮어쓴다.
-- [ ] **Vercel 환경 변수 등록**: 프로젝트 → Settings → Environment Variables
+- [x] **Vercel 환경 변수 등록**: 프로젝트 → Settings → Environment Variables
   - `ORIGIN_SECRET`을 **Production과 Preview 환경 둘 다** 체크해서 등록한다(`vercel.json`의 `routes[].transforms`가 읽고, Task 094의 미리보기 확인이 Preview 값을 쓴다).
   - **GitHub secrets의 `ORIGIN_SECRET`과 같은 값**이어야 한다.
   - `VITE_`로 시작하는 변수에 비밀 값을 넣지 않는다.
-- [ ] **로컬 `.env` 만들기**: 저장소 루트에서 복사한 뒤 필요한 값을 채운다.
+- [x] **로컬 `.env` 만들기**: 저장소 루트에서 복사한 뒤 필요한 값을 채운다.
   ```powershell
   Copy-Item .env.example .env
   ```
   - 개발에 필요한 값만 채운다(`JWT_SECRET` 개발용, `ADMIN_BATCH_TOKEN` 개발용, `TMDB_API_KEY`, Google OAuth, 메일). 운영 DB·Redis 값은 넣지 않는다.
   - `git status`에 `.env`가 나타나지 않는지 확인한다(`.gitignore`가 막는다).
-- [ ] **노출 시 재발급 절차**: 위 "노출됐을 때" 표가 기준이다. 빠진 값이 있으면 한 줄 추가한다.
+- [x] **노출 시 재발급 절차**: 위 "노출됐을 때" 표가 기준이다. 빠진 값이 있으면 한 줄 추가한다.
 
 ### 완료 기준(V-H)
 저장 위치표와 **GitHub·Vercel(Production·Preview)·로컬 등록일**을 ROADMAP Task 015 `기록:`에 남기고, **저장소에 비밀 값이 없음**을 확인한다.

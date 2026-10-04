@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 13/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 15/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 13/105 | |
+| 합계 | | 15/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 13/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 15/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -273,14 +273,44 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - **R11-27**은 PRD 11절 27번을 확정으로 바꾸고 10.2 표에서 뺐다.
   - 후속 반영: TECH T-6(하비 5분), Task 020(R-12, Redis 생존 확인), Task 022(무료 리소스), 4.6(메모리 예산과 측정 지점), Task 021·040·048·100(측정 항목).
 
-#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ⬜
+#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ✅
 - 태그: [H] · PRD: H2, FR-18, FR-19 · 선행: 002
 - 구현 사항
-  - [ ] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
-  - [ ] 7개 서비스 STANDARD 단품 월 가격과 조사일
-  - [ ] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
+  - [x] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
+  - [x] 7개 서비스 STANDARD 단품 월 가격과 조사일
+  - [x] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
 - 완료 기준
   - V-H: 매핑표·가격표(출처, 조사일)와 매핑되지 않은 KR 제공처 목록을 기록했다.
+- 기록: 2026-10-05 완료. TMDB `watch/providers/{movie,tv}?watch_region=KR&language=ko-KR`를 조회했다(v4 Read Access Token을 `Authorization: Bearer` 헤더로 보냄. 이 토큰은 `api_key` 쿼리로는 401). 영화·TV 목록의 ID는 같다.
+  - **매핑표(Task 033 `tmdb_provider` 시드 입력값)**
+
+    | 서비스 | provider_id | TMDB 원본 라벨 | tier | 비고 |
+    |---|---|---|---|---|
+    | Netflix | 8 | Netflix | STANDARD | |
+    | Netflix 광고형 | 1796 | Netflix Standard with Ads | AD | MVP에서 사용하지 않음(O3) |
+    | Disney+ | 337 | Disney Plus | STANDARD | 광고형 별도 ID 없음 |
+    | TVING | 1883 | TVING | STANDARD | 광고형 별도 ID 없음 |
+    | Watcha | 97 | Watcha | STANDARD | |
+    | wavve | 356 | wavve | STANDARD | 광고형 별도 ID 없음 |
+    | Coupang Play | 1881 | Coupang Play | STANDARD | **TV 목록에만 있고 영화 목록에는 없다**(TMDB 쪽 누락 가능, 수집 결과로 재확인) |
+    | Apple TV+ | 350 | Apple TV | STANDARD | 라벨이 "Apple TV"이나 구독형이다 |
+
+    광고형 라벨이 따로 있는 것은 Netflix(1796)뿐이다. 나머지 서비스의 광고형 요금제는 TMDB에서 STANDARD와 구분되지 않는다.
+  - **가격표(Task 061 관리자 입력값, 조사일 2026-10-05, 표시 가격 그대로)**
+
+    | 서비스 | STANDARD 요금제 | 월 가격(원) | 출처 | 확인 수준 |
+    |---|---|---|---|---|
+    | Netflix | 스탠다드 | 13,500 | help.netflix.com/ko/node/24926 | 공식. 기준일 표기 없음, "지역에 따라 세금이 추가될 수 있음" 안내 |
+    | Disney+ | 스탠다드 | 9,900 (부가세 포함) | disneyplus.com/ko-kr/commerce/plans | 공식(사용자가 화면에서 확인) |
+    | TVING | 스탠다드 | 13,500 | tving.com/bill/subscription/plan | 공식 |
+    | Watcha | 베이직 | 7,900 | 공식 정리 페이지 없음, 결제 화면에서 직접 확인 | 직접 확인 |
+    | wavve | 스탠다드 | 10,900 | wavve.com/voucher/?voucher-type=wavve | 공식 |
+    | Coupang Play | 와우 멤버십(광고 포함) | 7,890 | namu.wiki 쿠팡플레이 문서(요금제 표) | **비공식**. 쿠팡플레이는 와우 회원만 볼 수 있어 와우 월 요금이 곧 이용 비용이다. 광고 없는 시청은 프리미엄 패스 3,900 추가(합계 11,790) |
+    | Apple TV+ | 단일 | 6,500 | apple.com/kr/apple-tv | 공식 |
+
+    STANDARD 기준은 광고 없는 요금제가 원칙이지만 Coupang Play는 TMDB에 ID가 하나뿐이고 가격이 와우 7,890 하나로 정해져 7,890을 쓴다(2026-10-05 사용자 결정). Watcha는 베이직만 있어 이를 STANDARD로 쓴다. 와우 이용자의 해지 안내는 R11-27 결론을 따르며 "와우–패스 관계"는 TASK003에서 모름으로 둔 그대로다.
+  - **O3 참고 자료(MVP는 STANDARD 단품만이라 사용하지 않는다. O3 착수 때 다시 확인)**: Netflix 광고형 7,000·프리미엄 17,000. TVING 광고형 스탠다드 5,500·베이직 9,500. wavve 광고형 스탠다드 5,500·베이직 7,900. 번들(조사일 2026-10-05): 티빙+웨이브 더블 스탠다드 15,000, 티빙+웨이브 더블 광고형 스탠다드 7,000, 웨이브+티빙 더블 베이직 13,500, 디즈니+티빙 스탠다드 18,000(부가세 포함), 디즈니+티빙+웨이브 스탠다드 21,500(부가세 포함). 쿠팡 패스: 프리미엄 3,900, 스포츠 12,400(와우 회원가, 일반 회원가 19,300).
+  - **매핑되지 않은 KR 제공처 31개**: 7개 서비스 밖이다. 이 중 국내 구독 후보로 볼 만한 것은 Amazon Prime Video(119), Google Play Movies(3)이며 둘 다 범위 밖이다. 나머지는 해외 소규모·다큐·독립영화 서비스다(상위 30개: JustWatch TV 2285, GuideDoc 100, Curiosity Stream 190, DOCSVILLE 475, Plex 538, WOW Presents Plus 546, Magellan TV 551, BroadwayHD 554, Filmzie 559, Dekkoo 444, True Story 567, DocAlliance Films 569, Hoichoi 315, Eventive 677, Cultpix 692, Takflix 1771, Sun Nxt 309, Crunchyroll 283, Jolt Film 2330, FOUND TV 2478, MUBI 11, Bloodstream 2555, MovieMe 2565, KableOne 2603, CaixaForum+ 2620, Artiflix 2623, Artify 2685, Pijama Films 2765, Filmtap 2782. 표시 우선순위 순).
 
 #### Task 005: 도메인 ottnavi.shop 1년 구매로 운영 주소 확보 ⬜
 - 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: Task 092 착수 직전, 2026-11-04 이전(1년 사용 기간이 구매일부터 시작하므로 구매를 미룬다. 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소를 쓴다)
@@ -387,20 +417,37 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
 - 기록: 2026-10-05 완료. GitHub 저장소 `msw-Hub/ottnavi`를 Vercel에 연결했고 **Root Directory는 `frontend`**, **Production Branch는 기본값 `main`**(Environments의 Production에서 확인, 저장소 기본 브랜치가 `main`이라 자동 지정), **Node.js Version은 24.x**(CI와 동일, 기본값으로 설정돼 있음), 프리셋은 Vite로 자동 인식돼 `npm run build`·출력 `dist`가 기본값으로 들어갔다. 연결 직후 `main`(커밋 `23fe649`)이 Production으로 먼저 배포됐는데, 이때 `main`에는 `vercel.json`이 없었다(`vercel.json`은 PR #4로 `develop`에만 병합됨). **R-17 실측**은 PR #7의 미리보기(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)로 했다: 빌드(`vite build`, 21개 모듈)가 `Build Completed`·`Deployment completed`로 끝났고 `vercel.json` 검증 오류는 없었다. `routes` 단일 형식이 설정 오류 없이 배포됐고, `ORIGIN_SECRET` 환경 변수가 없어도 배포는 실패하지 않았다(Task 015에서 등록). 미리보기 루트 페이지(`/`)가 열린다. `/api`(슬래시 없음)는 프록시 규칙 `^/api/(.*)$`에 걸리지 않아 SPA 화면이 나오는 것이 정상이고, `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트 `REPLACE_BACKEND_HOST`로 프록시 시도, 요청 처리 지역 `icn1`)가 나와 `/api` 프록시가 SPA 대체보다 먼저 적용됨을 확인했다. 혼용(`routes`+`rewrites`)은 시험하지 않았다. 빌드 로그의 `engines` 경고(새 메이저 Node가 나오면 자동 상향될 수 있다는 안내)는 정상이다. `/api` 프록시 동작과 헤더 주입의 실제 확인은 Task 021이다.
 
-#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
+#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ✅
 - 태그: [H] · PRD: 6절 보안 · 선행: 002, 014
 - 관련: TECH 3절(cron 직접 호출), 4절, T-7, T-8
 - 범위: 준비 구간에는 GitHub·Vercel·로컬만 등록한다. Cloudtype 서비스 생성·환경 변수 등록·배포 토큰(R-12)은 Task 020에서 한다.
 - 구현 사항
-  - [ ] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
+  - [x] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
     - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`(cron이 Cloudtype 직접 호출 시 사용)을 지금 등록. Cloudtype 백엔드 주소·배포 토큰은 Task 020
     - Vercel 환경 변수: `ORIGIN_SECRET`(`routes[].transforms`가 읽음)을 **Production과 Preview 환경 모두**에 등록(Task 094의 미리보기 확인이 Preview 값을 쓴다)
     - Cloudtype 환경 변수(Task 020에서 등록): DB, Redis, TMDB, Google OAuth, `JWT_SECRET`, `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL`, 메일
     - 로컬: `.env`(커밋 금지)
-  - [ ] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
-  - [ ] 노출 시 재발급 절차 한 줄씩
+  - [x] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
+  - [x] 노출 시 재발급 절차 한 줄씩
 - 완료 기준
   - V-H: 저장 위치표와 GitHub·Vercel(Production·Preview)·로컬 등록일을 기록했고, 저장소에 비밀 값이 없음을 확인했다.
+- 기록: 2026-10-05 완료(값은 어디에도 적지 않는다).
+  - **저장 위치표**
+
+    | 변수 | 비밀번호 관리자 | GitHub Actions secrets | Vercel | 로컬 `.env` | Cloudtype(Task 020) |
+    |---|---|---|---|---|---|
+    | `ORIGIN_SECRET` | ✅ | ✅ | ✅ Production·Preview(사용자 보고) | ✅ | 같은 값 등록 |
+    | `ADMIN_BATCH_TOKEN` | ✅ 개발용·운영용 | ✅ (운영용) | — | ✅ (개발용) | 운영용 등록 |
+    | `JWT_SECRET` | ✅ 개발용·운영용 | — | — | ✅ (개발용) | 운영용 등록 |
+    | 운영 DB(Supabase)·Redis(Redis Cloud) 접속 정보 | ✅ | — | — | **넣지 않음**(비움) | 등록 |
+    | TMDB·Google OAuth·메일 | ✅ | — | — | ✅ | 등록 |
+
+  - **등록 결과**
+    - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 2026-10-05 05:39(KST)에 등록했다. `gh secret list`로 이름과 등록 시각을 확인했다(값은 볼 수 없다).
+    - Vercel: `ORIGIN_SECRET`을 2026-10-05에 등록했다(사용자 보고). 실수로 삭제한 뒤 다시 등록하려 하자 "이미 존재한다"는 응답이 와 변수가 남아 있음을 확인했다. Production·Preview 적용 범위와 GitHub secrets와 같은 값인지는 이 Task에서 직접 확인하지 못했고 Task 021(`/api` 프록시 헤더 주입)과 Task 094(미리보기)에서 검증한다.
+    - 로컬 `.env`: 저장소 루트에 만들었다. `.gitignore:8`에 걸려 추적되지 않고 추적되는 env 파일은 `.env.example`뿐이다. 변수 이름은 `.env.example`과 같다. `JWT_SECRET`·`ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 각각 44자(32바이트 Base64, 256비트)이고 서로 다른 값이다.
+  - **정리한 점**: `.env`에 운영 Supabase·Redis Cloud 접속 정보(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`)가 들어 있어 비웠다(`DB_NAME`, `DB_PORT`, `REDIS_PORT`도 비어 있음). 비워 두면 docker compose·로컬 프로필이 로컬 기본값을 쓴다. 이를 두면 `bootRun`·Flyway가 운영 DB에 붙을 수 있고, compose가 `--env-file .env`로 읽으면 로컬 PostgreSQL 컨테이너가 Supabase 계정으로 만들어진다.
+  - **저장소 검사**: `git grep -i -E "secret|password|token"`(`docs/`, `.env.example` 제외) 결과에 비밀 값은 없다(변수 이름, 설명 문구, `vercel.json`의 `$ORIGIN_SECRET` 참조, compose의 로컬 기본값 `ottnavi`뿐). `git status`에 `.env`는 나타나지 않는다.
 
 #### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 006, 008, 012 · 브랜치: `feature/b0-backend-setup`
