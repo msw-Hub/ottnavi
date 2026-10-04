@@ -13,7 +13,7 @@
 | 1 | 005 도메인 구매 | 없음 | Task 092 직전(1년 사용 기간을 늦추려고 미룸) | 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소 사용 |
 | 2 | 004 KR 제공처 ID·요금표 조사 | 002 | — | 033 시드, 061 입력값 |
 | 3 | 012 `develop` 생성·보호 규칙 | 코드 Task 006~011 완료 | — | **완료(2026-10-04)** |
-| 4 | 014 Vercel 연결 | 012 (009 포함) | 2026-10-07 | |
+| 4 | 014 Vercel 연결 | 012 (009 포함) | 2026-10-07 | **완료(2026-10-05)**. 015·020의 전제 |
 | 5 | 015 비밀 값 정리·등록 | 002, 014 | — | |
 | 6 | 020 Cloudtype 서비스·토큰 | 002, 015, 019(코드) | 2026-10-12 | 021(배포)의 전제 |
 
@@ -76,29 +76,29 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 **목적**: 이후 Task(004 조사, 015 등록, 020 배포, 022 SMTP 시험)가 쓰는 계정과 키를 준비한다. 비밀 값은 위 "비밀 값 보관 규칙"을 따른다.
 
 ### 할 일
-- [ ] **비밀번호 관리자 준비**: 아직 없다면 먼저 설치하고, 서비스별로 항목을 만들어 둘 곳을 정한다.
-- [ ] **TMDB API 키(비영리 용도)**
+- [x] **비밀번호 관리자 준비**: 아직 없다면 먼저 설치하고, 서비스별로 항목을 만들어 둘 곳을 정한다.
+- [x] **TMDB API 키(비영리 용도)**
   1. TMDB 계정을 만들고 이메일 인증을 한다.
   2. 계정 설정 → API에서 API 키를 신청한다. 용도는 비영리(개인 학습·무료 서비스)로 선택하고 서비스 이름·URL·설명을 적는다. URL은 도메인 구매 전이면 GitHub 저장소 주소를 쓴다.
   3. 발급된 API 키와 읽기 액세스 토큰을 비밀번호 관리자에 저장한다. → 등록 위치: 위 표 `TMDB_API_KEY`
-- [ ] **Google Cloud OAuth 클라이언트**
+- [x] **Google Cloud OAuth 클라이언트**
   1. Google Cloud 콘솔에서 프로젝트를 만든다.
   2. OAuth 동의 화면을 구성한다. 앱 이름은 `OTT내비`, 사용자 유형은 외부(External), 게시 상태는 **테스트**로 두고 **테스트 사용자에 본인 Google 계정을 추가**한다(테스트 상태에서는 등록된 계정만 로그인할 수 있다).
   3. 사용자 인증 정보 → OAuth 클라이언트 ID 만들기 → 유형은 웹 애플리케이션.
   4. **승인된 리디렉션 URI**에 `http://localhost:5173/api/login/oauth2/code/google`을 추가한다(TECH 4절 경로 규칙, 포트 5173은 Vite 기본값이고 `vite.config.ts`에서 바꾸지 않았다). 운영 URI는 Task 092에서 추가한다.
   5. 클라이언트 ID와 보안 비밀을 비밀번호 관리자에 저장한다. 보안 비밀은 생성 직후에 저장해 둔다. → `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
-- [ ] **Supabase 프로젝트**
+- [x] **Supabase 프로젝트**
   1. 프로젝트를 만들고(지역은 한국에서 가까운 곳, 예: 서울·도쿄) 데이터베이스 비밀번호를 비밀번호 관리자에 저장한다.
-  2. **버전 확인**: 로컬 compose가 PostgreSQL 17.6이므로 SQL 편집기에서 `SHOW server_version;`을 실행해 17.6인지 본다. 다르면 알려 주면 로컬 이미지를 맞춘다.
+  2. **버전 확인**: 로컬 compose가 PostgreSQL 17.6이고 `SHOW server_version;`으로 확인한 운영 버전은 17.11이다. 17.x 마이너 차이는 호환에 문제가 없다고 보고 로컬 17.6을 유지한다(맞출지는 필요할 때 사용자가 정한다).
   3. 연결 정보에서 **Session Pooler(5432)** 의 호스트·사용자·포트를 확인한다. JDBC URL은 Task 020에서 Cloudtype 환경 변수로 등록한다. → `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`(Cloudtype에만)
-- [ ] **Redis Cloud 무료 DB**
+- [x] **Redis Cloud 무료 DB**
   1. 계정을 만들고 무료 플랜 데이터베이스를 만든다.
   2. **버전은 8.6**을 고른다(선택지: 7.4, 8.2, 8.4, 8.6). 로컬 compose가 8.6이라서 맞춰야 한다.
   3. 공개 엔드포인트(호스트:포트)와 기본 사용자 비밀번호를 비밀번호 관리자에 저장한다. → `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`(Cloudtype에만)
-- [ ] **Cloudtype 계정**(무료): 가입 후 GitHub 저장소 연동 권한을 확인한다. 서비스 생성은 Task 020에서 한다.
-- [ ] **Vercel 계정**: GitHub 계정으로 가입한다. 프로젝트 연결은 Task 014에서 한다.
-- [ ] **GitHub 저장소 권한**: Actions secrets를 등록할 수 있는 권한(저장소 소유자)이 있는지 확인한다. 이미 `gh`가 인증돼 있다.
-- [ ] **Gmail 앱 비밀번호(SMTP 시험용)**
+- [x] **Cloudtype 계정**(무료): 가입 후 GitHub 저장소 연동 권한을 확인한다. 서비스 생성은 Task 020에서 한다.
+- [x] **Vercel 계정**: GitHub 계정으로 가입한다. 프로젝트 연결은 Task 014에서 한다.
+- [x] **GitHub 저장소 권한**: Actions secrets를 등록할 수 있는 권한(저장소 소유자)이 있는지 확인한다. 이미 `gh`가 인증돼 있다.
+- [x] **Gmail 앱 비밀번호(SMTP 시험용)**
   1. 시험에 쓸 Gmail 계정에서 2단계 인증을 켠다.
   2. Google 계정 → 보안 → 앱 비밀번호에서 앱 비밀번호(16자리)를 만든다.
   3. 비밀번호 관리자에 저장한다. → `MAIL_USERNAME`(Gmail 주소), `MAIL_PASSWORD`(앱 비밀번호), `MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`
@@ -106,7 +106,7 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 - [ ] Gemini 키는 Task 085, Grafana Cloud는 Task 096에서 발급한다(지금 하지 않는다).
 
 ### 버전 주의
-로컬 compose(`infra/docker-compose.yml`)가 PostgreSQL 17.6, Redis 8.6이므로 운영도 같은 버전으로 만든다.
+로컬 compose(`infra/docker-compose.yml`)가 PostgreSQL 17.6, Redis 8.6이다. 운영 Redis는 같은 8.6으로 만들고, 운영 PostgreSQL(Supabase)은 17.x 마이너 차이(현재 17.11)를 허용한다.
 
 ### 완료 기준(V-H)
 서비스별 **발급 여부·발급일·보관 위치(값 제외)** 를 ROADMAP Task 002 `기록:`에 남긴다. 저장소·채팅에 키가 없음을 확인한다(`git status`에 `.env`가 없고, 대화에 붙여 넣은 값이 없는지).
@@ -115,14 +115,14 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 **목적**: 화면 표기와 한도 가정이 실제 약관과 맞는지 확인한다. 결과는 서비스 표현(출처 고지)과 Task 022 진행 방식에 영향을 준다.
 
 ### 할 일
-- [ ] **TMDB 약관**: API 이용 약관(TMDB 사이트의 API Terms of Use)에서 아래를 확인한다.
+- [x] **TMDB 약관**: API 이용 약관(TMDB 사이트의 API Terms of Use)에서 아래를 확인한다.
   - 비영리 용도 조건, 승인된 로고·고지문 문구, 데이터 보관 기간(6개월 가정), JustWatch 출처 표기 조건
-- [ ] **7개 서비스 해지 예약 정책(R11-27)**: 각 서비스의 해지 안내 페이지에서 "해지 후 이용 가능 기간", "해지 예약 가능 여부"를 확인한다. 안내 문구에만 영향이 있다.
-- [ ] **무료 플랜 한도**: 각 서비스 요금·한도 페이지에서 확인한다.
+- [x] **7개 서비스 해지 예약 정책(R11-27)**: 각 서비스의 해지 안내 페이지에서 "해지 후 이용 가능 기간", "해지 예약 가능 여부"를 확인한다. 안내 문구에만 영향이 있다.
+- [x] **무료 플랜 한도**: 각 서비스 요금·한도 페이지에서 확인한다.
   - Cloudtype 무료·Hobby 조건
   - Supabase: 500MB, 7일 비활성 시 일시정지
   - Redis Cloud: 30MB, 초당 100 ops
-- [ ] **Cloudtype 서비스 개수**: 무료 플랜에서 운영 서비스 외에 서비스를 **하나 더 만들 수 있는지** 확인한다(Task 022의 일회성 서비스 전제, R-15).
+- [x] **Cloudtype 서비스 개수**: 무료 플랜에서 운영 서비스 외에 서비스를 **하나 더 만들 수 있는지** 확인한다(Task 022의 일회성 서비스 전제, R-15).
 
 ### 완료 기준(V-H)
 항목별 **출처 URL·확인 날짜·결론**을 ROADMAP Task 003 `기록:`에 남긴다. R11-27 결과를 PRD 10.2에 반영할지 판단한다. 서비스 추가가 불가능하면 Task 022를 어떻게 진행할지 Claude에게 알려 협의한다.
@@ -171,18 +171,18 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 - **완료 기준**: Task 010의 `develop` 대상 PR에서 두 워크플로 성공(실행 링크 기록, Task 010 검증 이관분. 첫 푸시는 이미 끝남). 보호 규칙 기록, `develop` 직접 푸시 거부 확인
 - **완료 (2026-10-04)**: PR #6에서 두 워크플로 성공, 보호 규칙 설정과 `develop` 직접 푸시 거부(`GH013`) 확인. 상세 기록은 ROADMAP Task 012 `기록:`
 
-## Task 014: Vercel 프로젝트 연결과 Production Branch 설정 (선행: 012, 기한 2026-10-07)
+## Task 014: Vercel 프로젝트 연결과 Production Branch 설정 — 완료(2026-10-05, 선행: 012)
 **목적**: 프론트 배포 경로를 열고, `vercel.json`이 설정 오류 없이 배포되는지(R-17) 실측한다.
 
 ### 할 일
-- [ ] **GitHub 저장소 연결**
+- [x] **GitHub 저장소 연결**
   1. Vercel 대시보드 → 새 프로젝트(Add New → Project)에서 GitHub 저장소 `msw-Hub/ottnavi`를 가져온다.
   2. **Root Directory = `frontend`** 로 지정한다(저장소 루트가 아니다).
   3. Framework Preset은 Vite로 자동 인식되는지 확인한다. Build Command는 `npm run build`, Output Directory는 `dist`가 기본값이다.
-- [ ] **Production Branch = `main`**: 프로젝트 설정(Settings → Git 또는 Environments)에서 Production Branch를 `main`으로 둔다. `develop`과 PR 브랜치는 미리보기(Preview)만 만든다.
-- [ ] **Node 버전을 CI와 같게(Node 24)**: 프로젝트 설정 → General → Node.js Version을 **24.x**로 바꾼다. Node 22(npm 10)는 `npm ci`가 실패해 CI도 24로 맞췄다(ROADMAP Task 010 `기록:`).
-- [ ] **환경 변수는 아직 넣지 않는다.** `ORIGIN_SECRET`은 Task 015에서 Production·Preview 둘 다에 넣는다.
-- [ ] **R-17 실측**: 미리보기 배포가 `vercel.json` 설정 오류 없이 만들어지는지 확인한다.
+- [x] **Production Branch = `main`**: 프로젝트 설정(Settings → Git 또는 Environments)에서 Production Branch를 `main`으로 둔다. `develop`과 PR 브랜치는 미리보기(Preview)만 만든다.
+- [x] **Node 버전을 CI와 같게(Node 24)**: 프로젝트 설정 → General → Node.js Version을 **24.x**로 바꾼다. Node 22(npm 10)는 `npm ci`가 실패해 CI도 24로 맞췄다(ROADMAP Task 010 `기록:`).
+- [x] **환경 변수는 아직 넣지 않는다.** `ORIGIN_SECRET`은 Task 015에서 Production·Preview 둘 다에 넣는다.
+- [x] **R-17 실측**: 미리보기 배포가 `vercel.json` 설정 오류 없이 만들어지는지 확인한다.
   - `develop`은 보호 규칙으로 직접 푸시할 수 없으니, **PR이 열려 있는 `feature/*` 브랜치**의 미리보기를 쓴다. 예를 들어 이 문서 변경 PR(`feature/docs-human-tasks-status`)을 열면 Vercel이 미리보기를 만든다.
   - PR의 Checks 또는 Vercel 봇 코멘트에서 미리보기 URL을 열고 **루트 페이지가 열리는지** 확인한다.
   - 백엔드 주소가 자리표시값(`REPLACE_BACKEND_HOST`)이라 `/api` 요청은 실패하는 것이 정상이다. 프록시 동작과 적용 순서는 Task 021에서 본다.
@@ -192,6 +192,7 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 - 혼용 허용 여부는 이미 `routes` 단일 형식이라 시험하지 않고, 배포가 설정 오류 없이 만들어졌는지만 기록한다.
 - 실패하면 **오류 메시지 원문**을 Claude에게 알려 Task 009(`vercel.json`)를 수정한다(`feature/f0-vercel-routes` PR).
 - 어느 쪽이든 PRD 10.3 R-17을 갱신한다.
+- **완료 (2026-10-05)**: Root Directory `frontend`, Production Branch `main`(기본값), Node 24.x(기본값)를 확인했다. PR #7의 미리보기가 `vercel.json` 오류 없이 배포됐고 루트 페이지가 열린다. `/api/public/ott-services`는 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 프록시 규칙이 SPA 대체보다 먼저 적용됨을 확인했다(`/api`는 슬래시가 없어 규칙에 걸리지 않으므로 SPA 화면이 나오는 것이 정상). 상세 기록은 ROADMAP Task 014 `기록:`.
 
 ## Task 015: 비밀 값 저장 위치 정리와 등록 (선행: 002, 014)
 **범위**: GitHub·Vercel·로컬만. Cloudtype은 Task 020. 위 "비밀 값 보관 규칙"의 표가 저장 위치표의 기본이다.

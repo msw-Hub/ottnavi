@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 12/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 13/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 12/105 | |
+| 합계 | | 13/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 12/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 13/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -265,7 +265,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 항목별 출처 URL·날짜·결론을 기록했고, R11-27 결과를 10.2에 반영할지 사용자가 판단했다. 서비스 추가가 불가능하면 Task 022 진행 방식을 사용자에게 올렸다.
 - 기록: 2026-10-05 완료. 항목별 출처 URL·확인일·원문 인용은 **`docs/TASK003_POLICY_PRICING.md`** 에 정리했다(확인됨 / 사용자 제공 / 2차 자료 / 모름으로 확인 수준을 표시). 결론 요약:
   - **TMDB 약관**(`themoviedb.org/api-terms-of-use`, 최종 수정 2023-10-20): 무료 API는 비상업 용도이고 상업 이용은 별도 서면 계약이 필요하다(**수익화 금지**). 고지 문구와 로고를 About에 넣고, TMDB 정보는 6개월을 넘겨 캐시하지 않는다(PRD FR-18과 일치). JustWatch 출처 표기는 약관이 아니라 Watch Providers API 문서(`developer.themoviedb.org/reference/movie-watch-providers`)에 있다.
-  - **7개 서비스 해지 예약 정책(R11-27 확정)**: 모든 서비스가 직접 결제 시 결제 주기·잔여 기간 종료까지 이용할 수 있는 예약 해지다. 앱스토어·통신사·제휴사 결제는 결제처의 정책이 적용된다. 확인 근거는 넷플릭스(해지 안내), 디즈니+(이용 약관 2절 c항), Apple TV+(약관 I절, 이용 종료일은 구독 관리 화면의 만료일), 티빙(유료이용약관 제8·12~15조, 2026-08-03 시행), 웨이브(결제 약관 제8조 제3항), 왓챠(이용약관 제15조 제2항), 쿠팡(와우 FAQ, 이용 약관 제9·10조, 패스 FAQ)이다. **모르는 부분**은 쿠팡 와우 해지와 패스의 관계(FAQ끼리 불일치)와 와우 없이 패스를 단독 구독할 수 있는지이고, 단정하지 않고 계정 화면에서 확인하도록 안내한다. 화면 안내 문구 초안은 정리 문서에 있다.
+  - **7개 서비스 해지 예약 정책(R11-27 확정)**: 7개 서비스의 일반 유료 구독을 직접 결제한 경우 결제 주기·잔여 기간 종료까지 이용할 수 있는 예약 해지다. 예외는 단정하지 않고 계정 화면 확인으로 안내한다: 무료 체험·프로모션(디즈니+는 즉시 발효될 수 있고 Apple TV+는 체험 종료 24시간 전 취소), 앱스토어·통신사·제휴사 결제(결제처 정책), 즉시 해지·환불(서비스별 조건)이다. 확인 근거는 넷플릭스(해지 안내), 디즈니+(이용 약관 2절 c항), Apple TV+(약관 I절, 이용 종료일은 구독 관리 화면의 만료일), 티빙(유료이용약관 제8·12~15조, 2026-08-03 시행), 웨이브(결제 약관 제8조 제3항), 왓챠(이용약관 제15조 제2항), 쿠팡(와우 FAQ, 이용 약관 제9·10조, 패스 FAQ)이다. **모르는 부분**은 쿠팡 와우 해지와 패스의 관계(FAQ끼리 불일치)와 와우 없이 패스를 단독 구독할 수 있는지이고, 단정하지 않고 계정 화면에서 확인하도록 안내한다. 화면 안내 문구 초안은 정리 문서에 있다.
   - **Cloudtype**(`cloudtype.io/ko/pricing`, 사용자 제공 스크린샷): 프리티어 무료(카드 등록 필요), 하비 월 6,600원부터, 프로 월 22,000원부터. 리소스 요금은 메모리 512MB 6,600원, CPU 1 vCPU 6,600원, 디스크 10GB 6,600원, 추가 트래픽 100GB 13,200원(월, VAT 포함). HTTP 타임아웃 프리티어 1분·하비 5분. 동시실행은 서비스 수(프리티어 4개, 하비 5개, 512MB당 +1). **무료 메모리와 구독 메모리는 따로 쓰고 서비스를 배포할 때 리소스를 고른다.** 커스텀 이미지 배포는 프로 전용이다. 운영비 기조는 "저예산(절약할수록 좋음)"이다.
   - **서비스 추가 가능 여부(R-15)**: 가능하다. 프리티어 동시실행 4개라 운영 서비스 외에 Task 022의 일회성 SMTP 시험 서비스를 무료 리소스로 만들 수 있다.
   - **Supabase 무료**(공식 문서): DB 500MB(초과 시 읽기 전용), 7일 비활성이면 일시정지(정지 후 1년까지 복구, 경고 이메일 약 1주 전). Egress에 외부 서버가 받는 DB 결과가 포함되는지는 문서에 없어 **모름**이다(대시보드 사용량으로 확인).
@@ -376,15 +376,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 설치 상태와 이름을 기록했다.
 - 기록: 플러그인 설치 확인(2026-10-03), `.claude/settings.json`(`enabledPlugins`에 세 플러그인 `true`, 미커밋이라 Task 012 초기 세팅 커밋에 포함). `~/.claude/plugins/installed_plugins.json`에 세 플러그인이 `scope: project`, `projectPath: ottnavi`로 등록됨. 스킬 `feature-dev:feature-dev`, `frontend-design:frontend-design`, `skill-creator:skill-creator`, 에이전트 `feature-dev:code-explorer`, `feature-dev:code-architect`, `feature-dev:code-reviewer`.
 
-#### Task 014: Vercel 프로젝트 연결과 Production Branch 설정으로 프론트 배포 경로 준비 ⬜
+#### Task 014: Vercel 프로젝트 연결과 Production Branch 설정으로 프론트 배포 경로 준비 ✅
 - 태그: [H] · PRD: F0, B1 · 선행: 012(009 포함) · 기한: 2026-10-07(R-17)
 - 구현 사항
-  - [ ] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
-  - [ ] 빌드 명령·Node 버전을 CI와 같게(Node **24**. CI를 24로 맞춘 이유는 Task 010 `기록:` 참고, Node 22(npm 10)는 `npm ci`가 실패한다)
-  - [ ] R-17 실측: Task 009의 `vercel.json`(`routes` 단일 형식, 혼용하지 않음)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
+  - [x] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
+  - [x] 빌드 명령·Node 버전을 CI와 같게(Node **24**. CI를 24로 맞춘 이유는 Task 010 `기록:` 참고, Node 22(npm 10)는 `npm ci`가 실패한다)
+  - [x] R-17 실측: Task 009의 `vercel.json`(`routes` 단일 형식, 혼용하지 않음)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
 - 완료 기준
   - V-H: 설정값을 기록했고, PR(또는 `feature/*` 브랜치 푸시)로 생긴 미리보기 URL의 루트 페이지가 열린다. `develop`은 보호 규칙(Task 012) 때문에 직접 푸시할 수 없다.
   - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
+- 기록: 2026-10-05 완료. GitHub 저장소 `msw-Hub/ottnavi`를 Vercel에 연결했고 **Root Directory는 `frontend`**, **Production Branch는 기본값 `main`**(Environments의 Production에서 확인, 저장소 기본 브랜치가 `main`이라 자동 지정), **Node.js Version은 24.x**(CI와 동일, 기본값으로 설정돼 있음), 프리셋은 Vite로 자동 인식돼 `npm run build`·출력 `dist`가 기본값으로 들어갔다. 연결 직후 `main`(커밋 `23fe649`)이 Production으로 먼저 배포됐는데, 이때 `main`에는 `vercel.json`이 없었다(`vercel.json`은 PR #4로 `develop`에만 병합됨). **R-17 실측**은 PR #7의 미리보기(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)로 했다: 빌드(`vite build`, 21개 모듈)가 `Build Completed`·`Deployment completed`로 끝났고 `vercel.json` 검증 오류는 없었다. `routes` 단일 형식이 설정 오류 없이 배포됐고, `ORIGIN_SECRET` 환경 변수가 없어도 배포는 실패하지 않았다(Task 015에서 등록). 미리보기 루트 페이지(`/`)가 열린다. `/api`(슬래시 없음)는 프록시 규칙 `^/api/(.*)$`에 걸리지 않아 SPA 화면이 나오는 것이 정상이고, `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트 `REPLACE_BACKEND_HOST`로 프록시 시도, 요청 처리 지역 `icn1`)가 나와 `/api` 프록시가 SPA 대체보다 먼저 적용됨을 확인했다. 혼용(`routes`+`rewrites`)은 시험하지 않았다. 빌드 로그의 `engines` 경고(새 메이저 Node가 나오면 자동 상향될 수 있다는 안내)는 정상이다. `/api` 프록시 동작과 헤더 주입의 실제 확인은 Task 021이다.
 
 #### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
 - 태그: [H] · PRD: 6절 보안 · 선행: 002, 014
@@ -1266,7 +1267,6 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 항목 | 내용 | 기한 | 막히는 Task |
 |---|---|---|---|
-| R-17 | Vercel `routes` 단일 형식 `vercel.json`의 미리보기 배포 성공 확인(혼용은 하지 않음) | **2026-10-07** (Task 014) | 014, 009, 021 |
 | R-12 | Cloudtype 배포 방식·토큰 이름 | **2026-10-12** (Task 020) | 020, 021 |
 | R11-11 | Cloudtype SMTP(587) 외부 발신 가능 여부. 실패 시 HTTPS 메일 API | **2026-10-14** (Task 022) | 072 |
 | R11-12 | 비로그인 요청 한도(일반, 단건 수집 검색). 추천안(PRD, 미확정): 두 단계로 나누고 Redis Cloud 초당 100 ops 반영. 수치는 사용자가 정한다 | **2026-10-15** (B4 전) | 049 |
@@ -1277,7 +1277,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 | R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **2026-10-29** | 066, 073 |
 | R-5 | 운영 ADMIN 역할 지정 방법. 추천안(미확정): DB 직접 수정. 대안(환경 변수 관리자 이메일 목록)이 채택되면 Task 054에 구현이 늘어나므로 054 착수(2026-10-22) 전에 정하는 편이 안전하다 | **2026-11-04** (Task 095 전) | 095 (대안 채택 시 054) |
 
-해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정). 10.3 참고.
+해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정), R-17(Vercel `vercel.json` 미리보기 배포 성공, Task 014에서 확인). 10.3 참고.
 
 ### 10.2 PRD 11절 결정 필요·작업 중·보류 항목
 
@@ -1328,7 +1328,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
 | R-15 | SMTP 시험(Task 022)의 Cloudtype 배포 방법 | **해소(2026-10-03, 사용자 결정)**: 병합하지 않는 시험 브랜치를 일회성 Cloudtype 서비스로 배포해 시험하고 삭제. 무료 플랜 서비스 추가 가능 여부는 Task 003에서 먼저 확인. Task 022 선행에 003·006·016 추가 | git.md, R11-11 | — |
 | R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | 미결 | PRD 5.5, TECH 3절 | 2026-10-15 |
-| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` | 확인 필요(Task 014) | TECH 6절·T-8 | 2026-10-07 |
+| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` **2026-10-05 실측(Task 014)**: 미리보기 배포(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)가 `routes` 단일 형식 `vercel.json`으로 설정 오류 없이 만들어졌고(`Build Completed`, `Deployment completed`), `ORIGIN_SECRET` 환경 변수가 아직 없어도 배포가 실패하지 않았다. 루트 페이지가 열리고 `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 `/api` 프록시 규칙이 SPA 대체보다 먼저 적용되는 것을 확인했다. 혼용 여부는 시험하지 않았다. 프록시·헤더 주입의 실제 동작은 Task 021 | 확인됨(Task 014, 2026-10-05) | TECH 6절·T-8 | 2026-10-07 |
 | R-18 | LLM 초안 저장 위치. ERD(24개 테이블)에 초안 테이블이 없다. Redis(TTL) 또는 ERD 추가 중 선택 필요. ERD 추가로 정하면 ERD 수정과 Flyway 마이그레이션이 Task 087 범위에 들어간다 | 미결 | PRD SCR-18, ERD | 2026-11-19 |
 | R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인 필요 | 미결 | FR-18, TECH 2절 | 2026-11-05 |
 | R-20 | MVP 계약 초안의 보관 방식 | **해소(2026-10-03, 사용자 결정)**: 별도 초안 파일 없이 `docs/api/openapi.yaml` 하나에 두고, 구현 전 operation에 `x-planned: true`("제안" 표시)를 단다. 계약 대조 테스트(Task 023)는 이 경로를 제외하고, 구현 Task가 표시를 지운다. orval 입력은 `openapi.yaml` 하나(Task 017). 4.2, Task 023·031 반영. `api-contract.md`는 다른 작업자가 갱신 중. 남은 판단: 2단계 이후 기능에도 `x-planned`를 쓸지(현재 4.4는 PRD 9절대로 구현 PR에서 추가) | PRD 9절, TECH T-5, api-contract.md | — |
