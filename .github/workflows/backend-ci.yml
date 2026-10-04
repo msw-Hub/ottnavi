@@ -23,7 +23,10 @@ jobs:
       run:
         working-directory: backend
     steps:
+      # 이후 단계에서 git push를 하지 않으므로 토큰을 .git에 남기지 않는다
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-java@v4
         with:

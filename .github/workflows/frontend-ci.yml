@@ -22,12 +22,16 @@ jobs:
       run:
         working-directory: frontend
     steps:
+      # 이후 단계에서 git push를 하지 않으므로 토큰을 .git에 남기지 않는다
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-      # package.json engines(^20.19.0 || >=22.12.0)를 만족하는 LTS 고정
+      # 로컬 개발 환경(Node 24, npm 11)과 맞춘다. Node 22(npm 10)는 vitest의 선택적 peer(msw ^2)와
+      # 설치된 msw 3이 어긋나 락 파일 불일치(Missing: msw@2.15.0)로 `npm ci`가 실패한다
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
