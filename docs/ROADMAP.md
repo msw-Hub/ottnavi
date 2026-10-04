@@ -444,7 +444,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
   - **등록 결과**
     - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 2026-10-05 05:39(KST)에 등록했다. `gh secret list`로 이름과 등록 시각을 확인했다(값은 볼 수 없다).
-    - Vercel: `ORIGIN_SECRET`을 등록했다(사용자 보고). 실수로 삭제한 뒤 다시 등록하려 하자 "이미 존재한다"는 응답이 와 변수가 남아 있음을 확인했다. Production·Preview 적용 범위와 GitHub secrets와 같은 값인지는 이 Task에서 직접 확인하지 못했고 Task 021(`/api` 프록시 헤더 주입)과 Task 094(미리보기)에서 검증한다.
+    - Vercel: `ORIGIN_SECRET`을 2026-10-05에 등록했다(사용자 보고). 실수로 삭제한 뒤 다시 등록하려 하자 "이미 존재한다"는 응답이 와 변수가 남아 있음을 확인했다. Production·Preview 적용 범위와 GitHub secrets와 같은 값인지는 이 Task에서 직접 확인하지 못했고 Task 021(`/api` 프록시 헤더 주입)과 Task 094(미리보기)에서 검증한다.
     - 로컬 `.env`: 저장소 루트에 만들었다. `.gitignore:8`에 걸려 추적되지 않고 추적되는 env 파일은 `.env.example`뿐이다. 변수 이름은 `.env.example`과 같다. `JWT_SECRET`·`ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 각각 44자(32바이트 Base64, 256비트)이고 서로 다른 값이다.
   - **정리한 점**: `.env`에 운영 Supabase·Redis Cloud 접속 정보(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`)가 들어 있어 비웠다(`DB_NAME`, `DB_PORT`, `REDIS_PORT`도 비어 있음). 비워 두면 docker compose·로컬 프로필이 로컬 기본값을 쓴다. 이를 두면 `bootRun`·Flyway가 운영 DB에 붙을 수 있고, compose가 `--env-file .env`로 읽으면 로컬 PostgreSQL 컨테이너가 Supabase 계정으로 만들어진다.
   - **저장소 검사**: `git grep -i -E "secret|password|token"`(`docs/`, `.env.example` 제외) 결과에 비밀 값은 없다(변수 이름, 설명 문구, `vercel.json`의 `$ORIGIN_SECRET` 참조, compose의 로컬 기본값 `ottnavi`뿐). `git status`에 `.env`는 나타나지 않는다.
