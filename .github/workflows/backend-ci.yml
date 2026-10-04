@@ -1,0 +1,43 @@
+name: backend-ci
+
+# develop·main 대상 PR과 두 브랜치 push에서 백엔드 빌드·테스트 실행
+# 경로 필터는 쓰지 않는다(필수 상태 검사가 보고되지 않아 PR이 막히는 것을 피함)
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+# 같은 PR·브랜치에서 푸시가 연달아 오면 이전 실행을 취소해 낭비를 줄인다
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      # 이후 단계에서 git push를 하지 않으므로 토큰을 .git에 남기지 않는다
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Gradle 래퍼·의존성 캐시
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 윈도우에서 커밋된 래퍼의 실행 권한 보정
+      - run: chmod +x gradlew
+
+      # Testcontainers는 러너에 설치된 Docker를 그대로 사용한다
+      - run: ./gradlew build

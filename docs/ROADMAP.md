@@ -12,8 +12,8 @@
 
 **저장소 상태 (2026-10-04 확인).**
 - 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. 보호 규칙은 아직 걸지 않았다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010 병합 뒤에 지정).
-- 생성됨: `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
-- 미생성: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/src/main/resources/application-{local,prod}.yml`(Task 016).
+- 생성됨: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
+- 미생성: `backend/src/main/resources/application-{local,prod}.yml`(Task 016).
 - PR은 `gh` CLI로 만들고, 병합 방식은 Squash다. PR마다 CodeRabbit이 자동 리뷰한다(`develop` 대상, 한국어, 생성 파일 제외). 자동 수정(Autofix·Autopilot)은 쓰지 않는다.
 - 플러그인: `feature-dev`, `frontend-design`, `skill-creator`(claude-plugins-official)가 프로젝트 범위로 설치돼 있고 `.claude/settings.json`의 `enabledPlugins`에 켜져 있다(`~/.claude/plugins/installed_plugins.json`, 2026-10-03 확인, Task 013).
 
@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 8/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 9/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 8/105 | |
+| 합계 | | 9/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -205,7 +205,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 8/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 9/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -302,15 +302,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - JSON 문법이 유효하다(`@vercel/routing-utils` 스키마 검증 통과). `routes` 단일 형식이라 혼용 여부는 시험하지 않고, 미리보기 배포 성공은 Task 014, 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
 - 기록: 2026-10-04 완료(PR #4, 스쿼시 커밋 `854a754`). `frontend/vercel.json`을 `routes` 단일 형식으로 작성: `/api/(.*)` → `https://REPLACE_BACKEND_HOST/api/$1`(`respectOriginCacheControl: false`, `x-origin-secret`을 `transforms`로 `$ORIGIN_SECRET` 주입) → `{ "handle": "filesystem" }` → `/index.html`. `routesSchema`·`normalizeRoutes`·`getTransformedRoutes` 검증 통과, `transforms` 형식은 공식 `@vercel/config` 출력과 동일. **`REPLACE_BACKEND_HOST`는 Task 021에서 반드시 교체한다**(코드래빗이 Major로 지적했으나 의도된 자리표시값이라 유지, 운영 배포 전 확인 항목은 Task 021 완료 기준). 같은 PR에서 `frontend/.prettierrc`에 `endOfLine: auto`를 추가했다(Windows `core.autocrlf`로 `package.json`이 CRLF가 되면 `format:check`가 실패하던 문제).
 
-#### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ⬜
+#### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ✅
 - 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `feature/b0-ci-skeleton`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 구현 사항
-  - [ ] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
-  - [ ] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 `npm run test`(Task 017에서 `vitest run`으로 구성됨)를 실행한다. 추가로 `format:check`(Prettier)를 넣을지는 이 Task에서 정한다
-  - [ ] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
-  - [ ] (제안) `main` 대상 PR에서만 `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 있으면 실패하는 한 단계를 `frontend-ci`에 넣는다. `develop` PR은 통과해야 하므로 `github.base_ref == 'main'`일 때만 실행한다(Task 021의 사람 확인을 자동으로도 막는 이중 안전장치). 넣을지는 Task 010 계획에서 사용자가 정한다
+  - [x] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
+  - [x] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 `npm run test`(Task 017에서 `vitest run`으로 구성됨)를 실행한다. 추가로 `format:check`(Prettier)를 넣을지는 이 Task에서 정한다
+  - [x] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
+  - [x] (제안) `main` 대상 PR에서만 `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 있으면 실패하는 한 단계를 `frontend-ci`에 넣는다. `develop` PR은 통과해야 하므로 `github.base_ref == 'main'`일 때만 실행한다(Task 021의 사람 확인을 자동으로도 막는 이중 안전장치). 넣을지는 Task 010 계획에서 사용자가 정한다
 - 완료 기준
   - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 이 Task의 PR(`develop` 대상)에서 확인하고, 그 실행 링크를 Task 012 `기록:`에 남긴다(첫 푸시는 이미 끝났다).
+- 기록: 2026-10-04 완료(브랜치 `feature/b0-ci-skeleton`). `backend-ci`(JDK 17 temurin, `gradle/actions/setup-gradle`, `./gradlew build`)와 `frontend-ci`(Node 24, `npm ci`·`lint`·`format:check`·`test`·`build`)를 만들었다. Node 22(npm 10)는 `npm ci`가 `Missing: msw@2.15.0`으로 실패해(vitest 선택적 peer `msw ^2`와 설치된 msw 3 불일치, npm 11은 통과) 로컬과 같은 Node 24로 맞췄다. 트리거는 `develop`·`main` 대상 PR과 두 브랜치 push이고 경로 필터·단어 트리거는 쓰지 않았다(필수 검사 미보고 방지). 같은 ref의 중복 실행은 `concurrency`로 취소한다. `main` 대상 PR에서만 `vercel.json`의 `REPLACE_BACKEND_HOST` 잔존 시 실패하는 단계를 넣었다(사용자 결정). `backend/gradlew`가 git에 실행 권한 없이(100644) 올라가 있어 러너에서 `chmod +x gradlew` 단계를 둔다. 로컬에서 `gradlew build`, 프론트 `npm ci`·`lint`·`format:check`·`test`·`build`(각 종료 코드 0)와 YAML 문법을 확인했다. **GitHub Actions 실행 성공 확인은 이 Task의 PR에서 하고 링크를 Task 012 `기록:`에 남긴다.** CD(`backend-deploy.yml`)는 `main` push + `workflow_dispatch`로 Task 020·021에서 만든다.
 
 #### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ✅
 - 태그: [B] · PRD: F1 선행 준비 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
