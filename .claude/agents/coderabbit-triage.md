@@ -45,8 +45,9 @@ N=<PR 번호>
 # (2) 인라인 지적. 코멘트 하나에 지적이 여러 개일 수 있어 "줄 전체가 굵은 글씨"인 제목마다 한 건으로 센다. 심각도 배지는 그 지적 바로 앞의 배지 줄, 본문은 다음 제목·배지 줄·코드 블록·<details 직전까지만 쓴다
 "$GH" api repos/$R/pulls/$N/comments --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | . as $c | (.body|split("\n")) as $L | (($c.body | capture("Addressed in commit (?<h>[0-9a-f]+)")? | .h) // "-") as $addr | ($L | to_entries | map(select(.value|test("^[*][*].+[*][*]$"))) | map(.key)) as $idx | $idx[] as $i | ([$L[0:$i][] | select(test("^_.+_ [|] _.+_ [|] _.+_$"))] | last // $L[0]) as $badge | ($L[$i+1:] | (map(test("^(<details|```|[*][*].+[*][*]$|_.+_ [|] _.+_ [|] _.+_$)")) | index(true)) as $j | .[0:($j // length)] | map(select(length>0))) as $rest | ([$L[$i]] + $rest | join(" ")) as $t | "[\($c.path):\($c.original_line // $c.line)] 코드래빗표시=\($addr) | \($badge | gsub("[_|]";"") | .[0:48]) | \($t[0:260])"'
 
-# (3) 리뷰 본문에만 있는 지적(Nitpick, 범위 밖). 첫 섹션만 자르고 Prompt 블록은 버린다
-"$GH" api repos/$R/pulls/$N/reviews --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | .body' | awk '
+# (3) 리뷰 본문에만 있는 지적(Nitpick, 범위 밖). 리뷰마다 구분 줄(@@END@@)을 넣어 awk 상태를 초기화한다(리뷰가 여러 개여도 뒤 리뷰의 지적이 빠지지 않게). 각 본문에서는 첫 섹션만 자르고 Prompt 블록은 버린다
+"$GH" api repos/$R/pulls/$N/reviews --paginate --jq '.[] | select(.user.login=="coderabbitai[bot]") | .body, "@@END@@"' | awk '
+/^@@END@@$/ {on=0; done=0; skip=0; next}
 done {next}
 /Nitpick comments|Outside diff range comments/ {on=1}
 on && /Prompt to fix review comments|Review info|autofix_checkbox_start/ {on=0; done=1; next}
