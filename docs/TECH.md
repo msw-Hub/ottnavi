@@ -143,7 +143,7 @@ sequenceDiagram
 | Boot 4의 `spring-boot-starter-batch`는 메모리(resourceless) 모드다. DB 이력은 `spring-boot-starter-batch-jdbc` 필요 | 위와 같음. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false` | web, c7 |
 | orval v8 기본 HTTP 클라이언트가 fetch라 axios mutator·인터셉터가 동작하지 않음 | `output.httpClient: 'axios'` 명시 | c7 |
 | Vercel external rewrite는 2026-04-06 이후 프로젝트에서 upstream `Cache-Control`을 따라 CDN 캐시 | 백엔드 `/api/**` 기본 `no-store` + `x-vercel-enable-rewrite-caching: 0`, 스모크로 응답 헤더 확인(T-8 확정) | web |
-| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes` + `rewrites` 동시 사용 시 적용 순서가 불명확 | `routes[].transforms`로 환경 변수 `ORIGIN_SECRET`을 요청 헤더에 주입. 순서는 얇은 배포 Task에서 실측(ROADMAP R-17) | web(부분) |
+| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes`와 `rewrites`·`headers`는 함께 쓸 수 없는 것으로 보임(Vercel CLI 소스: 함께 정의하면 스키마 검증 실패, 배포 실측은 아님) | `routes` 단일 형식으로 작성하고 `transforms`(`type: request.headers`, `op: set`, `target.key`, `args: "$ORIGIN_SECRET"`, `env: ["ORIGIN_SECRET"]`)로 주입. 공식 `@vercel/config`가 만든 JSON과 같고 `routesSchema` 검증 통과. 캐시 비활성화는 `respectOriginCacheControl: false`. 실제 동작은 Task 021에서 확인(ROADMAP R-17) | c7, 실측(Task 009) |
 | `vercel.json` rewrite 순서: SPA 대체를 먼저 두면 API가 `index.html`을 받음 | `/api/:path*` → SPA 대체 순서 | 도출 |
 | Jackson 2·3 혼재: Boot 4는 `tools.jackson.*`, jjwt-jackson은 Jackson 2(`com.fasterxml`) 의존 | jjwt-jackson은 런타임 스코프, 앱 직렬화는 Jackson 3만. 어노테이션은 `com.fasterxml.jackson.annotation` 유지 | web, c7 |
 | Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |

@@ -58,7 +58,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 ```powershell
 docker compose -f infra/docker-compose.yml up -d                      # 로컬 PostgreSQL 17.6·Redis 8.6 (포트 127.0.0.1만)
 cd backend; .\gradlew.bat build                                        # 백엔드 빌드·테스트 (현재 통과하는 유일한 백엔드 명령)
-cd backend; .\gradlew.bat test --tests "com.ottnavi.…"                 # 단일 테스트
+cd backend; .\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"   # 단일 테스트 (클래스·메서드 이름으로 바꿔 쓴다)
 cd backend; .\gradlew.bat bootRun --args="--spring.profiles.active=local"   # 실행 (localhost:8080). local 프로필은 Task 016에서 만든다
 cd frontend; npm run dev                                               # 프론트 (VITE_USE_MOCK=true면 MSW 목업, frontend/.env.local에 둔다)
 cd frontend; npm run lint; npm run format:check; npm run test; npm run build   # 프론트 검증 4종(모두 통과 상태 유지)

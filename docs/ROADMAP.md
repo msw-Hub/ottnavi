@@ -103,7 +103,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 구간 | 가정 기간 | 착수 Task |
 |---|---|---|
-| 준비 | 2026-10-05 ~ 10-07 | 002~011(006~011은 `main` 직접 커밋) → 012(`develop` 생성·보호 규칙) → 014(R-17 실측), 015(GitHub·Vercel·로컬 시크릿) |
+| 준비 | 2026-10-05 ~ 10-07 | 002~011(006·007·011은 `main` 직접 커밋, 008·009·010은 `feature/*` PR) → 012(`develop` 생성·보호 규칙) → 014(R-17 실측), 015(GitHub·Vercel·로컬 시크릿) |
 | MVP 1주차 | 10-08 ~ 10-14 | 016, 017, 018 / 023, 024 / 019 → 020(Cloudtype 서비스·환경 변수·배포 토큰, R-12 기한 10-12) → 021(**첫 배포**) / 022(SMTP 시험) / 025~031 / **038 착수(B2)** |
 | MVP 2주차 | 10-15 ~ 10-21 | 032~037 / 039, 040 / 041~048 / 049~052 |
 | MVP 3주차 | 10-22 ~ 10-28 | 053~061 |
@@ -189,7 +189,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   5. 반응형이 필요한 Task는 `browser_resize`(예: 375×812)로 모바일 폭도 본다.
   6. 끝나면 `browser_close`로 닫고 dev 서버를 종료한다.
   - 깊이: Phase 1은 "에러 없이 로드", Phase 2는 "목업 흐름이 끝까지 이어짐", Phase 3 이후는 "실제 값이 화면에 반영됨". Vitest·RTL 테스트는 V-F를 대체하지 않는다.
-- **V-B (백엔드 테스트)**: Docker Desktop을 켠 상태에서 `backend`에서 `.\gradlew.bat test`(또는 `.\gradlew.bat test --tests "com.ottnavi.…"`)가 통과한다. 통합 테스트는 Testcontainers(PostgreSQL, Redis), H2 금지.
+- **V-B (백엔드 테스트)**: Docker Desktop을 켠 상태에서 `backend`에서 `.\gradlew.bat test`(또는 `.\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"` 처럼 클래스·메서드 이름을 지정)가 통과한다. 통합 테스트는 Testcontainers(PostgreSQL, Redis), H2 금지.
 - **V-API (실제 엔드포인트 호출)**
   1. `docker compose -f infra/docker-compose.yml up -d`
   2. `backend`에서 `.\gradlew.bat bootRun --args="--spring.profiles.active=local"`
@@ -296,7 +296,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
   - [ ] `routes[].transforms`로 `/api` 요청에 `x-origin-secret` 헤더를 환경 변수 `ORIGIN_SECRET`에서 주입(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`). 비밀 값은 파일에 쓰지 않는다
-  - [ ] `/api` 응답의 Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`, T-8 ②). 넣는 위치는 Vercel 문서로 확인
+  - [ ] `/api` 프록시의 Vercel rewrite 캐시 비활성화(T-8 ②). `routes` 항목의 `respectOriginCacheControl: false`로 구현한다(`@vercel/routing-utils` 스키마에서 확인, `x-vercel-enable-rewrite-caching: 0` 헤더와 같은 목적). 실제 효과는 Task 021 배포 후 응답 헤더로 확인한다
+  - [ ] `routes`와 `rewrites`·`headers`는 함께 쓰지 않는다(Vercel CLI 소스에서 함께 정의하면 스키마 검증이 실패하도록 둔 것을 확인). 그래서 처음부터 `routes` 하나(`/api` 프록시 → `{ "handle": "filesystem" }` → SPA 대체)로 작성한다. `transforms` 형식은 Vercel 공식 도구 `@vercel/config`가 만든 JSON(`env`가 transforms 항목 안, `args`는 `$ORIGIN_SECRET`)과 같고 `routesSchema` 검증을 통과했다
 - 완료 기준
   - JSON 문법이 유효하다. `routes`·`rewrites` 혼용 허용 여부는 Task 014(미리보기 배포), 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
 
@@ -326,7 +327,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
   - [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬
 - 완료 기준
-  - 첫 푸시로 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 이 시점 `frontend-ci`의 `test`는 no-op이고 실제 테스트 실행은 Task 017부터다.
+  - Task 010의 `develop` 대상 PR에서 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 첫 푸시는 이미 끝났고 `frontend-ci`의 `test`는 Task 017에서 `vitest run`으로 구성됐다.
   - V-H: 보호 규칙 설정을 기록했고, `develop` 직접 푸시가 거부되는 것을 확인했다.
 - 기록(진행 중, 2026-10-04): `main`·`develop`을 `origin`에 푸시했고 기본 브랜치는 `main`이다. 저장소는 공개이고 Settings → Advanced Security에서 Secret Protection·Push protection이 켜져 있음을 확인했다. 남은 것은 보호 규칙(Rulesets 또는 Branches)과 `develop` 직접 푸시 거부 확인이며, 필수 검사 `backend-ci`·`frontend-ci`는 Task 010을 병합해 워크플로가 한 번 실행된 뒤에 지정한다. CI 경로 필터는 쓰지 않는 쪽을 권장한다(필수 검사가 보고되지 않아 PR이 막히는 것을 피함).
 
@@ -346,10 +347,10 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
   - [ ] 빌드 명령·Node 버전을 CI와 같게
-  - [ ] R-17 실측: Task 009의 `vercel.json`(`routes` + `rewrites`)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
+  - [ ] R-17 실측: Task 009의 `vercel.json`(`routes` 단일 형식, 혼용하지 않음)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
 - 완료 기준
   - V-H: 설정값을 기록했고, `develop` 푸시로 미리보기 URL의 루트 페이지가 열린다.
-  - R-17: 혼용이 허용되면 그 사실을 `기록:`에 남긴다. 거부되면(배포 실패·설정 오류) `/api` 프록시·헤더 주입·rewrite 캐시 비활성화·SPA 대체를 모두 `routes`로 옮긴 Task 009 수정본을 `feature/f0-vercel-routes` PR로 `develop`에 병합하고, 미리보기 배포가 성공하는 것을 다시 확인한다. 어느 쪽이든 10.3 R-17을 갱신한다.
+  - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
 
 #### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
 - 태그: [H] · PRD: 6절 보안 · 선행: 002, 014
@@ -1119,7 +1120,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 094: 프론트 운영 배포 설정으로 실제 API 연결 배포 준비 ⬜
 - 태그: [F] · PRD: F8, T-8 · 선행: 092 · 브랜치: `feature/f8-deploy`
 - 구현 사항
-  - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`)를 Task 021 기록 기준으로 점검
+  - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`respectOriginCacheControl: false`, 또는 Task 021 기록에서 효과가 확인된 방식)를 Task 021 기록 기준으로 점검
   - [ ] `VITE_USE_MOCK=false`, 운영 빌드에 MSW 미포함 확인
 - 완료 기준
   - `develop` 미리보기 배포에서 `/api/public/ott-services` 응답이 V-DEPLOY "헤더·경로"를 만족한다(Preview 환경 `ORIGIN_SECRET`, Task 015).
@@ -1226,7 +1227,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 항목 | 내용 | 기한 | 막히는 Task |
 |---|---|---|---|
-| R-17 | Vercel `routes`+`rewrites` 혼용 허용 여부 실측(거부 시 Task 009 수정) | **2026-10-07** (Task 014) | 014, 009, 021 |
+| R-17 | Vercel `routes` 단일 형식 `vercel.json`의 미리보기 배포 성공 확인(혼용은 하지 않음) | **2026-10-07** (Task 014) | 014, 009, 021 |
 | R-12 | Cloudtype 배포 방식·토큰 이름 | **2026-10-12** (Task 020) | 020, 021 |
 | R11-11 | Cloudtype SMTP(587) 외부 발신 가능 여부. 실패 시 HTTPS 메일 API | **2026-10-14** (Task 022) | 072 |
 | R11-12 | 비로그인 요청 한도(일반, 단건 수집 검색). 추천안(PRD, 미확정): 두 단계로 나누고 Redis Cloud 초당 100 ops 반영. 수치는 사용자가 정한다 | **2026-10-15** (B4 전) | 049 |
@@ -1289,7 +1290,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
 | R-15 | SMTP 시험(Task 022)의 Cloudtype 배포 방법 | **해소(2026-10-03, 사용자 결정)**: 병합하지 않는 시험 브랜치를 일회성 Cloudtype 서비스로 배포해 시험하고 삭제. 무료 플랜 서비스 추가 가능 여부는 Task 003에서 먼저 확인. Task 022 선행에 003·006·016 추가 | git.md, R11-11 | — |
 | R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | 미결 | PRD 5.5, TECH 3절 | 2026-10-15 |
-| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. 거부되면 Task 009를 `routes`만으로 고친다(Task 014 완료 기준). 적용 순서의 실제 동작은 Task 021 `기록:` | 확인 필요(Task 014) | TECH 6절·T-8 | 2026-10-07 |
+| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` | 확인 필요(Task 014) | TECH 6절·T-8 | 2026-10-07 |
 | R-18 | LLM 초안 저장 위치. ERD(24개 테이블)에 초안 테이블이 없다. Redis(TTL) 또는 ERD 추가 중 선택 필요. ERD 추가로 정하면 ERD 수정과 Flyway 마이그레이션이 Task 087 범위에 들어간다 | 미결 | PRD SCR-18, ERD | 2026-11-19 |
 | R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인 필요 | 미결 | FR-18, TECH 2절 | 2026-11-05 |
 | R-20 | MVP 계약 초안의 보관 방식 | **해소(2026-10-03, 사용자 결정)**: 별도 초안 파일 없이 `docs/api/openapi.yaml` 하나에 두고, 구현 전 operation에 `x-planned: true`("제안" 표시)를 단다. 계약 대조 테스트(Task 023)는 이 경로를 제외하고, 구현 Task가 표시를 지운다. orval 입력은 `openapi.yaml` 하나(Task 017). 4.2, Task 023·031 반영. `api-contract.md`는 다른 작업자가 갱신 중. 남은 판단: 2단계 이후 기능에도 `x-planned`를 쓸지(현재 4.4는 PRD 9절대로 구현 PR에서 추가) | PRD 9절, TECH T-5, api-contract.md | — |

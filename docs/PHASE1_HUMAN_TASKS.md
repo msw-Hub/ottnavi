@@ -54,7 +54,7 @@
 - [x] `main`에서 `develop` 생성·푸시. 기본 브랜치는 `main` 유지 (2026-10-04)
 - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수 없음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부 결정
 - [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬 (2026-10-04, 공개 저장소. Settings → Advanced Security에서 Secret Protection·Push protection 모두 켜져 있음을 확인)
-- **완료 기준**: 첫 푸시로 두 워크플로 성공(실행 링크 기록, Task 010 검증 이관분). 보호 규칙 기록, `develop` 직접 푸시 거부 확인
+- **완료 기준**: Task 010의 `develop` 대상 PR에서 두 워크플로 성공(실행 링크 기록, Task 010 검증 이관분. 첫 푸시는 이미 끝남). 보호 규칙 기록, `develop` 직접 푸시 거부 확인
 
 ## Task 014: Vercel 프로젝트 연결과 Production Branch 설정 (선행: 012, 기한 2026-10-07)
 - [ ] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`
