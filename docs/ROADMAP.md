@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 7/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 8/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 7/105 | |
+| 합계 | | 8/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -205,7 +205,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 7/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 8/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -290,16 +290,17 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - `docker compose -f infra/docker-compose.yml up -d` 후 두 컨테이너가 healthy이고 `psql`·`redis-cli` 접속이 된다.
 - 기록: 2026-10-04 완료(PR #1, 스쿼시 커밋 `667efd4`). `postgres:17.6-alpine`(`NULLS NOT DISTINCT` 동작 확인), `redis:8.6-alpine`(8.6.7, `SET ... EX`·`TTL` 확인). 접속 정보는 환경 변수 + 로컬 전용 기본값(`ottnavi`)이고 포트는 `127.0.0.1`에만 공개한다. compose는 `.env`를 `infra/` 기준으로 찾으므로 루트 `.env`를 쓰려면 `--env-file .env`를 붙인다. `.env.example`은 이름만 담았고 `.gitignore`(`.env`·`.env.*` 차단, `!.env.example` 예외)를 확인했다. Redis는 Redis Cloud에서 8.6으로 생성해야 로컬과 맞는다(Task 002).
 
-#### Task 009: vercel.json 초안 작성으로 /api 프록시·비밀 헤더·SPA 라우팅 준비 ⬜
+#### Task 009: vercel.json 초안 작성으로 /api 프록시·비밀 헤더·SPA 라우팅 준비 ✅
 - 태그: [F] · PRD: F0 · 선행: 007 · 브랜치: `feature/f0-vercel-json`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 관련: TECH T-8, TECH 6절(rewrite 순서·캐시·`routes`+`rewrites`)
 - 구현 사항
-  - [ ] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
-  - [ ] `routes[].transforms`로 `/api` 요청에 `x-origin-secret` 헤더를 환경 변수 `ORIGIN_SECRET`에서 주입(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`). 비밀 값은 파일에 쓰지 않는다
-  - [ ] `/api` 프록시의 Vercel rewrite 캐시 비활성화(T-8 ②). `routes` 항목의 `respectOriginCacheControl: false`로 구현한다(`@vercel/routing-utils` 스키마에서 확인, `x-vercel-enable-rewrite-caching: 0` 헤더와 같은 목적). 실제 효과는 Task 021 배포 후 응답 헤더로 확인한다
-  - [ ] `routes`와 `rewrites`·`headers`는 함께 쓰지 않는다(Vercel CLI 소스에서 함께 정의하면 스키마 검증이 실패하도록 둔 것을 확인). 그래서 처음부터 `routes` 하나(`/api` 프록시 → `{ "handle": "filesystem" }` → SPA 대체)로 작성한다. `transforms` 형식은 Vercel 공식 도구 `@vercel/config`가 만든 JSON(`env`가 transforms 항목 안, `args`는 `$ORIGIN_SECRET`)과 같고 `routesSchema` 검증을 통과했다
+  - [x] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
+  - [x] `routes[].transforms`로 `/api` 요청에 `x-origin-secret` 헤더를 환경 변수 `ORIGIN_SECRET`에서 주입(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`). 비밀 값은 파일에 쓰지 않는다
+  - [x] `/api` 프록시의 Vercel rewrite 캐시 비활성화(T-8 ②). `routes` 항목의 `respectOriginCacheControl: false`로 구현한다(`@vercel/routing-utils` 스키마에서 확인, `x-vercel-enable-rewrite-caching: 0` 헤더와 같은 목적). 실제 효과는 Task 021 배포 후 응답 헤더로 확인한다
+  - [x] `routes`와 `rewrites`·`headers`는 함께 쓰지 않는다(Vercel CLI 소스에서 함께 정의하면 스키마 검증이 실패하도록 둔 것을 확인). 그래서 처음부터 `routes` 하나(`/api` 프록시 → `{ "handle": "filesystem" }` → SPA 대체)로 작성한다. `transforms` 형식은 Vercel 공식 도구 `@vercel/config`가 만든 JSON(`env`가 transforms 항목 안, `args`는 `$ORIGIN_SECRET`)과 같고 `routesSchema` 검증을 통과했다
 - 완료 기준
-  - JSON 문법이 유효하다. `routes`·`rewrites` 혼용 허용 여부는 Task 014(미리보기 배포), 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
+  - JSON 문법이 유효하다(`@vercel/routing-utils` 스키마 검증 통과). `routes` 단일 형식이라 혼용 여부는 시험하지 않고, 미리보기 배포 성공은 Task 014, 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
+- 기록: 2026-10-04 완료(PR #4, 스쿼시 커밋 `854a754`). `frontend/vercel.json`을 `routes` 단일 형식으로 작성: `/api/(.*)` → `https://REPLACE_BACKEND_HOST/api/$1`(`respectOriginCacheControl: false`, `x-origin-secret`을 `transforms`로 `$ORIGIN_SECRET` 주입) → `{ "handle": "filesystem" }` → `/index.html`. `routesSchema`·`normalizeRoutes`·`getTransformedRoutes` 검증 통과, `transforms` 형식은 공식 `@vercel/config` 출력과 동일. **`REPLACE_BACKEND_HOST`는 Task 021에서 반드시 교체한다**(코드래빗이 Major로 지적했으나 의도된 자리표시값이라 유지, 운영 배포 전 확인 항목은 Task 021 완료 기준). 같은 PR에서 `frontend/.prettierrc`에 `endOfLine: auto`를 추가했다(Windows `core.autocrlf`로 `package.json`이 CRLF가 되면 `format:check`가 실패하던 문제).
 
 #### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ⬜
 - 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `feature/b0-ci-skeleton`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
@@ -307,6 +308,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
   - [ ] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 `npm run test`(Task 017에서 `vitest run`으로 구성됨)를 실행한다. 추가로 `format:check`(Prettier)를 넣을지는 이 Task에서 정한다
   - [ ] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
+  - [ ] (제안) `main` 대상 PR에서만 `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 있으면 실패하는 한 단계를 `frontend-ci`에 넣는다. `develop` PR은 통과해야 하므로 `github.base_ref == 'main'`일 때만 실행한다(Task 021의 사람 확인을 자동으로도 막는 이중 안전장치). 넣을지는 Task 010 계획에서 사용자가 정한다
 - 완료 기준
   - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 이 Task의 PR(`develop` 대상)에서 확인하고, 그 실행 링크를 Task 012 `기록:`에 남긴다(첫 푸시는 이미 끝났다).
 
@@ -438,7 +440,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 이 시점 백엔드는 임시 `permitAll`(Task 016)이고 공개 API는 서비스 목록뿐임을 확인한다
 - 완료 기준
   - V-DEPLOY "헤더·경로"(Vercel Production URL 기준): `/api/public/ott-services`가 200 `CommonResponse`, `no-store`, 캐시 적중 없음, Cloudtype 직접 호출 거부, 로그에 방문자 IP.
-  - `기록:` `routes`와 `rewrites`의 실제 적용 순서(혼용 허용 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
+  - `기록:` `routes` 단일 형식에서의 실제 적용 순서(미리보기 배포 성공 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
+  - `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 남아 있지 않다(`Select-String -Path frontend/vercel.json -Pattern REPLACE_BACKEND_HOST`가 아무것도 찾지 못함). Task 009가 남긴 자리표시값이 운영 배포로 새지 않게 하는 확인이다(Task 009 PR의 코드래빗 Major 지적에 대한 대응).
 
 #### Task 022: Cloudtype SMTP 외부 발신 테스트로 메일 방식 결정 근거 확보 ⬜
 - 태그: [B] · PRD: B1, R11-11 · 선행: 002, 003, 006, 015, 016 · 기한: 2026-10-14
