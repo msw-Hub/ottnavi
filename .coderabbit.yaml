@@ -4,6 +4,15 @@
 language: "ko-KR" # 리뷰 코멘트를 한국어로 작성한다
 
 reviews:
+  # 도구가 만들거나 원본 그대로 두는 파일은 리뷰하지 않는다. 직접 고치지 않는 파일이라 지적이 의미 없고,
+  # 리뷰 분량만 늘려 정작 중요한 코드의 지적이 묻힌다. (package-lock.json은 코드래빗이 기본으로 제외한다)
+  path_filters:
+    - "!frontend/src/api/generated/**" # orval 생성물(재생성하면 덮어써진다)
+    - "!frontend/public/mockServiceWorker.js" # MSW CLI가 생성·갱신
+    - "!frontend/src/components/ui/**" # shadcn 원본(수정하지 않는 규칙, frontend.md)
+    - "!backend/gradle/wrapper/**" # Gradle 래퍼(jar·properties)
+    - "!backend/gradlew" # Gradle 래퍼 스크립트
+    - "!backend/gradlew.bat"
   auto_review:
     # 기본값은 기본 브랜치(main) 대상 PR만 자동 리뷰한다. 이 프로젝트는 PR이 develop으로 가므로 추가한다
     # (main은 기본 브랜치라 항상 포함되어 따로 적지 않는다)
