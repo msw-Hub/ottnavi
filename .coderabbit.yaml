@@ -1,0 +1,11 @@
+# CodeRabbit 설정. 편집기 자동완성을 위한 스키마 지정
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "ko-KR" # 리뷰 코멘트를 한국어로 작성한다
+
+reviews:
+  auto_review:
+    # 기본값은 기본 브랜치(main) 대상 PR만 자동 리뷰한다. 이 프로젝트는 PR이 develop으로 가므로 추가한다
+    # (main은 기본 브랜치라 항상 포함되어 따로 적지 않는다)
+    base_branches:
+      - "develop"
