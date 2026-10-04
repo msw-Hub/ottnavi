@@ -1,0 +1,13 @@
+# 빌드 산출물, 의존성
+dist
+node_modules
+package-lock.json
+
+# 도구가 생성·관리하는 파일(직접 고치지 않는다)
+public/mockServiceWorker.js
+src/api/generated
+src/components/ui
+src/lib/utils.ts
+
+# shadcn이 변수를 덧붙인 전역 CSS. 디자인 토큰 정리(Task 037) 때 함께 정리한다
+src/index.css
