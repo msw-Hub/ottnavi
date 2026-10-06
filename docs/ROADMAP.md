@@ -13,7 +13,7 @@
 **저장소 상태 (2026-10-04 확인).**
 - 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. `main`·`develop`에는 보호 규칙(ruleset `protect-main-develop`)이 걸려 있어 직접 푸시할 수 없고 PR로만 합친다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`).
 - 생성됨: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
-- 미생성: `backend/src/main/resources/application-{local,prod}.yml`(Task 016).
+- Task 016 완료(2026-10-06): 백엔드 의존성 전체, `application.yml`·`-local.yml`·`-prod.yml`, 임시 `SecurityConfig`(전 경로 `permitAll`), Testcontainers 테스트 베이스가 있다.
 - PR은 `gh` CLI로 만들고, 병합 방식은 Squash다. PR마다 CodeRabbit이 자동 리뷰한다(`develop` 대상, 한국어, 생성 파일 제외). 자동 수정(Autofix·Autopilot)은 쓰지 않는다.
 - 플러그인: `feature-dev`, `frontend-design`, `skill-creator`(claude-plugins-official)가 프로젝트 범위로 설치돼 있고 `.claude/settings.json`의 `enabledPlugins`에 켜져 있다(`~/.claude/plugins/installed_plugins.json`, 2026-10-03 확인, Task 013).
 
@@ -24,7 +24,7 @@
   - Spring Boot 4.1: `spring-boot-starter-flyway`가 따로 있고 `flyway-database-postgresql`은 BOM 관리. Batch는 JDBC 저장소와 메모리 저장소를 따로 자동 구성한다(`/spring-projects/spring-boot/v4.1.0`, 초판 확인).
   - Spring Boot 4.1 스타터 이름: 웹은 `spring-boot-starter-webmvc`, OAuth2 클라이언트는 `spring-boot-starter-security-oauth2-client`(기존 `spring-boot-starter-oauth2-client`는 이 이름으로 대체되어 deprecated)(2판 확인). Task 016 의존성 목록에 반영했다.
 - context7로 확인하지 못한 것
-  - `spring-boot-starter-batch-jdbc` 아티팩트 이름. 이번 조회에서도 `spring.batch.jdbc.*` 설정만 확인됐다. TECH 6절(web, c7)을 근거로 쓰고 Task 016에서 의존성을 추가할 때 다시 확인한다(초판 10.3 R-13을 이곳으로 옮김).
+  - `spring-boot-starter-batch-jdbc` 아티팩트 이름. 이번 조회에서도 `spring.batch.jdbc.*` 설정만 확인됐다. TECH 6절(web, c7)을 근거로 썼고, Task 016에서 Maven Central의 4.1.1 아티팩트 존재를 확인해 `compileJava`가 통과했다(해소, 초판 10.3 R-13을 이곳으로 옮김).
   - Vercel `vercel.json`의 `routes[].transforms`로 환경 변수를 요청 헤더에 넣는 방식. context7 조회 결과에 해당 문서가 없었다. TECH T-8 ①(web)을 근거로 한다.
   - `routes`와 `rewrites` 혼용이 배포 검증에서 거부되는지. 3판 조회(`/vercel/vercel`)에서 `@vercel/routing-utils`의 `getTransformedRoutes`가 두 값을 함께 받으면 사용자 `routes`를 먼저 넣고 `{ handle: 'filesystem' }` 뒤에 `rewrites`를 붙인다는 코드는 확인했다(적용 순서 근거). 혼용 시 배포 거부 여부는 확인하지 못해 Task 014에서 미리보기 배포로 실측한다(10.3 R-17).
 - TECH·ERD·rules 사이의 불일치는 고르지 않고 10절에 올렸다.
@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 15/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 16/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 15/105 | |
+| 합계 | | 16/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -211,7 +211,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 - **전제**: 무료 메모리(프리티어 1GB, 매일 꺼짐)와 구독 메모리는 따로 쓰고 한 서비스에 합쳐지지 않는다. 운영 서비스의 메모리 상한은 **구독한 양**뿐이다. Task 022 시험 서비스처럼 임시로 쓰는 서비스는 무료 리소스에 둔다.
 - **추정**: Spring Boot 4(JPA·Security·Redis·Batch·Feign 등 의존성 전체)는 힙 150~300MB, 메타스페이스 100~150MB, 스레드·코드 캐시·네이티브 50~100MB로 컨테이너 전체가 약 400~600MB다. 서비스 목록 API만 있는 첫 배포는 부하가 작지만 기동 메모리는 의존성에 좌우된다.
-- **JVM 옵션 원칙**(Task 016의 `prod` 프로필과 실행 옵션에서 정한다): 힙은 컨테이너 한도의 약 50~60%로 제한하고 메타스페이스·스레드 스택·GC를 줄인다. 운영에서 불필요한 기능(springdoc UI 등)은 `prod`에서 끈다. Tomcat 스레드 수와 연결 풀(약 5)을 제한한다.
+- **JVM 옵션 원칙**: 힙은 컨테이너 한도의 약 50~60%로 제한하고 메타스페이스·스레드 스택·GC를 줄인다. 운영에서 불필요한 기능(springdoc UI 등)은 `prod`에서 끈다(Task 016에서 적용). 연결 풀은 약 5로 제한했다(Task 016). Tomcat 스레드는 기본값으로 두고(Task 016 결정, 연결 풀이 병목이라 값을 줄여도 효과가 작다), 힙 옵션은 yml이 아니라 Cloudtype 환경 변수(`JAVA_TOOL_OPTIONS`)로 Task 020·021에서 첫 배포 실측 후 정한다.
 - **설계 원칙**: 수집·재계산은 chunk 단위로 처리하고 전체를 메모리에 올리지 않는다(Spring Batch). 계산 엔진은 후보 조합 수 상한(R11-30)으로 메모리·시간 상한을 함께 정한다. 대량 조회는 페이징·프로젝션을 쓴다. 새 의존성은 필요한지 한 번 더 본다.
 
 | 측정 지점 | Task | 확인할 것 |
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 15/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 16/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -449,21 +449,26 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - **정리한 점**: `.env`에 운영 Supabase·Redis Cloud 접속 정보(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`)가 들어 있어 비웠다(`DB_NAME`, `DB_PORT`, `REDIS_PORT`도 비어 있음). 비워 두면 docker compose·로컬 프로필이 로컬 기본값을 쓴다. 이를 두면 `bootRun`·Flyway가 운영 DB에 붙을 수 있고, compose가 `--env-file .env`로 읽으면 로컬 PostgreSQL 컨테이너가 Supabase 계정으로 만들어진다.
   - **저장소 검사**: `git grep -i -E "secret|password|token"`(`docs/`, `.env.example` 제외) 결과에 비밀 값은 없다(변수 이름, 설명 문구, `vercel.json`의 `$ORIGIN_SECRET` 참조, compose의 로컬 기본값 `ottnavi`뿐). `git status`에 `.env`는 나타나지 않는다.
 
-#### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ⬜
+#### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 006, 008, 012 · 브랜치: `feature/b0-backend-setup`
 - 관련: TECH 6절, backend.md 개발 환경·기술 스택
 - 구현 사항
-  - [ ] `backend/build.gradle` 의존성 전체
+  - [x] `backend/build.gradle` 의존성 전체
     - `spring-boot-starter-webmvc`, `-data-jpa`, `-data-redis`, `-validation`, `-actuator`, `-security`, `-security-oauth2-client`, `-flyway` + `flyway-database-postgresql`, `-batch-jdbc`(이름 재확인, 1절)
     - Spring Cloud OpenFeign 2025.1.2 이상 BOM, springdoc-openapi, Bucket4j(로컬·Redis), ShedLock(JDBC), jjwt(`jjwt-jackson`은 runtime), PostgreSQL 드라이버
     - 테스트: `testcontainers-postgresql`(패키지 `org.testcontainers.postgresql.*`), Redis 컨테이너, WireMock(Jetty 충돌 시 `wiremock-jetty12`)
     - 메일·Thymeleaf·GreenMail은 넣지 않는다. 2단계 Task 072에서 추가한다(MVP 범위 번짐 방지)
-  - [ ] `application.yml` / `-local.yml` / `-prod.yml`. 운영 값은 `${ENV_VAR}`. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false`, `ddl-auto=validate`, Hikari 최대 풀 약 5, `server.forward-headers-strategy=framework`
-  - [ ] **임시 보안 설정**: security 스타터를 넣으면 기본 동작이 전 경로 인증 요구이므로, `global/security/SecurityConfig`에 STATELESS, csrf·formLogin·httpBasic 비활성, 전 경로 `permitAll`을 둔다. Task 053에서 실제 규칙으로 교체한다는 주석을 단다
-  - [ ] Testcontainers 통합 테스트 베이스(PostgreSQL, Redis). 빈 목킹은 `@MockitoBean`(`@MockBean` 제거됨)
+  - [x] `application.yml` / `-local.yml` / `-prod.yml`. 운영 값은 `${ENV_VAR}`. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false`, `ddl-auto=validate`, Hikari 최대 풀 약 5, `server.forward-headers-strategy=framework`
+  - [x] **임시 보안 설정**: security 스타터를 넣으면 기본 동작이 전 경로 인증 요구이므로, `global/security/SecurityConfig`에 STATELESS, csrf·formLogin·httpBasic 비활성, 전 경로 `permitAll`을 둔다. Task 053에서 실제 규칙으로 교체한다는 주석을 단다
+  - [x] Testcontainers 통합 테스트 베이스(PostgreSQL, Redis). 빈 목킹은 `@MockitoBean`(`@MockBean` 제거됨)
 - 완료 기준
   - V-B: Testcontainers로 컨텍스트 로드 테스트가 통과한다.
   - V-API: local 프로필 기동 시 Flyway·Batch·Security 관련 오류가 없고 기본 로그인 폼·생성 비밀번호가 나오지 않는다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b0-backend-setup`). 상세 절차와 근거는 `docs/TASK016_GUIDE.md`.
+  - 의존성: Boot 4.1.1 BOM에 Spring Cloud 2025.1.3, springdoc 3.1.1, Bucket4j 8.21.0, ShedLock 7.10.1, jjwt 0.13.0, WireMock `wiremock-standalone` 3.13.2를 더했다. `spring-boot-starter-batch-jdbc` 아티팩트는 Maven Central에서 4.1.1 존재를 확인했고 `compileJava`가 통과했다(context7로는 이름을 확인하지 못했다, 1절 해소). 메일·Thymeleaf·GreenMail은 제외했다. Lombok을 추가했다(목록에는 없었으나 backend.md가 전제). `dependencyInsight` 결과 Jackson 2는 `jjwt-jackson`·springdoc(swagger-core)로만 들어오고 Boot는 Jackson 3다. bucket4j-lettuce와 Lettuce 7 호환은 미확인이라 요청 제한 구현 Task에서 검증한다.
+  - 결정: OAuth2 Google 등록·`JWT_SECRET` 참조는 Task 053으로 미룬다(첫 배포 기동 실패 방지). `spring.profiles.default: local`, `spring.application.name: ottnavi`를 뒀다. Tomcat 스레드는 기본값이다. JVM 힙은 yml이 아니라 Cloudtype 환경 변수(`JAVA_TOOL_OPTIONS`)로 Task 020·021에서 첫 배포 실측 후 정한다(첫 배포는 프리티어 1GB 기준, 스왑은 플랫폼 허용 여부 미확인이라 계획에서 뺀다). Redis health 대응은 Task 020에서 Redis Cloud 생존을 확인한 뒤 판단한다. prod에서 springdoc을 끈다.
+  - 검증: V-B는 로컬 compose를 끈 상태에서 `OttnaviApplicationTests`(`IntegrationTestSupport` 상속)가 통과했고 Testcontainers의 `postgres:17.6-alpine`·`redis:8.6-alpine` 기동을 로그로 확인했다. `.\gradlew.bat build`도 통과했다. V-API는 local 프로필 기동 5.6초, `/actuator/health` 200 UP, `/login` 404, `/v3/api-docs` 200이며 Flyway는 `No migrations found` WARN만 낸다(V1은 Task 019).
+  - 발견: 베이스를 상속하지 않으면 테스트가 local 프로필(compose DB)에 붙어 로컬에서만 통과한다(TECH 6절에 추가). springdoc이 `openapi 3.1.0`을 출력해 계약(3.0.3)과 달라 Task 023 계약 대조 테스트 때 맞춘다.
 
 #### Task 017: 프론트 개발 도구와 API 생성 파이프라인 구성으로 목업 개발 준비 ✅
 - 태그: [F] · PRD: F0 · 선행: 007, 011, 012 · 브랜치: `feature/f0-frontend-setup`(실제로는 `develop` 생성 전에 진행해 커밋 `5093728`에 `main` 직접 커밋으로 들어갔고, `@hookform/resolvers` 추가분만 PR #1에 담겼다)

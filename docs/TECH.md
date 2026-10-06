@@ -152,7 +152,11 @@ sequenceDiagram
 | Batch chunk 안 TMDB 호출이 DB 연결을 점유해 풀(약 5) 고갈 | T-2 확정: 배치 예외 인정, 작은 chunk | rules 충돌 |
 | `@MockBean` 제거 | `@MockitoBean` | web |
 | Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
-| WireMock 기본 아티팩트가 Jetty 11 | Jetty 충돌 시 `wiremock-jetty12` | c7 |
+| WireMock 기본 아티팩트가 Jetty 11. Boot BOM은 Jetty를 12.1로 강제하고 `wiremock-jetty12` 3.13.2는 12.0 기준으로 빌드됨 | Task 016에서 셰이딩된 `wiremock-standalone` 3.13.2를 선택. `wiremock-jetty12`를 쓰면 기동 테스트로 확인. 실제로 WireMock을 띄워 본 적은 없어 TMDB 연동 테스트 Task에서 검증 | c7, BOM(미검증) |
+| springdoc 3.x는 기본으로 `openapi 3.1.0`을 출력해 계약(`openapi.yaml`, 3.0.3)과 `nullable` 표현 등이 달라질 수 있음 | Task 023 계약 대조 테스트 때 3.0 출력으로 맞추는 설정을 context7로 확인(키 미확인) | 실측(Task 016, `/v3/api-docs`) |
+| Redis `GenericContainer`는 `@ServiceConnection(name = "redis")`로 이름을 지정해야 연결 정보가 만들어짐. `@Bean` 컨테이너의 수명은 Spring이 관리하므로 IDE의 try-with-resources 경고는 `@SuppressWarnings("resource")`로 둔다 | `TestcontainersConfig`에 적용. Redis 연결을 쓰는 테스트는 아직 없다 | c7, 컨텍스트 로드 실측(Task 016) |
+| `spring.profiles.default: local`이면 테스트도 local 프로필(compose DB·Redis)을 가리켜서, `IntegrationTestSupport`를 상속하지 않은 통합 테스트는 로컬에서만 통과하고 CI에서 실패함 | 모든 통합 테스트는 `IntegrationTestSupport`를 상속. 컨테이너를 끈 상태로 테스트해 확인 | 실측(Task 016) |
+| Boot 4는 테스트 스타터가 기능별로 분리됨(`@DataJpaTest`는 `starter-data-jpa-test`, `@WithMockUser`는 `starter-security-test`) | 필요한 테스트 스타터를 추가(Task 016에서 두 개 추가). 해당 어노테이션을 실제로 쓰는 Task에서 확인 | Central POM(미검증) |
 | MSW `worker.start()` 전 렌더링 시 경쟁 상태 | await 후 렌더링 | c7 |
 | Vite 8·Vitest 4는 Node 20.19+ 또는 22.12+ | CI Node 버전 고정 | c7 |
 | Spring Cloud OpenFeign은 feature-complete | T-3 확정: 유지 | c7 |
