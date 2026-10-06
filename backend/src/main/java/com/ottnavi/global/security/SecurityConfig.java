@@ -1,5 +1,6 @@
 package com.ottnavi.global.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,7 +15,11 @@ import org.springframework.security.web.SecurityFilterChain;
  */
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint; // 401 ProblemDetail 응답
+    private final ProblemDetailAccessDeniedHandler accessDeniedHandler;           // 403 ProblemDetail 응답
 
     /** 세션 없이 모든 요청을 허용하는 임시 필터 체인을 등록한다 */
     @Bean
@@ -24,6 +29,10 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // 지금은 permitAll이라 호출되지 않지만, Task 053에서 인증 규칙을 넣으면 바로 같은 오류 형식이 적용된다
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
     }
