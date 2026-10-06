@@ -59,6 +59,7 @@ dependencies {
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
+	testImplementation 'org.yaml:snakeyaml'   // 계약 대조 테스트의 YAML 파싱(T-5). 버전은 Boot BOM 관리, 전이 의존에 기대지 않고 명시
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
@@ -68,4 +69,8 @@ dependencyManagement {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 계약 대조·오류 코드 일치 테스트가 읽는 문서. 입력으로 등록해 문서만 바뀌어도 테스트가 다시 돈다
+	def apiDocsDir = file('../docs/api')
+	inputs.dir(apiDocsDir).withPathSensitivity(PathSensitivity.RELATIVE)
+	systemProperty 'ottnavi.docs.api-dir', apiDocsDir.absolutePath
 }
