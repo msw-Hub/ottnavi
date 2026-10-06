@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 18/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 19/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 18/105 | |
+| 합계 | | 19/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 18/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 19/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -511,25 +511,38 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 검증(V-API): local 프로필 `bootRun`(compose DB에 V1 적용, 기동 9.0초) 후 `curl -i -H "x-real-ip: 1.2.3.4" -H "x-forwarded-for: 5.6.7.8, 9.9.9.9" http://localhost:8080/api/public/ott-services` → 200 `application/json`, `CommonResponse` 7건(ID 1~7), `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`. 로그 `x-real-ip=1.2.3.4, remoteAddr=5.6.7.8, serverName=localhost`.
   - 실측으로 확인한 것: `springdoc.default-produces-media-type: application/json`이 operation 응답 media type에 반영된다(`/v3/api-docs.yaml`의 200 응답이 `application/json`). record 컴포넌트의 `@Schema(requiredMode = REQUIRED)`가 `required`로 나오고 Java enum 필드는 인라인 `enum`으로 나온다. `@Enumerated(STRING)` ↔ `VARCHAR`, `BaseTimeEntity`의 `Instant` + `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)` ↔ `TIMESTAMPTZ`가 `ddl-auto=validate`를 통과한다. Boot 4.1.1은 `ForwardedHeaderFilter`를 order `Integer.MIN_VALUE`로 등록하고(jar `javap`), spring-web 7.0.9의 이 필터는 `X-Forwarded-*` 원본을 요청에서 숨긴다(`ForwardedHeaderExtractingRequest extends ForwardedHeaderRemovingRequest`). 그래서 뒤의 필터는 XFF 첫 값을 `remoteAddr`, XFH를 `serverName`으로만 보고 `x-real-ip`는 원본 그대로 본다(테스트·V-API로 확인). `@AutoConfigureMockMvc`는 `@Component` 필터와 Boot의 `ForwardedHeaderFilter`를 포함한다(403·IP 로그 테스트 통과).
   - 미확인: `MessageDigest.isEqual`의 상수 시간 보장은 문서로 대조하지 않았다(JDK 6u17 이후 상수 시간 구현으로 알려져 있음). XFF 원본 체인(Cloudtype이 홉을 덧붙이는지, Vercel이 클라이언트 XFF를 덮어쓰는지)은 로그에 첫 값만 남아 Task 021 배포 스모크에서 `x-real-ip`와 `remoteAddr`를 비교해 판단한다. `/actuator/health`는 Cloudtype 주소로 직접 호출해도 열려 있다(상세는 기본 비공개). Windows에서 `gradlew bootRun` 출력을 파일로 받으면 한국어 로그가 깨져 보였다(콘솔 인코딩 문제로 보이며 앱 동작과 무관, 원인 미확인).
+  - PR #11 CodeRabbit 반영(Major, 보안): 오리진 필터와 IP 로그 필터가 `getRequestURI()` 원본으로 `/api/`를 판정해 `/%61pi/public/ott-services`처럼 퍼센트 인코딩한 경로가 필터를 건너뛰고 MVC가 `/api/...`로 매칭해 헤더 없이 200이 됐다(CWE-647). 재현 테스트로 수정 전 200을 확인한 뒤 `UrlPathHelper`로 디코딩·정규화한 경로를 쓰는 공통 `ApiRequestPath`로 고쳤다(`/api;x=1/...`도 403, `//api/...`는 MVC가 매칭하지 못해 404이므로 "200이 아님"만 고정). 최종 `clean build` 테스트 38건 실패 0(`OttServiceApiTest` 8건). 실제 Tomcat(Cloudtype)에서도 인코딩 우회가 403임을 Task 020 검증에서 확인했다.
 
-#### Task 020: Cloudtype 서비스 생성과 환경 변수·배포 토큰 등록으로 첫 배포 준비 ⬜
+#### Task 020: Cloudtype 서비스 생성과 환경 변수·배포 토큰 등록으로 첫 배포 준비 ✅
 - 태그: [H] · PRD: B1, H2 · 선행: 002, 015, 019 · 기한: 2026-10-12(R-12)
 - 관련: 10.3 R-12, TECH 3절, T-8
 - 구현 사항
-  - [ ] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다. **하비는 커스텀 이미지 배포·이미지 저장소 연결이 프로 전용이라 쓸 수 없으므로**, Cloudtype이 저장소에서 직접 빌드(Dockerfile·빌드팩)하고 GitHub Actions는 그 배포를 트리거하는 방식이 전제다(Task 003 `기록:`). 빌드시간은 하비 월 500분, 프리티어 월 200분이다
-  - [ ] Task 002에서 만든 **Redis Cloud 무료 DB가 아직 살아 있는지 확인**한다(14일 동안 Redis 명령이 없으면 삭제됨, Task 003 `기록:`). 삭제됐거나 곧 쓸 계획이 없으면 필요할 때 다시 만든다
-  - [ ] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분. 서비스를 배포할 때 사용할 리소스(무료/구독)를 고른다(무료 메모리와 구독 메모리는 따로 쓰고 합산되지 않는다, Task 003 `기록:`)
-  - [ ] Cloudtype 환경 변수 등록(Task 015 위치표의 Cloudtype 항목, 이름만 기록). 첫 배포 기동에 필요 없는 값(Google OAuth, TMDB, 메일 등)은 Task 092 최종 점검 때 채워도 된다
-  - [ ] GitHub Actions secrets에 Cloudtype 배포 토큰(R-12 이름)과 백엔드 주소 등록
+  - [x] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다. **하비는 커스텀 이미지 배포·이미지 저장소 연결이 프로 전용이라 쓸 수 없으므로**, Cloudtype이 저장소에서 직접 빌드(Dockerfile·빌드팩)하고 GitHub Actions는 그 배포를 트리거하는 방식이 전제다(Task 003 `기록:`). 빌드시간은 하비 월 500분, 프리티어 월 200분이다
+  - [x] Task 002에서 만든 **Redis Cloud 무료 DB가 아직 살아 있는지 확인**한다(14일 동안 Redis 명령이 없으면 삭제됨, Task 003 `기록:`). 삭제됐거나 곧 쓸 계획이 없으면 필요할 때 다시 만든다
+  - [x] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분. 서비스를 배포할 때 사용할 리소스(무료/구독)를 고른다(무료 메모리와 구독 메모리는 따로 쓰고 합산되지 않는다, Task 003 `기록:`)
+  - [x] Cloudtype 환경 변수 등록(Task 015 위치표의 Cloudtype 항목, 이름만 기록). 첫 배포 기동에 필요 없는 값(Google OAuth, TMDB, 메일 등)은 Task 092 최종 점검 때 채워도 된다
+  - [x] GitHub Actions secrets에 Cloudtype 배포 토큰(R-12 이름)과 백엔드 주소 등록 → **하지 않음(보류)**: R-12 결정으로 당분간 콘솔 수동 배포를 쓰므로 토큰을 만들지 않았다(아래 기록)
 - 완료 기준
   - V-H: 서비스 이름·생성일, 등록한 변수 이름 목록(값 제외), R-12 결정 내용을 기록했고 10.3 R-12를 갱신했다.
+- 기록: 2026-10-06 완료(사용자가 콘솔에서 수행, 기록은 Claude).
+  - 서비스: 프로젝트 `backend`, 배포환경 `main`(Cloudtype의 배포환경 이름이며 Git 브랜치와 무관), 서비스 `ottnavi`, `java@17`, 프리티어 1GB, 서울 리전. 생성일 2026-10-06(약 15:31 KST, 첫 배포 시도). 공개 주소 `https://port-0-ottnavi-17xco2nlst8pr67.sel5.cloudtype.app`(같은 프로젝트 안의 내부 주소는 `ottnavi:8080`, Vercel에서는 쓰지 않는다).
+  - **R-12 결정(사용자, 2026-10-06)**: 저장소를 연결해 Cloudtype이 직접 빌드하고, 배포는 콘솔의 `배포하기`로 **수동**으로 한다. GitHub Actions 배포(문서 기준 secrets `CLOUDTYPE_TOKEN`, 권한 `repo`·`workflow`·`admin:public_key`의 PAT `GHP_TOKEN`)는 큰 권한의 토큰 관리와 빌드 시간 부담 때문에 당분간 쓰지 않는다. 그래서 `backend-deploy.yml`과 GitHub secrets의 Cloudtype 토큰은 만들지 않았다. 자동 배포가 필요해지면 그때 다시 정한다.
+  - 설정값: 서브 디렉토리 `backend`, JDK 17, 포트 8080, Build Command `./gradlew bootJar`, Start Command `java -Dspring.profiles.active=prod -jar build/libs/backend-0.0.1-SNAPSHOT.jar`. Cloudtype이 Dockerfile을 자동 생성(`Build type is dockerfile`)하므로 저장소에 Dockerfile이 필요 없고, `gradlew` 실행 권한 부여와 실행 jar 탐색(`-plain.jar` 제외)도 자동이다. 헬스체크(경로·Initial Delay)는 비워 두었다.
+  - 환경 변수(이름만): 런타임 `Environment variables` 7개 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `ORIGIN_SECRET`. `SPRING_PROFILES_ACTIVE`는 빌드 전용인 `Build Variables`에만 들어 있어 런타임에 전달되지 않으므로 Start Command의 `-D`로 대신한다. Build Variables에도 위 7개가 중복 입력돼 있다. 021의 재배포 때 정리한다(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기 — 비밀 값이 빌드 인자로 남는 노출을 줄이기 위함).
+  - Redis Cloud: 생존 확인(2026-10-06), 평문 접속(무료 플랜 TLS 불가, Task 003). **알려진 수용 위험**: 채팅에 노출된 것으로 보이는 문자열(마스킹된 글자 수로 Redis 비밀번호로 추정)을 재설정하지 않고 계속 쓰기로 했다(사용자 결정). 현재 Redis에 저장하는 데이터가 없어 허용하고, Refresh Token 같은 민감한 값을 저장하기 **전(Task 053 이전)에 비밀번호를 재설정**한다.
+  - **첫 배포는 `develop` 브랜치로 했다(일회성 예외)**: git.md의 "develop은 배포하지 않는다"의 예외로, 019까지 병합된 `develop`(`97b682a`)을 배포해 prod 프로필·Supabase·Redis·`ORIGIN_SECRET`·V1을 한 번에 검증했다. Task 021에서 `main` 병합 후 배포 브랜치를 `main`으로 바꾼다.
+  - 시도 이력(배포 내역 5건): ① 서브 디렉토리를 비워 둬 빌드 실패(`chmod: cannot access 'gradlew'`) → ② 서브 디렉토리 `backend` 후 빌드 성공 → ③ 런타임에 `SPRING_PROFILES_ACTIVE`가 없어 `local` 프로필로 떠 `127.0.0.1:5432` 접속 실패 → ④ `ORIGIN_SECRET`이 런타임에 없어 오리진 필터 빈 생성 실패(값 없이 켜지면 기동 실패하는 설계대로 동작) → ⑤ `DB_URL`의 `?`가 공백이라 `database "postgres sslmode=require" does not exist` → 수정 후 성공.
+  - 검증: 로그에서 `profile is active: "prod"`, Flyway `Successfully applied 1 migration ... now at version v1`(운영 Supabase PostgreSQL 17.11에 V1 첫 적용), Hibernate validate 통과, `Tomcat started on port 8080`, `Started OttnaviApplication in 201.494 seconds`. 공개 주소로 `/actuator/health` 200 `UP`(Redis 포함), `/api/public/ott-services` 헤더 없음 403 `FORBIDDEN`(`application/problem+json`), 인코딩 우회 `/%61pi/public/ott-services`도 403(실제 Tomcat에서 확인). 올바른 헤더로 200 확인은 Task 021(Vercel 경유)에서 한다.
+  - 실측: 기동 약 201초(프리티어 공유 CPU, 웹 컨텍스트 초기화만 약 60초). Redis 헬스 첫 호출 11.5초(`took 11489ms`), 이후 0.3~0.5초. **메모리 기동 직후 302.27MB**(1GB 중 약 30%, 서비스 목록 API만 있는 상태의 기준값, 4.6). 프리티어는 매일 1회 정지하므로 재기동마다 3분 이상 걸린다. 빌드 시간은 회당 약 1~3분이고 성공 3회·실패 1회 합계 약 6~8분으로 추정한다(월 200분 중, 콘솔에서 합계는 확인하지 못함).
+  - IP 헤더 실험(1회): `x-forwarded-for: 1.2.3.4, 5.6.7.8`, `x-real-ip: 9.9.9.9`, `x-forwarded-host: spoof.example`을 실어 공개 주소로 직접 호출했다(403). 로그의 `x-real-ip`·`remoteAddr`는 둘 다 실제 클라이언트 IP(위조 값이 아님, Cloudtype이 덮어씀), `serverName=spoof.example`(`X-Forwarded-Host`는 통과). 한 번의 관찰이라 일반화하지 않는다. Task 053의 로그인 리디렉션은 `OAUTH2_REDIRECT_BASE_URL` 고정을 쓴다(TECH 4절).
+  - 미확인·보류: 헬스체크 설정(기동이 길어 쓰려면 Initial Delay 300초 이상이 필요, Task 021 스모크 뒤 결정), 월 빌드 시간 합계(콘솔에서 확인 못 함). 위 현상과 함정은 TECH 6절에 정리했다.
 
 #### Task 021: Vercel·Cloudtype 얇은 배포와 develop→main 첫 배포로 배포 경로 검증 ⬜
 - 태그: [B][F] · PRD: B1 · 선행: 009, 014, 015, 019, 020 · 기한: 2026-10-14 · 브랜치: `feature/b1-thin-deploy` → `develop` → `main`
 - 관련: git.md "1주차 얇은 배포", TECH T-8, 10.3 R-12·R-17
 - 구현 사항
-  - [ ] `.github/workflows/backend-deploy.yml`: `main` push에서 Cloudtype 배포(Task 020의 토큰·방식). prod 프로필(Supabase Session Pooler 5432)
-  - [ ] `frontend/vercel.json` 백엔드 주소 확정, `routes[].transforms`로 `x-origin-secret` 주입, rewrite 캐시 비활성화
+  - [x] `.github/workflows/backend-deploy.yml`: `main` push에서 Cloudtype 배포 → **만들지 않음(보류)**: R-12 결정(Task 020 `기록:`)으로 당분간 `main` 병합 후 Cloudtype 콘솔에서 `배포하기`로 수동 배포한다. prod 프로필(Supabase Session Pooler 5432)은 Task 020에서 이미 적용됐다
+  - [x] `frontend/vercel.json` 백엔드 주소 확정(자리표시값 `REPLACE_BACKEND_HOST`를 Cloudtype 공개 주소로 교체, 2026-10-06), `routes[].transforms`로 `x-origin-secret` 주입, rewrite 캐시 비활성화(두 설정은 Task 009에서 작성)
   - [ ] feature → `develop` PR(squash) 후 `develop` → `main` PR을 merge commit으로 병합(사용자가 실행). 이것이 첫 배포이고 Vercel Production도 함께 배포된다
   - [ ] 이 시점 백엔드는 임시 `permitAll`(Task 016)이고 공개 API는 서비스 목록뿐임을 확인한다
 - 완료 기준
@@ -537,6 +550,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - `기록:` `routes` 단일 형식에서의 실제 적용 순서(미리보기 배포 성공 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
   - `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 남아 있지 않다(`Select-String -Path frontend/vercel.json -Pattern REPLACE_BACKEND_HOST`가 아무것도 찾지 못함). Task 009가 남긴 자리표시값이 운영 배포로 새지 않게 하는 확인이다(Task 009 PR의 코드래빗 Major 지적에 대한 대응).
   - 기동 직후와 서비스 목록 API 호출 후의 **메모리 사용량**(Cloudtype 대시보드)을 `기록:`에 남긴다(메모리 예산의 기본 사용량, 4.6). 무료 1GB 한도에서 측정한 값이라 512MB에서의 동작은 보장하지 않는다.
+- 진행(2026-10-06, `feature/b1-thin-deploy`): `frontend/vercel.json`에 Cloudtype 공개 주소를 반영했다(`Select-String`으로 `REPLACE_BACKEND_HOST` 잔존 없음 확인). 서버는 Task 020에서 `develop` 브랜치로 이미 배포돼 동작한다(기동 약 201초, 메모리 302.27MB 기준값은 020 `기록:`). **남은 것**: `develop` → `main` PR(merge commit, 사용자), 병합 후 Cloudtype 배포 브랜치를 `main`으로 변경, 환경 변수 정리(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기), 콘솔 `배포하기`, V-DEPLOY 확인(Vercel Production URL에서 `/api/public/ott-services` 200·`no-store`·캐시 미적중·로그의 IP 헤더 값)과 `기록:` 작성, Vercel Production·Preview의 `ORIGIN_SECRET`이 Cloudtype과 같은 값인지는 Vercel 경유 200으로 확인한다.
 
 #### Task 022: Cloudtype SMTP 외부 발신 테스트로 메일 방식 결정 근거 확보 ⬜
 - 태그: [B] · PRD: B1, R11-11 · 선행: 002, 003, 006, 015, 016 · 기한: 2026-10-14
@@ -1391,7 +1405,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-9 | 관리자 가격 겹침, 찜 상한 초과 등 TECH·rules에 없는 오류 코드가 필요. `error-codes.md`에 제안 등록 후 사용자 승인 | 미결 | FR-19, R11-30 | 해당 Task |
 | R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 추천안(미확정): 찜이나 ACTIVE·DRAFT가 참조하는 `watch_unit`은 삭제하지 않고 재수집으로 갱신하고, ARCHIVED만 참조하면서 TMDB에서 사라져 갱신할 수 없는 경우에만 해당 ARCHIVED 플랜을 먼저 삭제 | 미결(Task 080) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
 | R-11 | 초기 `main` 직접 커밋 범위. git.md는 "폴더 골격, 문서, CI 골격"까지 허용. 최소 빌드 프로젝트(006·007)와 미커밋 문서 변경을 초기 세팅에 포함한다고 가정 | 가정 | git.md | 2026-10-05 |
-| R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | 미결(Task 020에서 결정) | git.md | 2026-10-12 |
+| R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | **해소(2026-10-06, 사용자 결정)**: 저장소 연결 + Cloudtype 콘솔 수동 배포. GitHub Actions 배포와 Cloudtype 토큰은 당분간 쓰지 않는다(Task 020 `기록:`) | git.md | 2026-10-12 |
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
 | R-15 | SMTP 시험(Task 022)의 Cloudtype 배포 방법 | **해소(2026-10-03, 사용자 결정)**: 병합하지 않는 시험 브랜치를 일회성 Cloudtype 서비스로 배포해 시험하고 삭제. 무료 플랜 서비스 추가 가능 여부는 Task 003에서 먼저 확인. Task 022 선행에 003·006·016 추가 | git.md, R11-11 | — |
 | R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | 미결 | PRD 5.5, TECH 3절 | 2026-10-15 |
