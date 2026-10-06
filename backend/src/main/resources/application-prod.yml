@@ -1,0 +1,16 @@
+# application-prod.yml
+spring:
+  datasource:
+    url: ${DB_URL}                # Supabase Session Pooler 5432
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+springdoc:
+  api-docs:
+    enabled: false                # 운영에서 불필요한 기능은 끈다(ROADMAP 4.6)
+  swagger-ui:
+    enabled: false
