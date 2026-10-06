@@ -8,3 +8,6 @@ spring:
     redis:
       host: 127.0.0.1
       port: ${REDIS_PORT:6379}
+app:
+  origin-secret:
+    enabled: false                # 로컬은 Vite proxy·직접 호출이라 오리진 비밀 헤더를 검사하지 않는다
