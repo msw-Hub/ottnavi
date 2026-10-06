@@ -26,6 +26,6 @@ export interface ProblemDetail {
   instance?: string;
   /** SCREAMING_SNAKE_CASE 오류 코드. 프론트가 한국어 메시지로 매핑한다 */
   errorCode: string;
-  /** `VALIDATION_FAILED`일 때의 필드별 오류 목록(제안) */
+  /** `VALIDATION_FAILED`일 때의 필드별 오류 목록 */
   fieldErrors?: FieldError[];
 }

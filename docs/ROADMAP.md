@@ -10,10 +10,11 @@
 | 갱신 중인 근거 | PRD 11절 4·5번·FR-18, TECH 3·4절, `api-contract.md`는 3판의 사용자 결정(R-14, R-20, R-21)에 맞춰 다른 작업자가 갱신 중이다. 이 로드맵은 갱신된 내용을 전제로 적었다 |
 | 참고만 | `docs/proposal_v6.md`(v7 요약본, 세부 근거로 쓰지 않음) |
 
-**저장소 상태 (2026-10-03 확인).**
-- git 저장소이고 `main`에 커밋 3개가 있다: `28d2874 chore: 저장소 초기 설정 추가`, `f167699 chore: Claude 작업 규칙·에이전트·스킬 추가`, `52a3841 docs: 기획안·PRD·ERD·TECH 문서 추가`. `develop` 브랜치와 원격 추적 브랜치는 없다.
-- 커밋되지 않은 변경: `docs/PRD.md`, `docs/TECH.md`, `docs/ERD.md`, `.claude/rules/*.md`, `.claude/agents/*.md` 수정, `docs/ROADMAP.md`, `.claude/agents/roadmap-reviewer.md`, `.claude/settings.json`(플러그인 활성화) 신규. 초기 세팅 커밋(Task 012 전)에 함께 넣는다.
-- 미생성: `backend/`, `frontend/`, `infra/`, `.github/`, `docs/api/`, `.env.example`, `vercel.json`, 모든 빌드·설정 파일. 이 문서의 코드·설정 경로는 모두 **신규**다.
+**저장소 상태 (2026-10-04 확인).**
+- 원격 저장소 `github.com/msw-Hub/ottnavi`(공개)가 연결돼 있고 `main`과 `develop`이 있다. 기본 브랜치는 `main`이다. `main`·`develop`에는 보호 규칙(ruleset `protect-main-develop`)이 걸려 있어 직접 푸시할 수 없고 PR로만 합친다(Task 012, 필수 검사 `backend-ci`·`frontend-ci`).
+- 생성됨: `.github/workflows/`(Task 010), `frontend/vercel.json`(Task 009), `backend/`(Spring Boot 4.1.1 골격, Task 006), `frontend/`(Vite 골격과 개발 도구 구성, Task 007·017), `docs/api/`(계약 골격, Task 011), `infra/docker-compose.yml`·`.env.example`(Task 008, PR #1), `.coderabbit.yaml`(PR 자동 리뷰).
+- Task 016 완료(2026-10-06): 백엔드 의존성 전체, `application.yml`·`-local.yml`·`-prod.yml`, 임시 `SecurityConfig`(전 경로 `permitAll`), Testcontainers 테스트 베이스가 있다.
+- PR은 `gh` CLI로 만들고, 병합 방식은 Squash다. PR마다 CodeRabbit이 자동 리뷰한다(`develop` 대상, 한국어, 생성 파일 제외). 자동 수정(Autofix·Autopilot)은 쓰지 않는다.
 - 플러그인: `feature-dev`, `frontend-design`, `skill-creator`(claude-plugins-official)가 프로젝트 범위로 설치돼 있고 `.claude/settings.json`의 `enabledPlugins`에 켜져 있다(`~/.claude/plugins/installed_plugins.json`, 2026-10-03 확인, Task 013).
 
 **기술 스택 확인 결과.**
@@ -23,7 +24,7 @@
   - Spring Boot 4.1: `spring-boot-starter-flyway`가 따로 있고 `flyway-database-postgresql`은 BOM 관리. Batch는 JDBC 저장소와 메모리 저장소를 따로 자동 구성한다(`/spring-projects/spring-boot/v4.1.0`, 초판 확인).
   - Spring Boot 4.1 스타터 이름: 웹은 `spring-boot-starter-webmvc`, OAuth2 클라이언트는 `spring-boot-starter-security-oauth2-client`(기존 `spring-boot-starter-oauth2-client`는 이 이름으로 대체되어 deprecated)(2판 확인). Task 016 의존성 목록에 반영했다.
 - context7로 확인하지 못한 것
-  - `spring-boot-starter-batch-jdbc` 아티팩트 이름. 이번 조회에서도 `spring.batch.jdbc.*` 설정만 확인됐다. TECH 6절(web, c7)을 근거로 쓰고 Task 016에서 의존성을 추가할 때 다시 확인한다(초판 10.3 R-13을 이곳으로 옮김).
+  - `spring-boot-starter-batch-jdbc` 아티팩트 이름. 이번 조회에서도 `spring.batch.jdbc.*` 설정만 확인됐다. TECH 6절(web, c7)을 근거로 썼고, Task 016에서 Maven Central의 4.1.1 아티팩트 존재를 확인해 `compileJava`가 통과했다(해소, 초판 10.3 R-13을 이곳으로 옮김).
   - Vercel `vercel.json`의 `routes[].transforms`로 환경 변수를 요청 헤더에 넣는 방식. context7 조회 결과에 해당 문서가 없었다. TECH T-8 ①(web)을 근거로 한다.
   - `routes`와 `rewrites` 혼용이 배포 검증에서 거부되는지. 3판 조회(`/vercel/vercel`)에서 `@vercel/routing-utils`의 `getTransformedRoutes`가 두 값을 함께 받으면 사용자 `routes`를 먼저 넣고 `{ handle: 'filesystem' }` 뒤에 `rewrites`를 붙인다는 코드는 확인했다(적용 순서 근거). 혼용 시 배포 거부 여부는 확인하지 못해 Task 014에서 미리보기 배포로 실측한다(10.3 R-17).
 - TECH·ERD·rules 사이의 불일치는 고르지 않고 10절에 올렸다.
@@ -40,18 +41,20 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 2/22 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 0/15 | ⬜ 대기 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 19/23 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 2/105 | |
+| 합계 | | 19/105 | |
+
+- Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
 ---
 
 ## 3. PRD 단계와 Phase 매핑
 
-Phase 번호는 작업의 **성격**에 따른 분류이고 시간 순서와 꼭 같지는 않다. 그래서 선행 Task가 뒤 Phase에 있을 수 있다(예: 얇은 배포 Task 019가 Phase 2의 공통 응답 Task 023를 선행으로 둔다). PRD 9절 "위험한 작업은 일찍"에 따라 계산 엔진(B2, Phase 3)은 1주차에 골격과 함께 착수하고, MVP 배포(B8·F8, Phase 5)는 2단계 작업(Phase 4)보다 먼저 한다. 실제 착수 순서는 3.2를 따른다.
+Phase 번호는 작업의 **성격**에 따른 분류이고 시간 순서와 꼭 같지는 않다. 그래서 선행 Task가 뒤 Phase에 있을 수 있다(예: 얇은 배포 Task 019가 공통 응답 Task 023을 선행으로 둔다. 이 경우는 Task 023을 Phase 1로 옮겨 해소했다). PRD 9절 "위험한 작업은 일찍"에 따라 계산 엔진(B2, Phase 3)은 1주차에 골격과 함께 착수하고, MVP 배포(B8·F8, Phase 5)는 2단계 작업(Phase 4)보다 먼저 한다. 실제 착수 순서는 3.2를 따른다.
 
 **UI 선행 순서(PRD 9절).**
 - MVP: 전체 화면 목업(F1, Task 027~029) → 목업 승인과 화면 결정(Task 030) → OpenAPI 초안(Task 031) → ERD 보정(Task 032) → 작품·상품 영역(A·B, Task 033)과 사용자·플랜·알림 영역(C·D·E, Task 034) 마이그레이션. 1주차 얇은 배포에 필요한 V1(`ott_service`, Task 019)만 예외로 먼저 만든다.
@@ -100,7 +103,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 구간 | 가정 기간 | 착수 Task |
 |---|---|---|
-| 준비 | 2026-10-05 ~ 10-07 | 002~011(006~011은 `main` 직접 커밋) → 012(`develop` 생성·보호 규칙) → 014(R-17 실측), 015(GitHub·Vercel·로컬 시크릿) |
+| 준비 | 2026-10-05 ~ 10-07 | 002~011(006·007·011은 `main` 직접 커밋, 008·009·010은 `feature/*` PR) → 012(`develop` 생성·보호 규칙) → 014(R-17 실측), 015(GitHub·Vercel·로컬 시크릿) |
 | MVP 1주차 | 10-08 ~ 10-14 | 016, 017, 018 / 023, 024 / 019 → 020(Cloudtype 서비스·환경 변수·배포 토큰, R-12 기한 10-12) → 021(**첫 배포**) / 022(SMTP 시험) / 025~031 / **038 착수(B2)** |
 | MVP 2주차 | 10-15 ~ 10-21 | 032~037 / 039, 040 / 041~048 / 049~052 |
 | MVP 3주차 | 10-22 ~ 10-28 | 053~061 |
@@ -137,7 +140,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 ### 4.2 공통 규칙
 
 **브랜치(git.md).**
-- 초기 세팅 Task(006~011)와 미커밋 문서는 `main`에 직접 커밋하고, 직후 Task 012에서 `develop`을 만든다.
+- 초기 세팅 중 Task 006·007·011·017(일부)과 문서는 `main`에 직접 커밋했고(2026-10-04), 그 뒤 `develop`을 만들어 푸시했다. 이후 Task 008(PR #1)·009(PR #4)·010(PR #6)은 2026-10-04 사용자 결정으로 `main` 직접 커밋 예외를 쓰지 않고 `feature/*` 브랜치와 `develop` 대상 PR로 진행했다.
 - 이후 모든 개발 Task는 `develop`에서 `feature/{작업ID}-{설명}`을 만들어 `develop` 대상 PR로 합친다(squash). 그래서 모든 feature Task는 Task 012를 전제로 한다(체인의 첫 Task에만 선행으로 표기).
 - `develop` → `main`은 배포 Task에서만 merge commit으로 합친다: 첫 배포(021), MVP(095), 2단계(102), 3단계(105). `main` 직접 커밋이나 `develop` 수동 배포 예외는 두지 않는다.
 - cron 워크플로는 기본 브랜치(`main`) 기준으로 실행된다. 그래서 워크플로를 만드는 Task는 PR·로컬 수준으로 검증하고, 실제 실행 확인은 `main`에 병합하는 배포 Task의 완료 기준에 둔다.
@@ -186,7 +189,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   5. 반응형이 필요한 Task는 `browser_resize`(예: 375×812)로 모바일 폭도 본다.
   6. 끝나면 `browser_close`로 닫고 dev 서버를 종료한다.
   - 깊이: Phase 1은 "에러 없이 로드", Phase 2는 "목업 흐름이 끝까지 이어짐", Phase 3 이후는 "실제 값이 화면에 반영됨". Vitest·RTL 테스트는 V-F를 대체하지 않는다.
-- **V-B (백엔드 테스트)**: Docker Desktop을 켠 상태에서 `backend`에서 `.\gradlew.bat test`(또는 `.\gradlew.bat test --tests "com.ottnavi.…"`)가 통과한다. 통합 테스트는 Testcontainers(PostgreSQL, Redis), H2 금지.
+- **V-B (백엔드 테스트)**: Docker Desktop을 켠 상태에서 `backend`에서 `.\gradlew.bat test`(또는 `.\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"` 처럼 클래스·메서드 이름을 지정)가 통과한다. 통합 테스트는 Testcontainers(PostgreSQL, Redis), H2 금지.
 - **V-API (실제 엔드포인트 호출)**
   1. `docker compose -f infra/docker-compose.yml up -d`
   2. `backend`에서 `.\gradlew.bat bootRun --args="--spring.profiles.active=local"`
@@ -202,7 +205,27 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 2/22
+### 4.6 백엔드 메모리 예산과 측정 지점 (Task 003 조사 반영)
+
+운영비 기조는 "저예산(절약할수록 좋음)"이고 Cloudtype 구독 메모리는 512MB당 월 6,600원이다. 필요한 메모리는 추측하지 않고 **측정으로 정한다**. 아래 수치는 일반적인 추정이며 실측값이 아니다.
+
+- **전제**: 무료 메모리(프리티어 1GB, 매일 꺼짐)와 구독 메모리는 따로 쓰고 한 서비스에 합쳐지지 않는다. 운영 서비스의 메모리 상한은 **구독한 양**뿐이다. Task 022 시험 서비스처럼 임시로 쓰는 서비스는 무료 리소스에 둔다.
+- **추정**: Spring Boot 4(JPA·Security·Redis·Batch·Feign 등 의존성 전체)는 힙 150~300MB, 메타스페이스 100~150MB, 스레드·코드 캐시·네이티브 50~100MB로 컨테이너 전체가 약 400~600MB다. 서비스 목록 API만 있는 첫 배포는 부하가 작지만 기동 메모리는 의존성에 좌우된다.
+- **JVM 옵션 원칙**: 힙은 컨테이너 한도의 약 50~60%로 제한하고 메타스페이스·스레드 스택·GC를 줄인다. 운영에서 불필요한 기능(springdoc UI 등)은 `prod`에서 끈다(Task 016에서 적용). 연결 풀은 약 5로 제한했다(Task 016). Tomcat 스레드는 기본값으로 두고(Task 016 결정, 연결 풀이 병목이라 값을 줄여도 효과가 작다), 힙 옵션은 yml이 아니라 Cloudtype 환경 변수(`JAVA_TOOL_OPTIONS`)로 Task 020·021에서 첫 배포 실측 후 정한다.
+- **설계 원칙**: 수집·재계산은 chunk 단위로 처리하고 전체를 메모리에 올리지 않는다(Spring Batch). 계산 엔진은 후보 조합 수 상한(R11-30)으로 메모리·시간 상한을 함께 정한다. 대량 조회는 페이징·프로젝션을 쓴다. 새 의존성은 필요한지 한 번 더 본다.
+
+| 측정 지점 | Task | 확인할 것 |
+|---|---|---|
+| 첫 배포 | 021 | 기동 직후와 API 호출 후 사용량(무료 1GB 기준 기본 사용량) |
+| 엔진 완성 | 040 | 최악 입력·후보 상한 근처의 힙 사용량 |
+| 첫 전체 수집 | 048 | 수집 사이클의 최대 사용량, DB 용량(Supabase 500MB 한도 대비) |
+| MVP 배포 직전 | 092 | 운영 구성으로 다시 측정해 구독 메모리 단위 확정 |
+| 성능 측정 | 100 | `mem_limit: 512m` 컨테이너에서 계산·수집·조회 부하로 OOM 여부 최종 판정 |
+
+- 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
+- 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
+
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 19/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -219,45 +242,86 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 세 문서가 `main`에 커밋돼 있음을 확인했다(2026-10-03, `git log`).
   - ERD 보정은 F1 이후 Task 032에서 한다.
 
-#### Task 002: 외부 서비스 계정 생성과 API 키 발급으로 연동 준비 ⬜
+#### Task 002: 외부 서비스 계정 생성과 API 키 발급으로 연동 준비 ✅
 - 태그: [H] · PRD: H2 · 선행: 없음
 - 구현 사항
-  - [ ] TMDB API 키(비영리 용도)
-  - [ ] Google Cloud OAuth 클라이언트. 로컬 리다이렉트 URI는 `http://localhost:5173/api/login/oauth2/code/google`처럼 TECH 4절 경로 규칙에 맞추고(포트는 Vite 설정 확인 후), 운영 URI는 Task 092에서 추가
-  - [ ] Supabase 프로젝트(Session Pooler 5432), Redis Cloud 무료 DB, Cloudtype(무료), Vercel, GitHub 저장소 권한
-  - [ ] SMTP 시험용 메일 발신 계정(Gmail 앱 비밀번호). HTTPS 메일 API 키는 Task 022에서 SMTP 시험이 실패할 때만 발급한다(순환 의존 방지)
-  - [ ] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
+  - [x] TMDB API 키(비영리 용도)
+  - [x] Google Cloud OAuth 클라이언트. 로컬 리다이렉트 URI는 `http://localhost:5173/api/login/oauth2/code/google`처럼 TECH 4절 경로 규칙에 맞추고(포트는 Vite 설정 확인 후), 운영 URI는 Task 092에서 추가
+  - [x] Supabase 프로젝트(Session Pooler 5432), Redis Cloud 무료 DB, Cloudtype(무료), Vercel, GitHub 저장소 권한
+  - [x] SMTP 시험용 메일 발신 계정(Gmail 앱 비밀번호). HTTPS 메일 API 키는 Task 022에서 SMTP 시험이 실패할 때만 발급한다(순환 의존 방지)
+  - [x] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
 - 완료 기준
   - V-H: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록했고, 저장소·채팅에 키가 없음을 확인했다.
+- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/PHASE1_HUMAN_TASKS.md`의 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
 
-#### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ⬜
+#### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ✅
 - 태그: [H] · PRD: H2, R11-27 · 선행: 없음
 - 구현 사항
-  - [ ] TMDB 약관: 비영리, 승인 로고·고지문, 6개월 보관, JustWatch 출처 표기 조건
-  - [ ] 7개 서비스 해지 예약 정책(R11-27, 안내 문구에만 영향)
-  - [ ] Cloudtype 무료·Hobby 조건, Supabase(500MB, 7일 비활성 일시정지)·Redis Cloud(30MB, 초당 100 ops) 한도
-  - [ ] Cloudtype 무료 플랜에서 운영 서비스 외에 서비스를 하나 더 만들 수 있는지(개수 제한). Task 022 SMTP 시험용 일회성 서비스의 전제다(R-15)
+  - [x] TMDB 약관: 비영리, 승인 로고·고지문, 6개월 보관, JustWatch 출처 표기 조건
+  - [x] 7개 서비스 해지 예약 정책(R11-27, 안내 문구에만 영향)
+  - [x] Cloudtype 무료·Hobby 조건, Supabase(500MB, 7일 비활성 일시정지)·Redis Cloud(30MB, 초당 100 ops) 한도
+  - [x] Cloudtype 무료 플랜에서 운영 서비스 외에 서비스를 하나 더 만들 수 있는지(개수 제한). Task 022 SMTP 시험용 일회성 서비스의 전제다(R-15)
 - 완료 기준
   - V-H: 항목별 출처 URL·날짜·결론을 기록했고, R11-27 결과를 10.2에 반영할지 사용자가 판단했다. 서비스 추가가 불가능하면 Task 022 진행 방식을 사용자에게 올렸다.
+- 기록: 2026-10-05 완료. 항목별 출처 URL·확인일·원문 인용은 **`docs/TASK003_POLICY_PRICING.md`** 에 정리했다(확인됨 / 사용자 제공 / 2차 자료 / 모름으로 확인 수준을 표시). 결론 요약:
+  - **TMDB 약관**(`themoviedb.org/api-terms-of-use`, 최종 수정 2023-10-20): 무료 API는 비상업 용도이고 상업 이용은 별도 서면 계약이 필요하다(**수익화 금지**). 고지 문구와 로고를 About에 넣고, TMDB 정보는 6개월을 넘겨 캐시하지 않는다(PRD FR-18과 일치). JustWatch 출처 표기는 약관이 아니라 Watch Providers API 문서(`developer.themoviedb.org/reference/movie-watch-providers`)에 있다.
+  - **7개 서비스 해지 예약 정책(R11-27 확정)**: 7개 서비스의 일반 유료 구독을 직접 결제한 경우 결제 주기·잔여 기간 종료까지 이용할 수 있는 예약 해지다. 예외는 단정하지 않고 계정 화면 확인으로 안내한다: 무료 체험·프로모션(디즈니+는 즉시 발효될 수 있고 Apple TV+는 체험 종료 24시간 전 취소), 앱스토어·통신사·제휴사 결제(결제처 정책), 즉시 해지·환불(서비스별 조건)이다. 확인 근거는 넷플릭스(해지 안내), 디즈니+(이용 약관 2절 c항), Apple TV+(약관 I절, 이용 종료일은 구독 관리 화면의 만료일), 티빙(유료이용약관 제8·12~15조, 2026-08-03 시행), 웨이브(결제 약관 제8조 제3항), 왓챠(이용약관 제15조 제2항), 쿠팡(와우 FAQ, 이용 약관 제9·10조, 패스 FAQ)이다. **모르는 부분**은 쿠팡 와우 해지와 패스의 관계(FAQ끼리 불일치)와 와우 없이 패스를 단독 구독할 수 있는지이고, 단정하지 않고 계정 화면에서 확인하도록 안내한다. 화면 안내 문구 초안은 정리 문서에 있다.
+  - **Cloudtype**(`cloudtype.io/ko/pricing`, 사용자 제공 스크린샷): 프리티어 무료(카드 등록 필요), 하비 월 6,600원부터, 프로 월 22,000원부터. 리소스 요금은 메모리 512MB 6,600원, CPU 1 vCPU 6,600원, 디스크 10GB 6,600원, 추가 트래픽 100GB 13,200원(월, VAT 포함). HTTP 타임아웃 프리티어 1분·하비 5분. 동시실행은 서비스 수(프리티어 4개, 하비 5개, 512MB당 +1). **무료 메모리와 구독 메모리는 따로 쓰고 서비스를 배포할 때 리소스를 고른다.** 커스텀 이미지 배포는 프로 전용이다. 운영비 기조는 "저예산(절약할수록 좋음)"이다.
+  - **서비스 추가 가능 여부(R-15)**: 가능하다. 프리티어 동시실행 4개라 운영 서비스 외에 Task 022의 일회성 SMTP 시험 서비스를 무료 리소스로 만들 수 있다.
+  - **Supabase 무료**(공식 문서): DB 500MB(초과 시 읽기 전용), 7일 비활성이면 일시정지(정지 후 1년까지 복구, 경고 이메일 약 1주 전). Egress에 외부 서버가 받는 DB 결과가 포함되는지는 문서에 없어 **모름**이다(대시보드 사용량으로 확인).
+  - **Redis Cloud 무료**(공식 문서·지원 문서 원문): 30MB, 계정당 1개, 동시 연결 30개, 월 5GB, 100 ops/sec, CIDR 규칙 1개. **14일 연속 Redis 명령이 없으면 DB와 데이터가 영구 삭제되고 복구되지 않는다**(콘솔 접속은 활동이 아님, 경고 이메일은 보장되지 않음). 이 정책은 "평가 서비스 이용약관"에 정의돼 있고 지원 문서는 무료 DB를 운영 워크로드에 권장하지 않는다.
+  - **R11-27**은 PRD 11절 27번을 확정으로 바꾸고 10.2 표에서 뺐다.
+  - 후속 반영: TECH T-6(하비 5분), Task 020(R-12, Redis 생존 확인), Task 022(무료 리소스), 4.6(메모리 예산과 측정 지점), Task 021·040·048·100(측정 항목).
 
-#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ⬜
+#### Task 004: KR 제공처 ID 확정과 요금표 조사로 매핑·가격 입력값 준비 ✅
 - 태그: [H] · PRD: H2, FR-18, FR-19 · 선행: 002
 - 구현 사항
-  - [ ] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
-  - [ ] 7개 서비스 STANDARD 단품 월 가격과 조사일
-  - [ ] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
+  - [x] TMDB KR 제공처 목록에서 7개 서비스의 `provider_id`, 원본 라벨, tier(STANDARD/AD) 판정표
+  - [x] 7개 서비스 STANDARD 단품 월 가격과 조사일
+  - [x] 매핑표는 Task 033 시드 입력값, 가격표는 Task 061 관리자 입력값으로 넘긴다
 - 완료 기준
   - V-H: 매핑표·가격표(출처, 조사일)와 매핑되지 않은 KR 제공처 목록을 기록했다.
+- 기록: 2026-10-05 완료. TMDB `watch/providers/{movie,tv}?watch_region=KR&language=ko-KR`를 조회했다(v4 Read Access Token을 `Authorization: Bearer` 헤더로 보냄. 이 토큰은 `api_key` 쿼리로는 401). 영화·TV 목록의 ID는 같다.
+  - **매핑표(Task 033 `tmdb_provider` 시드 입력값)**
 
-#### Task 005: 도메인 ottnavi.shop 갱신 가격 확인 후 구매로 운영 주소 확보 ⬜
-- 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: 2026-10-29(B8 착수 전)
+    | 서비스 | provider_id | TMDB 원본 라벨 | tier | 비고 |
+    |---|---|---|---|---|
+    | Netflix | 8 | Netflix | STANDARD | |
+    | Netflix 광고형 | 1796 | Netflix Standard with Ads | AD | MVP에서 사용하지 않음(O3) |
+    | Disney+ | 337 | Disney Plus | STANDARD | 광고형 별도 ID 없음 |
+    | TVING | 1883 | TVING | STANDARD | 광고형 별도 ID 없음 |
+    | Watcha | 97 | Watcha | STANDARD | |
+    | wavve | 356 | wavve | STANDARD | 광고형 별도 ID 없음 |
+    | Coupang Play | 1881 | Coupang Play | STANDARD | **TV 목록에만 있고 영화 목록에는 없다**(TMDB 쪽 누락 가능, 수집 결과로 재확인) |
+    | Apple TV+ | 350 | Apple TV | STANDARD | 라벨이 "Apple TV"이나 구독형이다 |
+
+    광고형 라벨이 따로 있는 것은 Netflix(1796)뿐이다. 나머지 서비스의 광고형 요금제는 TMDB에서 STANDARD와 구분되지 않는다.
+  - **가격표(Task 061 관리자 입력값, 조사일 2026-10-05, 표시 가격 그대로)**
+
+    | 서비스 | STANDARD 요금제 | 월 가격(원) | 출처 | 확인 수준 |
+    |---|---|---|---|---|
+    | Netflix | 스탠다드 | 13,500 | help.netflix.com/ko/node/24926 | 공식. 기준일 표기 없음, "지역에 따라 세금이 추가될 수 있음" 안내 |
+    | Disney+ | 스탠다드 | 9,900 (부가세 포함) | disneyplus.com/ko-kr/commerce/plans | 공식(사용자가 화면에서 확인) |
+    | TVING | 스탠다드 | 13,500 | tving.com/bill/subscription/plan | 공식 |
+    | Watcha | 베이직 | 7,900 | 공식 정리 페이지 없음, 결제 화면에서 직접 확인 | 직접 확인 |
+    | wavve | 스탠다드 | 10,900 | wavve.com/voucher/?voucher-type=wavve | 공식 |
+    | Coupang Play | 와우 멤버십(광고 포함) | 7,890 | namu.wiki 쿠팡플레이 문서(요금제 표) | **비공식**. 쿠팡플레이는 와우 회원만 볼 수 있어 와우 월 요금이 곧 이용 비용이다. 광고 없는 시청은 프리미엄 패스 3,900 추가(합계 11,790) |
+    | Apple TV+ | 단일 | 6,500 | apple.com/kr/apple-tv | 공식 |
+
+    STANDARD 기준은 광고 없는 요금제가 원칙이지만 Coupang Play는 TMDB에 ID가 하나뿐이고 가격이 와우 7,890 하나로 정해져 7,890을 쓴다(2026-10-05 사용자 결정). Watcha는 베이직만 있어 이를 STANDARD로 쓴다. 와우 이용자의 해지 안내는 R11-27 결론을 따르며 "와우–패스 관계"는 TASK003에서 모름으로 둔 그대로다.
+  - **O3 참고 자료(MVP는 STANDARD 단품만이라 사용하지 않는다. O3 착수 때 다시 확인)**: Netflix 광고형 7,000·프리미엄 17,000. TVING 광고형 스탠다드 5,500·베이직 9,500. wavve 광고형 스탠다드 5,500·베이직 7,900. 번들(조사일 2026-10-05): 티빙+웨이브 더블 스탠다드 15,000, 티빙+웨이브 더블 광고형 스탠다드 7,000, 웨이브+티빙 더블 베이직 13,500, 디즈니+티빙 스탠다드 18,000(부가세 포함), 디즈니+티빙+웨이브 스탠다드 21,500(부가세 포함). 쿠팡 패스: 프리미엄 3,900, 스포츠 12,400(와우 회원가, 일반 회원가 19,300).
+  - **매핑되지 않은 KR 제공처 31개**: 7개 서비스 밖이다. 이 중 국내 구독 후보로 볼 만한 것은 Amazon Prime Video(119), Google Play Movies(3)이며 둘 다 범위 밖이다. 나머지는 해외 소규모·다큐·독립영화 서비스다(상위 30개: JustWatch TV 2285, GuideDoc 100, Curiosity Stream 190, DOCSVILLE 475, Plex 538, WOW Presents Plus 546, Magellan TV 551, BroadwayHD 554, Filmzie 559, Dekkoo 444, True Story 567, DocAlliance Films 569, Hoichoi 315, Eventive 677, Cultpix 692, Takflix 1771, Sun Nxt 309, Crunchyroll 283, Jolt Film 2330, FOUND TV 2478, MUBI 11, Bloodstream 2555, MovieMe 2565, KableOne 2603, CaixaForum+ 2620, Artiflix 2623, Artify 2685, Pijama Films 2765, Filmtap 2782. 표시 우선순위 순).
+
+#### Task 005: 도메인 ottnavi.shop 1년 구매로 운영 주소 확보 ⬜
+- 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: Task 092 착수 직전, 2026-11-04 이전(1년 사용 기간이 구매일부터 시작하므로 구매를 미룬다. 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소를 쓴다)
 - 구현 사항
-  - [ ] 등록업체별 첫해·**갱신 가격** 비교, 월 운영비 1만원 이내(Hobby 6,600원 포함) 확인
-  - [ ] 구매. DNS 연결은 Task 092
+  - [ ] 포트폴리오용이라 **1년만 쓰는 것을 기준**으로 한다. 등록업체별 **첫해 가격**을 비교하고(갱신 가격은 기록만 한다), 도메인 월 환산 비용(첫해 가격 ÷ 12)을 Cloudtype 구독료(512MB당 월 6,600원)와 합쳐 저예산 범위인지 확인한다(고정 상한은 두지 않는다)
+  - [ ] 구매. 1년 선결제만 지원하고 자동 갱신이 없다(이전 경험상 만료 전에 업체가 연장하라고 연락해 온다). 자동 갱신이 있다면 꺼 둔다. 소유자 이메일은 만료·연장 안내가 오는 주소라 평소 확인하는 메일을 쓴다. DNS 연결은 Task 092
+  - [ ] 만료 한 달 전 알림을 남기고, 만료되면 `*.vercel.app` 기본 주소로 돌아가도록 `APP_FRONTEND_ORIGIN`·`OAUTH2_REDIRECT_BASE_URL`·Google OAuth 운영 리디렉션 URI·`vercel.json`의 주소만 바꾸면 되는지(코드 변경 없음)를 포트폴리오 문서에 적어 둔다
 - 완료 기준
-  - V-H: 업체·첫해·갱신 가격·구매일을 기록했다.
+  - V-H: 업체·첫해 가격(·갱신 가격 참고)·구매일·만료일을 기록했다.
 
-#### Task 006: 백엔드 Gradle 프로젝트 골격 생성으로 빌드 기반 마련 ⬜
+#### Task 006: 백엔드 Gradle 프로젝트 골격 생성으로 빌드 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `backend/settings.gradle`, `backend/build.gradle`, Gradle wrapper(`gradlew.bat` 포함). Java 17, Spring Boot 4.1
@@ -265,8 +329,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 패키지(`global`, `infra`, `engine`, `collect`, `admin`, 도메인)는 실제 클래스가 생길 때 만든다
 - 완료 기준
   - V-B: `.\gradlew.bat build`가 성공한다.
+- 기록: 2026-10-04 완료(커밋 `23fe649`, `main` 직접 커밋). Spring Boot 4.1.1, Gradle 래퍼 9.7.1, Java 17. `.\gradlew.bat build` 통과, 메인 클래스 `com.ottnavi.OttnaviApplication`(패키지 루트 `com.ottnavi`). 설정 파일은 `application.yml`로 통일했다(Initializr 기본값 `application.properties`를 바꿈). 의존성은 `starter-webmvc`와 테스트 기본뿐이고 나머지는 Task 016에서 추가한다.
 
-#### Task 007: 프론트 Vite 프로젝트 골격 생성으로 빌드 기반 마련 ⬜
+#### Task 007: 프론트 Vite 프로젝트 골격 생성으로 빌드 기반 마련 ✅
 - 태그: [F] · PRD: F0 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `frontend/` Vite + React + TypeScript 템플릿(npm), `package-lock.json` 커밋
@@ -274,53 +339,61 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 스크립트 `dev`, `build`, `lint`, `test` 자리(도구 구성은 Task 017)
 - 완료 기준
   - `npm run build` 성공, V-F: 루트(`/`)가 에러 없이 로드된다.
+- 기록: 2026-10-04 완료(커밋 `5093728`에 Task 017과 함께 포함, `main` 직접 커밋). Vite 8.3, React 19, TypeScript 6.0. `engines.node`는 `^20.19.0 || >=22.12.0`. `npm run build` 통과, 목업 모드 V-F에서 콘솔 에러 0건. `test` 스크립트는 Task 017에서 no-op을 `vitest run`으로 교체했다.
 
-#### Task 008: 로컬 Docker Compose와 .env.example 작성으로 실행 환경 통일 ⬜
-- 태그: [B] · PRD: B0 · 선행: 006 · 브랜치: `main` 직접 커밋(초기 세팅)
+#### Task 008: 로컬 Docker Compose와 .env.example 작성으로 실행 환경 통일 ✅
+- 태그: [B] · PRD: B0 · 선행: 006 · 브랜치: `feature/b0-local-env`(PR #1. `develop`을 먼저 만들기로 해서 `main` 직접 커밋 예외를 쓰지 않았다)
 - 구현 사항
-  - [ ] `infra/docker-compose.yml`: PostgreSQL(15+)·Redis만, 볼륨, 헬스체크(4.1 ①). 백엔드 컨테이너는 k6용으로 Task 100에서 추가
+  - [x] `infra/docker-compose.yml`: PostgreSQL 17.6·Redis 8.6만, 볼륨, 헬스체크(4.1 ①). 운영(Supabase·Redis Cloud)과 같은 버전에 맞췄다. 백엔드 컨테이너는 k6용으로 Task 100에서 추가
   - [ ] 루트 `.env.example`: 이름만 둔다. `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL`, `JWT_SECRET`, `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, DB·Redis·TMDB·Google OAuth·메일 변수. 프론트는 `VITE_USE_MOCK`만
   - [ ] `.gitignore`가 `.env`·`.env.*`를 막는지 확인
 - 완료 기준
   - `docker compose -f infra/docker-compose.yml up -d` 후 두 컨테이너가 healthy이고 `psql`·`redis-cli` 접속이 된다.
+- 기록: 2026-10-04 완료(PR #1, 스쿼시 커밋 `667efd4`). `postgres:17.6-alpine`(`NULLS NOT DISTINCT` 동작 확인), `redis:8.6-alpine`(8.6.7, `SET ... EX`·`TTL` 확인). 접속 정보는 환경 변수 + 로컬 전용 기본값(`ottnavi`)이고 포트는 `127.0.0.1`에만 공개한다. compose는 `.env`를 `infra/` 기준으로 찾으므로 루트 `.env`를 쓰려면 `--env-file .env`를 붙인다. `.env.example`은 이름만 담았고 `.gitignore`(`.env`·`.env.*` 차단, `!.env.example` 예외)를 확인했다. Redis는 Redis Cloud에서 8.6으로 생성해야 로컬과 맞는다(Task 002).
 
-#### Task 009: vercel.json 초안 작성으로 /api 프록시·비밀 헤더·SPA 라우팅 준비 ⬜
-- 태그: [F] · PRD: F0 · 선행: 007 · 브랜치: `main` 직접 커밋(초기 세팅)
+#### Task 009: vercel.json 초안 작성으로 /api 프록시·비밀 헤더·SPA 라우팅 준비 ✅
+- 태그: [F] · PRD: F0 · 선행: 007 · 브랜치: `feature/f0-vercel-json`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 관련: TECH T-8, TECH 6절(rewrite 순서·캐시·`routes`+`rewrites`)
 - 구현 사항
-  - [ ] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
-  - [ ] `routes[].transforms`로 `/api` 요청에 `x-origin-secret` 헤더를 환경 변수 `ORIGIN_SECRET`에서 주입(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`). 비밀 값은 파일에 쓰지 않는다
-  - [ ] `/api` 응답의 Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`, T-8 ②). 넣는 위치는 Vercel 문서로 확인
+  - [x] `frontend/vercel.json`: `/api/:path*` → Cloudtype 백엔드를 먼저, SPA 대체(`/index.html`)를 뒤에 둔다. 백엔드 주소는 Task 021까지 자리표시값
+  - [x] `routes[].transforms`로 `/api` 요청에 `x-origin-secret` 헤더를 환경 변수 `ORIGIN_SECRET`에서 주입(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`). 비밀 값은 파일에 쓰지 않는다
+  - [x] `/api` 프록시의 Vercel rewrite 캐시 비활성화(T-8 ②). `routes` 항목의 `respectOriginCacheControl: false`로 구현한다(`@vercel/routing-utils` 스키마에서 확인, `x-vercel-enable-rewrite-caching: 0` 헤더와 같은 목적). 실제 효과는 Task 021 배포 후 응답 헤더로 확인한다
+  - [x] `routes`와 `rewrites`·`headers`는 함께 쓰지 않는다(Vercel CLI 소스에서 함께 정의하면 스키마 검증이 실패하도록 둔 것을 확인). 그래서 처음부터 `routes` 하나(`/api` 프록시 → `{ "handle": "filesystem" }` → SPA 대체)로 작성한다. `transforms` 형식은 Vercel 공식 도구 `@vercel/config`가 만든 JSON(`env`가 transforms 항목 안, `args`는 `$ORIGIN_SECRET`)과 같고 `routesSchema` 검증을 통과했다
 - 완료 기준
-  - JSON 문법이 유효하다. `routes`·`rewrites` 혼용 허용 여부는 Task 014(미리보기 배포), 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
+  - JSON 문법이 유효하다(`@vercel/routing-utils` 스키마 검증 통과). `routes` 단일 형식이라 혼용 여부는 시험하지 않고, 미리보기 배포 성공은 Task 014, 실제 프록시 동작과 적용 순서는 Task 021에서 확인한다.
+- 기록: 2026-10-04 완료(PR #4, 스쿼시 커밋 `854a754`). `frontend/vercel.json`을 `routes` 단일 형식으로 작성: `/api/(.*)` → `https://REPLACE_BACKEND_HOST/api/$1`(`respectOriginCacheControl: false`, `x-origin-secret`을 `transforms`로 `$ORIGIN_SECRET` 주입) → `{ "handle": "filesystem" }` → `/index.html`. `routesSchema`·`normalizeRoutes`·`getTransformedRoutes` 검증 통과, `transforms` 형식은 공식 `@vercel/config` 출력과 동일. **`REPLACE_BACKEND_HOST`는 Task 021에서 반드시 교체한다**(코드래빗이 Major로 지적했으나 의도된 자리표시값이라 유지, 운영 배포 전 확인 항목은 Task 021 완료 기준). 같은 PR에서 `frontend/.prettierrc`에 `endOfLine: auto`를 추가했다(Windows `core.autocrlf`로 `package.json`이 CRLF가 되면 `format:check`가 실패하던 문제).
 
-#### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ⬜
-- 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `main` 직접 커밋(초기 세팅)
+#### Task 010: CI 골격 작성으로 PR 자동 검증 기반 마련 ✅
+- 태그: [B][F] · PRD: B0, F0 · 선행: 006, 007 · 브랜치: `feature/b0-ci-skeleton`(제안. `develop`이 먼저 생겨 `main` 직접 커밋 예외를 쓰지 않는다)
 - 구현 사항
-  - [ ] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
-  - [ ] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 no-op(`package.json`의 `test` 스크립트가 아무것도 실행하지 않고 성공)으로 둔다
-  - [ ] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
+  - [x] `.github/workflows/backend-ci.yml`: JDK 17, Gradle 캐시, `./gradlew test`(ubuntu 러너 Docker로 Testcontainers)
+  - [x] `.github/workflows/frontend-ci.yml`: Node 버전 고정, `npm ci`, `lint`, `test`, `build`. Task 017에서 Vitest를 구성하기 전까지 `test`는 `npm run test`(Task 017에서 `vitest run`으로 구성됨)를 실행한다. 추가로 `format:check`(Prettier)를 넣을지는 이 Task에서 정한다
+  - [x] 트리거: `develop`·`main` 대상 PR과 두 브랜치 push. 필수 상태 검사로 쓸 job 이름 고정
+  - [x] (제안) `main` 대상 PR에서만 `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 있으면 실패하는 한 단계를 `frontend-ci`에 넣는다. `develop` PR은 통과해야 하므로 `github.base_ref == 'main'`일 때만 실행한다(Task 021의 사람 확인을 자동으로도 막는 이중 안전장치). 넣을지는 Task 010 계획에서 사용자가 정한다
 - 완료 기준
-  - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 첫 푸시를 하는 Task 012에서 확인한다.
+  - 로컬에서 워크플로와 같은 명령(`.\gradlew.bat build`, `npm ci; npm run build`)이 성공하고 YAML 문법이 유효하다. GitHub Actions 실행 성공은 이 Task의 PR(`develop` 대상)에서 확인하고, 그 실행 링크를 Task 012 `기록:`에 남긴다(첫 푸시는 이미 끝났다).
+- 기록: 2026-10-04 완료(브랜치 `feature/b0-ci-skeleton`). `backend-ci`(JDK 17 temurin, `gradle/actions/setup-gradle`, `./gradlew build`)와 `frontend-ci`(Node 24, `npm ci`·`lint`·`format:check`·`test`·`build`)를 만들었다. Node 22(npm 10)는 `npm ci`가 `Missing: msw@2.15.0`으로 실패해(vitest 선택적 peer `msw ^2`와 설치된 msw 3 불일치, npm 11은 통과) 로컬과 같은 Node 24로 맞췄다. 트리거는 `develop`·`main` 대상 PR과 두 브랜치 push이고 경로 필터·단어 트리거는 쓰지 않았다(필수 검사 미보고 방지). 같은 ref의 중복 실행은 `concurrency`로 취소한다. `main` 대상 PR에서만 `vercel.json`의 `REPLACE_BACKEND_HOST` 잔존 시 실패하는 단계를 넣었다(사용자 결정). `backend/gradlew`가 git에 실행 권한 없이(100644) 올라가 있어 러너에서 `chmod +x gradlew` 단계를 둔다. 로컬에서 `gradlew build`, 프론트 `npm ci`·`lint`·`format:check`·`test`·`build`(각 종료 코드 0)와 YAML 문법을 확인했다. **GitHub Actions 실행은 이 Task의 PR #6에서 확인했다(두 워크플로 성공, 실행 링크는 Task 012 `기록:`).** CD(`backend-deploy.yml`)는 `main` push + `workflow_dispatch`로 Task 020·021에서 만든다.
 
-#### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ⬜
+#### Task 011: docs/api 계약 골격 작성으로 API 계약 출발점 마련 ✅
 - 태그: [B] · PRD: F1 선행 준비 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
 - 구현 사항
   - [ ] `docs/api/openapi.yaml`: `servers`(`/api`), `paths: {}`, `bearerAuth`, `tags`(catalog, user, wishlist, product, plan, auth, notification, admin — api-contract.md), 공통 `ProblemDetail`(`errorCode` 확장)·페이지네이션 스키마
   - [ ] `docs/api/error-codes.md`: 공통 코드(`VALIDATION_FAILED`, `UNAUTHORIZED`, `FORBIDDEN`, `RATE_LIMIT_EXCEEDED`, `INTERNAL_ERROR`, `EXTERNAL_API_ERROR`, `TITLE_NOT_FOUND`)와 TECH 신규 코드(`PLAN_DRAFT_STALE`, `PLAN_DRAFT_NOT_FOUND`, `BATCH_ALREADY_RUNNING`, `BATCH_ALREADY_COMPLETED`). 열: HTTP 상태, 의미, 화면 메시지
 - 완료 기준
   - 지금 쓸 수 있는 검사 도구로 OpenAPI 3 문법 검사를 통과한다(예: `npx @redocly/cli lint docs/api/openapi.yaml`, 도구는 제안). orval 생성 확인은 Task 017에서 한다.
+- 기록: 2026-10-04 완료(커밋 `4eeca03`, `main` 직접 커밋). OpenAPI 3.0.3(`nullable` 표기 때문), `redocly lint` 에러 0건(경고 11건: 미사용 컴포넌트 10건, `info.license` 1건. operation이 생기면 미사용 경고는 사라진다). `ProblemDetail`의 `fieldErrors`(필드 오류 목록) 구조는 제안값이다. springdoc이 생성하는 버전과 다르면 Task 023의 계약 대조 테스트에서 맞춘다.
 
-#### Task 012: develop 브랜치 생성과 보호 규칙 설정으로 작업 흐름 고정 ⬜
+#### Task 012: develop 브랜치 생성과 보호 규칙 설정으로 작업 흐름 고정 ✅
 - 태그: [H] · PRD: — (git.md) · 선행: 006~011
 - 구현 사항
-  - [ ] 미커밋 문서(1절 저장소 상태)와 초기 세팅 커밋을 `origin/main`에 푸시
-  - [ ] `main`에서 `develop`을 만들어 푸시. 기본 브랜치는 `main` 유지
-  - [ ] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
-  - [ ] Secret scanning·push protection 사용 가능 여부 확인 후 켬
+  - [x] 미커밋 문서(1절 저장소 상태)와 초기 세팅 커밋을 `origin/main`에 푸시
+  - [x] `main`에서 `develop`을 만들어 푸시. 기본 브랜치는 `main` 유지
+  - [x] `main`·`develop` 보호: 직접 푸시 금지, PR 필수, `backend-ci`·`frontend-ci` 통과 필수, 강제 푸시·삭제 금지(리뷰 승인 필수는 두지 않음). CI 경로 필터를 쓰면 필수 검사가 보고되지 않아 PR이 막힐 수 있으니 필터 사용 여부를 정한다
+  - [x] Secret scanning·push protection 사용 가능 여부 확인 후 켬
 - 완료 기준
-  - 첫 푸시로 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 이 시점 `frontend-ci`의 `test`는 no-op이고 실제 테스트 실행은 Task 017부터다.
+  - Task 010의 `develop` 대상 PR에서 GitHub Actions의 두 워크플로가 성공했다(실행 링크 기록, Task 010 검증 이관분). 첫 푸시는 이미 끝났고 `frontend-ci`의 `test`는 Task 017에서 `vitest run`으로 구성됐다.
   - V-H: 보호 규칙 설정을 기록했고, `develop` 직접 푸시가 거부되는 것을 확인했다.
+- 기록: 2026-10-04 완료. `main`·`develop`을 `origin`에 푸시했고 기본 브랜치는 `main`이다. 저장소는 공개이고 Settings → Advanced Security에서 Secret Protection·Push protection이 켜져 있음을 확인했다. 보호 규칙은 Rulesets의 `protect-main-develop`(id 24456595, Enforcement: Active, 대상 `refs/heads/main`·`refs/heads/develop`, bypass 없음)이고 규칙은 삭제 금지(`deletion`), 강제 푸시 금지(`non_fast_forward`), PR 필수(`pull_request`, 승인 0, 병합 방식은 Merge·Squash·Rebase 모두 허용), 필수 상태 검사(`required_status_checks`: `backend-ci`·`frontend-ci`, GitHub Actions 통합, `strict`는 꺼서 "병합 전 최신 브랜치" 조건은 두지 않음)다. CI 경로 필터는 쓰지 않았다(필수 검사가 보고되지 않아 PR이 막히는 것을 피함). `develop` 직접 푸시 거부 확인: 규칙 설정 전에는 확인용 빈 커밋 `acabfaa`(`chore: 보호 규칙 확인용`)가 그대로 푸시돼 규칙이 없음을 알았고, 설정 후에는 `remote: error: GH013: Repository rule violations found ... Changes must be made through a pull request.`로 거부됐다(`gh api`로 규칙 내용도 확인). 원격 `develop`에는 빈 커밋 `acabfaa`가 남아 있다(파일 변경 없음, 강제 푸시로 지우지 않고 그대로 둠). Task 010 PR #6의 Actions 실행: `backend-ci` run `37195614998`, `frontend-ci` run `37195615009` 성공(처음 실패한 `37194586850`은 Node 22의 `npm ci` 오류, Task 010 `기록:` 참고).
 
 #### Task 013: Claude Code 플러그인 3종 설치로 작업 보조 도구 준비 ✅
 - 태그: [H] · PRD: — · 선행: 없음
@@ -333,49 +406,73 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 설치 상태와 이름을 기록했다.
 - 기록: 플러그인 설치 확인(2026-10-03), `.claude/settings.json`(`enabledPlugins`에 세 플러그인 `true`, 미커밋이라 Task 012 초기 세팅 커밋에 포함). `~/.claude/plugins/installed_plugins.json`에 세 플러그인이 `scope: project`, `projectPath: ottnavi`로 등록됨. 스킬 `feature-dev:feature-dev`, `frontend-design:frontend-design`, `skill-creator:skill-creator`, 에이전트 `feature-dev:code-explorer`, `feature-dev:code-architect`, `feature-dev:code-reviewer`.
 
-#### Task 014: Vercel 프로젝트 연결과 Production Branch 설정으로 프론트 배포 경로 준비 ⬜
+#### Task 014: Vercel 프로젝트 연결과 Production Branch 설정으로 프론트 배포 경로 준비 ✅
 - 태그: [H] · PRD: F0, B1 · 선행: 012(009 포함) · 기한: 2026-10-07(R-17)
 - 구현 사항
-  - [ ] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
-  - [ ] 빌드 명령·Node 버전을 CI와 같게
-  - [ ] R-17 실측: Task 009의 `vercel.json`(`routes` + `rewrites`)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
+  - [x] GitHub 저장소 연결, Root Directory = `frontend`, Production Branch = `main`(`develop`·PR은 미리보기만)
+  - [x] 빌드 명령·Node 버전을 CI와 같게(Node **24**. CI를 24로 맞춘 이유는 Task 010 `기록:` 참고, Node 22(npm 10)는 `npm ci`가 실패한다)
+  - [x] R-17 실측: Task 009의 `vercel.json`(`routes` 단일 형식, 혼용하지 않음)으로 미리보기 배포가 설정 오류 없이 만들어지는지 확인한다. 백엔드 주소는 자리표시값이라 `/api` 프록시 동작과 적용 순서는 Task 021에서 본다
 - 완료 기준
-  - V-H: 설정값을 기록했고, `develop` 푸시로 미리보기 URL의 루트 페이지가 열린다.
-  - R-17: 혼용이 허용되면 그 사실을 `기록:`에 남긴다. 거부되면(배포 실패·설정 오류) `/api` 프록시·헤더 주입·rewrite 캐시 비활성화·SPA 대체를 모두 `routes`로 옮긴 Task 009 수정본을 `feature/f0-vercel-routes` PR로 `develop`에 병합하고, 미리보기 배포가 성공하는 것을 다시 확인한다. 어느 쪽이든 10.3 R-17을 갱신한다.
+  - V-H: 설정값을 기록했고, PR(또는 `feature/*` 브랜치 푸시)로 생긴 미리보기 URL의 루트 페이지가 열린다. `develop`은 보호 규칙(Task 012) 때문에 직접 푸시할 수 없다.
+  - R-17: Task 009가 이미 `routes` 단일 형식이라 혼용 여부를 시험하지 않는다. 미리보기 배포가 설정 오류 없이 만들어지는지만 확인해 `기록:`에 남기고, 실패하면 오류 메시지를 근거로 Task 009를 고친다. 어느 쪽이든 10.3 R-17을 갱신한다.
+- 기록: 2026-10-05 완료. GitHub 저장소 `msw-Hub/ottnavi`를 Vercel에 연결했고 **Root Directory는 `frontend`**, **Production Branch는 기본값 `main`**(Environments의 Production에서 확인, 저장소 기본 브랜치가 `main`이라 자동 지정), **Node.js Version은 24.x**(CI와 동일, 기본값으로 설정돼 있음), 프리셋은 Vite로 자동 인식돼 `npm run build`·출력 `dist`가 기본값으로 들어갔다. 연결 직후 `main`(커밋 `23fe649`)이 Production으로 먼저 배포됐는데, 이때 `main`에는 `vercel.json`이 없었다(`vercel.json`은 PR #4로 `develop`에만 병합됨). **R-17 실측**은 PR #7의 미리보기(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)로 했다: 빌드(`vite build`, 21개 모듈)가 `Build Completed`·`Deployment completed`로 끝났고 `vercel.json` 검증 오류는 없었다. `routes` 단일 형식이 설정 오류 없이 배포됐고, `ORIGIN_SECRET` 환경 변수가 없어도 배포는 실패하지 않았다(Task 015에서 등록). 미리보기 루트 페이지(`/`)가 열린다. `/api`(슬래시 없음)는 프록시 규칙 `^/api/(.*)$`에 걸리지 않아 SPA 화면이 나오는 것이 정상이고, `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트 `REPLACE_BACKEND_HOST`로 프록시 시도, 요청 처리 지역 `icn1`)가 나와 `/api` 프록시가 SPA 대체보다 먼저 적용됨을 확인했다. 혼용(`routes`+`rewrites`)은 시험하지 않았다. 빌드 로그의 `engines` 경고(새 메이저 Node가 나오면 자동 상향될 수 있다는 안내)는 정상이다. `/api` 프록시 동작과 헤더 주입의 실제 확인은 Task 021이다.
 
-#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ⬜
+#### Task 015: 비밀 값 저장 위치 정리와 GitHub·Vercel·로컬 등록으로 키 노출 방지 ✅
 - 태그: [H] · PRD: 6절 보안 · 선행: 002, 014
 - 관련: TECH 3절(cron 직접 호출), 4절, T-7, T-8
 - 범위: 준비 구간에는 GitHub·Vercel·로컬만 등록한다. Cloudtype 서비스 생성·환경 변수 등록·배포 토큰(R-12)은 Task 020에서 한다.
 - 구현 사항
-  - [ ] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
+  - [x] 저장 위치표(값 제외). Cloudtype 항목은 표에만 적고 등록은 Task 020
     - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`(cron이 Cloudtype 직접 호출 시 사용)을 지금 등록. Cloudtype 백엔드 주소·배포 토큰은 Task 020
     - Vercel 환경 변수: `ORIGIN_SECRET`(`routes[].transforms`가 읽음)을 **Production과 Preview 환경 모두**에 등록(Task 094의 미리보기 확인이 Preview 값을 쓴다)
     - Cloudtype 환경 변수(Task 020에서 등록): DB, Redis, TMDB, Google OAuth, `JWT_SECRET`, `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL`, 메일
     - 로컬: `.env`(커밋 금지)
-  - [ ] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
-  - [ ] 노출 시 재발급 절차 한 줄씩
+  - [x] `JWT_SECRET` 256비트 이상, `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 긴 난수로 이때 만든다. `VITE_` 변수에 비밀 값 금지
+  - [x] 노출 시 재발급 절차 한 줄씩
 - 완료 기준
   - V-H: 저장 위치표와 GitHub·Vercel(Production·Preview)·로컬 등록일을 기록했고, 저장소에 비밀 값이 없음을 확인했다.
+- 기록: 2026-10-05 완료(값은 어디에도 적지 않는다).
+  - **저장 위치표**
 
-#### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ⬜
+    | 변수 | 비밀번호 관리자 | GitHub Actions secrets | Vercel | 로컬 `.env` | Cloudtype(Task 020) |
+    |---|---|---|---|---|---|
+    | `ORIGIN_SECRET` | ✅ | ✅ | ✅ Production·Preview(사용자 보고) | ✅ | 같은 값 등록 |
+    | `ADMIN_BATCH_TOKEN` | ✅ 개발용·운영용 | ✅ (운영용) | — | ✅ (개발용) | 운영용 등록 |
+    | `JWT_SECRET` | ✅ 개발용·운영용 | — | — | ✅ (개발용) | 운영용 등록 |
+    | 운영 DB(Supabase)·Redis(Redis Cloud) 접속 정보 | ✅ | — | — | **넣지 않음**(비움) | 등록 |
+    | TMDB·Google OAuth·메일 | ✅ | — | — | ✅ | 등록 |
+
+  - **등록 결과**
+    - GitHub Actions secrets: `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`을 2026-10-05 05:39(KST)에 등록했다. `gh secret list`로 이름과 등록 시각을 확인했다(값은 볼 수 없다).
+    - Vercel: `ORIGIN_SECRET`을 2026-10-05에 등록했다(사용자 보고). 실수로 삭제한 뒤 다시 등록하려 하자 "이미 존재한다"는 응답이 와 변수가 남아 있음을 확인했다. Production·Preview 적용 범위와 GitHub secrets와 같은 값인지는 이 Task에서 직접 확인하지 못했고 Task 021(`/api` 프록시 헤더 주입)과 Task 094(미리보기)에서 검증한다.
+    - 로컬 `.env`: 저장소 루트에 만들었다. `.gitignore:8`에 걸려 추적되지 않고 추적되는 env 파일은 `.env.example`뿐이다. 변수 이름은 `.env.example`과 같다. `JWT_SECRET`·`ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`은 각각 44자(32바이트 Base64, 256비트)이고 서로 다른 값이다.
+  - **정리한 점**: `.env`에 운영 Supabase·Redis Cloud 접속 정보(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PASSWORD`)가 들어 있어 비웠다(`DB_NAME`, `DB_PORT`, `REDIS_PORT`도 비어 있음). 비워 두면 docker compose·로컬 프로필이 로컬 기본값을 쓴다. 이를 두면 `bootRun`·Flyway가 운영 DB에 붙을 수 있고, compose가 `--env-file .env`로 읽으면 로컬 PostgreSQL 컨테이너가 Supabase 계정으로 만들어진다.
+  - **저장소 검사**: `git grep -i -E "secret|password|token"`(`docs/`, `.env.example` 제외) 결과에 비밀 값은 없다(변수 이름, 설명 문구, `vercel.json`의 `$ORIGIN_SECRET` 참조, compose의 로컬 기본값 `ottnavi`뿐). `git status`에 `.env`는 나타나지 않는다.
+
+#### Task 016: 백엔드 의존성·프로필·임시 보안 설정 구성으로 공통 실행 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 006, 008, 012 · 브랜치: `feature/b0-backend-setup`
 - 관련: TECH 6절, backend.md 개발 환경·기술 스택
 - 구현 사항
-  - [ ] `backend/build.gradle` 의존성 전체
+  - [x] `backend/build.gradle` 의존성 전체
     - `spring-boot-starter-webmvc`, `-data-jpa`, `-data-redis`, `-validation`, `-actuator`, `-security`, `-security-oauth2-client`, `-flyway` + `flyway-database-postgresql`, `-batch-jdbc`(이름 재확인, 1절)
     - Spring Cloud OpenFeign 2025.1.2 이상 BOM, springdoc-openapi, Bucket4j(로컬·Redis), ShedLock(JDBC), jjwt(`jjwt-jackson`은 runtime), PostgreSQL 드라이버
     - 테스트: `testcontainers-postgresql`(패키지 `org.testcontainers.postgresql.*`), Redis 컨테이너, WireMock(Jetty 충돌 시 `wiremock-jetty12`)
     - 메일·Thymeleaf·GreenMail은 넣지 않는다. 2단계 Task 072에서 추가한다(MVP 범위 번짐 방지)
-  - [ ] `application.yml` / `-local.yml` / `-prod.yml`. 운영 값은 `${ENV_VAR}`. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false`, `ddl-auto=validate`, Hikari 최대 풀 약 5, `server.forward-headers-strategy=framework`
-  - [ ] **임시 보안 설정**: security 스타터를 넣으면 기본 동작이 전 경로 인증 요구이므로, `global/security/SecurityConfig`에 STATELESS, csrf·formLogin·httpBasic 비활성, 전 경로 `permitAll`을 둔다. Task 053에서 실제 규칙으로 교체한다는 주석을 단다
-  - [ ] Testcontainers 통합 테스트 베이스(PostgreSQL, Redis). 빈 목킹은 `@MockitoBean`(`@MockBean` 제거됨)
+  - [x] `application.yml` / `-local.yml` / `-prod.yml`. 운영 값은 `${ENV_VAR}`. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false`, `ddl-auto=validate`, Hikari 최대 풀 약 5, `server.forward-headers-strategy=framework`
+  - [x] **임시 보안 설정**: security 스타터를 넣으면 기본 동작이 전 경로 인증 요구이므로, `global/security/SecurityConfig`에 STATELESS, csrf·formLogin·httpBasic 비활성, 전 경로 `permitAll`을 둔다. Task 053에서 실제 규칙으로 교체한다는 주석을 단다
+  - [x] Testcontainers 통합 테스트 베이스(PostgreSQL, Redis). 빈 목킹은 `@MockitoBean`(`@MockBean` 제거됨)
 - 완료 기준
   - V-B: Testcontainers로 컨텍스트 로드 테스트가 통과한다.
   - V-API: local 프로필 기동 시 Flyway·Batch·Security 관련 오류가 없고 기본 로그인 폼·생성 비밀번호가 나오지 않는다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b0-backend-setup`). 상세 절차와 근거는 `docs/TASK016_GUIDE.md`.
+  - 의존성: Boot 4.1.1 BOM에 Spring Cloud 2025.1.3, springdoc 3.1.1, Bucket4j 8.21.0, ShedLock 7.10.1, jjwt 0.13.0, WireMock `wiremock-standalone` 3.13.2를 더했다. `spring-boot-starter-batch-jdbc` 아티팩트는 Maven Central에서 4.1.1 존재를 확인했고 `compileJava`가 통과했다(context7로는 이름을 확인하지 못했다, 1절 해소). 메일·Thymeleaf·GreenMail은 제외했다. Lombok을 추가했다(목록에는 없었으나 backend.md가 전제). `dependencyInsight` 결과 Jackson 2는 `jjwt-jackson`·springdoc(swagger-core)로만 들어오고 Boot는 Jackson 3다. bucket4j-lettuce와 Lettuce 7 호환은 미확인이라 요청 제한 구현 Task에서 검증한다.
+  - 결정: OAuth2 Google 등록·`JWT_SECRET` 참조는 Task 053으로 미룬다(첫 배포 기동 실패 방지). `spring.profiles.default: local`, `spring.application.name: ottnavi`를 뒀다. Tomcat 스레드는 기본값이다. JVM 힙은 yml이 아니라 Cloudtype 환경 변수(`JAVA_TOOL_OPTIONS`)로 Task 020·021에서 첫 배포 실측 후 정한다(첫 배포는 프리티어 1GB 기준, 스왑은 플랫폼 허용 여부 미확인이라 계획에서 뺀다). Redis health 대응은 Task 020에서 Redis Cloud 생존을 확인한 뒤 판단한다. prod에서 springdoc을 끈다.
+  - 검증: V-B는 로컬 compose를 끈 상태에서 `OttnaviApplicationTests`(`IntegrationTestSupport` 상속)가 통과했고 Testcontainers의 `postgres:17.6-alpine`·`redis:8.6-alpine` 기동을 로그로 확인했다. `.\gradlew.bat build`도 통과했다. V-API는 local 프로필 기동 5.6초, `/actuator/health` 200 UP, `/login` 404, `/v3/api-docs` 200이며 Flyway는 `No migrations found` WARN만 낸다(V1은 Task 019).
+  - PR #9 CodeRabbit 반영: `IntegrationTestSupport`에 `@SpringBootTest`를 둬 상속만으로 컨텍스트가 뜨게 했다. Redis Cloud 무료 플랜은 TLS를 쓸 수 없다고 해서(사용자 확인) prod yml에 `ssl.enabled`를 넣지 않고 사유를 주석과 `TASK003_POLICY_PRICING.md`에 남겼다. frontend 차단 hook은 문자열 검사라 완전 차단이 아니며 실수 방지용이라는 한계를 스크립트 주석에 적었다.
+  - 발견: 베이스를 상속하지 않으면 테스트가 local 프로필(compose DB)에 붙어 로컬에서만 통과한다(TECH 6절에 추가). springdoc이 `openapi 3.1.0`을 출력해 계약(3.0.3)과 달라 Task 023 계약 대조 테스트 때 맞춘다.
 
-#### Task 017: 프론트 개발 도구와 API 생성 파이프라인 구성으로 목업 개발 준비 ⬜
-- 태그: [F] · PRD: F0 · 선행: 007, 011, 012 · 브랜치: `feature/f0-frontend-setup`
+#### Task 017: 프론트 개발 도구와 API 생성 파이프라인 구성으로 목업 개발 준비 ✅
+- 태그: [F] · PRD: F0 · 선행: 007, 011, 012 · 브랜치: `feature/f0-frontend-setup`(실제로는 `develop` 생성 전에 진행해 커밋 `5093728`에 `main` 직접 커밋으로 들어갔고, `@hookform/resolvers` 추가분만 PR #1에 담겼다)
 - 구현 사항
   - [ ] Tailwind v4, shadcn/ui(`src/components/ui/`), React Router, TanStack Query, Zustand, React Hook Form·Zod, ESLint·Prettier, Vitest·RTL
   - [ ] `frontend/orval.config.ts`: 입력 `../docs/api/openapi.yaml` 하나(초안 파일 없음, `x-planned` operation도 생성 대상, 4.2), 출력 `src/api/generated/`, `react-query`, **`httpClient: 'axios'`** + `override.mutator`(`src/api/http.ts`), MSW 생성
@@ -384,6 +481,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - `npm run api:generate`·`lint`·`test`·`build`가 성공한다(Task 011 계약 골격의 생성 확인 포함).
   - V-F: 목업 모드에서 루트가 로드되고 콘솔 에러가 0건이다.
+- 기록: 2026-10-04 완료. `api:generate`·`lint`·`test`·`build`·`format:check` 통과, 목업 모드 V-F 콘솔 에러 0건. 계약이 `paths: {}`여도 `api:generate`는 에러 없이 끝나지만 타입 11개만 생성되고 훅·핸들러는 만들어지지 않는다. 임시 계약(조회 1개·등록 1개)으로 `orval` 8.39와 `msw` 3.0 호환(생성·타입 검사·런타임 가로채기)을 확인한 뒤 임시 파일은 지웠다. `src/mocks/handlers.ts`는 operation이 생기는 Task 019·031에서 채운다. `@hookform/resolvers` 5.9.1을 함께 설치했다. 템플릿 CSS 정리(`#root`·템플릿 변수·다크 모드 충돌)는 Task 018, 디자인 토큰 정리는 Task 037에서 한다.
 
 #### Task 018: 라우트·레이아웃·라우트 가드 골격 구현으로 전체 화면 뼈대 마련 ⬜
 - 태그: [F] · PRD: F0~F1, FR-06, FR-17 · 선행: 017 · 브랜치: `feature/f0-routes-layout`
@@ -394,73 +492,105 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-F: 모든 경로가 로드되고 콘솔 에러가 0건이다.
 
-#### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ⬜
-- 태그: [B] · PRD: B1 · 선행: 016, 023(Phase 2), 011 · 브랜치: `feature/b1-ott-services`
+#### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ✅
+- 태그: [B] · PRD: B1 · 선행: 016, 023, 011 · 브랜치: `feature/b1-ott-services`
 - 관련: TECH T-8, TECH 4절 IP 헤더
 - 구현 사항
-  - [ ] `db/migration/V1__create_ott_service.sql`: `ott_service`와 7개 서비스 시드(쿠팡플레이 `data_quality = INSUFFICIENT`), `provider/domain/OttService` 엔티티·리포지토리
-  - [ ] 계약에 먼저 추가 후 구현: 상태 확인 API와 서비스 목록 API(예: `GET /api/public/ott-services`, operationId `listOttServices`, 경로·이름은 제안)
-  - [ ] `global/security`의 오리진 비밀 헤더 필터(`x-origin-secret`, 상수 시간 비교, T-8 ①). local 프로필에서는 끄는 설정 키(제안: `app.origin-secret.enabled`)
-  - [ ] `/api/**` 기본 `Cache-Control: no-store` 응답 헤더(T-8 ②, 이 Task 한 곳에서 구현)
-  - [ ] 진입 요청의 `x-real-ip`·`x-forwarded-for`·`x-forwarded-host`를 로그로 남김(TECH 4절, 확인 후 Task 049에서 정리)
+  - [x] `db/migration/V1__create_ott_service.sql`: `ott_service`와 7개 서비스 시드(쿠팡플레이 `data_quality = INSUFFICIENT`), `provider/domain/OttService` 엔티티·리포지토리
+  - [x] 계약에 먼저 추가 후 구현: 상태 확인 API와 서비스 목록 API(예: `GET /api/public/ott-services`, operationId `listOttServices`, 경로·이름은 제안). 상태 확인 API는 새로 만들지 않고 `/actuator/health`로 대신한다(아래 기록 D1)
+  - [x] `global/security`의 오리진 비밀 헤더 필터(`x-origin-secret`, 상수 시간 비교, T-8 ①). local 프로필에서는 끄는 설정 키(제안: `app.origin-secret.enabled`)
+  - [x] `/api/**` 기본 `Cache-Control: no-store` 응답 헤더(T-8 ②, 이 Task 한 곳에서 구현)
+  - [x] 진입 요청의 `x-real-ip`·`x-forwarded-for`·`x-forwarded-host`를 로그로 남김(TECH 4절, 확인 후 Task 049에서 정리)
 - 완료 기준
   - V-B: 헤더 없음 → 거부, 올바른 헤더 → 200, 응답에 `no-store`가 있는 테스트가 통과한다.
   - V-API: 서비스 목록이 `CommonResponse`로 7건 온다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b1-ott-services`). 계약 초안 `docs/TASK019_CONTRACT_DRAFT.md`는 이 기록에 흡수하고 삭제했다.
+  - 결정(사용자 승인, D1~D8): ① **상태 확인 API는 만들지 않는다.** PRD B1·이 Task의 "상태 확인 API"는 이미 있는 `/actuator/health`(`/api` 밖이라 Cloudtype 헬스체크가 오리진 비밀 헤더 없이 호출 가능)로 대신하고, Vercel 경유 확인은 V-DEPLOY 정의대로 서비스 목록 API로 한다. 새 operation·DTO·프론트 훅을 늘리지 않기 위함이며 PRD 문구는 고치지 않았다. ② ERD 7행(공통 감사 컬럼 생략 표기)에 따라 `created_at`·`updated_at`을 두고 `BaseTimeEntity`를 상속했다. ③ T-8 ②는 Spring Security 기본 캐시 헤더(`no-cache, no-store, max-age=0, must-revalidate`)로 충족하고, `SecurityConfig`에 `headers.cacheControl(withDefaults())`를 명시·주석·테스트로 고정했다(Task 053 교체 시 끄지 않는다). ④ `logoPath`는 required·non-null·DB NOT NULL(7건 모두 값 확정). ⑤ 시드 전용 엔티티라 생성자 오버로드를 두지 않았다(protected 기본 생성자만). ⑥ 오리진 비밀 헤더 필터는 Security 체인 밖의 서블릿 필터(`@Order(HIGHEST_PRECEDENCE + 20)`), 대상은 `/api/**`만, 거부는 `AccessDeniedException`을 `HandlerExceptionResolver`에 위임해 403 `FORBIDDEN` ProblemDetail. `app.origin-secret.enabled` 기본 true·local만 false, prod `value: ${ORIGIN_SECRET}`(기본값 없음), 켜져 있는데 값이 비면 기동 실패. 401이 아닌 403인 이유: 사용자 인증 챌린지(`WWW-Authenticate`)가 아니라 출처 제한이다. ⑦ IP 로그는 `x-real-ip` 원본 + 반영된 `remoteAddr`·`serverName`(아래 실측). ⑧ 서비스 클래스명 `OttServiceQueryService`.
+  - 계약: `/public/ott-services`(`listOttServices`, 태그 `product`), `OttService`·`CommonResponseOttServiceList` 스키마, `fieldErrors` "(제안)" 제거, `error-codes.md`의 `FORBIDDEN` 의미 보강. 시드 값(표시명·로고 경로)은 사용자 확정값이고 왓챠 로고는 TMDB에 남은 왓챠플레이 시절 구버전이다(V1 주석). TMDB `provider_id`는 넣지 않았다(Task 033). 프론트 생성물·MSW 핸들러는 메인 컨텍스트에서 갱신했다.
+  - 검증(V-B): `.\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"`(Flyway V1 적용·`ddl-auto=validate` 통과), `"com.ottnavi.contract.OpenApiContractTest"`(첫 실제 operation 대조 차이 0건), `"com.ottnavi.provider.*"`(`OttServiceApiTest` 6건: 올바른 헤더 200·7건 정렬, `no-store`, 헤더 없음 403, 틀린·빈 값 403, `/actuator/health` 헤더 없이 200, IP 로그) 통과. 마지막에 `.\gradlew.bat clean build`가 전체 36건 실패 0으로 통과했다.
+  - 검증(V-API): local 프로필 `bootRun`(compose DB에 V1 적용, 기동 9.0초) 후 `curl -i -H "x-real-ip: 1.2.3.4" -H "x-forwarded-for: 5.6.7.8, 9.9.9.9" http://localhost:8080/api/public/ott-services` → 200 `application/json`, `CommonResponse` 7건(ID 1~7), `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`. 로그 `x-real-ip=1.2.3.4, remoteAddr=5.6.7.8, serverName=localhost`.
+  - 실측으로 확인한 것: `springdoc.default-produces-media-type: application/json`이 operation 응답 media type에 반영된다(`/v3/api-docs.yaml`의 200 응답이 `application/json`). record 컴포넌트의 `@Schema(requiredMode = REQUIRED)`가 `required`로 나오고 Java enum 필드는 인라인 `enum`으로 나온다. `@Enumerated(STRING)` ↔ `VARCHAR`, `BaseTimeEntity`의 `Instant` + `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)` ↔ `TIMESTAMPTZ`가 `ddl-auto=validate`를 통과한다. Boot 4.1.1은 `ForwardedHeaderFilter`를 order `Integer.MIN_VALUE`로 등록하고(jar `javap`), spring-web 7.0.9의 이 필터는 `X-Forwarded-*` 원본을 요청에서 숨긴다(`ForwardedHeaderExtractingRequest extends ForwardedHeaderRemovingRequest`). 그래서 뒤의 필터는 XFF 첫 값을 `remoteAddr`, XFH를 `serverName`으로만 보고 `x-real-ip`는 원본 그대로 본다(테스트·V-API로 확인). `@AutoConfigureMockMvc`는 `@Component` 필터와 Boot의 `ForwardedHeaderFilter`를 포함한다(403·IP 로그 테스트 통과).
+  - 미확인: `MessageDigest.isEqual`의 상수 시간 보장은 문서로 대조하지 않았다(JDK 6u17 이후 상수 시간 구현으로 알려져 있음). XFF 원본 체인(Cloudtype이 홉을 덧붙이는지, Vercel이 클라이언트 XFF를 덮어쓰는지)은 로그에 첫 값만 남아 Task 021 배포 스모크에서 `x-real-ip`와 `remoteAddr`를 비교해 판단한다. `/actuator/health`는 Cloudtype 주소로 직접 호출해도 열려 있다(상세는 기본 비공개). Windows에서 `gradlew bootRun` 출력을 파일로 받으면 한국어 로그가 깨져 보였다(콘솔 인코딩 문제로 보이며 앱 동작과 무관, 원인 미확인).
+  - PR #11 CodeRabbit 반영(Major, 보안): 오리진 필터와 IP 로그 필터가 `getRequestURI()` 원본으로 `/api/`를 판정해 `/%61pi/public/ott-services`처럼 퍼센트 인코딩한 경로가 필터를 건너뛰고 MVC가 `/api/...`로 매칭해 헤더 없이 200이 됐다(CWE-647). 재현 테스트로 수정 전 200을 확인한 뒤 `UrlPathHelper`로 디코딩·정규화한 경로를 쓰는 공통 `ApiRequestPath`로 고쳤다(`/api;x=1/...`도 403, `//api/...`는 MVC가 매칭하지 못해 404이므로 "200이 아님"만 고정). 최종 `clean build` 테스트 38건 실패 0(`OttServiceApiTest` 8건). 실제 Tomcat(Cloudtype)에서도 인코딩 우회가 403임을 Task 020 검증에서 확인했다.
 
-#### Task 020: Cloudtype 서비스 생성과 환경 변수·배포 토큰 등록으로 첫 배포 준비 ⬜
+#### Task 020: Cloudtype 서비스 생성과 환경 변수·배포 토큰 등록으로 첫 배포 준비 ✅
 - 태그: [H] · PRD: B1, H2 · 선행: 002, 015, 019 · 기한: 2026-10-12(R-12)
 - 관련: 10.3 R-12, TECH 3절, T-8
 - 구현 사항
-  - [ ] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다
-  - [ ] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분
-  - [ ] Cloudtype 환경 변수 등록(Task 015 위치표의 Cloudtype 항목, 이름만 기록). 첫 배포 기동에 필요 없는 값(Google OAuth, TMDB, 메일 등)은 Task 092 최종 점검 때 채워도 된다
-  - [ ] GitHub Actions secrets에 Cloudtype 배포 토큰(R-12 이름)과 백엔드 주소 등록
+  - [x] R-12 결정: Cloudtype 배포 방식(GitHub Actions 배포 액션 여부)과 배포 토큰 이름·발급 위치를 Cloudtype 문서로 확인하고 사용자가 정한다. **하비는 커스텀 이미지 배포·이미지 저장소 연결이 프로 전용이라 쓸 수 없으므로**, Cloudtype이 저장소에서 직접 빌드(Dockerfile·빌드팩)하고 GitHub Actions는 그 배포를 트리거하는 방식이 전제다(Task 003 `기록:`). 빌드시간은 하비 월 500분, 프리티어 월 200분이다
+  - [x] Task 002에서 만든 **Redis Cloud 무료 DB가 아직 살아 있는지 확인**한다(14일 동안 Redis 명령이 없으면 삭제됨, Task 003 `기록:`). 삭제됐거나 곧 쓸 계획이 없으면 필요할 때 다시 만든다
+  - [x] Cloudtype 무료 플랜에 운영 백엔드 서비스 생성(Java 17, 포트 8080, `prod` 프로필). SMTP 시험용 일회성 서비스(Task 022)와 이름으로 구분. 서비스를 배포할 때 사용할 리소스(무료/구독)를 고른다(무료 메모리와 구독 메모리는 따로 쓰고 합산되지 않는다, Task 003 `기록:`)
+  - [x] Cloudtype 환경 변수 등록(Task 015 위치표의 Cloudtype 항목, 이름만 기록). 첫 배포 기동에 필요 없는 값(Google OAuth, TMDB, 메일 등)은 Task 092 최종 점검 때 채워도 된다
+  - [x] GitHub Actions secrets에 Cloudtype 배포 토큰(R-12 이름)과 백엔드 주소 등록 → **하지 않음(보류)**: R-12 결정으로 당분간 콘솔 수동 배포를 쓰므로 토큰을 만들지 않았다(아래 기록)
 - 완료 기준
   - V-H: 서비스 이름·생성일, 등록한 변수 이름 목록(값 제외), R-12 결정 내용을 기록했고 10.3 R-12를 갱신했다.
+- 기록: 2026-10-06 완료(사용자가 콘솔에서 수행, 기록은 Claude).
+  - 서비스: 프로젝트 `backend`, 배포환경 `main`(Cloudtype의 배포환경 이름이며 Git 브랜치와 무관), 서비스 `ottnavi`, `java@17`, 프리티어 1GB, 서울 리전. 생성일 2026-10-06(약 15:31 KST, 첫 배포 시도). 공개 주소 `https://port-0-ottnavi-17xco2nlst8pr67.sel5.cloudtype.app`(같은 프로젝트 안의 내부 주소는 `ottnavi:8080`, Vercel에서는 쓰지 않는다).
+  - **R-12 결정(사용자, 2026-10-06)**: 저장소를 연결해 Cloudtype이 직접 빌드하고, 배포는 콘솔의 `배포하기`로 **수동**으로 한다. GitHub Actions 배포(문서 기준 secrets `CLOUDTYPE_TOKEN`, 권한 `repo`·`workflow`·`admin:public_key`의 PAT `GHP_TOKEN`)는 큰 권한의 토큰 관리와 빌드 시간 부담 때문에 당분간 쓰지 않는다. 그래서 `backend-deploy.yml`과 GitHub secrets의 Cloudtype 토큰은 만들지 않았다. 자동 배포가 필요해지면 그때 다시 정한다.
+  - 설정값: 서브 디렉토리 `backend`, JDK 17, 포트 8080, Build Command `./gradlew bootJar`, Start Command `java -Dspring.profiles.active=prod -jar build/libs/backend-0.0.1-SNAPSHOT.jar`. Cloudtype이 Dockerfile을 자동 생성(`Build type is dockerfile`)하므로 저장소에 Dockerfile이 필요 없고, `gradlew` 실행 권한 부여와 실행 jar 탐색(`-plain.jar` 제외)도 자동이다. 헬스체크(경로·Initial Delay)는 비워 두었다.
+  - 환경 변수(이름만): 런타임 `Environment variables` 7개 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `ORIGIN_SECRET`. `SPRING_PROFILES_ACTIVE`는 빌드 전용인 `Build Variables`에만 들어 있어 런타임에 전달되지 않으므로 Start Command의 `-D`로 대신한다. Build Variables에도 위 7개가 중복 입력돼 있다. 021의 재배포 때 정리한다(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기 — 비밀 값이 빌드 인자로 남는 노출을 줄이기 위함).
+  - Redis Cloud: 생존 확인(2026-10-06), 평문 접속(무료 플랜 TLS 불가, Task 003). **알려진 수용 위험**: 채팅에 노출된 것으로 보이는 문자열(마스킹된 글자 수로 Redis 비밀번호로 추정)을 재설정하지 않고 계속 쓰기로 했다(사용자 결정). 현재 Redis에 저장하는 데이터가 없어 허용하고, Refresh Token 같은 민감한 값을 저장하기 **전(Task 053 이전)에 비밀번호를 재설정**한다.
+  - **첫 배포는 `develop` 브랜치로 했다(일회성 예외)**: git.md의 "develop은 배포하지 않는다"의 예외로, 019까지 병합된 `develop`(`97b682a`)을 배포해 prod 프로필·Supabase·Redis·`ORIGIN_SECRET`·V1을 한 번에 검증했다. Task 021에서 `main` 병합 후 배포 브랜치를 `main`으로 바꾼다.
+  - 시도 이력(배포 내역 5건): ① 서브 디렉토리를 비워 둬 빌드 실패(`chmod: cannot access 'gradlew'`) → ② 서브 디렉토리 `backend` 후 빌드 성공 → ③ 런타임에 `SPRING_PROFILES_ACTIVE`가 없어 `local` 프로필로 떠 `127.0.0.1:5432` 접속 실패 → ④ `ORIGIN_SECRET`이 런타임에 없어 오리진 필터 빈 생성 실패(값 없이 켜지면 기동 실패하는 설계대로 동작) → ⑤ `DB_URL`의 `?`가 공백이라 `database "postgres sslmode=require" does not exist` → 수정 후 성공.
+  - 검증: 로그에서 `profile is active: "prod"`, Flyway `Successfully applied 1 migration ... now at version v1`(운영 Supabase PostgreSQL 17.11에 V1 첫 적용), Hibernate validate 통과, `Tomcat started on port 8080`, `Started OttnaviApplication in 201.494 seconds`. 공개 주소로 `/actuator/health` 200 `UP`(Redis 포함), `/api/public/ott-services` 헤더 없음 403 `FORBIDDEN`(`application/problem+json`), 인코딩 우회 `/%61pi/public/ott-services`도 403(실제 Tomcat에서 확인). 올바른 헤더로 200 확인은 Task 021(Vercel 경유)에서 한다.
+  - 실측: 기동 약 201초(프리티어 공유 CPU, 웹 컨텍스트 초기화만 약 60초). Redis 헬스 첫 호출 11.5초(`took 11489ms`), 이후 0.3~0.5초. **메모리 기동 직후 302.27MB**(1GB 중 약 30%, 서비스 목록 API만 있는 상태의 기준값, 4.6). 프리티어는 매일 1회 정지하므로 재기동마다 3분 이상 걸린다. 빌드 시간은 회당 약 1~3분이고 성공 3회·실패 1회 합계 약 6~8분으로 추정한다(월 200분 중, 콘솔에서 합계는 확인하지 못함).
+  - IP 헤더 실험(1회): `x-forwarded-for: 1.2.3.4, 5.6.7.8`, `x-real-ip: 9.9.9.9`, `x-forwarded-host: spoof.example`을 실어 공개 주소로 직접 호출했다(403). 로그의 `x-real-ip`·`remoteAddr`는 둘 다 실제 클라이언트 IP(위조 값이 아님, Cloudtype이 덮어씀), `serverName=spoof.example`(`X-Forwarded-Host`는 통과). 한 번의 관찰이라 일반화하지 않는다. Task 053의 로그인 리디렉션은 `OAUTH2_REDIRECT_BASE_URL` 고정을 쓴다(TECH 4절).
+  - 미확인·보류: 헬스체크 설정(기동이 길어 쓰려면 Initial Delay 300초 이상이 필요, Task 021 스모크 뒤 결정), 월 빌드 시간 합계(콘솔에서 확인 못 함). 위 현상과 함정은 TECH 6절에 정리했다.
 
 #### Task 021: Vercel·Cloudtype 얇은 배포와 develop→main 첫 배포로 배포 경로 검증 ⬜
 - 태그: [B][F] · PRD: B1 · 선행: 009, 014, 015, 019, 020 · 기한: 2026-10-14 · 브랜치: `feature/b1-thin-deploy` → `develop` → `main`
 - 관련: git.md "1주차 얇은 배포", TECH T-8, 10.3 R-12·R-17
 - 구현 사항
-  - [ ] `.github/workflows/backend-deploy.yml`: `main` push에서 Cloudtype 배포(Task 020의 토큰·방식). prod 프로필(Supabase Session Pooler 5432)
-  - [ ] `frontend/vercel.json` 백엔드 주소 확정, `routes[].transforms`로 `x-origin-secret` 주입, rewrite 캐시 비활성화
+  - [x] `.github/workflows/backend-deploy.yml`: `main` push에서 Cloudtype 배포 → **만들지 않음(보류)**: R-12 결정(Task 020 `기록:`)으로 당분간 `main` 병합 후 Cloudtype 콘솔에서 `배포하기`로 수동 배포한다. prod 프로필(Supabase Session Pooler 5432)은 Task 020에서 이미 적용됐다
+  - [x] `frontend/vercel.json` 백엔드 주소 확정(자리표시값 `REPLACE_BACKEND_HOST`를 Cloudtype 공개 주소로 교체, 2026-10-06), `routes[].transforms`로 `x-origin-secret` 주입, rewrite 캐시 비활성화(두 설정은 Task 009에서 작성)
   - [ ] feature → `develop` PR(squash) 후 `develop` → `main` PR을 merge commit으로 병합(사용자가 실행). 이것이 첫 배포이고 Vercel Production도 함께 배포된다
   - [ ] 이 시점 백엔드는 임시 `permitAll`(Task 016)이고 공개 API는 서비스 목록뿐임을 확인한다
 - 완료 기준
   - V-DEPLOY "헤더·경로"(Vercel Production URL 기준): `/api/public/ott-services`가 200 `CommonResponse`, `no-store`, 캐시 적중 없음, Cloudtype 직접 호출 거부, 로그에 방문자 IP.
-  - `기록:` `routes`와 `rewrites`의 실제 적용 순서(혼용 허용 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
+  - `기록:` `routes` 단일 형식에서의 실제 적용 순서(미리보기 배포 성공 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
+  - `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 남아 있지 않다(`Select-String -Path frontend/vercel.json -Pattern REPLACE_BACKEND_HOST`가 아무것도 찾지 못함). Task 009가 남긴 자리표시값이 운영 배포로 새지 않게 하는 확인이다(Task 009 PR의 코드래빗 Major 지적에 대한 대응).
+  - 기동 직후와 서비스 목록 API 호출 후의 **메모리 사용량**(Cloudtype 대시보드)을 `기록:`에 남긴다(메모리 예산의 기본 사용량, 4.6). 무료 1GB 한도에서 측정한 값이라 512MB에서의 동작은 보장하지 않는다.
+- 진행(2026-10-06, `feature/b1-thin-deploy`): `frontend/vercel.json`에 Cloudtype 공개 주소를 반영했다(`Select-String`으로 `REPLACE_BACKEND_HOST` 잔존 없음 확인). 서버는 Task 020에서 `develop` 브랜치로 이미 배포돼 동작한다(기동 약 201초, 메모리 302.27MB 기준값은 020 `기록:`). **남은 것**: `develop` → `main` PR(merge commit, 사용자), 병합 후 Cloudtype 배포 브랜치를 `main`으로 변경, 환경 변수 정리(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기), 콘솔 `배포하기`, V-DEPLOY 확인(Vercel Production URL에서 `/api/public/ott-services` 200·`no-store`·캐시 미적중·로그의 IP 헤더 값)과 `기록:` 작성, Vercel Production·Preview의 `ORIGIN_SECRET`이 Cloudtype과 같은 값인지는 Vercel 경유 200으로 확인한다.
 
 #### Task 022: Cloudtype SMTP 외부 발신 테스트로 메일 방식 결정 근거 확보 ⬜
 - 태그: [B] · PRD: B1, R11-11 · 선행: 002, 003, 006, 015, 016 · 기한: 2026-10-14
 - 관련: 10.3 R-15(해소)
 - 구현 사항
   - [ ] `develop`에서 만든 시험 브랜치(제안: `feature/b1-smtp-trial`)에 최소 발신 코드를 둔다. 이 브랜치는 병합하지 않는다
-  - [ ] 운영 서비스와 분리된 일회성 Cloudtype 서비스로 시험 브랜치를 배포해 SMTP 587 발신 시험(무료 플랜 서비스 추가 가능 여부는 Task 003 기록 확인)
+  - [ ] 운영 서비스와 분리된 일회성 Cloudtype 서비스로 시험 브랜치를 배포해 SMTP 587 발신 시험(Task 003 결과: 프리티어 동시실행이 4개라 서비스 추가가 가능하다. 시험 서비스는 **무료 리소스**로 만들어 운영 서비스의 구독 메모리와 분리한다)
   - [ ] 연결·읽기·쓰기 타임아웃 설정 상태로 시험(TECH 5절)
   - [ ] 실패 시에만 HTTPS 메일 API(예: Resend, Brevo) 하나의 키를 발급하고(Task 002에서 옮김) 같은 시험
   - [ ] 시험 후 일회성 서비스와 시험 브랜치 삭제
 - 완료 기준
   - V-H: 성공·실패, 오류 메시지, 시험일, 일회성 서비스 삭제를 기록했고 사용자가 R11-11을 결정했다.
 
+#### Task 023: 공통 응답·예외 처리와 계약 대조 테스트 구현으로 API 형식 통일 ✅
+- 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-common-response`
+- 이동: 원래 Phase 2였으나 Task 019(서비스 목록 API)의 선행이라 2026-10-04 사용자 결정으로 Phase 1로 옮겼다. 번호는 그대로다.
+- 관련: api-contract.md 공통 응답, backend.md 예외 처리, TECH T-5
+- 구현 사항
+  - [x] `global/common/CommonResponse`(record), `BaseTimeEntity`
+  - [x] `global/error/GlobalExceptionHandler`: `ProblemDetail` + `errorCode`, `VALIDATION_FAILED` 필드 오류 목록, 보안 엔트리포인트·거부 핸들러도 같은 형식
+  - [x] `ErrorCode`(error-codes.md와 일치), 커스텀 예외 기반(생성자 2개)
+  - [x] `OpenApiContractTest`(T-5): `/v3/api-docs.yaml`과 `docs/api/openapi.yaml`을 경로·operationId·스키마·required·enum으로 비교(`servers`·`info.version`·`example` 제외). 계약 쪽 `x-planned: true` operation은 비교에서 제외한다(R-20, 4.2)
+- 완료 기준
+  - V-B: 예외 유형별 응답 테스트와 계약 대조 테스트가 통과한다. `x-planned: true` operation을 하나 둔 계약으로 제외 동작을 확인하는 테스트를 포함한다.
+  - V-API: 없는 경로·잘못된 요청에 `application/problem+json`과 `errorCode`가 온다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b0-common-response`).
+  - 결정(사용자 승인, 계획 D1~D8): ① 공통 코드 3개 추가 `INVALID_REQUEST`(400, 깨진 JSON 등. 406·415 같은 기타 4xx는 원래 상태 유지), `RESOURCE_NOT_FOUND`(404, 없는 경로), `METHOD_NOT_ALLOWED`(405). ② TECH 신규 4개(`PLAN_DRAFT_*`, `BATCH_ALREADY_*`)는 넣지 않고 해당 기능 Task에서 확정과 함께 추가한다. ③ 계약 path는 `servers`(`/api`)를 뺀 상대 경로로 쓰고 비교기가 생성 쪽 `/api`를 뗀다(api-contract.md에 명시). ④ `x-planned`인데 구현된 operation은 실패시킨다. ⑤ 비교 범위에 `tags`·`nullable`도 넣는다. ⑥ `BaseTimeEntity`는 Hibernate `@CreationTimestamp`·`@UpdateTimestamp`(Auditing 설정 불필요). ⑦ 보안 핸들러는 지금 `SecurityConfig`에 등록하고 테스트 전용 체인으로 검증한다. ⑧ error-codes.md "공통 코드" 표와 `ErrorCode`의 일치를 `ErrorCodeDocumentTest`가 검사한다.
+  - 구현: `GlobalExceptionHandler`는 `ResponseEntityExceptionHandler`를 확장하고, 내장 예외가 모두 모이는 `handleExceptionInternal` 한 곳에서 errorCode·한국어 detail·`fieldErrors`를 붙인다. 도메인 예외는 abstract `BusinessException`(생성자 2개 + `getErrorCode()`). 보안 401·403은 `ProblemDetailAuthenticationEntryPoint`·`ProblemDetailAccessDeniedHandler`가 `HandlerExceptionResolver`에 위임해 같은 핸들러를 탄다. 계약 대조는 테스트 소스의 `OpenApiContractComparator`(SnakeYAML Map 비교, `$ref`를 풀어 구조 비교, `allOf` 병합, 2xx 응답만)와 `OpenApiContractTest`(Testcontainers)다. `application.yml`에 `springdoc.api-docs.version: openapi_3_0`, `springdoc.default-produces-media-type: application/json`. `build.gradle`에 `testImplementation 'org.yaml:snakeyaml'`(BOM 관리)과 `test` 입력으로 `docs/api`(문서만 바뀌어도 테스트 재실행).
+  - 검증: 단계별로 `.\gradlew.bat test --tests "com.ottnavi.global.error.*"`(13건), `"com.ottnavi.global.*"`(16건), `"com.ottnavi.support.contract.*"`(11건), `"com.ottnavi.contract.OpenApiContractTest"`(1건)가 통과했고 마지막에 `.\gradlew.bat clean build`가 전체 29건 실패 0으로 통과했다. V-API는 local 프로필 기동 후 `curl.exe -i`로 `GET /api/does-not-exist` → 404 `application/problem+json` `RESOURCE_NOT_FOUND`, `POST /v3/api-docs`·`DELETE /actuator/health` → 405 `Allow: GET` `METHOD_NOT_ALLOWED`, `/v3/api-docs.yaml` → `openapi: 3.0.1`을 확인했다. 검증 실패(400)·깨진 JSON·415·500·401·403은 실행 중인 앱에 해당 엔드포인트가 없어 `@WebMvcTest`(테스트 전용 컨트롤러·체인)로만 확인했다.
+  - 실측으로 확인한 것: springdoc 3.0 출력 키와 그 결과 버전(3.0.1). 두 설정 키는 springdoc jar의 설정 메타데이터에도 있다. 테스트 클래스 안의 중첩 `@RestController`는 `@SpringBootTest` 스캔에서 빠진다(계약 대조 차이 0건). 보안 핸들러가 handler 없이 `HandlerExceptionResolver`에 위임해도 advice가 적용되고 `instance`가 채워진다. Spring 7의 ProblemDetail은 `type`이 `about:blank`이면 JSON에서 생략한다(계약에서 `type`은 required가 아니라 문제없음). 405에서는 Spring `PageNotFound` 로거와 이 핸들러가 WARN을 한 번씩 남긴다.
+  - 미확인: `springdoc.default-produces-media-type`이 실제 operation의 응답 media type을 `application/json`으로 바꾸는지(operation이 없어 Task 019에서 확인). springdoc이 Java record 응답 필드를 `required`·`nullable`로 어떻게 표시하는지(필요하면 DTO에 `@Schema(requiredMode = REQUIRED)`·`nullable` 지정, Task 019에서 확인). `BaseTimeEntity`의 `Instant` + `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)`가 TIMESTAMPTZ와 `ddl-auto=validate`를 통과하는지(엔티티가 없어 Task 019 V1에서 확인). Boot `spring.mvc.problemdetails.enabled`는 켜지 않았고, 직접 만든 핸들러와 함께 켰을 때의 동작은 확인하지 않았다. MVC 밖(필터·컨테이너)에서 난 오류는 Boot `/error`로 가서 problem+json이 아닐 수 있다(요청 제한 필터 Task에서 직접 같은 형식으로 쓴다).
+  - 남은 일: `openapi.yaml`의 `ProblemDetail.fieldErrors` description에 남은 "(제안)"은 다음에 `openapi.yaml`을 수정할 때 지운다(이번에는 프론트 생성물 변경을 피하려고 계약 파일을 건드리지 않았다. 구조는 확정). 신규 3개 코드의 화면 메시지는 Task 025 `errorMessages.ts`에서 확정한다.
+
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 0/15
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 0/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
 - F1 목업으로 전체 흐름을 확정하고(Phase 1~2만으로 목업 흐름 확인 가능) OpenAPI 초안 → ERD 보정 → 스키마 순으로 고정한다.
-
-#### Task 023: 공통 응답·예외 처리와 계약 대조 테스트 구현으로 API 형식 통일 ⬜
-- 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-common-response`
-- 관련: api-contract.md 공통 응답, backend.md 예외 처리, TECH T-5
-- 구현 사항
-  - [ ] `global/common/CommonResponse`(record), `BaseTimeEntity`
-  - [ ] `global/error/GlobalExceptionHandler`: `ProblemDetail` + `errorCode`, `VALIDATION_FAILED` 필드 오류 목록, 보안 엔트리포인트·거부 핸들러도 같은 형식
-  - [ ] `ErrorCode`(error-codes.md와 일치), 커스텀 예외 기반(생성자 2개)
-  - [ ] `OpenApiContractTest`(T-5): `/v3/api-docs.yaml`과 `docs/api/openapi.yaml`을 경로·operationId·스키마·required·enum으로 비교(`servers`·`info.version`·`example` 제외). 계약 쪽 `x-planned: true` operation은 비교에서 제외한다(R-20, 4.2)
-- 완료 기준
-  - V-B: 예외 유형별 응답 테스트와 계약 대조 테스트가 통과한다. `x-planned: true` operation을 하나 둔 계약으로 제외 동작을 확인하는 테스트를 포함한다.
-  - V-API: 없는 경로·잘못된 요청에 `application/problem+json`과 `errorCode`가 온다.
 
 #### Task 024: Redis·캐시·Feign 공통 설정 구성으로 외부 연동 기반 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-redis-feign-config`
@@ -620,6 +750,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 정답 입력·기대 결과 세트(예산·찜·구독 상태 조합). Task 065가 같은 세트를 쓰도록 위치를 정한다(제안: `backend/src/main/resources/engine-benchmark/`)
   - [ ] 입력 정규화와 `input_hash`(SHA-256) 계산기(정렬된 단위·상품·가격, 예산, 시청 분, `data_as_of`)
   - [ ] 두 Solver 점수·비용 차이와 계산 시간(3회 중앙값) 비교 테스트, 최악 입력(단품 7개, 큰 찜) 탐색 시간 측정
+  - [ ] 최악 입력과 후보 상한 근처에서 **힙 사용량**을 함께 기록한다(메모리 예산 측정 지점, 4.6)
 - 완료 기준
   - V-B: 정답 세트 전체 통과. 비교 결과표(점수 차, 비용 차, 시간)와 R11-30 잠정 상한 근거를 `기록:`에 남겼다. `calc_run` 기록은 Task 065.
 
@@ -697,7 +828,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: B3, R11-25, R11-26 · 선행: 045, 044 · 기한: 2026-10-21
 - 구현 사항
   - [ ] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
-  - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`), Redis ops 측정(R11-26)
+  - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`, Supabase 무료 한도 500MB와 비교, 인덱스·WAL 포함), Redis ops 측정(R11-26). 수집 사이클의 **최대 힙·메모리 사용량**도 기록한다(메모리 예산 측정 지점, 4.6)
   - [ ] 실측 러닝타임 중앙값으로 기본값 보정안(R11-25). 중단되면 Task 045 복구 API로 이어서 실행
 - 완료 기준
   - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다.
@@ -1092,7 +1223,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 092: MVP 운영 인프라 전환과 도메인 연결로 공개 준비 ⬜
 - 태그: [H] · PRD: B8·F8, R11-3, R11-4 · 선행: 005, 067 · 기한: 2026-11-04
 - 구현 사항
-  - [ ] Cloudtype Hobby(월 6,600원) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
+  - [ ] Cloudtype Hobby(512MB당 월 6,600원, 메모리는 실측 후 결정) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
   - [ ] `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` 확정, Google OAuth 운영 리다이렉트 URI(`https://{도메인}/api/login/oauth2/code/google`)·승인된 출처 추가
   - [ ] 운영 환경 변수 최종 점검(Task 015 위치표, Task 020 등록분). 첫 배포 때 미룬 Google OAuth·TMDB·메일 값을 채운다
 - 완료 기준
@@ -1109,7 +1240,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 094: 프론트 운영 배포 설정으로 실제 API 연결 배포 준비 ⬜
 - 태그: [F] · PRD: F8, T-8 · 선행: 092 · 브랜치: `feature/f8-deploy`
 - 구현 사항
-  - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`)를 Task 021 기록 기준으로 점검
+  - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`respectOriginCacheControl: false`, 또는 Task 021 기록에서 효과가 확인된 방식)를 Task 021 기록 기준으로 점검
   - [ ] `VITE_USE_MOCK=false`, 운영 빌드에 MSW 미포함 확인
 - 완료 기준
   - `develop` 미리보기 배포에서 `/api/public/ott-services` 응답이 V-DEPLOY "헤더·경로"를 만족한다(Preview 환경 `ORIGIN_SECRET`, Task 015).
@@ -1162,6 +1293,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 측정용 백엔드 컨테이너를 `cpus`·`mem_limit` 고정으로 추가(제안: `infra/docker-compose.yml`의 `profiles: [perf]` 또는 별도 compose 파일)
   - [ ] `infra/k6/` 스크립트(플랜 계산, 검색, 상세), 전후 각 3회 중앙값, 최악 입력(예산·찜 상한) 탐색 시간
   - [ ] 개선(캐시, 쿼리, 인덱스) 후 재측정. 배포 환경은 스모크만
+  - [ ] **메모리 최종 판정**: 측정용 컨테이너에 `mem_limit: 512m`을 걸고 계산·수집·조회 부하에서 OOM 없이 도는지 확인해 구독 메모리 단위(512MB당 월 6,600원)를 판단한다(4.6)
 - 완료 기준
   - 전후 비교표를 기록했고 R11-29·30 확정안을 사용자에게 올렸다.
 
@@ -1177,7 +1309,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `develop` → `main` merge commit, V-DEPLOY
   - [ ] cron 확인(이관분): tier별 두 수집 cron(Task 077)의 실행 기록, 수집 완료 뒤 백엔드가 이어서 실행한 재계산(Task 069, SCR-16 재계산 대상 플랜 수)과 월초 알림 생성(Task 073)의 기록
-  - [ ] 2단계 확인: 월초 알림 수신, 변경 내역, 독점 목록, 번들 계산, 탈퇴. 운영비 청구서(월 1만원 이내)
+  - [ ] 2단계 확인: 월초 알림 수신, 변경 내역, 독점 목록, 번들 계산, 탈퇴. 운영비 청구서(저예산 유지 확인)
   - [ ] `v0.2.0` 태그
 - 완료 기준
   - V-H: 항목별 결과를 기록했다.
@@ -1216,7 +1348,6 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 항목 | 내용 | 기한 | 막히는 Task |
 |---|---|---|---|
-| R-17 | Vercel `routes`+`rewrites` 혼용 허용 여부 실측(거부 시 Task 009 수정) | **2026-10-07** (Task 014) | 014, 009, 021 |
 | R-12 | Cloudtype 배포 방식·토큰 이름 | **2026-10-12** (Task 020) | 020, 021 |
 | R11-11 | Cloudtype SMTP(587) 외부 발신 가능 여부. 실패 시 HTTPS 메일 API | **2026-10-14** (Task 022) | 072 |
 | R11-12 | 비로그인 요청 한도(일반, 단건 수집 검색). 추천안(PRD, 미확정): 두 단계로 나누고 Redis Cloud 초당 100 ops 반영. 수치는 사용자가 정한다 | **2026-10-15** (B4 전) | 049 |
@@ -1227,7 +1358,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 | R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **2026-10-29** | 066, 073 |
 | R-5 | 운영 ADMIN 역할 지정 방법. 추천안(미확정): DB 직접 수정. 대안(환경 변수 관리자 이메일 목록)이 채택되면 Task 054에 구현이 늘어나므로 054 착수(2026-10-22) 전에 정하는 편이 안전하다 | **2026-11-04** (Task 095 전) | 095 (대안 채택 시 054) |
 
-해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결). 10.3 참고.
+해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정), R-17(Vercel `vercel.json` 미리보기 배포 성공, Task 014에서 확인). 10.3 참고.
 
 ### 10.2 PRD 11절 결정 필요·작업 중·보류 항목
 
@@ -1251,7 +1382,6 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R11-24 | SCR-16 알림 상태는 2단계부터(재계산 대상 플랜 수도 2단계 Task 069·070에서 채움) | 결정 필요 | 2026-10-22 (F6 전) | 061, 070, 071, 074 |
 | R11-25 | 러닝타임 기본값 실측 보정 | 작업 중 | 첫 전체 수집 후(2026-10-21) | 042, 048 |
 | R11-26 | TV 시즌 호출량과 배치 분할 | 작업 중 | 첫 전체 수집 후(2026-10-21) | 043, 044, 048 |
-| R11-27 | 7개 서비스 해지 예약 정책 | 작업 중 | H2(2026-10-07) | 003 |
 | R11-28 | QueryDSL 도입 시 Boot 4.1·Hibernate 7 호환 버전 | 보류 | 도입 시점 | — |
 | R11-29 | 계산·공개 조회 응답 시간 목표 | 보류 | k6 측정 후 | 100 |
 | R11-30 | 예산·찜 상한, 그리디 전환 후보 수 상한 | 보류(잠정값은 10.1) | 엔진·k6 측정 후 | 039, 040, 056, 076, 100 |
@@ -1275,11 +1405,11 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-9 | 관리자 가격 겹침, 찜 상한 초과 등 TECH·rules에 없는 오류 코드가 필요. `error-codes.md`에 제안 등록 후 사용자 승인 | 미결 | FR-19, R11-30 | 해당 Task |
 | R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 추천안(미확정): 찜이나 ACTIVE·DRAFT가 참조하는 `watch_unit`은 삭제하지 않고 재수집으로 갱신하고, ARCHIVED만 참조하면서 TMDB에서 사라져 갱신할 수 없는 경우에만 해당 ARCHIVED 플랜을 먼저 삭제 | 미결(Task 080) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
 | R-11 | 초기 `main` 직접 커밋 범위. git.md는 "폴더 골격, 문서, CI 골격"까지 허용. 최소 빌드 프로젝트(006·007)와 미커밋 문서 변경을 초기 세팅에 포함한다고 가정 | 가정 | git.md | 2026-10-05 |
-| R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | 미결(Task 020에서 결정) | git.md | 2026-10-12 |
+| R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | **해소(2026-10-06, 사용자 결정)**: 저장소 연결 + Cloudtype 콘솔 수동 배포. GitHub Actions 배포와 Cloudtype 토큰은 당분간 쓰지 않는다(Task 020 `기록:`) | git.md | 2026-10-12 |
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
 | R-15 | SMTP 시험(Task 022)의 Cloudtype 배포 방법 | **해소(2026-10-03, 사용자 결정)**: 병합하지 않는 시험 브랜치를 일회성 Cloudtype 서비스로 배포해 시험하고 삭제. 무료 플랜 서비스 추가 가능 여부는 Task 003에서 먼저 확인. Task 022 선행에 003·006·016 추가 | git.md, R11-11 | — |
 | R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | 미결 | PRD 5.5, TECH 3절 | 2026-10-15 |
-| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. 거부되면 Task 009를 `routes`만으로 고친다(Task 014 완료 기준). 적용 순서의 실제 동작은 Task 021 `기록:` | 확인 필요(Task 014) | TECH 6절·T-8 | 2026-10-07 |
+| R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` **2026-10-05 실측(Task 014)**: 미리보기 배포(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)가 `routes` 단일 형식 `vercel.json`으로 설정 오류 없이 만들어졌고(`Build Completed`, `Deployment completed`), `ORIGIN_SECRET` 환경 변수가 아직 없어도 배포가 실패하지 않았다. 루트 페이지가 열리고 `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 `/api` 프록시 규칙이 SPA 대체보다 먼저 적용되는 것을 확인했다. 혼용 여부는 시험하지 않았다. 프록시·헤더 주입의 실제 동작은 Task 021 | 확인됨(Task 014, 2026-10-05) | TECH 6절·T-8 | 2026-10-07 |
 | R-18 | LLM 초안 저장 위치. ERD(24개 테이블)에 초안 테이블이 없다. Redis(TTL) 또는 ERD 추가 중 선택 필요. ERD 추가로 정하면 ERD 수정과 Flyway 마이그레이션이 Task 087 범위에 들어간다 | 미결 | PRD SCR-18, ERD | 2026-11-19 |
 | R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인 필요 | 미결 | FR-18, TECH 2절 | 2026-11-05 |
 | R-20 | MVP 계약 초안의 보관 방식 | **해소(2026-10-03, 사용자 결정)**: 별도 초안 파일 없이 `docs/api/openapi.yaml` 하나에 두고, 구현 전 operation에 `x-planned: true`("제안" 표시)를 단다. 계약 대조 테스트(Task 023)는 이 경로를 제외하고, 구현 Task가 표시를 지운다. orval 입력은 `openapi.yaml` 하나(Task 017). 4.2, Task 023·031 반영. `api-contract.md`는 다른 작업자가 갱신 중. 남은 판단: 2단계 이후 기능에도 `x-planned`를 쓸지(현재 4.4는 PRD 9절대로 구현 PR에서 추가) | PRD 9절, TECH T-5, api-contract.md | — |

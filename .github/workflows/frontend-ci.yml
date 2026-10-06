@@ -1,0 +1,51 @@
+name: frontend-ci
+
+# develop·main 대상 PR과 두 브랜치 push에서 프론트 검증 실행
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+# 같은 PR·브랜치에서 푸시가 연달아 오면 이전 실행을 취소해 낭비를 줄인다
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      # 이후 단계에서 git push를 하지 않으므로 토큰을 .git에 남기지 않는다
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # 로컬 개발 환경(Node 24, npm 11)과 맞춘다. Node 22(npm 10)는 vitest의 선택적 peer(msw ^2)와
+      # 설치된 msw 3이 어긋나 락 파일 불일치(Missing: msw@2.15.0)로 `npm ci`가 실패한다
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test
+      - run: npm run build
+
+      # main 대상 PR에서만: 운영 배포 전 백엔드 주소 자리표시값이 남아 있으면 실패(Task 021 이중 안전장치)
+      - name: REPLACE_BACKEND_HOST 잔존 검사
+        if: github.base_ref == 'main'
+        run: |
+          if grep -q 'REPLACE_BACKEND_HOST' vercel.json; then
+            echo "::error file=frontend/vercel.json::REPLACE_BACKEND_HOST를 실제 백엔드 주소로 교체해야 main에 병합할 수 있습니다."
+            exit 1
+          fi

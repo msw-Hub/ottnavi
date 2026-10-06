@@ -1,0 +1,20 @@
+{
+  "routes": [
+    {
+      "src": "^/api/(.*)$",
+      "dest": "https://port-0-ottnavi-17xco2nlst8pr67.sel5.cloudtype.app/api/$1",
+      "respectOriginCacheControl": false,
+      "transforms": [
+        {
+          "type": "request.headers",
+          "op": "set",
+          "target": { "key": "x-origin-secret" },
+          "args": "$ORIGIN_SECRET",
+          "env": ["ORIGIN_SECRET"]
+        }
+      ]
+    },
+    { "handle": "filesystem" },
+    { "src": "^/(.*)$", "dest": "/index.html" }
+  ]
+}

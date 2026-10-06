@@ -1,0 +1,20 @@
+# application-prod.yml
+spring:
+  datasource:
+    url: ${DB_URL}                # Supabase Session Pooler 5432
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      # Redis Cloud 무료 플랜은 TLS를 쓸 수 없어 평문 접속이다. 유료 전환 시 ssl.enabled를 추가한다(TASK003 참고)
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+springdoc:
+  api-docs:
+    enabled: false                # 운영에서 불필요한 기능은 끈다(ROADMAP 4.6)
+  swagger-ui:
+    enabled: false
+app:
+  origin-secret:
+    value: ${ORIGIN_SECRET}       # 기본값 없음. 누락 시 기동이 실패한다(Vercel 주입 값과 같아야 함)

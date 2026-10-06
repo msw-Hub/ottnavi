@@ -5,7 +5,7 @@
 - 근거 우선순위: PRD 11절 확정 → PRD 본문 → ERD → rules. [기획서](./proposal_v6.md)는 v7 요약본이라 근거로 쓰지 않는다.
 - 출처 표기: `R`=PRD, `E`=ERD, `rules`, `c7`=context7 확인, `web`=공식 문서 확인, `도출`=문서 근거 없이 이 문서에서 정한 설계.
 - PRD 11절의 결정 필요 항목은 `R11-번호`로, 이 문서가 올린 결정 필요 항목은 `T-번호`로 참조한다. T 항목은 7절이 단일 출처다.
-- 저장소 상태(2026-10-03): 빌드·설정·CI 파일 모두 미생성. 스택은 rules를 따르고, 확인한 버전은 6절에 적는다.
+- 저장소 상태(2026-10-04): `backend/`·`frontend/`·`docs/api/`·`infra/` 골격이 생겼고 CI(`.github/workflows/`)와 `vercel.json`은 아직 없다. 스택은 rules를 따르고, 확인한 버전은 6절에 적는다.
 
 ---
 
@@ -66,7 +66,7 @@ stateDiagram-v2
 ## 3. 배치 (FR-18·20)
 
 **비동기 202와 중복 실행 409.**
-- 관리자 실행 API는 `TaskExecutor`를 가진 `JobOperator`로 Job을 비동기 시작하고 즉시 **202 + `jobExecutionId`**를 반환한다(c7 Batch 6). Cloudtype HTTP 타임아웃(무료 1분, Hobby 1분 또는 5분은 공식 페이지끼리 불일치)과 무관하게 동작한다(T-6 종결).
+- 관리자 실행 API는 `TaskExecutor`를 가진 `JobOperator`로 Job을 비동기 시작하고 즉시 **202 + `jobExecutionId`**를 반환한다(c7 Batch 6). Cloudtype HTTP 타임아웃(프리티어 1분, 하비 5분)과 무관하게 동작한다(T-6 종결).
 - 식별 파라미터는 `targetDate`(LocalDate) + `tier`(DAILY/WEEKLY)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
 - GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
 
@@ -111,7 +111,7 @@ sequenceDiagram
   S-->>B: 200 { accessToken } (회전 시 새 RT 쿠키)
 ```
 
-- 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다.
+- 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다. Cloudtype이 `X-Forwarded-Host`를 통과시키는 것으로 관찰됐으므로(Task 020 실험, 1회) 템플릿 대신 **`OAUTH2_REDIRECT_BASE_URL` 고정**을 쓴다(도출).
 - **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
 - RT 서버 측 저장은 R11-21 미결정이다. `RefreshTokenStore` 인터페이스로 "Redis 저장 + 회전·폐기"와 "서명 검증만" 구현을 교체 가능하게 둔다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
 - 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
@@ -120,7 +120,7 @@ sequenceDiagram
 **IP 헤더 신뢰 문제.**
 - `server.forward-headers-strategy=framework`를 쓴다. Cloudtype은 Boot가 인식하는 클라우드가 아니라 기본값이 `NONE`이다(c7). `native`는 컨테이너가 신뢰 프록시를 판정해 Vercel 같은 공인 IP 프록시 헤더를 무시할 수 있어 기각했다(도출, 배포 스모크로 확인).
 - FRAMEWORK는 헤더를 조건 없이 신뢰한다. Cloudtype 주소로 직접 들어와 `X-Forwarded-For`를 위조하면 요청 제한을 우회한다 → 오리진 비밀 헤더 검사로 막는다(T-8 확정).
-- 클라이언트 IP는 `x-real-ip` 1순위, 없으면 `x-forwarded-for` 첫 값(Vercel이 둘 다 방문자 IP로 채움, web). Cloudtype 진입점이 홉을 덧붙일 수 있어서다(도출). Vercel이 클라이언트가 보낸 `X-Forwarded-For`를 덮어쓰는지는 확인 불가이므로 배포 스모크에서 실제 헤더를 로그로 확인한다.
+- 클라이언트 IP는 `x-real-ip` 1순위, 없으면 `x-forwarded-for` 첫 값(Vercel이 둘 다 방문자 IP로 채움, web). Cloudtype 진입점이 홉을 덧붙일 수 있어서다(도출). Vercel이 클라이언트가 보낸 `X-Forwarded-For`를 덮어쓰는지는 확인 불가이므로 배포 스모크에서 실제 헤더를 로그로 확인한다. **Cloudtype 직접 호출 실험(Task 020, 2026-10-06, 1회)**: `x-real-ip: 9.9.9.9`, `x-forwarded-for: 1.2.3.4, 5.6.7.8`을 실었을 때 로그의 `x-real-ip`·`remoteAddr`는 모두 실제 클라이언트 IP였다(Cloudtype이 덮어씀). `x-forwarded-host: spoof.example`은 `serverName`에 그대로 반영됐다(통과). 한 번의 관찰이라 일반화하지 않고, Vercel 경유 값은 Task 021 스모크에서 본다.
 
 ---
 
@@ -143,7 +143,7 @@ sequenceDiagram
 | Boot 4의 `spring-boot-starter-batch`는 메모리(resourceless) 모드다. DB 이력은 `spring-boot-starter-batch-jdbc` 필요 | 위와 같음. `spring.batch.jdbc.initialize-schema=never`, `spring.batch.job.enabled=false` | web, c7 |
 | orval v8 기본 HTTP 클라이언트가 fetch라 axios mutator·인터셉터가 동작하지 않음 | `output.httpClient: 'axios'` 명시 | c7 |
 | Vercel external rewrite는 2026-04-06 이후 프로젝트에서 upstream `Cache-Control`을 따라 CDN 캐시 | 백엔드 `/api/**` 기본 `no-store` + `x-vercel-enable-rewrite-caching: 0`, 스모크로 응답 헤더 확인(T-8 확정) | web |
-| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes` + `rewrites` 동시 사용 시 적용 순서가 불명확 | `routes[].transforms`로 환경 변수 `ORIGIN_SECRET`을 요청 헤더에 주입. 순서는 얇은 배포 Task에서 실측(ROADMAP R-17) | web(부분) |
+| 오리진 비밀 헤더는 `vercel.json`에 비밀 값을 적을 수 없고(저장소에 커밋됨), `routes`와 `rewrites`·`headers`는 함께 쓸 수 없는 것으로 보임(Vercel CLI 소스: 함께 정의하면 스키마 검증 실패, 배포 실측은 아님) | `routes` 단일 형식으로 작성하고 `transforms`(`type: request.headers`, `op: set`, `target.key`, `args: "$ORIGIN_SECRET"`, `env: ["ORIGIN_SECRET"]`)로 주입. 공식 `@vercel/config`가 만든 JSON과 같고 `routesSchema` 검증 통과. 캐시 비활성화는 `respectOriginCacheControl: false`. 실제 동작은 Task 021에서 확인(ROADMAP R-17) | c7, 실측(Task 009) |
 | `vercel.json` rewrite 순서: SPA 대체를 먼저 두면 API가 `index.html`을 받음 | `/api/:path*` → SPA 대체 순서 | 도출 |
 | Jackson 2·3 혼재: Boot 4는 `tools.jackson.*`, jjwt-jackson은 Jackson 2(`com.fasterxml`) 의존 | jjwt-jackson은 런타임 스코프, 앱 직렬화는 Jackson 3만. 어노테이션은 `com.fasterxml.jackson.annotation` 유지 | web, c7 |
 | Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |
@@ -152,7 +152,25 @@ sequenceDiagram
 | Batch chunk 안 TMDB 호출이 DB 연결을 점유해 풀(약 5) 고갈 | T-2 확정: 배치 예외 인정, 작은 chunk | rules 충돌 |
 | `@MockBean` 제거 | `@MockitoBean` | web |
 | Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
-| WireMock 기본 아티팩트가 Jetty 11 | Jetty 충돌 시 `wiremock-jetty12` | c7 |
+| WireMock 기본 아티팩트가 Jetty 11. Boot BOM은 Jetty를 12.1로 강제하고 `wiremock-jetty12` 3.13.2는 12.0 기준으로 빌드됨 | Task 016에서 셰이딩된 `wiremock-standalone` 3.13.2를 선택. `wiremock-jetty12`를 쓰면 기동 테스트로 확인. 실제로 WireMock을 띄워 본 적은 없어 TMDB 연동 테스트 Task에서 검증 | c7, BOM(미검증) |
+| springdoc 3.x는 기본으로 `openapi 3.1.0`을 출력해 계약(`openapi.yaml`, 3.0.3)과 `nullable` 표현 등이 달라질 수 있음 | `springdoc.api-docs.version: openapi_3_0`(Task 023). 이 설정은 `3.0.1`을 출력하므로 계약 대조는 버전 문자열을 비교하지 않고 `3.0` 접두사만 검사한다 | c7, 실측(Task 016·023, `/v3/api-docs.yaml`) |
+| springdoc은 produces를 지정하지 않은 operation의 응답 media type을 `*/*`로 낼 수 있고, `@RestControllerAdvice` 핸들러의 응답을 모든 operation의 오류 응답으로 자동으로 붙임 | `springdoc.default-produces-media-type: application/json`. Task 019에서 첫 operation의 200 응답이 `application/json`으로 나오는 것을 확인했다. 계약 대조는 2xx 응답만 비교한다 | c7, 실측(Task 023·019) |
+| springdoc이 record 응답 필드를 `required`로 표시하는지 | 필드마다 `@Schema(requiredMode = REQUIRED)`를 붙이면 `required`에 들어간다(primitive도 자동으로 들어가지 않으므로 명시). Java enum 필드는 인라인 `enum` 목록으로 나온다 | 실측(Task 019, `/v3/api-docs.yaml`) |
+| springdoc 제네릭 응답 스키마 이름(`CommonResponseListOttServiceResponse` 등)이 계약의 이름(`CommonResponseOttServiceList`)과 다름 | 계약 대조는 스키마 이름이 아니라 `$ref`를 풀어 구조(type·format·nullable·enum·required·properties·items, `allOf`는 병합)로 비교한다 | 도출(Task 023) |
+| 계약 path는 `servers: /api` 기준 상대 경로(orval·axios `baseURL: /api`)이고 springdoc은 `/api/...` 전체 경로를 냄 | 비교기가 계약 `servers[0].url` 접두사를 생성 쪽 path에서 떼고 비교한다(api-contract.md 경로 절) | 도출(Task 023) |
+| 테스트 소스의 `@RestController`도 `com.ottnavi` 아래면 `@SpringBootTest` 스캔에 잡혀 `/v3/api-docs`에 섞일 수 있음 | 테스트 전용 컨트롤러는 테스트 클래스 안의 중첩 static 클래스로 두고 `@Import`한다. 이렇게 하면 스캔에서 빠지는 것을 계약 대조 차이 0건으로 확인했다 | 실측(Task 023) |
+| Spring 7 `ProblemDetail`은 `type`이 `about:blank`이면 JSON에서 `type`을 생략함 | 계약에서 `type`은 required가 아니므로 그대로 둔다. 프론트는 `type`이 없을 수 있다고 본다 | 실측(Task 023) |
+| 보안 필터는 DispatcherServlet 앞이라 `@RestControllerAdvice`가 401·403을 직접 받지 못함 | 엔트리포인트·거부 핸들러가 `@Qualifier("handlerExceptionResolver") HandlerExceptionResolver`에 handler 없이(null) 위임한다. advice 적용과 `instance` 설정을 테스트로 확인했다. Lombok 생성자는 `@Qualifier`를 옮기지 않아 생성자를 직접 쓴다 | 실측(Task 023) |
+| Hibernate는 `Instant`를 기본으로 `TIMESTAMP`(TZ 없음)로 매핑한다는 문서 설명이 있음(문서가 Boot 4.1에 포함된 7.x와 같은 버전인지는 미확인) | `BaseTimeEntity`에 `@JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)`를 지정했다. 첫 엔티티(`OttService`, Task 019)에서 `TIMESTAMPTZ` 컬럼과 `ddl-auto=validate` 통과를 확인했다. `@Enumerated(STRING)` ↔ `VARCHAR`도 통과 | c7, 실측(Task 019) |
+| Boot 4.1.1은 `server.forward-headers-strategy=framework`일 때 `ForwardedHeaderFilter`를 order `Integer.MIN_VALUE`로 등록하고, 이 필터는 `Forwarded`·`X-Forwarded-*` 원본을 요청 래퍼에서 숨긴다. 뒤의 필터·컨트롤러는 XFF 원본 체인을 볼 수 없다 | 클라이언트 IP는 `x-real-ip`(숨김 대상 아님) 원본과 반영된 `getRemoteAddr()`(XFF 첫 값), 호스트는 `getServerName()`으로 본다. `RequestIpLoggingFilter`(Task 019)가 이 셋을 남긴다. XFF 원본 체인이 필요하면 별도 방법이 필요하다(Task 021 스모크 결과로 판단) | 실측(jar `javap`, Task 019 테스트) |
+| Spring Security는 기본으로 `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`, `Pragma: no-cache`, `Expires: 0`을 붙이고, 앱이 `Cache-Control`을 직접 넣으면 덮어쓰지 않는다 | T-8 ②(`/api/**` 기본 no-store)를 이 기본 헤더로 충족한다. `SecurityConfig`에 `headers.cacheControl(withDefaults())`를 명시하고 `OttServiceApiTest`가 검사한다. 공개 조회 CDN 캐시를 열 때는 해당 응답에서만 `Cache-Control`을 넣는다. 오리진 비밀 헤더 거부(403)는 Security 체인 앞에서 끝나므로 구조상 이 헤더가 붙지 않는다(직접 호출에만 생기는 응답이라 허용) | c7, 실측(Task 019) |
+| Cloudtype 설정의 환경 변수가 `Environment variables`(런타임)와 `Build Variables`(빌드 전용, "더 많은 옵션" 아래)로 나뉜다. 빌드 쪽에만 넣으면 실행 중인 앱은 값을 받지 못한다(`SPRING_PROFILES_ACTIVE`를 빌드 쪽에만 넣어 `local` 프로필로 떴고, `ORIGIN_SECRET` 미전달로 기동이 실패했다) | 런타임에 필요한 변수는 `Environment variables`에 넣고 Build Variables는 비운다(비밀 값이 빌드 인자로 남는 노출을 줄임). 프로필은 Start Command의 `-Dspring.profiles.active=prod`로도 고정한다. 문서(docs.cloudtype.io 환경 변수)에는 이 구분 설명이 없고 화면 문구("applied only at build time")로 확인했다 | 실측(Task 020, 설정 화면·로그) |
+| Cloudtype 빌드는 저장소 루트를 컨텍스트로 쓰므로 `backend/` 아래 프로젝트는 서브 디렉토리(`backend`)를 지정해야 한다(빠지면 `gradlew`를 찾지 못함). Dockerfile은 Cloudtype이 자동 생성하고(`Build type is dockerfile`) `gradlew` 실행 권한과 실행 jar 탐색(`-plain.jar` 제외)도 자동이다 | 서브 디렉토리 `backend`, Build `./gradlew bootJar`(테스트는 Docker가 없어 제외), Start `java -Dspring.profiles.active=prod -jar build/libs/backend-0.0.1-SNAPSHOT.jar` | 실측(Task 020 빌드 로그), web(docs.cloudtype.io 배포·Spring Boot 가이드) |
+| 프리티어 기동이 느리다: `Started` 201초(웹 컨텍스트 약 60초), Redis 헬스 첫 호출 11.5초(이후 0.3~0.5초), 매일 1회 정지 후 재기동도 3분 이상. Cloudtype 헬스체크(경로·Initial Delay)는 기본이 비어 있다 | 헬스체크를 쓰려면 경로 `/actuator/health`에 Initial Delay를 300초 이상으로 잡는다(짧으면 정상 기동 중에 재시작될 수 있음, 미검증). 첫 요청 지연과 Vercel 타임아웃은 Task 021 스모크에서 본다 | 실측(Task 020) |
+| JDBC URL의 옵션은 `?`로 잇는다. 공백이면 DB 이름이 `postgres sslmode=require`로 해석돼 `FATAL: database ... does not exist`가 난다 | `jdbc:postgresql://<호스트>:5432/postgres?sslmode=require` | 실측(Task 020) |
+| Redis `GenericContainer`는 `@ServiceConnection(name = "redis")`로 이름을 지정해야 연결 정보가 만들어짐. `@Bean` 컨테이너의 수명은 Spring이 관리하므로 IDE의 try-with-resources 경고는 `@SuppressWarnings("resource")`로 둔다 | `TestcontainersConfig`에 적용. Redis 연결을 쓰는 테스트는 아직 없다 | c7, 컨텍스트 로드 실측(Task 016) |
+| `spring.profiles.default: local`이면 테스트도 local 프로필(compose DB·Redis)을 가리켜서, `IntegrationTestSupport`를 상속하지 않은 통합 테스트는 로컬에서만 통과하고 CI에서 실패함 | 모든 통합 테스트는 `IntegrationTestSupport`를 상속. 컨테이너를 끈 상태로 테스트해 확인 | 실측(Task 016) |
+| Boot 4는 테스트 스타터가 기능별로 분리됨(`@DataJpaTest`는 `starter-data-jpa-test`, `@WithMockUser`는 `starter-security-test`) | 필요한 테스트 스타터를 추가(Task 016에서 두 개 추가). 해당 어노테이션을 실제로 쓰는 Task에서 확인 | Central POM(미검증) |
 | MSW `worker.start()` 전 렌더링 시 경쟁 상태 | await 후 렌더링 | c7 |
 | Vite 8·Vitest 4는 Node 20.19+ 또는 22.12+ | CI Node 버전 고정 | c7 |
 | Spring Cloud OpenFeign은 feature-complete | T-3 확정: 유지 | c7 |
@@ -161,6 +179,14 @@ sequenceDiagram
 | Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(초기 기획의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수집은 로컬에서 실측, 운영 적재는 MVP 배포 때(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
 | Loki4j 최신 라인의 Logback 요구 버전과 Boot 관리 Logback 미대조 | 3단계 도입 시 대조 | c7(부분) |
 | Gemini 무료 등급 입력은 제품 개선에 사용됨 | 개인정보를 프롬프트에 넣지 않음 | web |
+| `msw` 3에서 `worker.start()`·`server.listen()`의 `onUnhandledRequest`가 `onUnhandledFrame`으로 바뀜(설치된 타입 정의로 확인). `orval` 8.39와는 생성·타입 검사·런타임 모두 호환 확인 | `onUnhandledFrame: 'bypass'`(브라우저), 테스트 서버는 `'error'` | 실측(Task 017) |
+| TypeScript 6에서 `baseUrl` 없이 `paths`만으로 `@/*` 별칭이 동작함(`baseUrl`을 넣어 본 적은 없고 deprecated 여부는 문서로 확인하지 못함) | `tsconfig.json`·`tsconfig.app.json` 양쪽에 `paths`, `vite.config.ts`에 같은 별칭 | 실측(Task 017) |
+| Vite 8의 설정 로더(`configLoader: native`)는 `vite.config.ts`의 `__dirname`을 경고함 | `import.meta.dirname` 사용(Node 20.11+) | 실측(Task 017) |
+| shadcn Nova 프리셋은 `clsx`·`tailwind-merge` 대신 `cn` 패키지(`shadcn-ui/cn`)를 `utils.ts`·컴포넌트가 import함. `shadcn` CLI는 `package.json`에 Tailwind가 없으면 "Tailwind 미설치"로 중단됨 | `cn`을 그대로 사용, Tailwind를 `dependencies`에 둔 뒤 `init` | 실측(Task 017) |
+| `shadcn` 패키지의 하위 의존성(`braces` 등)에 `npm audit` 높음 7건이 나오지만 CLI 개발 도구 쪽이라 번들에는 들어가지 않음. `npm audit fix --force`는 `shadcn@1.0.0`으로 내려 `index.css`의 `shadcn/tailwind.css` import가 깨질 수 있음 | 강제 수정하지 않고 `shadcn` 새 버전을 기다림 | 실측(Task 017) |
+| 설치된 Vitest는 5.0.3이고 이 문서의 위 줄은 "Vitest 4"로 적혀 있음. Vitest 5의 Node 요구 버전은 확인하지 못함 | Vite 8 기준(Node 20.19+/22.12+)을 유지 | 실측(Task 017) |
+| `docker compose -f infra/docker-compose.yml`은 `.env`를 compose 파일이 있는 `infra/` 기준으로 찾아 루트 `.env`를 읽지 않음 | compose에 로컬 전용 기본값을 두고, 루트 `.env`가 필요하면 `--env-file .env`. DB·Redis 포트는 `127.0.0.1`에만 공개 | 도출(Task 008) |
+| CodeRabbit은 기본값으로 기본 브랜치(`main`) 대상 PR만 자동 리뷰해 `develop` 대상 PR은 건너뜀. 코멘트 틀(제목·안내문)은 `language: ko-KR`에서도 영어로 나옴 | `.coderabbit.yaml`의 `reviews.auto_review.base_branches`에 `develop` 추가. Autopilot·Autofix 체크박스는 누르지 않음 | c7, 실측 |
 
 ---
 
@@ -180,7 +206,7 @@ T-1~T-8은 확정(2026-10-03), T-9는 결정 필요다. PRD 11절 항목은 PRD�
 - [x] **T-3. OpenFeign.** — **확정(2026-10-03)**: 유지. feature-complete이며 새 프로젝트는 HTTP Service Clients를 고려하라는 안내가 있으나(c7), 스택 확정 사항이고 Boot 4.1 호환이 확인됐다. 깨지는 조건: 이후 Boot 버전에서 호환 단절.
 - [x] **T-4. 운영 경로 알고리즘.** — **확정(2026-10-03)**: 정확해 기본 + 후보 수 상한 초과 시 그리디(1절). 상한 값은 R11-30 측정 후 정한다. 운영 계산은 선택된 알고리즘 하나만 돌리고 `plan.algorithm`에 남긴다. 두 알고리즘을 같은 `input_hash`로 비교하는 `calc_run` 기록은 FR-13 측정 경로(테스트 세트, 관리자 측정)에서만 만든다.
 - [x] **T-5. CI 명세 대조 방식.** — **확정(2026-10-03)**: 새 도구 없이 테스트 코드에서 `/v3/api-docs.yaml`을 받아 `docs/api/openapi.yaml`과 YAML 파싱으로 경로·operationId·스키마·required·enum을 비교(`servers`, `info.version`, `example` 제외). 아직 구현하지 않은 API는 `openapi.yaml`에 `x-planned: true`(이름은 제안)를 달아 두고 이 표시가 있는 operation은 대조에서 제외한다. 계약 초안을 별도 파일로 나누지 않으므로 orval 생성 원천은 `openapi.yaml` 하나다.
-- [x] **T-6. Cloudtype Hobby HTTP 타임아웃.** — **종결(2026-10-03)**: 영향 없음. `cloudtype.io/pricing`은 1분, `cloudtype.co.kr/pricing`은 5분으로 불일치하지만(web) 장시간 작업은 모두 202 비동기다. 동기 계산 API 시간은 R11-30 측정 때 확인한다.
+- [x] **T-6. Cloudtype Hobby HTTP 타임아웃.** — **종결(2026-10-03), 확정(2026-10-05)**: 영향 없음. `cloudtype.io/pricing`(`/ko/pricing` 요금제 비교, 사용자 제공 스크린샷 2026-10-05)에서 HTTP 타임아웃은 프리티어 1분, **하비 5분**, 프로 30분이다. 이전에 `cloudtype.io/pricing`은 1분, `cloudtype.co.kr/pricing`은 5분으로 불일치한다고 적었는데 하비는 5분으로 확인했다. 장시간 작업은 모두 202 비동기다. 동기 계산 API 시간은 R11-30 측정 때 확인한다.
 - [x] **T-7. JWT 수명.** — **확정(2026-10-03)**: Access Token 30분, Refresh Token 14일, Refresh Token은 재발급 때 회전한다. 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl` 설정 키로 둔다. `JWT_SECRET`은 256비트 이상(미달 시 `WeakKeyException`, c7).
 - [x] **T-8. Vercel 경유 강제와 캐시 헤더.** — **확정(2026-10-03)**: ①②를 모두 채택해 함께 적용한다. ① Vercel이 `/api` 요청에 오리진 비밀 헤더 `x-origin-secret`(값은 `ORIGIN_SECRET`)을 붙이고 백엔드가 상수 시간 비교로 검사한다. 주입 방식은 `vercel.json`의 `routes[].transforms`(`type: request.headers`, `op: set`, `env: ["ORIGIN_SECRET"]`)이다(web: vercel.com/docs/project-configuration/vercel-json). `routes`는 `rewrites`와 함께 쓸 수 있지만 둘의 적용 순서는 문서로 확정되지 않아 얇은 배포 Task에서 실측한다(ROADMAP R-17). cron은 이 검사를 Cloudtype 직접 호출로 통과한다(3절) ② `/api/**` 기본 `Cache-Control: no-store` + Vercel rewrite 캐시 비활성화(`x-vercel-enable-rewrite-caching: 0`). 공개 조회 CDN 캐시는 필요해질 때 별도로 연다.
 - [ ] **T-9. 오래된 DRAFT 판정 기준 (2단계 개선).** 현재 기준(2절 저장 규칙 2번: `data_as_of`가 마지막 수집 완료 시각보다 이르면 409)은 수집이 매일 돌아 대부분의 DRAFT가 다음 날 막힌다. MVP는 프론트가 409를 받으면 자동 재계산한다(2절). 개선 후보: DRAFT에 포함된 시청 단위의 `availability_change` 또는 사용한 상품의 가격 변경이 `data_as_of` 이후에 있을 때만 차단. 판단 필요: 판정 쿼리 비용, 변경 이력 보존 범위(`availability_change`가 판정 기간 동안 남아 있는지), 놓친 변경이 결과를 틀리게 만드는 경우의 허용 여부.

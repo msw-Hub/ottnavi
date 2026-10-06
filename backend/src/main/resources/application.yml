@@ -1,3 +1,27 @@
+# application.yml
 spring:
   application:
-    name: OttnaviApplication
+    name: ottnavi
+  profiles:
+    default: local
+  datasource:
+    hikari:
+      maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+  jpa:
+    open-in-view: false           # 권장(로드맵 목록에는 없음)
+    hibernate:
+      ddl-auto: validate
+  batch:
+    jdbc:
+      initialize-schema: never    # BATCH_* 테이블은 Flyway V4(Task 033)가 만든다
+    job:
+      enabled: false              # 기동 시 Job 자동 실행 금지, 관리자 API로만 실행
+server:
+  forward-headers-strategy: framework   # Cloudtype은 Boot가 아는 클라우드가 아니라 기본값이 NONE(TECH 4절)
+springdoc:
+  api-docs:
+    version: openapi_3_0                # 계약(openapi.yaml 3.0.3)과 nullable 표기를 맞춘다. 기본값은 3.1(TECH 6절)
+  default-produces-media-type: application/json   # 미지정 시 응답 media type이 */*로 나와 계약과 어긋난다
+app:
+  origin-secret:
+    enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다

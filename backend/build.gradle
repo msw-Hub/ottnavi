@@ -18,12 +18,59 @@ repositories {
 	mavenCentral()
 }
 
+ext { set('springCloudVersion', '2025.1.3') }
+
 dependencies {
+	// 웹·검증·모니터링
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	// DB·마이그레이션
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-flyway'
+	implementation 'org.flywaydb:flyway-database-postgresql'
+	runtimeOnly 'org.postgresql:postgresql'
+	// Redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	// 보안·JWT (jjwt-jackson은 Jackson 2라 런타임에만 둔다, TECH 6절)
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
+	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+	// 배치·락
+	implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
+	implementation 'net.javacrumbs.shedlock:shedlock-spring:7.10.1'
+	implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.10.1'
+	// 외부 연동·요청 제한·API 문서
+	implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
+	implementation 'com.bucket4j:bucket4j_jdk17-core:8.21.0'
+	implementation 'com.bucket4j:bucket4j_jdk17-redis-common:8.21.0'
+	implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.21.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+	// Lombok (결정 2)
+	compileOnly 'org.projectlombok:lombok'
+	annotationProcessor 'org.projectlombok:lombok'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
+	testImplementation 'org.yaml:snakeyaml'   // 계약 대조 테스트의 YAML 파싱(T-5). 버전은 Boot BOM 관리, 전이 의존에 기대지 않고 명시
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+dependencyManagement {
+	imports { mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}" }
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 계약 대조·오류 코드 일치 테스트가 읽는 문서. 입력으로 등록해 문서만 바뀌어도 테스트가 다시 돈다
+	def apiDocsDir = file('../docs/api')
+	inputs.dir(apiDocsDir).withPathSensitivity(PathSensitivity.RELATIVE)
+	systemProperty 'ottnavi.docs.api-dir', apiDocsDir.absolutePath
 }

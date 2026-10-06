@@ -1,0 +1,13 @@
+# application-local.yml (DB_URL은 일부러 참조하지 않는다. 운영 DB에 붙는 사고 방지, ROADMAP Task 015 기록)
+spring:
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:${DB_PORT:5432}/${DB_NAME:ottnavi}   # compose가 127.0.0.1에만 바인딩
+    username: ${DB_USERNAME:ottnavi}
+    password: ${DB_PASSWORD:ottnavi}
+  data:
+    redis:
+      host: 127.0.0.1
+      port: ${REDIS_PORT:6379}
+app:
+  origin-secret:
+    enabled: false                # 로컬은 Vite proxy·직접 호출이라 오리진 비밀 헤더를 검사하지 않는다
