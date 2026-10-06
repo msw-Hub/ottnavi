@@ -6,6 +6,7 @@ spring:
     password: ${DB_PASSWORD}
   data:
     redis:
+      # Redis Cloud 무료 플랜은 TLS를 쓸 수 없어 평문 접속이다. 유료 전환 시 ssl.enabled를 추가한다(TASK003 참고)
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
