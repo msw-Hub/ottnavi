@@ -2,7 +2,7 @@
   "routes": [
     {
       "src": "^/api/(.*)$",
-      "dest": "https://REPLACE_BACKEND_HOST/api/$1",
+      "dest": "https://port-0-ottnavi-17xco2nlst8pr67.sel5.cloudtype.app/api/$1",
       "respectOriginCacheControl": false,
       "transforms": [
         {
