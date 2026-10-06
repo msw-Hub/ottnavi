@@ -236,6 +236,19 @@ class OpenApiContractComparatorTest {
 		assertThat(compare(contract(), generated)).singleElement().asString().contains("media type");
 	}
 
+	@Test
+	void 응답_코드를_따옴표_없이_써도_응답_본문이_비교된다() {
+		// 따옴표 없는 200:은 YAML에서 Integer 키라, 정규화하지 않으면 응답 비교가 조용히 누락된다
+		Map<String, Object> contract = OpenApiYaml.parse(CONTRACT.replace("'200':", "200:"));
+		assertThat(compare(contract, generated())).isEmpty();
+
+		Map<String, Object> generated = generated();
+		Map<String, Object> content = map(map(map(operation(generated, "/api" + OTT_SERVICES).get("responses")).get("200"))
+				.get("content"));
+		content.put("*/*", content.remove("application/json"));
+		assertThat(compare(contract, generated)).singleElement().asString().contains("media type");
+	}
+
 	// 픽스처 도우미 (매번 새로 파싱해 테스트끼리 상태를 공유하지 않는다)
 
 	private static List<String> compare(Map<String, Object> contract, Map<String, Object> generated) {
