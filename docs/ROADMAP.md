@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 19/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 20/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 19/105 | |
+| 합계 | | 20/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 19/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 20/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -537,20 +537,28 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - IP 헤더 실험(1회): `x-forwarded-for: 1.2.3.4, 5.6.7.8`, `x-real-ip: 9.9.9.9`, `x-forwarded-host: spoof.example`을 실어 공개 주소로 직접 호출했다(403). 로그의 `x-real-ip`·`remoteAddr`는 둘 다 실제 클라이언트 IP(위조 값이 아님, Cloudtype이 덮어씀), `serverName=spoof.example`(`X-Forwarded-Host`는 통과). 한 번의 관찰이라 일반화하지 않는다. Task 053의 로그인 리디렉션은 `OAUTH2_REDIRECT_BASE_URL` 고정을 쓴다(TECH 4절).
   - 미확인·보류: 헬스체크 설정(기동이 길어 쓰려면 Initial Delay 300초 이상이 필요, Task 021 스모크 뒤 결정), 월 빌드 시간 합계(콘솔에서 확인 못 함). 위 현상과 함정은 TECH 6절에 정리했다.
 
-#### Task 021: Vercel·Cloudtype 얇은 배포와 develop→main 첫 배포로 배포 경로 검증 ⬜
+#### Task 021: Vercel·Cloudtype 얇은 배포와 develop→main 첫 배포로 배포 경로 검증 ✅
 - 태그: [B][F] · PRD: B1 · 선행: 009, 014, 015, 019, 020 · 기한: 2026-10-14 · 브랜치: `feature/b1-thin-deploy` → `develop` → `main`
 - 관련: git.md "1주차 얇은 배포", TECH T-8, 10.3 R-12·R-17
 - 구현 사항
   - [x] `.github/workflows/backend-deploy.yml`: `main` push에서 Cloudtype 배포 → **만들지 않음(보류)**: R-12 결정(Task 020 `기록:`)으로 당분간 `main` 병합 후 Cloudtype 콘솔에서 `배포하기`로 수동 배포한다. prod 프로필(Supabase Session Pooler 5432)은 Task 020에서 이미 적용됐다
   - [x] `frontend/vercel.json` 백엔드 주소 확정(자리표시값 `REPLACE_BACKEND_HOST`를 Cloudtype 공개 주소로 교체, 2026-10-06), `routes[].transforms`로 `x-origin-secret` 주입, rewrite 캐시 비활성화(두 설정은 Task 009에서 작성)
-  - [ ] feature → `develop` PR(squash) 후 `develop` → `main` PR을 merge commit으로 병합(사용자가 실행). 이것이 첫 배포이고 Vercel Production도 함께 배포된다
-  - [ ] 이 시점 백엔드는 임시 `permitAll`(Task 016)이고 공개 API는 서비스 목록뿐임을 확인한다
+  - [x] feature → `develop` PR(squash) 후 `develop` → `main` PR을 merge commit으로 병합(사용자가 실행). 이것이 첫 배포이고 Vercel Production도 함께 배포된다
+  - [x] 이 시점 백엔드는 임시 `permitAll`(Task 016)이고 공개 API는 서비스 목록뿐임을 확인한다
 - 완료 기준
   - V-DEPLOY "헤더·경로"(Vercel Production URL 기준): `/api/public/ott-services`가 200 `CommonResponse`, `no-store`, 캐시 적중 없음, Cloudtype 직접 호출 거부, 로그에 방문자 IP.
   - `기록:` `routes` 단일 형식에서의 실제 적용 순서(미리보기 배포 성공 여부는 Task 014 기록), 로그에 찍힌 IP 헤더 실제 값. 무료 플랜이 꺼져 있으면 대시보드에서 기동한 뒤 확인한다.
   - `frontend/vercel.json`에 `REPLACE_BACKEND_HOST`가 남아 있지 않다(`Select-String -Path frontend/vercel.json -Pattern REPLACE_BACKEND_HOST`가 아무것도 찾지 못함). Task 009가 남긴 자리표시값이 운영 배포로 새지 않게 하는 확인이다(Task 009 PR의 코드래빗 Major 지적에 대한 대응).
   - 기동 직후와 서비스 목록 API 호출 후의 **메모리 사용량**(Cloudtype 대시보드)을 `기록:`에 남긴다(메모리 예산의 기본 사용량, 4.6). 무료 1GB 한도에서 측정한 값이라 512MB에서의 동작은 보장하지 않는다.
-- 진행(2026-10-06, `feature/b1-thin-deploy`): `frontend/vercel.json`에 Cloudtype 공개 주소를 반영했다(`Select-String`으로 `REPLACE_BACKEND_HOST` 잔존 없음 확인). 서버는 Task 020에서 `develop` 브랜치로 이미 배포돼 동작한다(기동 약 201초, 메모리 302.27MB 기준값은 020 `기록:`). **남은 것**: `develop` → `main` PR(merge commit, 사용자), 병합 후 Cloudtype 배포 브랜치를 `main`으로 변경, 환경 변수 정리(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기), 콘솔 `배포하기`, V-DEPLOY 확인(Vercel Production URL에서 `/api/public/ott-services` 200·`no-store`·캐시 미적중·로그의 IP 헤더 값)과 `기록:` 작성, Vercel Production·Preview의 `ORIGIN_SECRET`이 Cloudtype과 같은 값인지는 Vercel 경유 200으로 확인한다.
+- 진행 메모(작성 당시, 아래 `기록:`에서 모두 완료): `frontend/vercel.json`에 Cloudtype 공개 주소를 반영했다(`Select-String`으로 `REPLACE_BACKEND_HOST` 잔존 없음 확인). 서버는 Task 020에서 `develop` 브랜치로 이미 배포돼 동작한다(기동 약 201초, 메모리 302.27MB 기준값은 020 `기록:`). **남은 것**: `develop` → `main` PR(merge commit, 사용자), 병합 후 Cloudtype 배포 브랜치를 `main`으로 변경, 환경 변수 정리(런타임에 `SPRING_PROFILES_ACTIVE=prod` 추가, Build Variables 비우기), 콘솔 `배포하기`, V-DEPLOY 확인(Vercel Production URL에서 `/api/public/ott-services` 200·`no-store`·캐시 미적중·로그의 IP 헤더 값)과 `기록:` 작성, Vercel Production·Preview의 `ORIGIN_SECRET`이 Cloudtype과 같은 값인지는 Vercel 경유 200으로 확인한다.
+- 기록: 2026-10-06 완료.
+  - 병합: PR #12(`feature/b1-thin-deploy` → `develop`, squash `c076d3e`, `vercel.json` 주소와 020 기록), PR #13(`develop` → `main`, **merge commit** `ec6162d`, 13커밋·71파일). 병합 직후 Vercel Production 배포 성공(`ec6162d`). 사용자가 Cloudtype 배포 브랜치를 **`main`으로 변경**하고 재배포했다(배포 내역 이름 `Merge pull request #13 from msw-Hub/develop`). 환경 변수는 사용자가 정리했다고 보고했다(런타임 `Environment variables`에 `SPRING_PROFILES_ACTIVE=prod` 추가, `Build Variables` 비움, 화면은 Claude가 확인하지 못함). Start Command의 `-Dspring.profiles.active=prod`는 유지한다. `backend-deploy.yml`은 만들지 않았다(R-12, 020 `기록:`).
+  - 운영 도메인 `ottnavi.vercel.app`(응답의 프론트 `index.html`과 빌드 해시가 일치해 우리 프로젝트로 확인). 개별 배포 주소(`ottnavi-<해시>-team-msw.vercel.app`)는 Vercel Authentication 보호(302)라 외부에서 호출되지 않는다.
+  - **첫 Vercel 경유 호출은 403 `FORBIDDEN`**이었다. 요청은 Cloudtype까지 도달했고 백엔드 오리진 필터가 거부한 것이다. `vercel.json`의 `transforms`(`args: "$ORIGIN_SECRET"` + `env`) 문법은 Vercel 문서 예시와 같아 후보에서 제외했다. Vercel에 `ORIGIN_SECRET` 키는 있었고 값은 열람이 안 되어, 사용자가 값을 다시 입력하고 Vercel에서 재배포하자 200이 됐다. 값을 볼 수 없어 정확한 원인(값 불일치 또는 미반영)은 확인하지 못했고, 문서상 변수가 없거나 다르면 `$VAR`가 글자 그대로 나가 403이 되는 동작과 일치한다. TECH 6절에 정리했다. 참고로 이 직전 Cloudtype 서버는 재배포 중이라 한동안 503(Cloudtype 오류 페이지)이었고 기동에 약 2분 37초가 걸렸다.
+  - **V-DEPLOY(운영 도메인 `ottnavi.vercel.app`)**: `/api/public/ott-services` → **200**, `CommonResponse` 서비스 7건(NETFLIX → COUPANG_PLAY 순, 쿠팡플레이만 `INSUFFICIENT`), `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`, 연속 3회 `X-Vercel-Cache: MISS`(캐시 미적중). Cloudtype 직접 호출(헤더 없음)은 403, 실제 Tomcat에서 인코딩 우회(`/%61pi/...`)도 403(Vercel 경유로 같은 경로를 부르면 `/api` 프록시 규칙에 걸리지 않아 프론트 `index.html` 200이며 백엔드에는 닿지 않는다). 클라이언트가 보낸 가짜 `x-origin-secret`은 Vercel `set`이 덮어써 200. Vercel↔Cloudtype `ORIGIN_SECRET` 값 일치는 이 200으로 검증됐다. `/api` 프록시 규칙이 SPA 대체(`/index.html`)보다 먼저 적용된다(R-17의 `routes` 단일 형식, 실측).
+  - **IP 헤더 실측(로그 값은 기록하지 않음)**: Vercel 경유에서 `x-real-ip`는 Vercel의 IP(호출마다 바뀌는 AWS 서울 대역으로 보이는 값, 추정)이고 `remoteAddr`(= `X-Forwarded-For` 첫 값)가 **방문자의 실제 IP**였다. 위조한 `x-forwarded-for`·`x-real-ip`·`x-forwarded-host`는 어느 것도 백엔드에 닿지 않았다(Vercel이 덮어씀). TECH 4절의 "방문자 IP는 `x-real-ip` 1순위" 가정이 **틀렸음**을 확인해 `remoteAddr`로 정정했다. **후속: IP별 요청 제한은 반드시 `remoteAddr`를 쓴다**(`x-real-ip`를 쓰면 방문자가 Vercel의 몇 개 IP로 뭉쳐 한도를 공유한다).
+  - 메모리: 기동 직후 302.27MB(020 `기록:`, 1GB 중 약 30%). 이번 재배포 후와 서비스 목록 호출 후의 값은 이 기록에 담지 못했다(Cloudtype 대시보드에서 확인해야 하며, 측정 항목으로 Task 040·100에 남아 있다). 헬스체크(경로·Initial Delay)는 여전히 미설정이다(기동 약 200초라 쓰려면 Initial Delay 300초 이상 필요, 미검증).
+  - 후속 메모: ① Redis 비밀번호는 Redis에 민감한 값을 저장하기 전(Task 053 이전)에 재설정(020 수용 위험). ② `RequestIpLoggingFilter` 로그는 Task 049에서 레벨·항목 정리(방문자 IP는 `remoteAddr`로 본다). ③ 자동 배포가 필요해지면 R-12 재결정. ④ 서비스를 지우고 다시 만들면 주소가 바뀌어 `vercel.json`을 고쳐야 한다.
 
 #### Task 022: Cloudtype SMTP 외부 발신 테스트로 메일 방식 결정 근거 확보 ⬜
 - 태그: [B] · PRD: B1, R11-11 · 선행: 002, 003, 006, 015, 016 · 기한: 2026-10-14
