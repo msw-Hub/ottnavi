@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 17/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 18/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 17/105 | |
+| 합계 | | 18/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 17/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 18/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -492,18 +492,25 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-F: 모든 경로가 로드되고 콘솔 에러가 0건이다.
 
-#### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ⬜
+#### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ✅
 - 태그: [B] · PRD: B1 · 선행: 016, 023, 011 · 브랜치: `feature/b1-ott-services`
 - 관련: TECH T-8, TECH 4절 IP 헤더
 - 구현 사항
-  - [ ] `db/migration/V1__create_ott_service.sql`: `ott_service`와 7개 서비스 시드(쿠팡플레이 `data_quality = INSUFFICIENT`), `provider/domain/OttService` 엔티티·리포지토리
-  - [ ] 계약에 먼저 추가 후 구현: 상태 확인 API와 서비스 목록 API(예: `GET /api/public/ott-services`, operationId `listOttServices`, 경로·이름은 제안)
-  - [ ] `global/security`의 오리진 비밀 헤더 필터(`x-origin-secret`, 상수 시간 비교, T-8 ①). local 프로필에서는 끄는 설정 키(제안: `app.origin-secret.enabled`)
-  - [ ] `/api/**` 기본 `Cache-Control: no-store` 응답 헤더(T-8 ②, 이 Task 한 곳에서 구현)
-  - [ ] 진입 요청의 `x-real-ip`·`x-forwarded-for`·`x-forwarded-host`를 로그로 남김(TECH 4절, 확인 후 Task 049에서 정리)
+  - [x] `db/migration/V1__create_ott_service.sql`: `ott_service`와 7개 서비스 시드(쿠팡플레이 `data_quality = INSUFFICIENT`), `provider/domain/OttService` 엔티티·리포지토리
+  - [x] 계약에 먼저 추가 후 구현: 상태 확인 API와 서비스 목록 API(예: `GET /api/public/ott-services`, operationId `listOttServices`, 경로·이름은 제안). 상태 확인 API는 새로 만들지 않고 `/actuator/health`로 대신한다(아래 기록 D1)
+  - [x] `global/security`의 오리진 비밀 헤더 필터(`x-origin-secret`, 상수 시간 비교, T-8 ①). local 프로필에서는 끄는 설정 키(제안: `app.origin-secret.enabled`)
+  - [x] `/api/**` 기본 `Cache-Control: no-store` 응답 헤더(T-8 ②, 이 Task 한 곳에서 구현)
+  - [x] 진입 요청의 `x-real-ip`·`x-forwarded-for`·`x-forwarded-host`를 로그로 남김(TECH 4절, 확인 후 Task 049에서 정리)
 - 완료 기준
   - V-B: 헤더 없음 → 거부, 올바른 헤더 → 200, 응답에 `no-store`가 있는 테스트가 통과한다.
   - V-API: 서비스 목록이 `CommonResponse`로 7건 온다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b1-ott-services`). 계약 초안 `docs/TASK019_CONTRACT_DRAFT.md`는 이 기록에 흡수하고 삭제했다.
+  - 결정(사용자 승인, D1~D8): ① **상태 확인 API는 만들지 않는다.** PRD B1·이 Task의 "상태 확인 API"는 이미 있는 `/actuator/health`(`/api` 밖이라 Cloudtype 헬스체크가 오리진 비밀 헤더 없이 호출 가능)로 대신하고, Vercel 경유 확인은 V-DEPLOY 정의대로 서비스 목록 API로 한다. 새 operation·DTO·프론트 훅을 늘리지 않기 위함이며 PRD 문구는 고치지 않았다. ② ERD 7행(공통 감사 컬럼 생략 표기)에 따라 `created_at`·`updated_at`을 두고 `BaseTimeEntity`를 상속했다. ③ T-8 ②는 Spring Security 기본 캐시 헤더(`no-cache, no-store, max-age=0, must-revalidate`)로 충족하고, `SecurityConfig`에 `headers.cacheControl(withDefaults())`를 명시·주석·테스트로 고정했다(Task 053 교체 시 끄지 않는다). ④ `logoPath`는 required·non-null·DB NOT NULL(7건 모두 값 확정). ⑤ 시드 전용 엔티티라 생성자 오버로드를 두지 않았다(protected 기본 생성자만). ⑥ 오리진 비밀 헤더 필터는 Security 체인 밖의 서블릿 필터(`@Order(HIGHEST_PRECEDENCE + 20)`), 대상은 `/api/**`만, 거부는 `AccessDeniedException`을 `HandlerExceptionResolver`에 위임해 403 `FORBIDDEN` ProblemDetail. `app.origin-secret.enabled` 기본 true·local만 false, prod `value: ${ORIGIN_SECRET}`(기본값 없음), 켜져 있는데 값이 비면 기동 실패. 401이 아닌 403인 이유: 사용자 인증 챌린지(`WWW-Authenticate`)가 아니라 출처 제한이다. ⑦ IP 로그는 `x-real-ip` 원본 + 반영된 `remoteAddr`·`serverName`(아래 실측). ⑧ 서비스 클래스명 `OttServiceQueryService`.
+  - 계약: `/public/ott-services`(`listOttServices`, 태그 `product`), `OttService`·`CommonResponseOttServiceList` 스키마, `fieldErrors` "(제안)" 제거, `error-codes.md`의 `FORBIDDEN` 의미 보강. 시드 값(표시명·로고 경로)은 사용자 확정값이고 왓챠 로고는 TMDB에 남은 왓챠플레이 시절 구버전이다(V1 주석). TMDB `provider_id`는 넣지 않았다(Task 033). 프론트 생성물·MSW 핸들러는 메인 컨텍스트에서 갱신했다.
+  - 검증(V-B): `.\gradlew.bat test --tests "com.ottnavi.OttnaviApplicationTests"`(Flyway V1 적용·`ddl-auto=validate` 통과), `"com.ottnavi.contract.OpenApiContractTest"`(첫 실제 operation 대조 차이 0건), `"com.ottnavi.provider.*"`(`OttServiceApiTest` 6건: 올바른 헤더 200·7건 정렬, `no-store`, 헤더 없음 403, 틀린·빈 값 403, `/actuator/health` 헤더 없이 200, IP 로그) 통과. 마지막에 `.\gradlew.bat clean build`가 전체 36건 실패 0으로 통과했다.
+  - 검증(V-API): local 프로필 `bootRun`(compose DB에 V1 적용, 기동 9.0초) 후 `curl -i -H "x-real-ip: 1.2.3.4" -H "x-forwarded-for: 5.6.7.8, 9.9.9.9" http://localhost:8080/api/public/ott-services` → 200 `application/json`, `CommonResponse` 7건(ID 1~7), `Cache-Control: no-cache, no-store, max-age=0, must-revalidate`. 로그 `x-real-ip=1.2.3.4, remoteAddr=5.6.7.8, serverName=localhost`.
+  - 실측으로 확인한 것: `springdoc.default-produces-media-type: application/json`이 operation 응답 media type에 반영된다(`/v3/api-docs.yaml`의 200 응답이 `application/json`). record 컴포넌트의 `@Schema(requiredMode = REQUIRED)`가 `required`로 나오고 Java enum 필드는 인라인 `enum`으로 나온다. `@Enumerated(STRING)` ↔ `VARCHAR`, `BaseTimeEntity`의 `Instant` + `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)` ↔ `TIMESTAMPTZ`가 `ddl-auto=validate`를 통과한다. Boot 4.1.1은 `ForwardedHeaderFilter`를 order `Integer.MIN_VALUE`로 등록하고(jar `javap`), spring-web 7.0.9의 이 필터는 `X-Forwarded-*` 원본을 요청에서 숨긴다(`ForwardedHeaderExtractingRequest extends ForwardedHeaderRemovingRequest`). 그래서 뒤의 필터는 XFF 첫 값을 `remoteAddr`, XFH를 `serverName`으로만 보고 `x-real-ip`는 원본 그대로 본다(테스트·V-API로 확인). `@AutoConfigureMockMvc`는 `@Component` 필터와 Boot의 `ForwardedHeaderFilter`를 포함한다(403·IP 로그 테스트 통과).
+  - 미확인: `MessageDigest.isEqual`의 상수 시간 보장은 문서로 대조하지 않았다(JDK 6u17 이후 상수 시간 구현으로 알려져 있음). XFF 원본 체인(Cloudtype이 홉을 덧붙이는지, Vercel이 클라이언트 XFF를 덮어쓰는지)은 로그에 첫 값만 남아 Task 021 배포 스모크에서 `x-real-ip`와 `remoteAddr`를 비교해 판단한다. `/actuator/health`는 Cloudtype 주소로 직접 호출해도 열려 있다(상세는 기본 비공개). Windows에서 `gradlew bootRun` 출력을 파일로 받으면 한국어 로그가 깨져 보였다(콘솔 인코딩 문제로 보이며 앱 동작과 무관, 원인 미확인).
 
 #### Task 020: Cloudtype 서비스 생성과 환경 변수·배포 토큰 등록으로 첫 배포 준비 ⬜
 - 태그: [H] · PRD: B1, H2 · 선행: 002, 015, 019 · 기한: 2026-10-12(R-12)

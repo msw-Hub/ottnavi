@@ -11,9 +11,13 @@
 
 export * from './badGatewayResponse';
 export * from './badRequestResponse';
+export * from './commonResponseOttServiceList';
 export * from './fieldError';
 export * from './forbiddenResponse';
 export * from './internalErrorResponse';
+export * from './ottService';
+export * from './ottServiceCode';
+export * from './ottServiceDataQuality';
 export * from './pageMeta';
 export * from './pageParamParameter';
 export * from './problemDetail';

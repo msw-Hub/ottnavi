@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 저장소 현황
 
-- **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)도 있다. 백엔드는 Task 016에서 의존성 전체·프로필(`local`·`prod`)·임시 `SecurityConfig`(전 경로 `permitAll`)·Testcontainers 테스트 베이스까지 구성했고 도메인 코드는 없다(Task 019 이후). 도메인 패키지·계약 operation도 아직 없다.
+- **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)도 있다. 백엔드는 Task 016에서 의존성 전체·프로필(`local`·`prod`)·임시 `SecurityConfig`(전 경로 `permitAll`)·Testcontainers 테스트 베이스를, Task 023에서 `CommonResponse`·`ProblemDetail` 예외 처리·계약 대조 테스트(`OpenApiContractTest`)를 구성했다. Task 019에서 첫 도메인(`provider`: `ott_service` Flyway V1, 서비스 목록 API `GET /api/public/ott-services`)과 오리진 비밀 헤더 필터(`app.origin-secret.enabled`, local만 꺼짐)·진입 IP 로그가 생겼다. 다른 도메인 패키지는 아직 없다.
 - 진행 상황과 다음 Task는 `docs/ROADMAP.md`(5단계 Phase, 105개 Task)가 기준이다. 새 작업 전에 해당 Task의 선행·완료 기준을 확인한다. 사용자가 직접 하는 `[H]` Task는 `docs/PHASE1_HUMAN_TASKS.md`에 체크리스트로 따로 있다.
 - Task 진행은 쉬림프 태스크 매니저(MCP)로 추적한다. 데이터는 `shrimp_data/`(git 제외)에 있고, 경로는 `.claude/settings.local.json`의 `SHRIMP_DATA_DIR`이 정한다(`.mcp.json`이 `${SHRIMP_DATA_DIR}`로 참조). 로드맵이 기준이고 쉬림프는 보조다.
 - 사용자 전역 규칙(`~/.claude/CLAUDE.md`)이 적용된다: 주석·로그·에러 메시지·UI 문자열은 한국어, 식별자는 영어, 커밋은 한국어 Conventional Commits, 터미널 명령은 PowerShell 기준(Windows 11), 탐색 → 계획 제시 → 승인 → 구현 순서.
@@ -25,7 +25,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
 | `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
-| `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. 지금은 골격(`paths: {}`)이고 operation은 Task 019·031부터 추가된다 |
+| `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation은 서비스 목록(`listOttServices`, Task 019) 하나이고 나머지는 Task 031부터 추가된다 |
 | `docs/PHASE1_HUMAN_TASKS.md` | Phase 1의 사람 작업 `[H]` 체크리스트와 완료 기록 |
 | `.claude/rules/backend.md` | `backend/**` 작업 시 자동 로드. Java/Spring 스타일·스택·패키지 구조 |
 | `.claude/rules/frontend.md` | `frontend/**` 작업 시 자동 로드. React/TS 스타일·상태 관리·인증 규칙 |

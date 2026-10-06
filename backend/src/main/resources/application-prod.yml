@@ -15,3 +15,6 @@ springdoc:
     enabled: false                # 운영에서 불필요한 기능은 끈다(ROADMAP 4.6)
   swagger-ui:
     enabled: false
+app:
+  origin-secret:
+    value: ${ORIGIN_SECRET}       # 기본값 없음. 누락 시 기동이 실패한다(Vercel 주입 값과 같아야 함)

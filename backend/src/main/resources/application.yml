@@ -22,3 +22,6 @@ springdoc:
   api-docs:
     version: openapi_3_0                # 계약(openapi.yaml 3.0.3)과 nullable 표기를 맞춘다. 기본값은 3.1(TECH 6절)
   default-produces-media-type: application/json   # 미지정 시 응답 media type이 */*로 나와 계약과 어긋난다
+app:
+  origin-secret:
+    enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
