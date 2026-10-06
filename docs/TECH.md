@@ -153,7 +153,14 @@ sequenceDiagram
 | `@MockBean` 제거 | `@MockitoBean` | web |
 | Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
 | WireMock 기본 아티팩트가 Jetty 11. Boot BOM은 Jetty를 12.1로 강제하고 `wiremock-jetty12` 3.13.2는 12.0 기준으로 빌드됨 | Task 016에서 셰이딩된 `wiremock-standalone` 3.13.2를 선택. `wiremock-jetty12`를 쓰면 기동 테스트로 확인. 실제로 WireMock을 띄워 본 적은 없어 TMDB 연동 테스트 Task에서 검증 | c7, BOM(미검증) |
-| springdoc 3.x는 기본으로 `openapi 3.1.0`을 출력해 계약(`openapi.yaml`, 3.0.3)과 `nullable` 표현 등이 달라질 수 있음 | Task 023 계약 대조 테스트 때 3.0 출력으로 맞추는 설정을 context7로 확인(키 미확인) | 실측(Task 016, `/v3/api-docs`) |
+| springdoc 3.x는 기본으로 `openapi 3.1.0`을 출력해 계약(`openapi.yaml`, 3.0.3)과 `nullable` 표현 등이 달라질 수 있음 | `springdoc.api-docs.version: openapi_3_0`(Task 023). 이 설정은 `3.0.1`을 출력하므로 계약 대조는 버전 문자열을 비교하지 않고 `3.0` 접두사만 검사한다 | c7, 실측(Task 016·023, `/v3/api-docs.yaml`) |
+| springdoc은 produces를 지정하지 않은 operation의 응답 media type을 `*/*`로 낼 수 있고, `@RestControllerAdvice` 핸들러의 응답을 모든 operation의 오류 응답으로 자동으로 붙임 | `springdoc.default-produces-media-type: application/json`(키는 springdoc jar 메타데이터로 확인, 출력 반영은 operation이 생기는 Task 019에서 확인). 계약 대조는 2xx 응답만 비교한다 | c7, 메타데이터 실측(Task 023) |
+| springdoc 제네릭 응답 스키마 이름(`CommonResponseListOttServiceResponse` 등)이 계약의 이름(`CommonResponseOttServiceList`)과 다름 | 계약 대조는 스키마 이름이 아니라 `$ref`를 풀어 구조(type·format·nullable·enum·required·properties·items, `allOf`는 병합)로 비교한다 | 도출(Task 023) |
+| 계약 path는 `servers: /api` 기준 상대 경로(orval·axios `baseURL: /api`)이고 springdoc은 `/api/...` 전체 경로를 냄 | 비교기가 계약 `servers[0].url` 접두사를 생성 쪽 path에서 떼고 비교한다(api-contract.md 경로 절) | 도출(Task 023) |
+| 테스트 소스의 `@RestController`도 `com.ottnavi` 아래면 `@SpringBootTest` 스캔에 잡혀 `/v3/api-docs`에 섞일 수 있음 | 테스트 전용 컨트롤러는 테스트 클래스 안의 중첩 static 클래스로 두고 `@Import`한다. 이렇게 하면 스캔에서 빠지는 것을 계약 대조 차이 0건으로 확인했다 | 실측(Task 023) |
+| Spring 7 `ProblemDetail`은 `type`이 `about:blank`이면 JSON에서 `type`을 생략함 | 계약에서 `type`은 required가 아니므로 그대로 둔다. 프론트는 `type`이 없을 수 있다고 본다 | 실측(Task 023) |
+| 보안 필터는 DispatcherServlet 앞이라 `@RestControllerAdvice`가 401·403을 직접 받지 못함 | 엔트리포인트·거부 핸들러가 `@Qualifier("handlerExceptionResolver") HandlerExceptionResolver`에 handler 없이(null) 위임한다. advice 적용과 `instance` 설정을 테스트로 확인했다. Lombok 생성자는 `@Qualifier`를 옮기지 않아 생성자를 직접 쓴다 | 실측(Task 023) |
+| Hibernate는 `Instant`를 기본으로 `TIMESTAMP`(TZ 없음)로 매핑한다는 문서 설명이 있음(문서가 Boot 4.1에 포함된 7.x와 같은 버전인지는 미확인) | `BaseTimeEntity`에 `@JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)`를 지정했다. `ddl-auto=validate` 통과는 첫 엔티티(Task 019)에서 확인한다 | c7(버전 미대조) |
 | Redis `GenericContainer`는 `@ServiceConnection(name = "redis")`로 이름을 지정해야 연결 정보가 만들어짐. `@Bean` 컨테이너의 수명은 Spring이 관리하므로 IDE의 try-with-resources 경고는 `@SuppressWarnings("resource")`로 둔다 | `TestcontainersConfig`에 적용. Redis 연결을 쓰는 테스트는 아직 없다 | c7, 컨텍스트 로드 실측(Task 016) |
 | `spring.profiles.default: local`이면 테스트도 local 프로필(compose DB·Redis)을 가리켜서, `IntegrationTestSupport`를 상속하지 않은 통합 테스트는 로컬에서만 통과하고 CI에서 실패함 | 모든 통합 테스트는 `IntegrationTestSupport`를 상속. 컨테이너를 끈 상태로 테스트해 확인 | 실측(Task 016) |
 | Boot 4는 테스트 스타터가 기능별로 분리됨(`@DataJpaTest`는 `starter-data-jpa-test`, `@WithMockUser`는 `starter-security-test`) | 필요한 테스트 스타터를 추가(Task 016에서 두 개 추가). 해당 어노테이션을 실제로 쓰는 Task에서 확인 | Central POM(미검증) |

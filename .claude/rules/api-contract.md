@@ -30,6 +30,7 @@ paths:
 - 동작이 CRUD로 표현되지 않으면 하위 경로에 동사를 둔다 (`POST /api/plans/calculate`, `POST /api/admin/collect/run`).
 - 작품은 외부에 TMDB 기준으로 노출한다: `/api/public/titles/{mediaType}/{tmdbId}`. 내부 `id`는 경로에 쓰지 않는다.
 - 로그인한 사용자 본인의 데이터는 경로에 userId를 넣지 않고 `/api/me/**`로 표현한다 (예: `/api/me/settings`, `/api/me/subscriptions`).
+- **`openapi.yaml`의 path 키는 `servers`(`/api`)를 뺀 상대 경로로 쓴다** (예: 실제 `/api/public/ott-services` → 계약 `/public/ott-services`). 프론트 axios·MSW가 `/api`를 베이스로 붙이기 때문이다. 백엔드 컨트롤러는 `/api/...` 전체 경로로 매핑하고, 계약 대조 테스트가 생성 명세의 `/api` 접두사를 떼고 비교한다.
 
 ## operationId (프론트 훅 이름)
 
@@ -82,7 +83,15 @@ paths:
 
 - `errorCode`는 SCREAMING_SNAKE_CASE이며, 각 operation의 오류 응답에 발생 가능한 `errorCode`를 설명으로 적는다.
 - 전체 오류 코드 목록은 `docs/api/error-codes.md`에 HTTP 상태, 의미, 화면 메시지와 함께 관리한다. 프론트의 `lib/errorMessages.ts`는 이 목록과 일치해야 한다.
-- 공통 오류: `400 VALIDATION_FAILED`(필드 오류 목록 포함), `401 UNAUTHORIZED`, `403 FORBIDDEN`, `429 RATE_LIMIT_EXCEEDED`, `500 INTERNAL_ERROR`, `502 EXTERNAL_API_ERROR`.
+- 공통 오류: `400 VALIDATION_FAILED`(필드 오류 목록 포함), `400 INVALID_REQUEST`(깨진 본문 등 필드를 특정할 수 없는 요청 오류. 406·415 같은 기타 4xx는 원래 상태 유지), `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 RESOURCE_NOT_FOUND`(없는 경로), `405 METHOD_NOT_ALLOWED`, `429 RATE_LIMIT_EXCEEDED`, `500 INTERNAL_ERROR`, `502 EXTERNAL_API_ERROR`. 데이터가 없을 때는 `TITLE_NOT_FOUND`처럼 도메인 코드를 쓴다.
+- Spring 7은 `type`이 `about:blank`이면 응답 JSON에서 `type`을 생략한다. 계약에서 `type`은 필수가 아니다.
+
+## 계약 대조 (CI)
+
+- 백엔드 `OpenApiContractTest`가 springdoc 생성 명세(`/v3/api-docs.yaml`, OpenAPI 3.0 출력)와 `openapi.yaml`을 비교한다. 비교 대상은 operation 존재, `operationId`, `tags`, 파라미터, 요청 본문, **2xx 응답** 스키마(type·format·nullable·enum·required·properties·items)다.
+- 비교하지 않는 것: `openapi` 버전 문자열, `info`, `servers`, `example`, `description`, 4xx·5xx 응답(오류 형식은 백엔드 예외 처리 테스트가 검증한다).
+- 스키마 이름은 비교하지 않고 `$ref`를 풀어 구조로 비교한다. 그래서 계약의 `CommonResponseXxx` 이름이 springdoc 제네릭 이름과 달라도 된다.
+- `x-planned: true` operation은 비교에서 빠진다. 단 백엔드에 이미 구현돼 있으면 "표시를 지우라"며 실패한다.
 
 ## 페이지네이션
 

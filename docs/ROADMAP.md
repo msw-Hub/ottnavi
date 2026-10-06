@@ -41,12 +41,12 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 16/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 17/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 0/14 | ⬜ 대기 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 16/105 | |
+| 합계 | | 17/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -225,7 +225,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 측정 지점에서 예산을 넘으면 먼저 튜닝과 설계(청크 축소, 후보 상한 조정, 의존성 제거)로 줄이고, 그래도 부족하면 구독 메모리를 올리거나(512MB 단위) 무거운 작업의 실행 위치를 바꾸는 방안을 사용자에게 올린다.
 - 512MB에서 도는지는 Cloudtype 무료 1GB의 측정값으로는 확인되지 않으므로, 로컬에서 `docker run --memory=512m` 또는 Task 100의 측정용 컨테이너로 시험한다.
 
-## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 16/23
+## 5. Phase 1 — 프로젝트 초기 설정 (골격 구축) · 17/23
 
 **목표.**
 - 모노레포 뼈대, 로컬 실행 환경, CI, 브랜치 규칙을 준비하고, 1주차 안에 배포 경로(Vercel `/api` → Cloudtype)를 첫 배포로 얇게 확인한다.
@@ -543,18 +543,25 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-H: 성공·실패, 오류 메시지, 시험일, 일회성 서비스 삭제를 기록했고 사용자가 R11-11을 결정했다.
 
-#### Task 023: 공통 응답·예외 처리와 계약 대조 테스트 구현으로 API 형식 통일 ⬜
+#### Task 023: 공통 응답·예외 처리와 계약 대조 테스트 구현으로 API 형식 통일 ✅
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-common-response`
 - 이동: 원래 Phase 2였으나 Task 019(서비스 목록 API)의 선행이라 2026-10-04 사용자 결정으로 Phase 1로 옮겼다. 번호는 그대로다.
 - 관련: api-contract.md 공통 응답, backend.md 예외 처리, TECH T-5
 - 구현 사항
-  - [ ] `global/common/CommonResponse`(record), `BaseTimeEntity`
-  - [ ] `global/error/GlobalExceptionHandler`: `ProblemDetail` + `errorCode`, `VALIDATION_FAILED` 필드 오류 목록, 보안 엔트리포인트·거부 핸들러도 같은 형식
-  - [ ] `ErrorCode`(error-codes.md와 일치), 커스텀 예외 기반(생성자 2개)
-  - [ ] `OpenApiContractTest`(T-5): `/v3/api-docs.yaml`과 `docs/api/openapi.yaml`을 경로·operationId·스키마·required·enum으로 비교(`servers`·`info.version`·`example` 제외). 계약 쪽 `x-planned: true` operation은 비교에서 제외한다(R-20, 4.2)
+  - [x] `global/common/CommonResponse`(record), `BaseTimeEntity`
+  - [x] `global/error/GlobalExceptionHandler`: `ProblemDetail` + `errorCode`, `VALIDATION_FAILED` 필드 오류 목록, 보안 엔트리포인트·거부 핸들러도 같은 형식
+  - [x] `ErrorCode`(error-codes.md와 일치), 커스텀 예외 기반(생성자 2개)
+  - [x] `OpenApiContractTest`(T-5): `/v3/api-docs.yaml`과 `docs/api/openapi.yaml`을 경로·operationId·스키마·required·enum으로 비교(`servers`·`info.version`·`example` 제외). 계약 쪽 `x-planned: true` operation은 비교에서 제외한다(R-20, 4.2)
 - 완료 기준
   - V-B: 예외 유형별 응답 테스트와 계약 대조 테스트가 통과한다. `x-planned: true` operation을 하나 둔 계약으로 제외 동작을 확인하는 테스트를 포함한다.
   - V-API: 없는 경로·잘못된 요청에 `application/problem+json`과 `errorCode`가 온다.
+- 기록: 2026-10-06 완료(브랜치 `feature/b0-common-response`).
+  - 결정(사용자 승인, 계획 D1~D8): ① 공통 코드 3개 추가 `INVALID_REQUEST`(400, 깨진 JSON 등. 406·415 같은 기타 4xx는 원래 상태 유지), `RESOURCE_NOT_FOUND`(404, 없는 경로), `METHOD_NOT_ALLOWED`(405). ② TECH 신규 4개(`PLAN_DRAFT_*`, `BATCH_ALREADY_*`)는 넣지 않고 해당 기능 Task에서 확정과 함께 추가한다. ③ 계약 path는 `servers`(`/api`)를 뺀 상대 경로로 쓰고 비교기가 생성 쪽 `/api`를 뗀다(api-contract.md에 명시). ④ `x-planned`인데 구현된 operation은 실패시킨다. ⑤ 비교 범위에 `tags`·`nullable`도 넣는다. ⑥ `BaseTimeEntity`는 Hibernate `@CreationTimestamp`·`@UpdateTimestamp`(Auditing 설정 불필요). ⑦ 보안 핸들러는 지금 `SecurityConfig`에 등록하고 테스트 전용 체인으로 검증한다. ⑧ error-codes.md "공통 코드" 표와 `ErrorCode`의 일치를 `ErrorCodeDocumentTest`가 검사한다.
+  - 구현: `GlobalExceptionHandler`는 `ResponseEntityExceptionHandler`를 확장하고, 내장 예외가 모두 모이는 `handleExceptionInternal` 한 곳에서 errorCode·한국어 detail·`fieldErrors`를 붙인다. 도메인 예외는 abstract `BusinessException`(생성자 2개 + `getErrorCode()`). 보안 401·403은 `ProblemDetailAuthenticationEntryPoint`·`ProblemDetailAccessDeniedHandler`가 `HandlerExceptionResolver`에 위임해 같은 핸들러를 탄다. 계약 대조는 테스트 소스의 `OpenApiContractComparator`(SnakeYAML Map 비교, `$ref`를 풀어 구조 비교, `allOf` 병합, 2xx 응답만)와 `OpenApiContractTest`(Testcontainers)다. `application.yml`에 `springdoc.api-docs.version: openapi_3_0`, `springdoc.default-produces-media-type: application/json`. `build.gradle`에 `testImplementation 'org.yaml:snakeyaml'`(BOM 관리)과 `test` 입력으로 `docs/api`(문서만 바뀌어도 테스트 재실행).
+  - 검증: 단계별로 `.\gradlew.bat test --tests "com.ottnavi.global.error.*"`(13건), `"com.ottnavi.global.*"`(16건), `"com.ottnavi.support.contract.*"`(11건), `"com.ottnavi.contract.OpenApiContractTest"`(1건)가 통과했고 마지막에 `.\gradlew.bat clean build`가 전체 29건 실패 0으로 통과했다. V-API는 local 프로필 기동 후 `curl.exe -i`로 `GET /api/does-not-exist` → 404 `application/problem+json` `RESOURCE_NOT_FOUND`, `POST /v3/api-docs`·`DELETE /actuator/health` → 405 `Allow: GET` `METHOD_NOT_ALLOWED`, `/v3/api-docs.yaml` → `openapi: 3.0.1`을 확인했다. 검증 실패(400)·깨진 JSON·415·500·401·403은 실행 중인 앱에 해당 엔드포인트가 없어 `@WebMvcTest`(테스트 전용 컨트롤러·체인)로만 확인했다.
+  - 실측으로 확인한 것: springdoc 3.0 출력 키와 그 결과 버전(3.0.1). 두 설정 키는 springdoc jar의 설정 메타데이터에도 있다. 테스트 클래스 안의 중첩 `@RestController`는 `@SpringBootTest` 스캔에서 빠진다(계약 대조 차이 0건). 보안 핸들러가 handler 없이 `HandlerExceptionResolver`에 위임해도 advice가 적용되고 `instance`가 채워진다. Spring 7의 ProblemDetail은 `type`이 `about:blank`이면 JSON에서 생략한다(계약에서 `type`은 required가 아니라 문제없음). 405에서는 Spring `PageNotFound` 로거와 이 핸들러가 WARN을 한 번씩 남긴다.
+  - 미확인: `springdoc.default-produces-media-type`이 실제 operation의 응답 media type을 `application/json`으로 바꾸는지(operation이 없어 Task 019에서 확인). springdoc이 Java record 응답 필드를 `required`·`nullable`로 어떻게 표시하는지(필요하면 DTO에 `@Schema(requiredMode = REQUIRED)`·`nullable` 지정, Task 019에서 확인). `BaseTimeEntity`의 `Instant` + `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)`가 TIMESTAMPTZ와 `ddl-auto=validate`를 통과하는지(엔티티가 없어 Task 019 V1에서 확인). Boot `spring.mvc.problemdetails.enabled`는 켜지 않았고, 직접 만든 핸들러와 함께 켰을 때의 동작은 확인하지 않았다. MVC 밖(필터·컨테이너)에서 난 오류는 Boot `/error`로 가서 problem+json이 아닐 수 있다(요청 제한 필터 Task에서 직접 같은 형식으로 쓴다).
+  - 남은 일: `openapi.yaml`의 `ProblemDetail.fieldErrors` description에 남은 "(제안)"은 다음에 `openapi.yaml`을 수정할 때 지운다(이번에는 프론트 생성물 변경을 피하려고 계약 파일을 건드리지 않았다. 구조는 확정). 신규 3개 코드의 화면 메시지는 Task 025 `errorMessages.ts`에서 확정한다.
 
 ---
 
