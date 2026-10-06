@@ -22,12 +22,10 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10) // 오리진 비밀 헤더 검사(+20)보다 먼저 남겨 거부된 요청도 기록한다
 public class RequestIpLoggingFilter extends OncePerRequestFilter {
 
-	private static final String API_PATH_PREFIX = "/api/";
-
-	/** /api 밖의 요청은 기록하지 않는다 */
+	/** /api 밖의 요청은 기록하지 않는다(경로 판정은 오리진 필터와 같은 ApiRequestPath를 쓴다) */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return !request.getRequestURI().startsWith(API_PATH_PREFIX);
+		return !ApiRequestPath.isApi(request);
 	}
 
 	/** 요청 IP 관련 값을 기록하고 다음 필터로 넘긴다 */

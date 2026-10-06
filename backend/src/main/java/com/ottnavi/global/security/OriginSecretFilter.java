@@ -28,7 +28,6 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 public class OriginSecretFilter extends OncePerRequestFilter {
 
 	public static final String HEADER_NAME = "x-origin-secret";
-	private static final String API_PATH_PREFIX = "/api/";
 
 	private final boolean enabled;               // local 프로필에서만 끈다
 	private final byte[] secret;                 // 기대하는 헤더 값(UTF-8)
@@ -51,7 +50,7 @@ public class OriginSecretFilter extends OncePerRequestFilter {
 	/** 꺼져 있거나 /api 밖의 요청은 검사하지 않는다 */
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) {
-		return !enabled || !request.getRequestURI().startsWith(API_PATH_PREFIX);
+		return !enabled || !ApiRequestPath.isApi(request);
 	}
 
 	/** 헤더가 없거나 다르면 403 FORBIDDEN ProblemDetail로 거부한다 */

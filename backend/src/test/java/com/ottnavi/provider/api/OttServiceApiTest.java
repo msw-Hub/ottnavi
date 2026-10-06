@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.ottnavi.global.security.OriginSecretFilter;
 import com.ottnavi.support.IntegrationTestSupport;
+import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +71,23 @@ class OttServiceApiTest extends IntegrationTestSupport {
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 				.andExpect(jsonPath("$.errorCode").value("FORBIDDEN"))
 				.andExpect(jsonPath("$.instance").value(URL));
+	}
+
+	@Test
+	void 인코딩하거나_세미콜론을_붙인_api_경로도_비밀_헤더_검사를_우회할_수_없다() throws Exception {
+		// /%61pi는 디코딩하면 /api다. 원본 URI 문자열로만 검사하면 필터를 건너뛰고 MVC가 /api/...로 매칭해 헤더 없이 200이 된다(CWE-647)
+		for (String path : new String[] {"/%61pi/public/ott-services", "/api;x=1/public/ott-services"}) {
+			mockMvc.perform(get(URI.create(path)))
+					.andExpect(status().isForbidden())
+					.andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+		}
+	}
+
+	@Test
+	void 중복_슬래시_api_경로는_헤더_없이_데이터가_나가지_않는다() throws Exception {
+		// //api/...는 MVC가 매칭하지 못해 404가 되지만, 이 동작에 기대지 않고 데이터가 절대 200으로 나가지 않는 것만 고정한다
+		int status = mockMvc.perform(get(URI.create("//api/public/ott-services"))).andReturn().getResponse().getStatus();
+		assertThat(status).isNotEqualTo(200);
 	}
 
 	@Test
