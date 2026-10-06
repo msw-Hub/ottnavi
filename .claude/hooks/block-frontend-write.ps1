@@ -1,4 +1,6 @@
 ﻿# backend-dev 에이전트의 frontend/ 하위 수정 시도를 차단하는 PreToolUse hook (exit 2 = 차단)
+# 한계: Bash는 명령 문자열 패턴으로만 검사하므로 인터프리터(python -c 등)를 통한 쓰기는 막지 못한다.
+#       악의적 우회를 막는 보안 경계가 아니라 에이전트의 실수를 줄이는 보조 장치다.
 $ErrorActionPreference = 'Stop'
 # 한글 메시지가 깨지지 않도록 입출력을 UTF-8로 맞춘다
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
