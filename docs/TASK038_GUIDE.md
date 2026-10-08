@@ -1,7 +1,7 @@
 # Task 038 작업 안내서 (계산 엔진 입력 모델과 배정 규칙)
 
 > 2026-10-09 작성. 기준 문서는 `docs/PRD.md` 5.4(계산 규칙)·11절, `docs/TECH.md` 1절(계산 엔진)·T-4, `docs/ERD.md` A~D 영역, `docs/ROADMAP.md` Task 038·039·040, `.claude/rules/backend.md`(계산 엔진).
-> 근거 수준: 위 문서에 적힌 규칙만 옮겼다. 문서에 없어 **도출한 부분은 "(도출)"로 표시**했고, 구현 전에 정해야 할 것은 7절 결정 사항(D1~D8)에 모았다. 모두 추천안(미확정)이다.
+> 근거 수준: 위 문서에 적힌 규칙만 옮겼다. 문서에 없어 **도출한 부분은 "(도출)"로 표시**했고, 구현 전에 정해야 할 것은 7절 결정 사항(D1~D8)에 모았다. D6(④ 결제 미루기)만 확정이고 나머지는 추천안(미확정)이다.
 > 이 Task는 사용자가 직접 작성한다. Claude(또는 `backend-dev` 에이전트)는 검수를 돕는다.
 
 ## 1. 한눈에 보기
@@ -99,7 +99,7 @@ record PlanInput(List<WatchUnit> units, List<Product> products,
 record Selection(List<Set<Long>> productIdsByMonth) {}  // 길이 3
 record UnitResult(long watchUnitId, boolean scheduled, Integer completedMonthIndex,
                   UnitReason reason, List<Assignment> assignments) {}   // 미배정이면 reason
-record Assignment(int monthIndex, long productId, int minutes) {}   // 어느 상품으로 본 분량인지(서비스가 달마다 다를 수 있음, D9)
+record Assignment(int monthIndex, long productId, int minutes) {}   // 어느 상품으로 본 분량인지(서비스가 달마다 다를 수 있음, D9). MVP는 단품 1:1이라 서비스는 productId에서 정해지고(plan이 ott_service_id로 변환), 번들을 지원하는 2단계에 ottServiceId 필드를 추가한다
 record Evaluation(Selection selection,   // 평가한 구독 조합. 비교기 ④(결제 미루기)·⑤(상품 ID 순, D6)가 이 값을 쓴다
                   int mustCompleted, int score, int totalCost, List<UnitResult> units) {}
 // Evaluation evaluate(PlanInput input, Selection selection)   <- 039의 Solver가 부르는 함수
@@ -168,7 +168,7 @@ cd backend
 | T13 | "모름"은 커버 아님 | H의 p1 제공 상태가 UNKNOWN(덮는 상품 없음, `hasUnknownProvider`=true). p1 선택 | H 미배정, 이유 **UNKNOWN** |
 | T14 | 비교기 | (a) `mustCompleted` 2·score 0·비용 20,000 vs 1·10·0 → 앞이 좋다. (b) 같은 must, score 5 vs 4 → 5. (c) 같은 must·score, 비용 10,000 vs 15,000 → 10,000. (d) 같은 must·score·비용, 조합이 `[N,T],[],[]` vs `[N],[T],[]`(N·T는 각 10,000원, 달별 새 결제 수 `2,0,0` vs `1,1,0`) → **뒤(결제를 미루는 쪽)** 가 좋다(④). (e) 결제 수까지 같고 상품 ID만 다름 `[1],[2],[]` vs `[1],[3],[]` → 앞(⑤, 달별 사전순) | 위 판정 그대로 |
 | T15 | **서비스가 달라도 이어보기(B안)** | M=600. A(WANT,200,id=1)는 넷플릭스 상품 N만, B(WANT,200,id=2)는 티빙 상품 T만, C(WANT,800,id=3)는 N·T 둘 다 덮음. 선택: 0번째 달 `{N}`, 1번째 달 `{T}` | A는 0번째 달(N) 200분, B는 1번째 달(T) 200분, C는 0번째 달 남은 400분(N)+1번째 달 남은 400분(T)=800분으로 **1번째 달에 완주**(`completedMonthIndex`=1, 배정 행 2개의 `productId`가 N과 T). `score`=6, `totalCost`=N+T. (이전 규칙이면 C가 미배정) |
-| T16 | 같은 달에 두 서비스 결제 | M=600. A(200,N만), B(200,T만), C2(200,N·T 둘 다). 선택: 0번째 달 `{N,T}` | 셋 다 0번째 달 배정(합계 600분 = 월 한도), 달 안에서는 서비스 상관없이 시간을 함께 센다. `score`=6, `totalCost`=N+T. C2의 `productId`는 ID가 작은 상품(D9) |
+| T16 | 같은 달에 두 서비스 결제 | M=600. A(200,N만), B(200,T만), C2(200,N·T 둘 다), 우선순위는 셋 모두 `WANT`. 선택: 0번째 달 `{N,T}` | 셋 다 0번째 달 배정(합계 600분 = 월 한도), 달 안에서는 서비스 상관없이 시간을 함께 센다. `score`=6, `totalCost`=N+T. C2의 `productId`는 ID가 작은 상품(D9) |
 | T17 | 긴 시즌이 서비스 상관없이도 연속이어야 함 | 같은 S(1200)를 N·T 둘 다 덮음. 선택: 0번째 달 `{N}`, 1번째 달 없음, 2번째 달 `{T}` | 선택된 달이 연속이 아니라 못 나눔 → 미배정, 이유 **TIME**(T6의 서비스 무관 버전) |
 
 > T9·T10의 입력은 **결과가 규칙에 따라 달라지도록** 일부러 만들었다. 정렬 기준이나 시간 해제 규칙을 빼먹으면 이 테스트가 실패한다.
@@ -178,7 +178,7 @@ cd backend
 - 그래서 `evaluate`는 **새 객체를 많이 만들지 않고** 단위 정렬은 호출 밖(입력 준비 때 한 번)에서 해 두는 설계가 유리하다. 정렬된 단위 목록을 `PlanInput`에 미리 정렬해서 넣을지 `evaluate`가 정렬할지는 D8이다.
 - 성능 측정은 040·Task 100에서 한다. 038에서는 **정확성이 우선**이다(최적화는 측정 뒤).
 
-## 7. 사용자 결정 사항 (모두 추천안, 미확정)
+## 7. 사용자 결정 사항 (추천안. D6은 확정)
 
 | ID | 내용 | 추천안 | 이유 |
 |---|---|---|---|
@@ -193,7 +193,7 @@ cd backend
 | D9 | 같은 달에 그 단위를 덮는 상품이 둘 이상 선택됐을 때 어느 상품으로 기록할까 | **상품 ID가 가장 작은 것**으로 기록한다 | 비용은 선택 조합으로 이미 정해지므로 기록만의 문제이고, 결과가 항상 같아야 한다 |
 
 ## 8. 확인하지 못한 것 (이 Task에서 확인)
-- D1~D8은 문서에 명시되지 않은 도출이라 구현하면서 모호하면 PRD 5.4와 대조해 이 표를 고친다.
+- D1~D9 중 D6(④ 결제 미루기)을 뺀 나머지는 문서에 명시되지 않은 도출이라 구현하면서 모호하면 PRD 5.4와 대조해 이 표를 고친다.
 - "다 본 달에 점수" 시 긴 시즌이 이번 달 중간에 끝나는 경우 같은 달의 남은 시간을 다른 단위가 쓸 수 있다고 본다(D4와 같은 맥락). 테스트로 한 번 더 확인한다.
 - **서로 다른 서비스로 이어 보기**는 B안으로 확정했다(2026-10-09, T15). 그래서 "같은 상품 연속인지 같은 서비스 연속인지" 문제는 사라졌고 `Product`에 서비스 ID가 필요 없다. 남은 한계: 두 서비스가 같은 시즌을 제공해도 **회차 구성이 다를 수 있다**(한쪽은 일부 회차만 제공 등). 지금 데이터는 시즌 단위 제공 여부만 가져서 구분하지 못하므로 "확인된 범위"라는 표현으로 감수한다(PRD 5.6).
 - 번들·광고형(2단계)의 `in_ad_tier` 커버는 이 Task 범위가 아니다.
