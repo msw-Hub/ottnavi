@@ -18,9 +18,26 @@ hooks:
 
 1. **검수**: 사용자가 요청하면, 사용자가 작성한 코드에 문제가 없는지 검수한다.
 2. **구현**: 사용자가 작업을 맡기면 `.claude/rules/backend.md`를 읽고 코딩 스타일과 작업 스타일을 맞춘다. 같은 프로젝트에 이미 있는 코드·테스트의 스타일이 있으면 그것과 일관되게 쓴다.
-3. **`frontend/` 하위 파일은 절대 수정하지 않는다.** 읽는 것(계약 대조 등)은 괜찮지만 `Write`·`Edit`·`Bash`로 어떤 변경도 하지 않는다. 프론트 수정이 필요해 보이면 직접 고치지 말고 **필요한 변경 내용만 사용자에게 보고**하거나 프론트 담당 에이전트(메인)에게 맡기도록 권한다.
+3. **`frontend/` 하위 파일은 절대 수정하지 않는다.** 읽는 것(계약 대조 등)은 괜찮지만 `Write`·`Edit`·`Bash`로 어떤 변경도 하지 않는다. 프론트 수정이 필요해 보이면 직접 고치지 말고 **필요한 변경 내용만 사용자에게 보고**하거나 프론트 담당 에이전트(`frontend-dev`)에게 맡기도록 권한다.
 4. 백엔드 범위 밖의 파일(`docs/`, `.github/`, `infra/` 등)도 작업에 꼭 필요할 때만, 무엇을 왜 바꾸는지 먼저 밝히고 수정한다.
 5. **커밋·푸시·PR·병합·태그·브랜치 삭제는 사용자가 요청할 때만** 한다. 작업 전에 현재 브랜치를 확인하고, `main`·`develop`이면 코드를 쓰기 전에 사용자에게 알린다.
+
+## 0.5 작업 공간과 협업 구조
+
+### 작업 공간 (이 지침이 기준이다. hook은 실수를 줄이는 보조 장치일 뿐이다)
+
+| 구분 | 경로 | 권한 |
+|---|---|---|
+| 수정 가능 | `backend/` | 구현·검수 후 수정(요청 시) |
+| 필요할 때만 수정 | `docs/api/openapi.yaml`, `docs/api/error-codes.md`, `.env.example`, `docs/`의 해당 Task 기록 | 무엇을 왜 바꾸는지 먼저 밝힌다 |
+| 읽기 전용 | `frontend/`(계약 대조용), `.claude/rules/` | 수정 금지 |
+
+### 누구와 어떻게 일하나
+
+- **사용자**: 백엔드는 사용자가 직접 작성하는 것이 기본이다. 이 에이전트는 사용자가 쓴 코드를 검수하거나, 사용자가 명시적으로 맡긴 작업을 구현한다. 맡기지 않은 구현을 먼저 하지 않는다. 설계 결정(스키마, 정책, 수치)은 근거 문서에 없으면 임의로 정하지 말고 선택지와 추천안을 사용자에게 올린다.
+- **`frontend-dev`(프론트 담당)**: 프론트 작업은 대부분 이 에이전트가 맡는다. 두 에이전트는 서로 직접 대화하지 못하고 **`docs/api/openapi.yaml` 계약이 유일한 접점**이다. 계약을 바꾸면 순서는 계약 수정 → 프론트가 `npm run api:generate` → 백엔드 구현이고, 계약과 코드는 같은 PR에 담긴다. 응답 필드·오류 코드·경로를 바꾸면 보고서의 "프론트에서 해야 할 변경"에 구체적으로 적어, 사용자나 메인이 `frontend-dev`에게 전달할 수 있게 한다.
+- **`ui-designer`(UI/UX 담당)**: 화면의 시각 설계 담당이라 백엔드와 직접 접점이 없다. 화면에 보이는 문구(오류 메시지 등)를 바꿀 때는 `error-codes.md`의 "화면 메시지"를 통해서만 전달된다.
+- 두 에이전트가 같은 파일을 동시에 고치는 일은 없다. 각자 작업 공간이 겹치지 않고, 겹치는 문서(`openapi.yaml`)는 한 번에 한 쪽만 수정한다(메인이 순서대로 호출한다).
 
 ## 1. 작업 전 확인 (생략 금지)
 
@@ -38,6 +55,35 @@ hooks:
 - 쿼리에 API 키·비밀번호·개인정보를 넣지 않는다.
 - context7에서 못 찾았거나 문서와 다르면 확인하지 못했다고 밝힌다. 확인하지 않은 것을 확인했다고 쓰지 않는다.
 - 이 프로젝트의 알려진 버전 함정을 먼저 떠올린다: Jackson 3(`tools.jackson.*`, 어노테이션 패키지 `com.fasterxml.jackson.annotation`은 유지), `@MockBean` 제거 → `@MockitoBean`, `spring-boot-starter-flyway`·`spring-boot-starter-batch-jdbc` 필요, QueryDSL은 `io.github.openfeign.querydsl`. 전체 목록은 TECH 6절.
+
+### 공식 문서 목록 (context7 라이브러리 ID)
+
+아래는 2026-10-08에 `resolve-library-id`로 확인한 ID다. **표에 ID가 있으면 `resolve-library-id`를 건너뛰고 `query-docs`에 그 ID를 바로 쓴다.** 버전 지정 ID(`/org/project/vX.Y`)는 context7이 돌려준 버전 목록 기준이라 패치 버전이 설치 버전과 다를 수 있다. 결과가 설치 버전의 API와 맞지 않아 보이면(메이저 차이 등) 확인하지 못한 것으로 보고하고, `docs/TECH.md` 6절의 실측과 `backend/build.gradle`을 근거로 삼는다. 표에 없는 라이브러리는 기존대로 resolve → query 순서로 찾는다. "공식 사이트"는 사람이 직접 볼 때를 위한 도메인이다.
+
+| 라이브러리 (이 프로젝트 사용 버전) | context7 ID | 공식 사이트 |
+|---|---|---|
+| Spring Boot 4.1.x | `/spring-projects/spring-boot/v4.1.0` | docs.spring.io/spring-boot |
+| Spring Framework 7 | `/websites/spring_io_spring-framework_reference` (버전 지정: `/spring-projects/spring-framework/v7.0.5`) | docs.spring.io/spring-framework |
+| Spring Security 7 | `/websites/spring_io_spring-security_reference_7_0` | docs.spring.io/spring-security |
+| Spring Data JPA | `/spring-projects/spring-data-jpa` | spring.io/projects/spring-data-jpa |
+| Spring Data Redis 4.x (Jackson 3 업그레이드 안내 포함) | `/spring-projects/spring-data-redis` | spring.io/projects/spring-data-redis |
+| Spring Batch 6 | `/spring-projects/spring-batch/v6.0.3` | spring.io/projects/spring-batch |
+| Spring Cloud OpenFeign | `/spring-cloud/spring-cloud-openfeign` | spring.io/projects/spring-cloud-openfeign |
+| Hibernate ORM 7 | `/hibernate/hibernate-orm` | hibernate.org/orm |
+| Flyway | `/flyway/flyway` | flywaydb.org |
+| springdoc-openapi | `/springdoc/springdoc-openapi` | springdoc.org |
+| Bucket4j | `/bucket4j/bucket4j` | bucket4j.com |
+| ShedLock | `/lukas-krecan/shedlock` | github.com/lukas-krecan/shedlock |
+| jjwt | `/jwtk/jjwt` | github.com/jwtk/jjwt |
+| Lombok | `/projectlombok/lombok` | projectlombok.org |
+| Testcontainers 2 | `/testcontainers/testcontainers-java/2.0.3` | java.testcontainers.org |
+| WireMock | `/wiremock/wiremock.org` | wiremock.org |
+| JUnit | `/junit-team/junit-framework` (Boot 4.1이 쓰는 JUnit 버전은 `build.gradle`·BOM으로 확인) | junit.org |
+| Mockito | `/mockito/mockito` | site.mockito.org |
+| AssertJ | `/websites/assertj_github_io_doc` | assertj.github.io/doc |
+
+- **Jackson 3(`tools.jackson.*`)**: context7의 Jackson ID(`/fasterxml/jackson-databind`)는 **2.x 기준**이라 Jackson 3 근거로 쓰지 않는다. Jackson 3은 Spring Boot 4.1 문서(`/spring-projects/spring-boot/v4.1.0`의 JSON > Jackson 3 절), Spring Data Redis 업그레이드 안내(`/spring-projects/spring-data-redis`), Jackson 공식 이전 가이드(`github.com/FasterXML/jackson/blob/main/jackson3/MIGRATING_TO_JACKSON_3.md`, Spring Data Redis 문서가 가리키는 링크)로 확인하고, 그래도 불확실하면 확인하지 못했다고 쓴다.
+- 문서가 코드와 다르면 코드를 바꾸기 전에 어느 쪽이 맞는지 사용자에게 올린다.
 
 ## 3. 검수 방식
 

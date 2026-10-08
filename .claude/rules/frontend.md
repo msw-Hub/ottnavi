@@ -68,7 +68,7 @@ paths:
 
 백엔드는 `.claude/rules/backend.md` 기준을 따른다. 프론트는 그 규칙에 맞춰 다음을 지킨다.
 
-- **API 계약**: `docs/api/openapi.yaml`이 유일한 근거다. 필드를 추측하거나 타입을 손으로 정의하지 않는다.
+- **API 계약**: `docs/api/openapi.yaml`이 유일한 근거다. 필드를 추측하거나 타입을 손으로 정의하지 않는다(목업 단계의 예외는 아래 "목업 단계의 임시 타입 예외").
   계약에 없는 데이터가 필요하면 코드를 짜기 전에 계약 변경부터 제안한다.
 - **코드 생성**: orval로 `docs/api/openapi.yaml`에서 타입, TanStack Query 훅, MSW 목업을 생성한다 (`npm run api:generate`).
   생성물은 `src/api/generated/`에 두고 **직접 수정하지 않는다.**
@@ -80,6 +80,12 @@ paths:
   `status`/`title`/`detail`/`errorCode`를 파싱하는 형태로 통일한다. `errorCode`(SCREAMING_SNAKE_CASE)는 `src/lib/errorMessages.ts`의 매핑 테이블로 한국어 메시지를 보여준다.
   429(`RATE_LIMIT_EXCEEDED`)는 "잠시 후 다시 시도" 안내로 처리한다.
 - **타입 정의**: 백엔드 DTO는 Java record라 필드명이 camelCase로 그대로 직렬화된다. 생성된 타입을 그대로 쓰고, 변환 레이어를 두지 않는다.
+- **목업 단계의 임시 타입 예외**: 이 프로젝트는 화면(목업)을 먼저 만들고 계약(`openapi.yaml`)은 승인된 화면에서 뽑는다(PRD 9절, ROADMAP 4.4). 그래서 **아직 계약에 없는 API**는 생성 타입이 없다. 이 경우에 한해 임시 타입을 허용한다.
+  - 위치: `features/{기능}/mockTypes.ts` 한 파일에만 둔다(제거할 때 한 번에 찾기 위함).
+  - 표시: 타입마다 `// 임시: 계약 반영 후 생성 타입으로 교체` 주석을 단다.
+  - 이미 계약에 있는 API(예: 서비스 목록)는 처음부터 생성 타입을 쓴다.
+  - 제거: 계약이 반영되는 Task(MVP는 Task 031, 2단계 이후 기능은 해당 기능의 "실제 API 교체" Task)에서 생성 타입으로 바꾸고 `mockTypes.ts`를 지운다. 이 Task의 완료 조건은 해당 기능에 `mockTypes.ts`가 남지 않는 것이다. 확인은 범위를 구분한다: 2단계 이후 기능은 해당 기능 폴더만(`Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src/features/{기능}`), MVP의 Task 031은 MVP 기능 전체가 대상이라 `frontend/src` 전체(`Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src`)가 비어 있어야 한다. 아직 계약에 반영되지 않은 다른 기능의 `mockTypes.ts`는 남아 있어도 된다.
+  - 이 예외는 `mockTypes.ts`에만 적용한다. 컴포넌트·훅에서 API 응답 타입을 따로 손으로 만들지 않는다.
 - **환경변수**: 비밀 값은 프론트에 두지 않는다. `VITE_` 접두사 변수는 브라우저에 노출되므로 공개해도 되는 값(목업 사용 여부 `VITE_USE_MOCK` 등)만 둔다.
 
 ## 인증 규칙

@@ -32,7 +32,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `.claude/rules/api-contract.md` | OpenAPI 계약 변경 절차, 응답·오류·페이지네이션 형식 |
 | `.claude/rules/git.md` | 브랜치·커밋·병합 규칙 |
 
-`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage)가, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
+`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage), 개발 에이전트 3종(backend-dev: 백엔드 검수·맡긴 구현 / frontend-dev: 프론트 구현 전반 / ui-designer: UI/UX 시각 설계·수정)이, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. 개발 에이전트끼리는 직접 대화하지 못하고 `docs/api/openapi.yaml` 계약과 보고서의 "넘길 내용"으로 협업한다. 작업 공간의 기준은 각 에이전트 md이고 `.claude/hooks/`의 hook은 보조 안전장치다(backend-dev는 `frontend/`, frontend-dev는 `backend/`와 `frontend/src/api/generated/` 수정을 막는다). 프론트는 대부분 frontend-dev가 맡고 UI/UX 수정 요청은 ui-designer가 맡는다. 구성은 `docs/TASK018_031_PLAN.md` 7절. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
 
 ## 목표 아키텍처 (big picture)
 
