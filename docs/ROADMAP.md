@@ -46,7 +46,7 @@
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 20/105 | |
+| 합계 | | 22/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -613,7 +613,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: Testcontainers Redis에 캐시를 저장·조회하고 값이 JSON인지 확인하는 테스트가 통과한다.
 - 안내서(2026-10-08): `docs/TASK024_GUIDE.md`. 주의: Jackson 3의 `GenericJacksonJsonRedisSerializer`는 기본으로 타입 정보를 넣지 않아 record가 Map으로 돌아올 수 있으므로, 추천안(미확정, 안내서 D1)은 캐시별 타입 지정(`JacksonJsonRedisSerializer<T>`)이고 record 왕복 테스트를 포함한다. 사용자가 직접 작성하고 `backend-dev`가 검수한다.
-- 기록: 2026-10-09 완료(`feature/b0-redis-feign-config`, PR #17 develop 병합 9ba0ae5). 결정(안내서 5절): D1 값 직렬화 B(캐시별 `JacksonJsonRedisSerializer<T>`, 기본은 타입 정보 없는 `GenericJacksonJsonRedisSerializer`), D2 `spring-boot-starter-cache` 추가(Boot 4는 캐시 자동 구성이 `spring-boot-cache` 모듈이고 `RedisCacheManagerBuilderCustomizer`가 `org.springframework.boot.cache.autoconfigure`에 있다), D3 Feign `tmdb` 연결 3초·읽기 5초(Task 048 첫 전체 수집에서 실측 후 조정), D4 TTL 기본 1시간·세 캐시 24시간(실측 86400초), D5 Redis 명령 2초·연결 5초, **D6 캐시 쓰기 즉시 반영(`immediateWrites`)**(구현 중 발견: Spring Data Redis 4에서 Lettuce면 기본 `RedisCacheWriter`의 `put`·`evict`·`clear`가 비동기라 수집 직후 clear해도 옛 값이 읽힐 수 있다. 블로킹 비용은 규모가 작아 수용, 운영 응답 시간은 첫 배포 뒤 로그로 확인). 테스트 `RedisCacheConfigTest` 8건(저장·조회, JSON, 키 접두사, TTL, 실제 캐시 TTL, 즉시 반영, null 미저장) 통과, 전체 `clean build` 8개 클래스 46건 통과, CI 4건과 CodeRabbit 통과(지적 0건). 로컬 기동에서 오류 없이 `/actuator/health` 200 `UP`, `@EnableFeignClients`는 클라이언트 없이도 뜬다. 첫 Redis 연결 때 Netty `TCP_KEEPCOUNT`·`TCP_KEEPIDLE`·`TCP_KEEPINTERVAL` WARN 3건이 나오나 영향이 없어 무시(Windows·Java 17 추정, 운영 로그에서 다시 나오면 판단). 확인하지 못한 것: Feign 기본 디코더의 Jackson 3 사용 여부(Task 042 WireMock 테스트), 운영(Redis Cloud) 블로킹 쓰기 응답 시간.
+- 기록: 2026-10-09 완료(`feature/b0-redis-feign-config`, PR #17 develop 병합 9ba0ae5). 결정(안내서 5절): D1 값 직렬화 B 방침(기본 직렬화기는 타입 정보 없는 `GenericJacksonJsonRedisSerializer`로 구성했고, 캐시별 `JacksonJsonRedisSerializer<T>`는 DTO가 생기는 후속 Task에서 등록한다. 지금 `src/main`에는 등록된 것이 없고 테스트 fixture(`RedisCacheConfigTest`)에서만 B 방식으로 왕복을 확인했다), D2 `spring-boot-starter-cache` 추가(Boot 4는 캐시 자동 구성이 `spring-boot-cache` 모듈이고 `RedisCacheManagerBuilderCustomizer`가 `org.springframework.boot.cache.autoconfigure`에 있다), D3 Feign `tmdb` 연결 3초·읽기 5초(Task 048 첫 전체 수집에서 실측 후 조정), D4 TTL 기본 1시간·세 캐시 24시간(실측 86400초), D5 Redis 명령 2초·연결 5초, **D6 캐시 쓰기 즉시 반영(`immediateWrites`)**(구현 중 발견: Spring Data Redis 4에서 Lettuce면 기본 `RedisCacheWriter`의 `put`·`evict`·`clear`가 비동기라 수집 직후 clear해도 옛 값이 읽힐 수 있다. 블로킹 비용은 규모가 작아 수용, 운영 응답 시간은 첫 배포 뒤 로그로 확인). 테스트 `RedisCacheConfigTest` 8건(저장·조회, JSON, 키 접두사, TTL, 실제 캐시 TTL, 즉시 반영, null 미저장) 통과, 전체 `clean build` 8개 클래스 46건 통과, CI 4건과 CodeRabbit 통과(지적 0건). 로컬 기동에서 오류 없이 `/actuator/health` 200 `UP`, `@EnableFeignClients`는 클라이언트 없이도 뜬다. 첫 Redis 연결 때 Netty `TCP_KEEPCOUNT`·`TCP_KEEPIDLE`·`TCP_KEEPINTERVAL` WARN 3건이 나오나 영향이 없어 무시(Windows·Java 17 추정, 운영 로그에서 다시 나오면 판단). 확인하지 못한 것: Feign 기본 디코더의 Jackson 3 사용 여부(Task 042 WireMock 테스트), 운영(Redis Cloud) 블로킹 쓰기 응답 시간.
   - 이후 Task에 넘길 내용: ① 캐시에 DTO를 쓰는 Task(049·051·062 등)는 `RedisConfig`에 그 캐시의 `JacksonJsonRedisSerializer<DTO>`를 한 줄씩 등록한다(기본 직렬화기로는 꺼낸 값이 `LinkedHashMap`이 되어 `ClassCastException`). ② `cache.put(key, null)`은 `IllegalArgumentException`이므로 `@Cacheable`에 `unless = "#result == null"`을 붙인다. ③ CodeRabbit이 짚은 일반론: 운영 스키마 호환(DTO 변경 시 기존 캐시 값)과 동시 무효화는 TTL만으로 보장되지 않으니 해당 Task에서 다룬다.
 
 #### Task 025: 공통 유틸과 에러 인터셉터 작성으로 화면 표시 규칙 통일 ⬜
