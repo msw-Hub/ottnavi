@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 1/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 3/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 23/105 | |
+| 합계 | | 25/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -604,7 +604,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 1/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 3/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -621,24 +621,33 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 기록: 2026-10-09 완료(`feature/b0-redis-feign-config`, PR #17 develop 병합 9ba0ae5). 결정(안내서 5절): D1 값 직렬화 B 방침(기본 직렬화기는 타입 정보 없는 `GenericJacksonJsonRedisSerializer`로 구성했고, 캐시별 `JacksonJsonRedisSerializer<T>`는 DTO가 생기는 후속 Task에서 등록한다. 지금 `src/main`에는 등록된 것이 없고 테스트 fixture(`RedisCacheConfigTest`)에서만 B 방식으로 왕복을 확인했다), D2 `spring-boot-starter-cache` 추가(Boot 4는 캐시 자동 구성이 `spring-boot-cache` 모듈이고 `RedisCacheManagerBuilderCustomizer`가 `org.springframework.boot.cache.autoconfigure`에 있다), D3 Feign `tmdb` 연결 3초·읽기 5초(Task 048 첫 전체 수집에서 실측 후 조정), D4 TTL 기본 1시간·세 캐시 24시간(실측 86400초), D5 Redis 명령 2초·연결 5초, **D6 캐시 쓰기 즉시 반영(`immediateWrites`)**(구현 중 발견: Spring Data Redis 4에서 Lettuce면 기본 `RedisCacheWriter`의 `put`·`evict`·`clear`가 비동기라 수집 직후 clear해도 옛 값이 읽힐 수 있다. 블로킹 비용은 규모가 작아 수용, 운영 응답 시간은 첫 배포 뒤 로그로 확인). 테스트 `RedisCacheConfigTest` 8건(저장·조회, JSON, 키 접두사, TTL, 실제 캐시 TTL, 즉시 반영, null 미저장) 통과, 전체 `clean build` 8개 클래스 46건 통과, CI 4건과 CodeRabbit 통과(지적 0건). 로컬 기동에서 오류 없이 `/actuator/health` 200 `UP`, `@EnableFeignClients`는 클라이언트 없이도 뜬다. 첫 Redis 연결 때 Netty `TCP_KEEPCOUNT`·`TCP_KEEPIDLE`·`TCP_KEEPINTERVAL` WARN 3건이 나오나 영향이 없어 무시(Windows·Java 17 추정, 운영 로그에서 다시 나오면 판단). 확인하지 못한 것: Feign 기본 디코더의 Jackson 3 사용 여부(Task 042 WireMock 테스트), 운영(Redis Cloud) 블로킹 쓰기 응답 시간.
   - 이후 Task에 넘길 내용: ① 캐시에 DTO를 쓰는 Task(049·051·062 등)는 `RedisConfig`에 그 캐시의 `JacksonJsonRedisSerializer<DTO>`를 한 줄씩 등록한다(기본 직렬화기로는 꺼낸 값이 `LinkedHashMap`이 되어 `ClassCastException`). ② `cache.put(key, null)`은 `IllegalArgumentException`이므로 `@Cacheable`에 `unless = "#result == null"`을 붙인다. ③ CodeRabbit이 짚은 일반론: 운영 스키마 호환(DTO 변경 시 기존 캐시 값)과 동시 무효화는 TTL만으로 보장되지 않으니 해당 Task에서 다룬다.
 
-#### Task 025: 공통 유틸과 에러 인터셉터 작성으로 화면 표시 규칙 통일 ⬜
+#### Task 025: 공통 유틸과 에러 인터셉터 작성으로 화면 표시 규칙 통일 ✅
 - 태그: [F] · PRD: F1~F2, FR-05 · 선행: 018 · 브랜치: `feature/f1-common-lib-components`(Task 026과 합침, 2026-10-08 결정. 원래 `feature/f1-common-lib`)
 - 구현 사항
-  - [ ] `src/lib/format.ts`(금액 "15,000원", 시간 "12시간 30분"), `tmdbImage.ts`, `errorMessages.ts`(error-codes.md와 일치)
-  - [ ] `src/api/http.ts` 응답 인터셉터: `ProblemDetail` 파싱, 429 "잠시 후 다시 시도"(401 재발급은 Task 057)
-  - [ ] Vitest 단위 테스트
+  - [x] `src/lib/format.ts`(금액 "15,000원", 시간 "12시간 30분"), `tmdbImage.ts`, `errorMessages.ts`(error-codes.md와 일치)
+  - [x] `src/api/http.ts` 응답 인터셉터: `ProblemDetail` 파싱, 429 "잠시 후 다시 시도"(401 재발급은 Task 057)
+  - [x] Vitest 단위 테스트
 - 완료 기준
   - `npm run test` 통과, V-F: 429 목업 핸들러를 켰을 때 안내 문구가 보인다.
 - 결정(2026-10-08): 026과 PR 하나로 합친다(025 검증 4종 통과 → 026 진행, 단계마다 확인). 완료할 때 025·026 `기록:`에 합친 사실을 남긴다. 429·오류 안내는 shadcn `sonner`(토스트)를 추가해 쓴다(P3).
+- 기록: 2026-10-09 완료(026과 같은 브랜치·PR #21 병합 1c48931). 검증·V-F는 Task 026 기록과 같다.
+  - 구현: `lib/format.ts`(금액·시간), `tmdbImage.ts`, `errorMessages.ts`(error-codes.md와 일치, 문서에 없는 코드용·네트워크 오류용 기본 문구 2개는 임의로 정함), `api/http.ts` 응답 인터셉터(`ApiError`로 정규화, `ProblemDetail` 파싱, 429는 토스트 id `api-rate-limit`로 한 번만 표시, 401 재발급은 Task 057), 단위 테스트, MSW `?mockScenario=rate-limit`로 429 시나리오. 토스트는 shadcn `sonner`(원본 유지)를 `app/providers.tsx`에 두었다: 위쪽 가운데·머리글 아래, 큰 화면 폭 `--container-md`, 오류는 `--destructive-solid` 바탕+흰 글자, `theme="dark"`(jsdom에 matchMedia가 없어 `system`을 피함). 429 문구는 "잠시 후 다시 시도"를 안내한다.
+  - 확인하지 못한 것: MSW가 오래 열어 둔 페이지에서 요청을 놓쳐 502가 한 번 난 일(재현되지 않음, 목업 영역). 신규 공통 코드 3개(`INVALID_REQUEST`, `RESOURCE_NOT_FOUND`, `METHOD_NOT_ALLOWED`)의 화면 메시지는 이 Task에서 확정했다(Task 023의 남은 일 해소).
 
-#### Task 026: 공통 표시 컴포넌트 1차 구현으로 화면 간 중복 제거 ⬜
+#### Task 026: 공통 표시 컴포넌트 1차 구현으로 화면 간 중복 제거 ✅
 - 태그: [F] · PRD: F2(1차), FR-02, 5.6 · 선행: 025 · 브랜치: `feature/f1-common-lib-components`(Task 025와 같은 브랜치·PR, 2026-10-08 결정. 원래 `feature/f1-common-components`)
 - 구현 사항
-  - [ ] `src/components/common/`: `ProviderStatusBadge`(모양·텍스트로 3상태), `ServiceStatusRow`(쿠팡플레이 "데이터 부족"), `PosterCard`, `PriceDisplay`(가격 출처 라벨), `SourceAttribution`, `DataAsOf`, `EstimatedTag`, `LoadingState`·`ErrorState`·`EmptyState`
-  - [ ] 색은 임시 토큰(`src/styles/tokens.css`)만, 확정은 Task 037
-  - [ ] RTL 테스트: 3상태 텍스트 구분
+  - [x] `src/components/common/`: `ProviderStatusBadge`(모양·텍스트로 3상태), `ServiceStatusRow`(쿠팡플레이 "데이터 부족"), `PosterCard`, `PriceDisplay`(가격 출처 라벨), `SourceAttribution`, `DataAsOf`, `EstimatedTag`, `LoadingState`·`ErrorState`·`EmptyState`
+  - [x] 색은 임시 토큰(`src/styles/tokens.css`)만, 확정은 Task 037
+  - [x] RTL 테스트: 3상태 텍스트 구분
 - 완료 기준
   - `npm run test` 통과, V-F: 확인용 임시 화면에서 3상태·출처·추정 표시가 보인다.
+- 기록: 2026-10-09 완료(025와 같은 브랜치 `feature/f1-common-lib-components`, PR #21 develop 병합 1c48931, CodeRabbit 지적 0건). 검증 4종 통과(테스트 7개 파일 126건), V-F(`/__dev/components`, 1280·375 폭, 흑백 보기, 오류 토스트) 콘솔 에러 0건, 사용자가 화면을 확인했다.
+  - 결정(사용자): ① 시각 방향은 **미드나잇 블루 D2c 어두운 기본 테마**(기준 시안 `.playwright-mcp/directions-dark/direction-D2c.html`, 강조색 하늘 230). ② 한글 글꼴은 **Pretendard 웹폰트**(`pretendard@^1.3.9` 가변 다이내믹 서브셋, 새 의존성). ③ 가격 라벨은 "기본 요금". ④ 오류 토스트 빨강(`--destructive-solid` #e7000b)은 유지하고 Task 037에서 다시 본다.
+  - 구현: `src/styles/tokens.css`(상태·품질·추정 토큰과 `--destructive-solid`), `src/components/common/`(`ProviderStatusBadge`, `ServiceStatusRow`, `PosterCard`, `PosterImage`, `PriceDisplay`, `SourceAttribution`, `DataAsOf`, `EstimatedTag`, `DataInsufficientTag`, `LoadingState`·`ErrorState`·`EmptyState`), 개발 전용 확인 화면 `/__dev/components`(`import.meta.env.DEV`일 때만 라우트 등록, 운영 번들에 없음을 확인). `PosterCard`는 완성된 `posterUrl`을 받아 목업·테스트에서 외부 요청이 나가지 않게 했고, 상세 화면용 제목 없는 `PosterImage`를 분리했다. `ServiceStatusRow`는 서비스 목록 전체(`<ul>`)를 그린다. 한글 단어 단위 줄바꿈(`break-keep`), outline 버튼 테두리 `border-input`, 버튼·입력창 40px, 머리글 `bg-card`와 모바일 2줄 배치, "모름" 물음표 확대를 `ui-designer` 검수로 반영했다.
+  - 이후 Task에 넘길 내용: ① 제공 상태·가격 출처 타입(`AvailabilityStatus`, `PriceSource`)은 계약에 없어 `components/common/displayTypes.ts`에 임시로 두었다. Task 031에서 enum을 계약에 넣고 생성 타입으로 교체한다. ② Task 027 상세 화면은 `PosterImage`를 쓴다. 쿠팡플레이 "데이터 부족"은 `DataInsufficientTag`. ③ 토스트 offset이 머리글 높이(57px)를 손수 계산한 값인데 이번에 머리글 입력창·버튼이 40px로 커졌으므로 머리글 높이가 바뀌었는지 Task 027 확인 때 같이 본다.
+  - 확인하지 못한 것: Pretendard가 실제로 적용됐는지와 숫자 폭 고정(`tabular-nums`) 동작(스크린샷 눈대중만), 화면 움직임 줄이기(`reducedMotion`) 설정 시 동작, 375 폭 흑백, 화면 낭독기. 접근성 이름은 RTL 테스트로만 확인했다.
+  - 작업 방식 메모: `frontend-dev` 모델을 `sonnet`으로 바꾸고 검증 4종·스크린샷은 모든 구현이 끝난 마지막에 한 번만 하도록 에이전트 지침에 넣었다(토큰 사용량 절약). `ui-designer`는 새 시각 방향 제안 때만 `opus`를 쓰는 안.
 
 #### Task 027: 공개 화면 목업 구현(SCR-01·02·04·06)으로 공개 흐름 확정 ⬜
 - 태그: [F] · PRD: F1, FR-01~03, 05, 06 · 선행: 018, 026 · 브랜치: `feature/f1-public-screens`
@@ -743,6 +752,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `src/styles/tokens.css`에 Task 036 결정 반영, 직접 쓴 색 값 점검
   - [ ] shadcn/ui 변형은 variant 또는 `components/common/` 래핑, 키보드 포커스·`alt`·대비 점검
   - [ ] Task 025·026에서 이월한 정리(2026-10-09): ① 토스트 위치 `offset`이 머리글 높이(57px)를 간격 토큰으로 손수 계산한 값(`providers.tsx`의 `HEADER_HEIGHT`)이라 머리글의 여백·높이·줄 수가 바뀌면 같이 고쳐야 한다 — 값을 공유하는 방법 검토. ② `index.css`의 `--destructive-foreground`는 `:root`(light)에만 있고 `.dark`용 값은 없다 — 다크 모드 도입 시 정의. ③ `Toaster`의 `theme="light"` 고정과 `next-themes`(shadcn `sonner`가 끌고 온 패키지, 지금은 쓰이지 않음) 정리. ④ 붉은 토스트 위의 키보드 포커스 링이 잘 보이는지(sonner 기본 포커스 링 `rgba(0,0,0,0.2)`) 점검. ⑤ 여러 토스트가 쌓일 때의 모양(지금은 같은 id라 1개만 뜸). ⑥ `errorMessages.ts`의 기본 메시지 2개(문서에 없는 코드용, 네트워크 오류용)는 Task 025에서 임의로 정한 문구라 확정. ⑦ Task 026의 임시 토큰(`src/styles/tokens.css`)을 036 결정값으로 교체
+  - 2026-10-09 갱신(Task 026 결과): 어두운 테마(미드나잇 블루 D2c)가 기본으로 확정돼 ②는 "`.dark`용 값 정의"가 아니라 `:root`가 곧 어두운 값이고 `index.css`에 남은 `@custom-variant dark`와 `.dark` 블록을 정리하는 일로 바뀌었고, ③의 `Toaster`는 이미 `theme="dark"`다(`next-themes` 제거 여부만 남음). ⑧ 오류 토스트 빨강(`--destructive-solid` #e7000b, 흰 글자 대비 4.76:1로 기준 4.5:1에 근접)을 더 짙게(`oklch(0.5 0.18 25)`, 6.59:1) 할지. ⑨ 버튼·입력창 크기 단계(32/36/40px)를 하나로 정리하고 토스트 offset의 머리글 높이 값과 맞추기. ⑩ shadcn `dark:` 변형을 늘 켤지(outline 버튼이 `bg-input/30`이 되는 영향 비교). ⑪ 포커스 링 `ring-ring/50`(바탕 대비 약 3.28:1)을 `--ring` 그대로로 진하게. ⑫ 머리글 "로그인"·푸터 링크의 누르는 영역, 가격 출처 알약(`bg-muted`가 카드와 1.11:1) 눈에 띄게 할지. ⑬ Pretendard의 숫자 폭 고정(`tabular-nums`) 동작 확인. ⑭ 임시 타입 `displayTypes.ts`는 Task 031에서 계약 enum으로 교체.
 - 완료 기준
   - V-F: SCR-01, 02, 08, 10 스크린샷을 남겼고 콘솔 에러 0건, 3상태가 흑백에서도 구분된다.
 
