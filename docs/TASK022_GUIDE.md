@@ -67,7 +67,7 @@ git switch -c feature/b1-smtp-trial origin/develop
 ```
 
 - `develop`을 체크아웃하지 않고 원격 `develop`에서 곧바로 새 브랜치를 만든다. 워크트리 방식에서 `git switch develop; git pull`이 막히는 문제를 피한다.
-- 이전 Task 브랜치(예: `feature/b0-redis-feign-config`)가 병합된 뒤라면 그 브랜치에서 그대로 새 브랜치로 옮겨 가도 된다.
+- 이전 Task 브랜치(예: `feature/b0-redis-feign-config`)에서 파생하지 말고 항상 `origin/develop`에서 만든다. 이전 브랜치가 Squash 병합되면 그 브랜치 이력이 `develop`과 달라져, 거기서 파생한 브랜치에는 이미 병합된 커밋이 중복으로 남기 때문이다.
 
 - 이 브랜치는 **PR을 만들지 않는다**. Cloudtype이 원격 브랜치를 빌드하므로 푸시는 필요하다(⑤). 푸시하면 CI(`backend-ci`)가 돌 수 있지만 PR이 없으므로 병합될 일은 없다.
 
