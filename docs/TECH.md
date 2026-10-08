@@ -15,11 +15,11 @@
 
 계산 규칙의 정의는 R 5.4(FR-12)가 기준이다. `ExactSolver`와 `GreedySolver`는 `PlanSolver` 하나를 구현하고(rules), 배정 규칙과 비교기는 공유한다. 두 구현의 차이는 "구독 조합을 고르는 방법"뿐이다.
 
-**목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 상품 ID 집합 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
+**목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 **결제를 미루는 쪽**(달 0→1→2 순서로 그 달에 **새로 돈이 드는 상품 수**를 비교해 먼저 다른 달에서 적은 쪽, FREE와 이번 달 이미 낸 SUBSCRIBED는 세지 않음. 2026-10-09 사용자 결정: 되돌릴 수 없는 결제를 늦추는 쪽이 매월 재계산하는 롤링 계획과 맞는다) → ⑤ 그래도 같으면 달별 상품 ID 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
 
 **배정 규칙(고정).**
 - 정렬: 우선순위 높은 순 → 필요 분 짧은 순 → `watchUnitId` 순(마지막 기준은 도출).
-- 볼 수 있는 가장 이른 달부터 남은 시청 시간에 채운다. 한 달보다 긴 시즌은 같은 서비스가 연속 커버되는 달에 나눠 배정하고 다 본 달에 점수를 준다. 3개월 안에 끝나지 않으면 배정하지 않는다(도출).
+- 볼 수 있는 가장 이른 달부터 남은 시청 시간에 채운다. 한 달보다 긴 시즌은 그 시즌을 덮는 상품이 선택된 **연속된 달**에 서비스와 상관없이 이어서 나눠 배정하고(예: 1월 넷플릭스, 2월 티빙, 2026-10-09 사용자 결정) 다 본 달에 점수를 준다. 달마다 어느 상품으로 본 분량인지를 기록하고(같은 달에 덮는 상품이 둘이면 ID가 작은 쪽), 월 시청 가능 시간은 서비스와 무관하게 그 달 전체에서 센다. 3개월 안에 끝나지 않으면 배정하지 않는다(도출).
 - 번들은 상품 하나로 다루고 "모름"은 커버로 세지 않는다(R). 쿠팡플레이 포함 여부(R11-13)는 입력 단계 필터로 받아 엔진은 바뀌지 않는다.
 
 **정확해 → 그리디 전환.**
@@ -115,7 +115,7 @@ sequenceDiagram
 
 - 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다. Cloudtype이 `X-Forwarded-Host`를 통과시키는 것으로 관찰됐으므로(Task 020 실험, 1회) 템플릿 대신 **`OAUTH2_REDIRECT_BASE_URL` 고정**을 쓴다(도출).
 - **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
-- **RT 서버 측 저장(R11-21 확정, 2026-10-09)**: **Redis(TTL)에 해시로 저장**하고 재발급 때 **회전**(새 RT 발급, 이전 RT 폐기), 이미 쓴 RT가 다시 쓰이면(**재사용 감지**) 해당 계열을 무효화한다. 서명 검증만 하는 방식은 한 번 발급한 RT를 만료 전에 무효화할 수 없고 회전의 재사용 감지도 못 하므로 택하지 않았다(Auth0 등 refresh token rotation 문서, 2차 자료). `RefreshTokenStore` 인터페이스는 유지해 저장소를 교체할 수 있게 둔다(예: PostgreSQL 구현). **알려진 한계**: Redis Cloud 무료는 영속성이 없고 메모리가 차면 키가 지워질 수 있으며(`allkeys-lru`) 14일 접속이 없으면 DB가 삭제되므로(Task 003·020 기록) 그때 모든 사용자가 다시 로그인해야 한다. 규모가 작아 수용하고, 사용자가 늘어 불편해지면 PostgreSQL 구현으로 바꾼다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
+- **RT 서버 측 저장(R11-21 확정, 2026-10-09)**: **Redis(TTL)에 해시로 저장**하고 재발급 때 **회전**(새 RT 발급, 이전 RT 폐기), 이미 쓴 RT가 다시 쓰이면(**재사용 감지**) 해당 계열을 무효화한다. 서명 검증만 하는 방식은 한 번 발급한 RT를 만료 전에 무효화할 수 없고 회전의 재사용 감지도 못 하므로 택하지 않았다(Auth0 등 refresh token rotation 문서, 2차 자료). `RefreshTokenStore` 인터페이스는 유지해 저장소를 교체할 수 있게 둔다(예: PostgreSQL 구현). **알려진 한계**: ① Redis Cloud 무료는 영속성이 없다. 메모리가 차서 `allkeys-lru`가 키를 지우면 **그 키의 사용자만** 다시 로그인하고, 14일 동안 접속이 없어 DB가 삭제되거나 Redis가 통째로 사라지면(Task 003·020 기록) **모든 사용자**가 다시 로그인해야 한다. ② 무료 플랜은 TLS를 쓸 수 없어(Task 003 기록, 2026-10-06 사용자 확인) Cloudtype → Redis Cloud 구간이 **평문**이다. 그래서 RT 상태가 평문 구간을 지나는데, 저장하는 값은 RT의 **해시**라 중간에서 엿봐도 쿠키로 재생할 수 없고 RT 원문은 이 구간을 지나지 않는다(원문은 브라우저 쿠키와 서버 메모리에서만 다룸). TLS는 TLS를 지원하는 유료 플랜으로 옮기거나 PostgreSQL 구현으로 교체할 때 해결한다(유료 전환 시점에 결정). 규모가 작아 수용하고, 사용자가 늘어 불편해지면 PostgreSQL 구현으로 바꾼다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
 - 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
 - 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출).
 
