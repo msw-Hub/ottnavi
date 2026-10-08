@@ -27,5 +27,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* 테스트 파일은 Node 타입(node:fs 등)이 필요해 tsconfig.test.json에서 따로 검사한다. 앱 코드에 Node 전역 타입이 섞이지 않게 하기 위함이다 */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test"]
 }

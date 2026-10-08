@@ -6,6 +6,29 @@ import { RouteErrorBoundary } from '@/app/RouteErrorBoundary'
 import { RouteLoadingFallback } from '@/app/RouteLoadingFallback'
 
 /*
+ * 개발 모드에서만 등록하는 확인용 화면(Task 026). 운영 화면이 아니라 화면 주소표(경로표)에 넣지 않는다.
+ *
+ * 운영 빌드에 들어가지 않는 이유: Vite는 빌드할 때 import.meta.env.DEV를 false로 바꿔 넣는다.
+ * 그러면 아래 삼항식이 항상 [] 쪽이 되어, 쓰이지 않는 import('@/pages/dev/...')가 빌드 과정에서 제거되고
+ * 확인용 화면 파일 조각(chunk)도 만들어지지 않는다. lazy로 둔 것은 개발 중에도 첫 번들을 가볍게 하기 위함이다.
+ *
+ * router.test.tsx와의 관계: 테스트(Vitest)도 개발 모드라(DEV = true) 이 경로가 등록된다.
+ * 그래서 테스트는 경로표(ROUTE_TABLE)와 별도로 DEV_ROUTE_TABLE을 두고, DEV일 때만 합쳐서 비교한다.
+ * 여기에 경로를 더하면 router.test.tsx의 DEV_ROUTE_TABLE도 함께 고친다.
+ */
+const DEV_ONLY_ROUTES: RouteObject[] = import.meta.env.DEV
+  ? [
+      {
+        path: '__dev/components', // 공통 표시 컴포넌트 확인 화면
+        lazy: {
+          Component: () =>
+            import('@/pages/dev/ComponentsPreviewPage').then((m) => m.ComponentsPreviewPage),
+        },
+      },
+    ]
+  : []
+
+/*
  * 화면 주소표(TASK018_031_PLAN 5절, 사용자 결정 P6). 여기 주소는 브라우저 주소창에 보이는 프론트 화면 주소이며
  * 백엔드 API 주소(/api/...)와 다르다. 주소를 바꾸거나 더하면 src/app/router.test.tsx의 표도 함께 고쳐야 테스트가 통과한다.
  *
@@ -156,6 +179,9 @@ export const routes: RouteObject[] = [
               },
             ],
           },
+
+          // 개발 모드 전용 확인 화면(운영 빌드에서는 빈 배열이라 아무것도 더해지지 않는다)
+          ...DEV_ONLY_ROUTES,
 
           // 위 어디에도 맞지 않는 주소는 404 화면(레이아웃 안)
           {

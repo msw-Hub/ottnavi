@@ -20,7 +20,8 @@ export function RootLayout() {
         본문으로 건너뛰기
       </a>
 
-      <header className="border-b">
+      {/* bg-card: 본문 바탕보다 한 단계 밝은 면으로 머리글을 구분한다(Task 026 검수) */}
+      <header className="border-b bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
           <Link to="/" className="font-semibold">
             OTT내비
@@ -78,7 +79,12 @@ function HeaderSearchForm() {
   }
 
   return (
-    <form role="search" onSubmit={handleSubmit} className="flex min-w-0 flex-1 items-center gap-2">
+    // 모바일(sm 미만): 로고·로그인은 윗줄, 검색창은 아랫줄 전체 폭(order-1 + basis-full). 좁은 폭에서 검색창이 찌그러지지 않게 한다
+    <form
+      role="search"
+      onSubmit={handleSubmit}
+      className="flex min-w-0 flex-1 items-center gap-2 max-sm:order-1 max-sm:basis-full"
+    >
       {/*
         입력창을 제어 컴포넌트(useState) 대신 defaultValue로 두고 key에 현재 검색어를 넣었다.
         단순히 useState로 두면 뒤로 가기로 주소의 검색어가 바뀌어도 입력창 글자는 그대로 남는다.
@@ -91,9 +97,10 @@ function HeaderSearchForm() {
         defaultValue={currentQuery}
         aria-label="작품 제목 검색"
         placeholder="작품 제목 검색"
-        className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
       />
-      <Button type="submit" variant="outline">
+      {/* h-10: 터치 크기 40px. border-input bg-transparent: 어두운 테마에서 outline 버튼 테두리가 흐려 입력창과 같은 테두리색을 쓴다 */}
+      <Button type="submit" variant="outline" className="h-10 border-input bg-transparent">
         검색
       </Button>
     </form>

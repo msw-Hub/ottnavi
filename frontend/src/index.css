@@ -1,8 +1,17 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* Task 026 검수: 글꼴을 Pretendard로 바꿨다(사용자 결정). Geist는 한글이 없어 시스템 글꼴로 떨어졌다. 되돌릴 때를 위해 남긴다 */
+/* @import "@fontsource-variable/geist"; */
+/* Pretendard Variable 다이내믹 서브셋: 화면에 쓰인 글자 묶음만 내려받아 용량이 작다. 글꼴 이름은 'Pretendard Variable' */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+/* 서비스 고유 디자인 토큰(제공 상태·데이터 부족·추정·토스트 빨강)과 그 Tailwind 연결(Task 026) */
+@import "./styles/tokens.css";
 
+/*
+ * shadcn의 다크 모드 방식(.dark 클래스) 설정이다. 앱은 이제 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않는다.
+ * 아래 .dark 블록과 함께 Task 037에서 정리한다(지금 지우면 shadcn 원본 컴포넌트의 dark: 클래스 처리가 달라질 수 있어 그대로 둔다).
+ */
 @custom-variant dark (&:is(.dark *));
 
 /*
@@ -15,44 +24,79 @@
  *   다크 모드는 shadcn 방식(.dark 클래스)만 남기고, 켤지 여부는 디자인 토큰 정리(Task 037)에서 정한다.
  * - 남긴 것: 아래 shadcn 토큰 전부. --border·--accent는 템플릿 블록 안에 섞여 있던 shadcn 값 그대로 옮겼다.
  */
+/*
+ * Task 026: 앱 기본 테마를 어두운 "D2c 미드나잇 블루"로 정했다(사용자 확정 2026-10-09, 밝은 테마·토글은 두지 않는다).
+ * 기준 시안: .playwright-mcp/directions-dark/direction-D2c.html. 시안에 값이 있는 토큰은 그대로 옮겼고,
+ * 시안에 없는 shadcn 토큰(card-foreground, secondary, accent, sidebar 등)은 가장 가까운 시안 토큰과 같은 값으로 맞췄다.
+ * 이전(밝은 shadcn 기본) 값은 이 블록 아래 주석으로 남긴다. 서비스 고유 토큰(제공 상태 등)은 styles/tokens.css에 있다.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: oklch(0.125 0.035 264); /* 거의 검정에 가까운 남청색. 순흑은 흰 글자가 번져 보여 피한다 */
+  --foreground: oklch(0.96 0.006 258); /* 거의 흰색(순백 아님). 바탕 대비 약 18:1 */
+  --card: oklch(0.175 0.04 264); /* 바탕과 밝기 차가 작아 카드는 테두리(--border)로 면을 나눈다 */
+  --card-foreground: oklch(0.96 0.006 258); /* 시안에 없음: --foreground와 같게 */
+  --popover: oklch(0.175 0.04 264);
+  --popover-foreground: oklch(0.96 0.006 258); /* 시안에 없음: --foreground와 같게 */
+  --primary: oklch(0.79 0.09 230); /* 강조색: 차분한 하늘색 */
+  --primary-foreground: oklch(0.15 0.035 264);
+  --secondary: oklch(0.225 0.045 264); /* 시안에 없음: --muted와 같게 */
+  --secondary-foreground: oklch(0.96 0.006 258);
+  --muted: oklch(0.225 0.045 264);
+  --muted-foreground: oklch(0.77 0.025 258); /* muted 위 약 8.28:1 */
+  --accent: oklch(0.225 0.045 264); /* 시안에 없음: --muted와 같게(shadcn에서 hover 바탕으로 쓰인다) */
+  --accent-foreground: oklch(0.96 0.006 258);
+  /* 어두운 바탕 위 오류 글자·아이콘용 밝은 빨강. 흰 글자를 올리는 토스트 바탕은 --destructive-solid(tokens.css) */
+  --destructive: oklch(0.76 0.12 22);
+  /*
+   * 붉은 바탕(--destructive-solid, tokens.css) 위에 올리는 글자·아이콘 색. 오류 토스트(app/providers.tsx)에서 쓴다.
+   * shadcn 4 기본 토큰에는 이 짝이 없어 Task 025에서 추가했다. 흰색과 --destructive-solid(약 #e7000b)의 대비는 약 4.77:1로
+   * WCAG AA 본문 기준(4.5:1)을 넘는다. 회색빛 흰색(0.985)은 4.56:1로 기준에 너무 붙어 순백을 쓴다.
+   * Task 026에서 --destructive가 밝은 빨강으로 바뀌어(그 위에 흰 글자를 올리면 대비가 모자란다) 짝을 --destructive-solid로 옮겼다.
+   */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.28 0.045 264); /* 장식용 구분선(카드 테두리 등) */
+  --input: oklch(0.54 0.04 258); /* 입력창 테두리. "여기에 입력한다"는 정보라 카드 위 3:1 이상(약 3.76:1) */
+  --ring: oklch(0.79 0.09 230); /* 키보드 포커스 표시(--primary와 같은 하늘색) */
+  /* 차트 색은 아직 쓰는 곳이 없어 shadcn 기본값 그대로 둔다(Task 037에서 정한다) */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+  /* 사이드바는 아직 쓰지 않는다. 시안에 없어 카드·강조색과 같은 값으로 맞췄다 */
+  --sidebar: oklch(0.175 0.04 264);
+  --sidebar-foreground: oklch(0.96 0.006 258);
+  --sidebar-primary: oklch(0.79 0.09 230);
+  --sidebar-primary-foreground: oklch(0.15 0.035 264);
+  --sidebar-accent: oklch(0.225 0.045 264);
+  --sidebar-accent-foreground: oklch(0.96 0.006 258);
+  --sidebar-border: oklch(0.28 0.045 264);
+  --sidebar-ring: oklch(0.79 0.09 230);
+  /* 스크롤바·입력창 같은 브라우저 기본 부품도 어둡게 그린다(MDN color-scheme). 어두운 테마만 있어 dark 하나만 둔다 */
+  color-scheme: dark;
 }
+
+/*
+ * Task 025까지 쓰던 밝은 shadcn 기본값. 참고용으로 남긴다.
+ * --background: oklch(1 0 0); --foreground: oklch(0.145 0 0); --card: oklch(1 0 0); --card-foreground: oklch(0.145 0 0);
+ * --popover: oklch(1 0 0); --popover-foreground: oklch(0.145 0 0); --primary: oklch(0.205 0 0);
+ * --primary-foreground: oklch(0.985 0 0); --secondary: oklch(0.97 0 0); --secondary-foreground: oklch(0.205 0 0);
+ * --muted: oklch(0.97 0 0); --muted-foreground: oklch(0.556 0 0); --accent: oklch(0.97 0 0);
+ * --accent-foreground: oklch(0.205 0 0); --destructive: oklch(0.577 0.245 27.325); --destructive-foreground: oklch(1 0 0);
+ * --border: oklch(0.922 0 0); --input: oklch(0.922 0 0); --ring: oklch(0.708 0 0); --radius: 0.625rem;
+ * --sidebar: oklch(0.985 0 0); --sidebar-foreground: oklch(0.145 0 0); --sidebar-primary: oklch(0.205 0 0);
+ * --sidebar-primary-foreground: oklch(0.985 0 0); --sidebar-accent: oklch(0.97 0 0);
+ * --sidebar-accent-foreground: oklch(0.205 0 0); --sidebar-border: oklch(0.922 0 0); --sidebar-ring: oklch(0.708 0 0);
+ */
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Geist Variable', sans-serif;
+  /* --font-sans: 'Geist Variable', sans-serif; (Task 026 검수 이전) */
+  /* D2c 시안 글꼴 목록. Pretendard가 못 불러와도 한글이 깨지지 않게 OS 한글 글꼴을 차례로 둔다 */
+  --font-sans:
+    'Pretendard Variable', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR',
+    system-ui, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -70,6 +114,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -93,6 +138,7 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* shadcn 기본 다크 값. 앱은 .dark 클래스를 붙이지 않아 적용되지 않는다. Task 037에서 정리한다 */
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -133,6 +179,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* break-keep: 한글을 글자 단위가 아니라 단어(띄어쓰기) 단위로 줄바꿈한다. wrap-break-word: 긴 영문·주소는 넘치지 않게 강제 줄바꿈 */
+    @apply break-keep wrap-break-word;
+    /* 한글 본문은 줄 간격이 넉넉해야 읽기 편하다(시안 D2c와 같은 1.6) */
+    line-height: 1.6;
   }
   html {
     @apply font-sans;
