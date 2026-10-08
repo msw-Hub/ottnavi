@@ -25,6 +25,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
 | `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
+| `docs/PROJECT_STORY.md` | 프로젝트를 만든 이유(포트폴리오·README·자기소개서·면접용 문구). 사용자가 직접 겪은 경험만 담고 용도별(문단·두 문장·구두)로 다듬어 둠. 근거 문서가 아니다 |
 | `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation은 서비스 목록(`listOttServices`, Task 019) 하나이고 나머지는 Task 031부터 추가된다 |
 | `docs/PHASE1_HUMAN_TASKS.md` | Phase 1의 사람 작업 `[H]` 체크리스트와 완료 기록 |
 | `.claude/rules/backend.md` | `backend/**` 작업 시 자동 로드. Java/Spring 스타일·스택·패키지 구조 |

@@ -733,6 +733,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: H3, R11-1 · 선행: 027~029 · 기한: 2026-10-21(MVP 2주차)
 - 구현 사항
   - [ ] 색·글꼴·간격·모서리 방향 결정(3상태는 색 외 구분 유지), 참고 화면·시안
+  - [ ] Task 025·026에서 임시로 정한 값 확정(이월, 2026-10-09): 오류 토스트의 색 톤(지금 진한 빨강 `--destructive` 바탕+흰 글자, 대안은 연한 빨강 바탕+빨간 테두리·아이콘+검정 글자. 빨간 글자는 대비 기준 미달), 큰 화면 크기(지금 폭 448px·글자 14px), 아이콘 크기(지금 16px), 모바일에서 토스트가 본문 제목을 약 4초 덮는 것을 허용할지(지금은 머리글을 덮지 않도록 위쪽 69px에서 시작), 오류 외 토스트(성공·정보·경고)의 모양
 - 완료 기준
   - V-H: 결정 내용(토큰 값 후보)을 기록했다. 늦어지면 F2 이후 화면을 다시 손봐야 한다(PRD 9절).
 
@@ -741,6 +742,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `src/styles/tokens.css`에 Task 036 결정 반영, 직접 쓴 색 값 점검
   - [ ] shadcn/ui 변형은 variant 또는 `components/common/` 래핑, 키보드 포커스·`alt`·대비 점검
+  - [ ] Task 025·026에서 이월한 정리(2026-10-09): ① 토스트 위치 `offset`이 머리글 높이(57px)를 간격 토큰으로 손수 계산한 값(`providers.tsx`의 `HEADER_HEIGHT`)이라 머리글의 여백·높이·줄 수가 바뀌면 같이 고쳐야 한다 — 값을 공유하는 방법 검토. ② `index.css`의 `--destructive-foreground`는 `:root`(light)에만 있고 `.dark`용 값은 없다 — 다크 모드 도입 시 정의. ③ `Toaster`의 `theme="light"` 고정과 `next-themes`(shadcn `sonner`가 끌고 온 패키지, 지금은 쓰이지 않음) 정리. ④ 붉은 토스트 위의 키보드 포커스 링이 잘 보이는지(sonner 기본 포커스 링 `rgba(0,0,0,0.2)`) 점검. ⑤ 여러 토스트가 쌓일 때의 모양(지금은 같은 id라 1개만 뜸). ⑥ `errorMessages.ts`의 기본 메시지 2개(문서에 없는 코드용, 네트워크 오류용)는 Task 025에서 임의로 정한 문구라 확정. ⑦ Task 026의 임시 토큰(`src/styles/tokens.css`)을 036 결정값으로 교체
 - 완료 기준
   - V-F: SCR-01, 02, 08, 10 스크린샷을 남겼고 콘솔 에러 0건, 3상태가 흑백에서도 구분된다.
 
@@ -757,8 +759,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 관련: TECH 1절(쿠팡플레이 포함 여부는 입력 단계 필터라 엔진은 바뀌지 않음)
 - 구현 사항
   - [ ] `engine/` 순수 Java record: 시청 단위, 상품, 계산 조건, 결과
-  - [ ] 배정 규칙: 우선순위 → 필요 분 짧은 순 → `watchUnitId`, 가장 이른 달부터, 긴 시즌은 연속 커버 달에 분할하고 다 본 달에 점수, 3개월 안에 안 끝나면 미배정
-  - [ ] 커버 규칙(FREE 상시 0원, SUBSCRIBED 이번 달 0원, "모름"은 커버 아님), 목적함수 비교기(must 완주 → 점수 → 총비용 → 상품 ID 집합 사전순), 이유 코드(`NO_PROVIDER` → `UNKNOWN` → `BUDGET` → `TIME`)
+  - [ ] 배정 규칙: 우선순위 → 필요 분 짧은 순 → `watchUnitId`, 가장 이른 달부터, 긴 시즌은 서비스와 상관없이 연속된 달(그 시즌을 덮는 상품이 선택된 달)에 이어서 분할하고 다 본 달에 점수(2026-10-09 결정, 예: 1월 넷플릭스·2월 티빙), 3개월 안에 안 끝나면 미배정
+  - [ ] 커버 규칙(FREE 상시 0원, SUBSCRIBED 이번 달 0원, "모름"은 커버 아님), 목적함수 비교기(must 완주 → 점수 → 총비용 → 결제를 미루는 쪽(이른 달 새로 결제하는 상품이 적은 쪽, 2026-10-09 결정) → 상품 ID 사전순), 이유 코드(`NO_PROVIDER` → `UNKNOWN` → `BUDGET` → `TIME`)
   - [ ] 규칙 구현부에 PRD 5.4 규칙 주석
 - 완료 기준
   - V-B: Spring 컨텍스트 없는 정답 테스트(긴 시즌 분할, 분할 불가, 이유 코드 4종, 동점)가 통과한다.
@@ -805,7 +807,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 관련: TECH 3절, T-2
 - 구현 사항
   - [ ] `collect/` Job 골격과 첫 Step: 서비스별 discover(KR 구독)로 후보 `title` 저장. 처음 본 제공처는 `tmdb_provider`에 `first_seen_at`과 함께 미매핑 저장
-  - [ ] Job 파라미터 `targetDate`(LocalDate) + `tier`. MVP 일괄 수집의 `tier` 값은 문서에 근거가 없어 R-16 결정을 따른다
+  - [ ] Job 파라미터 `targetDate`(LocalDate) + `tier`. MVP 일괄 수집은 **`tier=ALL`**(R-16 확정, `tier`의 뜻은 TECH 3절 설명 참고). 작품의 `title.refresh_tier`(DAILY/WEEKLY)와 Job 파라미터 `tier`가 같은 enum을 공유하는지는 이 Task에서 정한다(공유하지 않으면 `ALL`은 Job 파라미터에만 둔다)
   - [ ] 작은 chunk, 짧은 Feign 타임아웃, 연결 풀 사용량 지표(T-2)
 - 완료 기준
   - V-B: Testcontainers + WireMock으로 작은 discover 응답을 수집했을 때 후보 `title`·`tmdb_provider` 행이 기대값과 같다.
@@ -823,6 +825,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항
   - [ ] `POST /api/admin/collect/run`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
+  - [ ] 관리자 수집 API의 `tier` 파라미터 enum은 `DAILY`·`WEEKLY`·`ALL`이다(R-16 확정). MVP 일괄 수집은 `ALL`을 쓴다. 계약(`openapi.yaml`)과 코드의 enum을 같게 둔다
   - [ ] `targetDate` 직접 지정은 `local` 프로필에서만 허용한다(설정 키 제안: `app.collect.allow-target-date-override`, local만 `true`). 운영(`prod`)에서 지정하면 거부(제안: 400 `VALIDATION_FAILED`)하고 서버 날짜를 쓴다. 같은 날 409를 피해 재수집을 재현하는 용도다(Task 067, 069)
   - [ ] 복구 `POST /api/admin/collect/{executionId}/recover`(제안): `recover` 후 `restart`
   - [ ] 이력 조회: `BATCH_*` 읽기 전용(시작·종료, 성공/실패, 처리 건수, 실패 사유)
@@ -861,11 +864,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다.
 
 #### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ⬜
-- 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · 기한 전제: R11-12(2026-10-15) · 브랜치: `feature/b4-rate-limit`
+- 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · R11-12 확정(2026-10-09) · 브랜치: `feature/b4-rate-limit`
 - 구현 사항
-  - [ ] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 `x-real-ip` 우선·없으면 `x-forwarded-for` 첫 값(Task 021 기록 반영)
+  - [ ] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
   - [ ] 일반 공개 버킷(fail-open, 인증 경로 `/api/auth/**`·`/api/oauth2/**`·`/api/login/**`도 적용, backend.md), 단건 수집 검색 버킷(fail-closed, 더 낮은 한도)
-  - [ ] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키, R11-12 전에는 사용자가 정한 잠정값
+  - [ ] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키(`app.rate-limit.*`), **R11-12 확정값: 일반 버킷 IP당 분당 60회, 단건 수집 검색 버킷 IP당 분당 10회**(순간 몰림 허용량은 한도의 약 1/3). 단건 수집 검색 버킷이 더 낮은 이유는 TECH 3절 "TMDB는 언제 호출하나". 요청 1건이 쓰는 Redis 연산 수는 구현 후 측정한다(Redis Cloud 무료 초당 100 ops를 캐시와 나눠 씀)
 - 완료 기준
   - V-B: 한도 초과·IP 헤더 우선순위·fail-open/closed 테스트가 통과한다. V-API: 반복 호출 시 429와 `errorCode`.
 
@@ -908,13 +911,13 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 로컬에서 Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착 → RT 쿠키 생성을 브라우저로 확인했다.
 
 #### Task 054: 토큰 재발급·로그아웃과 관리자 권한 분리 구현으로 인증 수명주기 완성 ⬜
-- 태그: [B] · PRD: B5, FR-06, 17 · 선행: 053 · 기한 전제: R11-21(2026-10-22) · 브랜치: `feature/b5-token-refresh`
+- 태그: [B] · PRD: B5, FR-06, 17 · 선행: 053 · R11-21 확정(2026-10-09) · 브랜치: `feature/b5-token-refresh`
 - 구현 사항
   - [ ] `POST /api/auth/refresh`(RT 검증 → 새 AT, RT 회전 14일), `POST /api/auth/logout`(폐기·쿠키 삭제). 두 경로에 `Origin` = `APP_FRONTEND_ORIGIN` 검사
-  - [ ] `RefreshTokenStore` 인터페이스와 두 구현(Redis TTL / 서명 검증만), R11-21로 선택
-  - [ ] `/api/admin/**`는 ADMIN 역할 필요, 배치 토큰 경로는 토큰 또는 ADMIN. 로컬·테스트에서는 DB에서 `users.role`을 직접 바꿔 ADMIN을 만든다. 운영 지정 방법은 R-5(Task 095 전 결정, 대안이 채택되면 이 Task 범위에 구현 추가)
+  - [ ] `RefreshTokenStore` 인터페이스와 **Redis TTL 구현**(R11-21 확정: RT는 해시로 저장, 재발급 때 회전, 이미 쓴 RT가 다시 쓰이면 해당 계열 무효화). 서명 검증만 하는 구현은 만들지 않는다. 알려진 한계(Redis가 비워지면 모든 사용자가 다시 로그인)는 TECH 4절
+  - [ ] `/api/admin/**`는 ADMIN 역할 필요, 배치 토큰 경로는 토큰 또는 ADMIN. 로컬·테스트에서는 DB에서 `users.role`을 직접 바꿔 ADMIN을 만든다. 운영 지정 방법은 R-5(2026-10-09 **DB 직접 수정으로 확정**, 이 Task에 구현이 늘지 않는다. 절차는 Task 095 ②)
 - 완료 기준
-  - V-B: RT 회전(Redis 방식일 때 이전 RT 거부), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/run` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
+  - V-B: RT 회전(이전 RT 거부, 이미 쓴 RT 재사용 시 계열 무효화), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/run` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
   - V-API: refresh·logout 호출을 확인했다.
 
 #### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ⬜
@@ -928,11 +931,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: 사용자 격리, 필수값 400, 비로그인 401 테스트가 통과한다. V-API: 저장 후 조회가 일치한다.
 
 #### Task 056: 찜·우선순위·시청 체크 API 구현으로 계산 대상 관리 ⬜
-- 태그: [B] · PRD: B5, FR-09, R11-19 · 선행: 055, 051 · 기한 전제: 찜 상한 잠정값(2026-10-15) · 브랜치: `feature/b5-wishlist`
+- 태그: [B] · PRD: B5, FR-09, R11-19 · 선행: 055, 051 · 찜 상한 잠정값 30 확정(2026-10-09) · 브랜치: `feature/b5-wishlist`
 - 구현 사항
   - [ ] `/api/wishlist-items` 추가·삭제·목록, 우선순위 변경, "다 봤음"(`watched_at`) 토글. 중복 추가 무시, 드라마는 R11-19 결정 단위
   - [ ] 목록: 필요 시간·추정, 서비스별 상태, "이미 시청 가능"
-  - [ ] 찜 상한(사용자가 정한 잠정값) 초과 시 오류(코드는 R-9 절차로 등록). `refresh_tier` 갱신은 Task 077에서 한다
+  - [ ] 찜 상한(**잠정값 30개**, 시청 단위 기준이라 드라마는 시즌마다 1개. 설정 키로 두고 측정 후 조정, R11-30) 초과 시 오류(코드는 R-9 절차로 등록). `refresh_tier` 갱신은 Task 077에서 한다
 - 완료 기준
   - V-B: 다른 사용자 찜 차단, 중복 무시, 상한 테스트. V-API: 시즌 찜과 다 봤음 토글.
 
@@ -1279,7 +1282,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: B8·F8, MVP 완료 기준 ①~④ · 선행: 093, 094, 052, 061, 065, 067, 037
 - 구현 사항(이 순서로 진행)
   - [ ] ① `develop` → `main` PR merge commit, `backend-deploy.yml`·Vercel Production 성공 확인(Task 093 이관분). 병합 전 `openapi.yaml`에 `x-planned`가 남아 있지 않음을 확인(4.2)
-  - [ ] ② 운영 ADMIN 지정. R-5 추천안(첫 로그인 후 DB에서 `users.role` 직접 수정)이지만 확정이 아니며, 이 Task 전까지 사용자가 정한다
+  - [ ] ② 운영 ADMIN 지정(R-5 확정, 2026-10-09): 운영 관리자는 **2명**(본인 계정과 포트폴리오 평가용 계정)이고 **DB에서 `users.role`을 직접 수정**한다. 순서: 그 사람이 Google로 **한 번 로그인**해 `users` 행이 생기게 한 뒤 `UPDATE users SET role = 'ADMIN' WHERE email = '해당 이메일'`을 실행하고(README에 이 SQL을 기록) 다시 로그인한다. 주의: 평가용 계정에 ADMIN을 주면 상품 가격 수정·수집 실행·제공처 매핑 변경으로 운영 데이터를 바꿀 수 있으니 평가 전에 가격표(Task 004)를 백업해 두고 확인한다. 평가자의 Google 이메일이 `users`에 저장되므로 개인정보 안내(About)와 탈퇴 정책과 일관되게 처리한다. 읽기 전용 관리자 역할은 지금 만들지 않고, 필요해지면 `role` 값을 추가한다
   - [ ] ③ 관리자 화면(SCR-14)으로 운영 상품·가격 입력(Task 004 가격표)
   - [ ] ④ 첫 운영 수집 적재(R-14 확정): `collect.yml` `workflow_dispatch` 202·재실행 409(Task 047 이관분), SCR-16에서 완료·처리 건수 확인. 다음 날 cron 실행 기록 확인
   - [ ] ⑤ 스모크: V-DEPLOY 전체(인증, 기능, 헤더·경로)와 요청 제한 429, 주요 화면 로드(Task 094에서 넘긴 화면 확인)
@@ -1377,16 +1380,10 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 | 항목 | 내용 | 기한 | 막히는 Task |
 |---|---|---|---|
-| R-12 | Cloudtype 배포 방식·토큰 이름 | **2026-10-12** (Task 020) | 020, 021 |
-| R11-12 | 비로그인 요청 한도(일반, 단건 수집 검색). 추천안(PRD, 미확정): 두 단계로 나누고 Redis Cloud 초당 100 ops 반영. 수치는 사용자가 정한다 | **2026-10-15** (B4 전) | 049 |
-| R11-30(일부) | 찜 상한 잠정값. 최종 확정은 측정 후(Task 100). 수치는 사용자가 정한다 | **2026-10-15** | 056 |
-| R-16 | MVP 일괄 수집의 `tier` 파라미터 값 | **2026-10-15** | 043 |
-| R11-21 | Refresh Token 서버 측 저장(Redis TTL vs 서명 검증만) | **2026-10-22** (B5 전) | 054 |
 | R11-13 | 쿠팡플레이를 계산 입력에 포함할지(입력 단계 필터, TECH 1절) | **2026-10-29** (계산 입력 전) | 063 |
 | R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **2026-10-29** | 066, 073 |
-| R-5 | 운영 ADMIN 역할 지정 방법. 추천안(미확정): DB 직접 수정. 대안(환경 변수 관리자 이메일 목록)이 채택되면 Task 054에 구현이 늘어나므로 054 착수(2026-10-22) 전에 정하는 편이 안전하다 | **2026-11-04** (Task 095 전) | 095 (대안 채택 시 054) |
 
-해소되어 이 표에서 뺀 항목: R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정), R11-11(Cloudtype SMTP 발신 가능 여부, 2026-10-09 Task 022 시험 성공으로 SMTP(Gmail) 채택 확정), R-17(Vercel `vercel.json` 미리보기 배포 성공, Task 014에서 확인). 10.3 참고.
+해소되어 이 표에서 뺀 항목: R-12(Cloudtype 배포 방식: 저장소 연결 + 콘솔 수동 배포, Task 020 기록), R11-12(비로그인 요청 한도: 일반 IP당 분당 60회·단건 수집 검색 IP당 분당 10회, 2026-10-09 사용자 결정), R11-30의 찜 상한 잠정값(30개, 2026-10-09 사용자 결정. 나머지 상한은 측정 후, 10.2), R-16(MVP 일괄 수집의 `tier`는 새 값 `ALL`, TECH 3절 설명 참고, 2026-10-09), R11-21(Refresh Token은 Redis TTL에 해시로 저장·회전·재사용 감지, 2026-10-09), R-5(운영 ADMIN은 가입 후 DB에서 `users.role` 직접 수정, 2026-10-09), R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정), R11-11(Cloudtype SMTP 발신 가능 여부, 2026-10-09 Task 022 시험 성공으로 SMTP(Gmail) 채택 확정), R-17(Vercel `vercel.json` 미리보기 배포 성공, Task 014에서 확인). 10.3 참고.
 
 ### 10.2 PRD 11절 결정 필요·작업 중·보류 항목
 
@@ -1394,7 +1391,6 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 
 | 번호 | 항목 | 분류 | 결정 시점(제안) | 관련 Task |
 |---|---|---|---|---|
-| R11-12 | 비로그인 요청 한도 | 결정 필요 | 2026-10-15 | 049 |
 | R11-13 | 쿠팡플레이 계산 포함 여부 | 결정 필요 | 2026-10-29 | 063 |
 | R11-14 | SCR-06·07 화면 통합(18개 화면) | 결정 필요 | 2026-10-14 (F1 승인) | 030 |
 | R11-15 | SCR-05 정적 콘텐츠 여부 | 결정 필요 | 2026-11-19 | 089 |
@@ -1403,7 +1399,6 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R11-18 | "주 N회 × 회당 M시간" 환산 입력 저장(ERD 필드 없음) | 결정 필요 | 2026-10-14 (F1 승인) | 030, 032, 055, 058 |
 | R11-19 | 드라마 찜 단위(시즌 vs 작품) | 결정 필요 | 2026-10-14 (F1 승인) | 030, 032, 056 |
 | R11-20 | 시즌 0 미수집의 화면 안내 | 결정 필요 | 2026-10-14 (F1 승인) | 030 |
-| R11-21 | Refresh Token 저장 방식 | 결정 필요 | 2026-10-22 | 054 |
 | R11-22 | FR-15에 SUBSCRIBE_GUIDE 포함 | 결정 필요 | 2026-11-05 | 073 |
 | R11-23 | 제공처 매핑 관리 별도 FR 없음(FR-18 흡수) | 결정 필요 | 2026-10-22 (F6 전) | 046, 061 |
 | R11-24 | SCR-16 알림 상태는 2단계부터(재계산 대상 플랜 수도 2단계 Task 069·070에서 채움) | 결정 필요 | 2026-10-22 (F6 전) | 061, 070, 071, 074 |
@@ -1411,7 +1406,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R11-26 | TV 시즌 호출량과 배치 분할 | 작업 중 | 첫 전체 수집 후(2026-10-21) | 043, 044, 048 |
 | R11-28 | QueryDSL 도입 시 Boot 4.1·Hibernate 7 호환 버전 | 보류 | 도입 시점 | — |
 | R11-29 | 계산·공개 조회 응답 시간 목표 | 보류 | k6 측정 후 | 100 |
-| R11-30 | 예산·찜 상한, 그리디 전환 후보 수 상한 | 보류(잠정값은 10.1) | 엔진·k6 측정 후 | 039, 040, 056, 076, 100 |
+| R11-30 | 예산·찜 상한, 그리디 전환 후보 수 상한 | 보류(찜 상한 잠정값 30개는 2026-10-09 확정, 나머지는 측정 후) | 엔진·k6 측정 후 | 039, 040, 056, 076, 100 |
 | R11-31 | 재현율 측정 | 보류 | 3단계 | 103 |
 | R11-32 | 쿠팡플레이·웨이브·왓챠 표본 추가 | 보류 | 3단계 | 103 |
 | T-9 | 오래된 DRAFT 판정 기준 개선 | 결정 필요(2단계 후보) | 2026-11-05 | 091 |
@@ -1425,7 +1420,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-2 | backend.md가 RT Redis 저장·Gmail SMTP를 확정처럼 적음 | **해소(2026-10-03)**: backend.md가 "잠정 기준, 확정은 R11-21·R11-11"로 갱신됨 | backend.md | — |
 | R-3 | 오리진 비밀 헤더 주입 방법 | **해소(2026-10-03)**: `vercel.json` `routes[].transforms`(TECH T-8 ①). 적용 순서 실측은 Task 021 `기록:` | TECH T-8 | — |
 | R-4 | cron이 백엔드에 닿는 경로 | **해소(2026-10-03)**: Cloudtype 직접 호출 + `x-origin-secret`·`ADMIN_BATCH_TOKEN`(TECH 3절). Task 047 | TECH 3절 | — |
-| R-5 | 운영 ADMIN 역할 지정 방법이 문서에 없다. 추천안(미확정): 관리자 1명이므로 첫 로그인 후 DB에서 `users.role`을 직접 수정하고 SQL을 README에 기록. 대안: 환경 변수 관리자 이메일 목록으로 로그인 시 부여. 로컬·테스트는 DB 직접 수정으로 진행(Task 054). Task 095 ②단계에서 적용 | 미결(추천안) | FR-17, ERD `users.role` | 2026-11-04 (Task 095 전) |
+| R-5 | 운영 ADMIN 역할 지정 방법이 문서에 없다. 추천안(미확정): 관리자 1명이므로 첫 로그인 후 DB에서 `users.role`을 직접 수정하고 SQL을 README에 기록. 대안: 환경 변수 관리자 이메일 목록으로 로그인 시 부여. 로컬·테스트는 DB 직접 수정으로 진행(Task 054). Task 095 ②단계에서 적용 | **해소(2026-10-09, 사용자 결정)**: DB 직접 수정으로 확정(운영 관리자는 2명: 본인 계정과 포트폴리오 평가용 계정). 환경 변수 이메일 목록은 만들지 않는다. 절차와 주의는 Task 095 ② | FR-17, ERD `users.role` | 2026-11-04 (Task 095 전) |
 | R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부(TECH 2절 4번 vs PRD 9절 알림 미룸). 추천안(미확정): MVP에서는 만들지 않고 Task 073에서 추가. 발송기 없이 쌓인 행이 2단계 배포 때 한꺼번에 나가는 것을 막기 위함 | 미결 | TECH 2절 vs PRD 9절 | 2026-10-29 |
 | R-7 | api-contract.md `tags`에 인증·알림 태그 없음 | **해소**: `auth`, `notification` 추가됨 | api-contract.md | — |
 | R-8 | 인증 경로가 backend.md 3분류에 걸림 | **해소**: backend.md·api-contract.md가 인증 경로를 3분류의 예외로 명시 | backend.md, api-contract.md | — |
@@ -1435,7 +1430,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | **해소(2026-10-06, 사용자 결정)**: 저장소 연결 + Cloudtype 콘솔 수동 배포. GitHub Actions 배포와 Cloudtype 토큰은 당분간 쓰지 않는다(Task 020 `기록:`) | git.md | 2026-10-12 |
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
 | R-15 | SMTP 시험(Task 022)의 Cloudtype 배포 방법 | **해소(2026-10-03, 사용자 결정)**: 병합하지 않는 시험 브랜치를 일회성 Cloudtype 서비스로 배포해 시험하고 삭제. 무료 플랜 서비스 추가 가능 여부는 Task 003에서 먼저 확인. Task 022 선행에 003·006·016 추가 | git.md, R11-11 | — |
-| R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | 미결 | PRD 5.5, TECH 3절 | 2026-10-15 |
+| R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | **해소(2026-10-09, 사용자 결정)**: 새 값 **`ALL`**을 추가한다(`DAILY`·`WEEKLY`로 표기하면 이름과 실제가 달라 헷갈림). `tier`의 뜻은 TECH 3절에 기록. 계약(Task 045)의 `tier` enum에 `ALL`을 넣고, Job 파라미터 `tier`와 `title.refresh_tier`가 같은 enum을 공유하는지는 Task 043에서 정한다 | PRD 5.5, TECH 3절 | 2026-10-15 |
 | R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` **2026-10-05 실측(Task 014)**: 미리보기 배포(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)가 `routes` 단일 형식 `vercel.json`으로 설정 오류 없이 만들어졌고(`Build Completed`, `Deployment completed`), `ORIGIN_SECRET` 환경 변수가 아직 없어도 배포가 실패하지 않았다. 루트 페이지가 열리고 `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 `/api` 프록시 규칙이 SPA 대체보다 먼저 적용되는 것을 확인했다. 혼용 여부는 시험하지 않았다. 프록시·헤더 주입의 실제 동작은 Task 021 | 확인됨(Task 014, 2026-10-05) | TECH 6절·T-8 | 2026-10-07 |
 | R-18 | LLM 초안 저장 위치. ERD(24개 테이블)에 초안 테이블이 없다. Redis(TTL) 또는 ERD 추가 중 선택 필요. ERD 추가로 정하면 ERD 수정과 Flyway 마이그레이션이 Task 087 범위에 들어간다 | 미결 | PRD SCR-18, ERD | 2026-11-19 |
 | R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인 필요 | 미결 | FR-18, TECH 2절 | 2026-11-05 |

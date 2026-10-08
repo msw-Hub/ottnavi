@@ -15,15 +15,15 @@
 
 계산 규칙의 정의는 R 5.4(FR-12)가 기준이다. `ExactSolver`와 `GreedySolver`는 `PlanSolver` 하나를 구현하고(rules), 배정 규칙과 비교기는 공유한다. 두 구현의 차이는 "구독 조합을 고르는 방법"뿐이다.
 
-**목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 상품 ID 집합 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
+**목적함수 비교(사전식).** ① `mustCompleted` 큰 쪽 → ② `score`(WANT 2, MAYBE 1) 큰 쪽 → ③ `totalCost` 작은 쪽 → ④ 모두 같으면 **결제를 미루는 쪽**(달 0→1→2 순서로 그 달에 **새로 돈이 드는 상품 수**를 비교해 먼저 다른 달에서 적은 쪽, FREE와 이번 달 이미 낸 SUBSCRIBED는 세지 않음. 2026-10-09 사용자 결정: 되돌릴 수 없는 결제를 늦추는 쪽이 매월 재계산하는 롤링 계획과 맞는다) → ⑤ 그래도 같으면 달별 상품 ID 사전순(도출: 정답 테스트를 결정적으로 만들기 위해).
 
 **배정 규칙(고정).**
 - 정렬: 우선순위 높은 순 → 필요 분 짧은 순 → `watchUnitId` 순(마지막 기준은 도출).
-- 볼 수 있는 가장 이른 달부터 남은 시청 시간에 채운다. 한 달보다 긴 시즌은 같은 서비스가 연속 커버되는 달에 나눠 배정하고 다 본 달에 점수를 준다. 3개월 안에 끝나지 않으면 배정하지 않는다(도출).
+- 볼 수 있는 가장 이른 달부터 남은 시청 시간에 채운다. 한 달보다 긴 시즌은 그 시즌을 덮는 상품이 선택된 **연속된 달**에 서비스와 상관없이 이어서 나눠 배정하고(예: 1월 넷플릭스, 2월 티빙, 2026-10-09 사용자 결정) 다 본 달에 점수를 준다. 달마다 어느 상품으로 본 분량인지를 기록하고(같은 달에 덮는 상품이 둘이면 ID가 작은 쪽), 월 시청 가능 시간은 서비스와 무관하게 그 달 전체에서 센다. 3개월 안에 끝나지 않으면 배정하지 않는다(도출).
 - 번들은 상품 하나로 다루고 "모름"은 커버로 세지 않는다(R). 쿠팡플레이 포함 여부(R11-13)는 입력 단계 필터로 받아 엔진은 바뀌지 않는다.
 
 **정확해 → 그리디 전환.**
-- 정확해: 달마다 예산 이하 상품 부분집합을 만들고, 지배 조합(비용이 같거나 높은데 커버 집합이 부분집합인 것, FREE 서비스만 추가 커버하는 것)을 제거한 뒤 3개월을 중첩 순회한다. MVP(STANDARD 단품 7개)는 달마다 최대 128, 3개월 최대 약 210만 평가이고, 평가 1회는 O(n log n)이다. 2단계에서 상품 수 P가 늘면 2^P로 커진다.
+- 정확해: 달마다 예산 이하 상품 부분집합을 만들고, 지배 조합(비용이 같거나 높은데 커버 집합이 부분집합인 것, FREE 서비스만 추가 커버하는 것)을 제거한 뒤(단, 비용·커버가 같으면 새 결제 상품 수가 적은 쪽을 남겨 결제 미루기 ④를 보존한다) 3개월을 중첩 순회한다. MVP(STANDARD 단품 7개)는 달마다 최대 128, 3개월 최대 약 210만 평가이고, 평가 1회는 O(n log n)이다. 2단계에서 상품 수 P가 늘면 2^P로 커진다.
 - 그리디: 0번째 달부터 앞선 달을 고정하고 목적함수 증가가 가장 큰 조합 하나를 고른다(R 5.4).
 - 전환: 정확해 기본, **후보 조합 수가 상한을 넘으면 그리디**로 대체한다(T-4 확정). 상한 값은 R11-30 측정 후 정한다. 선택된 알고리즘은 `plan.algorithm`에 남는다(E).
 - 이유 코드는 `NO_PROVIDER` → `UNKNOWN` → `BUDGET`(그 서비스가 어느 달에도 선택되지 않음, 도출) → `TIME`(선택된 달은 있으나 시간 부족, 도출) 순으로 첫 번째로 맞는 것을 쓴다.
@@ -67,7 +67,9 @@ stateDiagram-v2
 
 **비동기 202와 중복 실행 409.**
 - 관리자 실행 API는 `TaskExecutor`를 가진 `JobOperator`로 Job을 비동기 시작하고 즉시 **202 + `jobExecutionId`**를 반환한다(c7 Batch 6). Cloudtype HTTP 타임아웃(프리티어 1분, 하비 5분)과 무관하게 동작한다(T-6 종결).
-- 식별 파라미터는 `targetDate`(LocalDate) + `tier`(DAILY/WEEKLY)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
+- 식별 파라미터는 `targetDate`(LocalDate) + `tier`(`DAILY`/`WEEKLY`/`ALL`)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
+- **`tier`란(R-16 확정, 2026-10-09 — 나중에 헷갈리지 않도록 기록).** 갱신 주기는 두 종류다. 사용자가 **찜한 작품**은 정보가 바뀌면 바로 반영돼야 해서 **매일(`DAILY`)**, 아무도 찜하지 않은 **나머지 후보 작품**은 TMDB 호출을 아끼려고 **주 1회(`WEEKLY`)** 갱신한다. 이 등급이 tier이고 작품마다 `title.refresh_tier`로 붙는다(ERD). 수집 Job은 "이번에 어느 등급을 수집하나"를 Job 파라미터 `tier`로 받고, `날짜 + tier`가 같은 실행인지(중복인지)를 가르는 키다. 예를 들어 "10월 9일의 DAILY 수집"과 "10월 9일의 WEEKLY 수집"은 서로 다른 실행이다. **MVP는 등급을 나누지 않고 전체를 한 번에 일괄 수집하므로 새 값 `ALL`을 쓴다**(`DAILY`·`WEEKLY`로 표기하면 이름과 실제가 달라 헷갈리기 때문). 2단계(O3, Task 077)에서 등급별 갱신을 도입할 때 `DAILY`·`WEEKLY` 실행을 추가한다. 영향: 관리자 수집 API(Task 045)의 `tier` 파라미터 enum에 `ALL`을 넣고(계약), 확인할 것은 Job 파라미터 `tier`와 `title.refresh_tier`가 같은 enum을 공유하는지다(별개 개념으로 보이며 Task 043 구현 때 정한다. 공유하지 않으면 `ALL`은 Job 파라미터에만 있다).
+- **TMDB는 언제 호출하나(요청 제한 버킷을 두 개로 나눈 이유 — 기록).** 평소 사용자 요청은 **우리 DB를 읽을 뿐 TMDB를 호출하지 않는다.** TMDB 호출은 두 경우뿐이다. ① **수집 배치**(서버가 정한 시간에 자동, 속도를 서버가 조절) ② **단건 수집**(사용자가 검색했는데 DB에 없는 작품이면 그 순간 TMDB에서 가져와 저장, FR-01). ②는 익명 사용자가 일으킬 수 있는 TMDB 호출이라 TMDB 한도(초당 약 40회)를 배치와 나눠 쓰는 문제가 생기므로, 공개 요청 제한에 **단건 수집 검색 버킷을 일반 버킷보다 낮게** 따로 둔다(R11-12 확정: 일반 IP당 분당 60회, 단건 수집 IP당 분당 10회). 일반 버킷은 서버·Redis를 보호하는 용도다. 한 번 저장된 작품은 이후 DB에서 바로 나오므로 다시 단건 수집하지 않는다.
 - GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
 
 **중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(예: `POST /api/admin/collect/{executionId}/recover`, 제안).
@@ -113,7 +115,7 @@ sequenceDiagram
 
 - 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다. Cloudtype이 `X-Forwarded-Host`를 통과시키는 것으로 관찰됐으므로(Task 020 실험, 1회) 템플릿 대신 **`OAUTH2_REDIRECT_BASE_URL` 고정**을 쓴다(도출).
 - **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
-- RT 서버 측 저장은 R11-21 미결정이다. `RefreshTokenStore` 인터페이스로 "Redis 저장 + 회전·폐기"와 "서명 검증만" 구현을 교체 가능하게 둔다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
+- **RT 서버 측 저장(R11-21 확정, 2026-10-09)**: **Redis(TTL)에 해시로 저장**하고 재발급 때 **회전**(새 RT 발급, 이전 RT 폐기), 이미 쓴 RT가 다시 쓰이면(**재사용 감지**) 해당 계열을 무효화한다. 서명 검증만 하는 방식은 한 번 발급한 RT를 만료 전에 무효화할 수 없고 회전의 재사용 감지도 못 하므로 택하지 않았다(Auth0 등 refresh token rotation 문서, 2차 자료). `RefreshTokenStore` 인터페이스는 유지해 저장소를 교체할 수 있게 둔다(예: PostgreSQL 구현). **알려진 한계**: ① Redis Cloud 무료는 영속성이 없다. 메모리가 차서 `allkeys-lru`가 키를 지우면 **그 키의 사용자만** 다시 로그인하고, 14일 동안 접속이 없어 DB가 삭제되거나 Redis가 통째로 사라지면(Task 003·020 기록) **모든 사용자**가 다시 로그인해야 한다. ② 무료 플랜은 TLS를 쓸 수 없어(Task 003 기록, 2026-10-06 사용자 확인) Cloudtype → Redis Cloud 구간이 **평문**이다. 그래서 RT 상태가 평문 구간을 지나는데, 저장하는 값은 RT의 **해시**라 중간에서 엿봐도 쿠키로 재생할 수 없고 RT 원문은 이 구간을 지나지 않는다(원문은 브라우저 쿠키와 서버 메모리에서만 다룸). TLS는 TLS를 지원하는 유료 플랜으로 옮기거나 PostgreSQL 구현으로 교체할 때 해결한다(유료 전환 시점에 결정). 규모가 작아 수용하고, 사용자가 늘어 불편해지면 PostgreSQL 구현으로 바꾼다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
 - 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
 - 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출).
 
