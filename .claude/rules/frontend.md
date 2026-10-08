@@ -84,7 +84,7 @@ paths:
   - 위치: `features/{기능}/mockTypes.ts` 한 파일에만 둔다(제거할 때 한 번에 찾기 위함).
   - 표시: 타입마다 `// 임시: 계약 반영 후 생성 타입으로 교체` 주석을 단다.
   - 이미 계약에 있는 API(예: 서비스 목록)는 처음부터 생성 타입을 쓴다.
-  - 제거: 계약이 반영되는 Task(MVP는 Task 031, 2단계 이후 기능은 해당 기능의 "실제 API 교체" Task)에서 생성 타입으로 바꾸고 `mockTypes.ts`를 지운다. 이 Task의 완료 조건은 해당 기능에 `mockTypes.ts`가 남지 않는 것이다(`Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src`로 확인).
+  - 제거: 계약이 반영되는 Task(MVP는 Task 031, 2단계 이후 기능은 해당 기능의 "실제 API 교체" Task)에서 생성 타입으로 바꾸고 `mockTypes.ts`를 지운다. 이 Task의 완료 조건은 해당 기능에 `mockTypes.ts`가 남지 않는 것이다. 확인은 범위를 구분한다: 2단계 이후 기능은 해당 기능 폴더만(`Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src/features/{기능}`), MVP의 Task 031은 MVP 기능 전체가 대상이라 `frontend/src` 전체(`Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src`)가 비어 있어야 한다. 아직 계약에 반영되지 않은 다른 기능의 `mockTypes.ts`는 남아 있어도 된다.
   - 이 예외는 `mockTypes.ts`에만 적용한다. 컴포넌트·훅에서 API 응답 타입을 따로 손으로 만들지 않는다.
 - **환경변수**: 비밀 값은 프론트에 두지 않는다. `VITE_` 접두사 변수는 브라우저에 노출되므로 공개해도 되는 값(목업 사용 여부 `VITE_USE_MOCK` 등)만 둔다.
 
