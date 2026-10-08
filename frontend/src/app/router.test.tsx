@@ -34,6 +34,19 @@ const ROUTE_TABLE = [
   { pattern: '/*', url: '/no-such-page', heading: '페이지를 찾을 수 없음' }, // 404
 ]
 
+/*
+ * 개발 모드에서만 등록되는 확인용 화면(app/router.tsx의 DEV_ONLY_ROUTES). 운영 화면이 아니라 위 경로표와 나눠 적는다.
+ * Vitest는 개발 모드(import.meta.env.DEV = true)로 돌아 이 경로도 등록되므로, DEV일 때만 경로표에 합쳐 비교한다.
+ * 이렇게 하면 ① 확인용 화면이 실제로 그려지는지도 함께 검사하고 ② 운영 화면 경로표는 그대로 유지된다.
+ */
+const DEV_ROUTE_TABLE = [
+  { pattern: '/__dev/components', url: '/__dev/components', heading: '공통 컴포넌트 확인' }, // Task 026
+]
+
+const EXPECTED_ROUTE_TABLE = import.meta.env.DEV
+  ? [...ROUTE_TABLE, ...DEV_ROUTE_TABLE]
+  : ROUTE_TABLE
+
 // 라우트 설정을 따라 내려가며 "화면이 그려지는 끝 라우트(자식 없음)"의 전체 경로 패턴을 모은다.
 // 경로 없는 부모(가드·오류 경계)는 경로를 더하지 않고, index 라우트는 부모 경로를 그대로 쓴다.
 function collectLeafPatterns(routeObjects: RouteObject[], parentPath = ''): string[] {
@@ -60,12 +73,17 @@ function renderAt(url: string) {
 
 describe('라우터 경로표', () => {
   it('라우터에 등록된 화면 경로가 경로표와 정확히 같다', () => {
-    expect(collectLeafPatterns(routes).sort()).toEqual(ROUTE_TABLE.map((row) => row.pattern).sort())
+    expect(collectLeafPatterns(routes).sort()).toEqual(
+      EXPECTED_ROUTE_TABLE.map((row) => row.pattern).sort(),
+    )
   })
 
-  it.each(ROUTE_TABLE)('$url 주소가 "$heading" 화면을 그린다', async ({ url, heading }) => {
-    renderAt(url)
-    // 페이지는 lazy로 불러오므로 바로 나타나지 않는다. findBy는 나타날 때까지 기다린다
-    expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
-  })
+  it.each(EXPECTED_ROUTE_TABLE)(
+    '$url 주소가 "$heading" 화면을 그린다',
+    async ({ url, heading }) => {
+      renderAt(url)
+      // 페이지는 lazy로 불러오므로 바로 나타나지 않는다. findBy는 나타날 때까지 기다린다
+      expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
+    },
+  )
 })

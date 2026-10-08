@@ -1,0 +1,68 @@
+/*
+ * OTT내비 전용 디자인 토큰(Task 026, 임시. 확정은 Task 037).
+ *
+ * shadcn 기본 토큰(--background, --primary 등)은 index.css의 :root에 있고, 여기에는 shadcn에 없는
+ * 서비스 고유 의미(제공 상태 3가지, 데이터 부족, 추정, 토스트용 빨강)의 색만 둔다.
+ * 값은 사용자가 확정한 시안 "D2c 미드나잇 블루"(.playwright-mcp/directions-dark/direction-D2c.html)를 그대로 옮겼다.
+ *
+ * 왜 토큰으로 두나: 컴포넌트가 색 값을 직접 쓰면 디자인을 바꿀 때 파일마다 찾아 고쳐야 한다.
+ * 토큰 이름(의미)만 쓰게 하면 여기 값만 바꿔 앱 전체에 반영된다(frontend.md 디자인 값 규칙).
+ *
+ * 색만으로 정보를 전달하지 않는다: 제공 상태는 색 외에도 모양(꽉 채움 / 실선 / 점선 테두리)과
+ * 아이콘(체크 / X / 물음표), 글자(있음 / 없음 / 모름)로 구분한다. 색은 보조 수단이다.
+ */
+:root {
+  /* 제공 상태: 있음(AVAILABLE). 초록으로 꽉 채운 알약 + 짙은 남색 글자 */
+  --status-available: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --status-available-bg: oklch(0.8 0.12 160); /* 바탕(채움) */
+  --status-available-border: oklch(0.8 0.12 160); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+
+  /* 제공 상태: 없음(NOT_AVAILABLE). 바탕 없이 실선 테두리 */
+  --status-unavailable: oklch(0.9 0.012 258);
+  --status-unavailable-bg: transparent;
+  --status-unavailable-border: oklch(0.62 0.025 258);
+
+  /* 제공 상태: 모름(UNKNOWN). 바탕 없이 점선 테두리(점선 모양은 컴포넌트의 border-dashed가 정한다) */
+  --status-unknown: oklch(0.88 0.1 85);
+  --status-unknown-bg: transparent;
+  --status-unknown-border: oklch(0.74 0.11 80);
+
+  /* 데이터 부족(쿠팡플레이처럼 data_quality = INSUFFICIENT인 서비스) 표시 */
+  --quality-insufficient: oklch(0.88 0.09 80); /* 글자·아이콘 */
+  --quality-insufficient-bg: oklch(0.3 0.05 75); /* 바탕 */
+
+  /* "추정" 태그(러닝타임 등 추정값) */
+  --estimated: oklch(0.85 0.07 290); /* 글자·점선 테두리 */
+  --estimated-bg: oklch(0.27 0.05 290); /* 바탕 */
+
+  /*
+   * 오류 토스트 바탕 빨강(약 #e7000b). 위에 흰 글자(--destructive-foreground)를 올리면 대비 약 4.77:1이다.
+   * 어두운 테마에서는 빨강을 둘로 나눈다.
+   * - --destructive(index.css): 어두운 바탕 위에 직접 쓰는 오류 글자·아이콘용 밝은 빨강
+   * - --destructive-solid(여기): 흰 글자를 올리는 면(토스트 바탕)용 짙은 빨강
+   * 하나로 쓰면 밝은 빨강 위 흰 글자는 대비가 모자라고, 짙은 빨강 글자는 어두운 바탕에서 읽기 어렵다.
+   */
+  --destructive-solid: oklch(0.577 0.245 27.325);
+}
+
+/*
+ * 위 토큰을 Tailwind 클래스로 쓸 수 있게 연결한다(예: bg-status-available-bg, text-status-unknown).
+ * inline을 붙이는 이유: 클래스가 var(--status-...)를 그대로 참조하게 해, :root 값을 바꾸면 클래스 결과도 바로 바뀐다
+ * (Tailwind v4 문서 "Referencing other variables", context7 /tailwindlabs/tailwindcss.com 확인).
+ */
+@theme inline {
+  --color-status-available: var(--status-available);
+  --color-status-available-bg: var(--status-available-bg);
+  --color-status-available-border: var(--status-available-border);
+  --color-status-unavailable: var(--status-unavailable);
+  --color-status-unavailable-bg: var(--status-unavailable-bg);
+  --color-status-unavailable-border: var(--status-unavailable-border);
+  --color-status-unknown: var(--status-unknown);
+  --color-status-unknown-bg: var(--status-unknown-bg);
+  --color-status-unknown-border: var(--status-unknown-border);
+  --color-quality-insufficient: var(--quality-insufficient);
+  --color-quality-insufficient-bg: var(--quality-insufficient-bg);
+  --color-estimated: var(--estimated);
+  --color-estimated-bg: var(--estimated-bg);
+  --color-destructive-solid: var(--destructive-solid);
+}
