@@ -485,7 +485,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-F: 목업 모드에서 루트가 로드되고 콘솔 에러가 0건이다.
 - 기록: 2026-10-04 완료. `api:generate`·`lint`·`test`·`build`·`format:check` 통과, 목업 모드 V-F 콘솔 에러 0건. 계약이 `paths: {}`여도 `api:generate`는 에러 없이 끝나지만 타입 11개만 생성되고 훅·핸들러는 만들어지지 않는다. 임시 계약(조회 1개·등록 1개)으로 `orval` 8.39와 `msw` 3.0 호환(생성·타입 검사·런타임 가로채기)을 확인한 뒤 임시 파일은 지웠다. `src/mocks/handlers.ts`는 operation이 생기는 Task 019·031에서 채운다. `@hookform/resolvers` 5.9.1을 함께 설치했다. 템플릿 CSS 정리(`#root`·템플릿 변수·다크 모드 충돌)는 Task 018, 디자인 토큰 정리는 Task 037에서 한다.
 
-#### Task 018: 라우트·레이아웃·라우트 가드 골격 구현으로 전체 화면 뼈대 마련 ⬜
+#### Task 018: 라우트·레이아웃·라우트 가드 골격 구현으로 전체 화면 뼈대 마련 ✅
 - 태그: [F] · PRD: F0~F1, FR-06, FR-17 · 선행: 017 · 브랜치: `feature/f0-routes-layout`
 - 구현 사항
   - [ ] `src/app/router.tsx`: SCR-01~18 경로표(제안)와 빈 페이지 연결. 2·3단계 화면은 "준비 중" 자리표시. `/auth/callback`은 TECH 4절 그대로
@@ -494,6 +494,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-F: 모든 경로가 로드되고 콘솔 에러가 0건이다.
 - 결정(2026-10-08): 경로표는 `docs/TASK018_031_PLAN.md` 5절의 표로 확정한다(P6). 이 경로는 브라우저 주소창에 보이는 프론트 화면 주소이며 `/api/...` 백엔드 주소와 다르다. 작품 상세는 `/titles/:mediaType/:tmdbId`. 구현은 `frontend-dev` 에이전트가 하고(에이전트 PR 병합 후 `develop`에서 브랜치), 사용자는 가드 코드를 검토한다.
+- 기록: 2026-10-09 완료(`feature/f0-routes-layout`). 경로 19개와 404를 `src/app/router.tsx`에 등록했고 페이지는 `lazy`(React Router 8 객체형)로 나눠 관리자 화면이 첫 번들에 섞이지 않는다. `RootLayout`(헤더 검색·로그인, 푸터 출처 자리), `Providers`(QueryClient), `RouteErrorBoundary`(두 겹), `RouteLoadingFallback`, `ComingSoon`, 빈 페이지 20개를 만들었다. `RequireAuth`·`RequireAdmin`은 지금 `<Outlet />`만 돌려주며 `TODO(Task 057)`에 들어올 동작을 적어 두었다. `/auth/callback`은 가드 밖(공개)이다. `App.tsx`·`App.css`·템플릿 에셋·`public/icons.svg`를 지우고 `index.css`의 템플릿 CSS를 정리했다(`favicon.svg`는 Task 036·037에서 교체). 화면 문구는 존댓말로 통일했다. `lint`·`format:check`·`test`(23건, 경로표 비교 포함)·`build` 통과, V-F 경로 19개·404 로드와 콘솔 에러 0건. 확인하지 못한 것: `RouteErrorBoundary`가 실제로 그려지는 모습과 뒤로 가기 때 검색창 동기화(Task 027에서 Playwright로 확인). `/admin`만 입력하면 404이며 자동 이동은 Task 029에서 정한다. 관리자 권한 없음 처리 방식은 Task 057로 이관했다. 사용자가 가드 설계를 검토·승인했다.
 
 #### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ✅
 - 태그: [B] · PRD: B1 · 선행: 016, 023, 011 · 브랜치: `feature/b1-ott-services`
@@ -935,6 +936,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `/auth/callback`·앱 시작 시 `POST /api/auth/refresh`
   - [ ] `src/api/http.ts` 401 인터셉터: 재발급 1회, 동시 401이어도 요청 하나, 실패 시 로그인 화면
   - [ ] `RequireAuth`(원래 화면 복귀), `RequireAdmin`, 로그아웃. 토큰 처리 코드는 사용자가 직접 검토
+  - [ ] 관리자 권한 없음 처리 방식 결정(Task 018 검토에서 이관, 2026-10-09): 로그인했지만 ADMIN이 아닌 사용자가 `/admin/*`에 들어왔을 때 "권한 없음 안내 화면"을 보일지 "홈으로 이동"할지 정한다. 백엔드 `/api/admin/**`의 403 응답(Task 053·054)과 같은 기준으로 맞추고, 그 결정을 `RequireAdmin`에 반영한다
+- 결정(2026-10-09): Task 018의 `RequireAuth`·`RequireAdmin`은 지금 통과만 하는 골격이고 `TODO(Task 057)` 주석에 들어올 동작을 적어 두었다. 이 Task에서 그 주석을 실제 동작으로 바꾼다.
 - 완료 기준
   - V-FS: 로그인 → 새로고침 유지 → 로그아웃 → 보호 화면 접근 시 로그인 → 원래 화면 복귀, 일반 사용자 관리자 화면 차단. 짧은 AT TTL(local)로 401 → 재발급 1회 → 재시도를 확인했다.
 
