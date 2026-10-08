@@ -138,7 +138,7 @@ paths:
 - **캐시/요청 제한**: Redis(Lettuce), Spring Cache, Bucket4j
 - **외부 연동**: Spring Cloud OpenFeign(2025.1.2 이상, 클라이언트별 timeout 개별 설정)
 - **배치/락**: Spring Batch 6(JDBC JobRepository), ShedLock(JDBC)
-- **메일**: Spring Mail + Gmail SMTP를 잠정 기준으로 하고(Cloudtype 발신 가능 여부는 PRD 11절 11번 결정 전), 발송은 SMTP·HTTPS 메일 API 구현체를 교체할 수 있게 인터페이스로 분리한다. Thymeleaf 템플릿 (2단계)
+- **메일**: Spring Mail + Gmail SMTP를 쓴다(Cloudtype 발신 가능 여부는 PRD 11절 11번, 2026-10-09 Task 022 시험 성공으로 확정). 발송은 SMTP·HTTPS 메일 API 구현체를 교체할 수 있게 인터페이스로 분리한다. Thymeleaf 템플릿 (2단계)
 - **LLM**: Spring AI 2.0 + Gemini 무료 등급, 관리자 기능 전용 (3단계)
 - **모니터링**: Spring Actuator, Micrometer(OTLP) + Loki4j → Grafana Cloud
 - **API 문서**: springdoc-openapi
