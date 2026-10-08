@@ -1,0 +1,193 @@
+# Task 038 작업 안내서 (계산 엔진 입력 모델과 배정 규칙)
+
+> 2026-10-09 작성. 기준 문서는 `docs/PRD.md` 5.4(계산 규칙)·11절, `docs/TECH.md` 1절(계산 엔진)·T-4, `docs/ERD.md` A~D 영역, `docs/ROADMAP.md` Task 038·039·040, `.claude/rules/backend.md`(계산 엔진).
+> 근거 수준: 위 문서에 적힌 규칙만 옮겼다. 문서에 없어 **도출한 부분은 "(도출)"로 표시**했고, 구현 전에 정해야 할 것은 7절 결정 사항(D1~D8)에 모았다. 모두 추천안(미확정)이다.
+> 이 Task는 사용자가 직접 작성한다. Claude(또는 `backend-dev` 에이전트)는 검수를 돕는다.
+
+## 1. 한눈에 보기
+
+| 항목 | 내용 |
+|---|---|
+| 목적 | 플랜 계산의 **규칙을 코드로 고정**한다. "어떤 구독 조합이 최선인지 고르는 일"(Task 039)은 하지 않고, **"구독 조합이 주어졌을 때 작품을 어느 달에 보는지, 그 결과가 얼마나 좋은지 평가하는 일"**을 만든다 |
+| 태그·선행 | [B] · 선행 Task 006·012(완료) · Phase 3 · 다른 Task에 의존하지 않는다 |
+| 브랜치 | `feature/b2-engine-assignment` (`origin/develop`에서, 워크트리에서는 `git switch -c feature/b2-engine-assignment origin/develop`) |
+| 이어지는 Task | 039(조합을 고르는 정확해·그리디 Solver) → 040(정답 테스트 세트·비교 측정) → 063·064(`plan`이 엔진을 호출) |
+| 만드는 것 | `engine/` 아래 순수 Java record·enum, 배정 규칙(평가기), 목적함수 비교기, 이유 코드 판정, 정답이 알려진 단위 테스트 |
+| 만들지 않는 것 | `PlanSolver`·`ExactSolver`·`GreedySolver`·그리디 전환·`input_hash` 캐시(039·064), 엔티티·DB 변환(`plan` 서비스, 063), 쿠팡플레이 포함 여부 필터(입력 단계, R11-13) |
+
+| 완료 기준 (ROADMAP) | 확인 방법 |
+|---|---|
+| V-B: Spring 컨텍스트 없는 정답 테스트(긴 시즌 분할, 분할 불가, 이유 코드 4종, 동점)가 통과한다 | `cd backend; .\gradlew.bat test --tests "com.ottnavi.engine.*"`, 마지막에 `.\gradlew.bat clean build` |
+| (공통) `develop` 대상 PR에서 `backend-ci`·`frontend-ci` 통과 | PR 화면 |
+
+## 2. 왜 하는가
+
+1. **이 서비스의 핵심 가치가 이 규칙에 있다.** "찜한 작품을 예산·시청 시간 안에서 어느 달에 어디서 볼까"가 서비스의 답이다. 규칙이 모호하면 정확해와 그리디의 결과를 비교(FR-13)할 수 없고, 같은 입력에 같은 결과가 나온다는 보장(캐시 `input_hash`, 정답 테스트)도 깨진다.
+2. **엔진을 순수 Java로 분리하는 이유**(backend.md): 프레임워크 없이 테스트가 빠르고 정답 케이스를 수없이 돌릴 수 있다. 정확해는 한 번에 최대 약 210만 번 평가를 돌리므로(TECH 1절) **평가 1회가 가벼워야** 한다.
+3. **결정적(deterministic)이어야 한다.** 같은 입력은 항상 같은 결과여야 정답 테스트가 흔들리지 않는다. 그래서 정렬의 마지막 기준(`watchUnitId`)과 비교기의 마지막 기준(상품 ID 집합 사전순)이 있다(TECH 1절, 도출).
+4. **038을 먼저 하는 이유**: 039(Solver)는 038의 평가기를 "조합 하나를 점수로 바꾸는 함수"로 부른다. 이 함수가 틀리면 그 위의 모든 탐색이 틀린다.
+
+## 3. 규칙 정리 (PRD 5.4·TECH 1절을 코드 관점으로 다시 쓴 것)
+
+### 3.1 입력과 용어
+
+| 용어 | 뜻 | 출처 |
+|---|---|---|
+| 시청 단위(watch unit) | 영화 1편 또는 드라마 시즌 1개. 필요 시간은 **분** | PRD 5.4 |
+| 월 시청 가능 시간 | 한 달에 볼 수 있는 분(프리셋 8/15/30시간 = 480/900/1800분, 환산, 직접 입력) | PRD 5.4 |
+| 상품(product) | 구독 선택지 하나. MVP는 STANDARD **단품 7개**(번들·광고형은 2단계). 엔진에는 "ID + 가격 + 이 상품이 덮는 시청 단위 집합"으로 들어온다 | ERD B, TECH 1절 |
+| 우선순위 | MUST(꼭) / WANT(보고 싶음) / MAYBE(여유될 때) | ERD C |
+| 월(month index) | 0 = 이번 달(확정), 1·2 = 다음 두 달(예상). **항상 3개월** | PRD 5.4 |
+| 구독 상태 | 서비스별 SUBSCRIBED(이미 구독 중) / FREE(무료 이용) / 없음 | ERD C |
+
+### 3.2 커버(덮는다) 규칙
+- 어떤 시청 단위가 어떤 상품으로 **볼 수 있으면** 그 상품이 그 단위를 덮는다. 단품이므로 그 서비스의 제공 상태가 AVAILABLE일 때다.
+- **"모름"(UNKNOWN)은 덮는 것으로 세지 않는다.**
+- FREE(무료 이용) 서비스: **비용 0인 상시 커버**. 구독 조합에 넣지 않아도 모든 달에 덮는다.
+- SUBSCRIBED(이미 구독 중): **이번 달(0번째 달) 비용 0**. 다음 달부터는 유지하면 가격이 들고, 유지하지 않으면 해지로 본다(PRD 5.4).
+- 번들은 하나의 가상 서비스로 다룬다(MVP에는 없지만 입력 모델이 막지 않게 둔다).
+
+### 3.3 배정 규칙 (고정)
+1. **정렬**: 우선순위(MUST → WANT → MAYBE) → 필요 분 **짧은 순** → `watchUnitId` 오름차순(마지막은 도출).
+2. 정렬 순서대로 한 단위씩, **볼 수 있는 가장 이른 달**부터 그 달의 **남은 시청 시간**에 채운다.
+3. **한 달 시청 가능 시간보다 긴 시즌**은 같은 서비스가 **연속으로 덮는 달**에 나눠 배정한다. 연속이 아니면 나눌 수 없다.
+4. 한 달 이내로 볼 수 있는 단위는 **나눠 보지 않는다**. 이번 달 남은 시간이 부족하면 다음에 덮이는 달로 넘어간다(도출, D3).
+5. **다 본 달에 점수**를 준다(긴 시즌이 3개월에 걸쳐도 다 본 달 한 번).
+6. **3개월 안에 끝나지 않으면 배정하지 않는다**(미배정). 이때 일부 배정했던 시간은 **풀어 준다**(도출, D4).
+
+### 3.4 목적함수 비교 (사전식, 큰 쪽이 좋다)
+① `mustCompleted`(완주한 MUST 수) 큰 쪽 → ② `score`(완주한 WANT 2점, MAYBE 1점의 합, MUST는 ①에서 센다 — D5) 큰 쪽 → ③ `totalCost`(3개월 비용 합) **작은** 쪽 → ④ 모두 같으면 선택된 상품 ID 집합이 **사전순으로 앞서는** 쪽(도출, D6).
+
+### 3.5 남은 작품의 이유 코드
+판정 순서 **NO_PROVIDER → UNKNOWN → BUDGET → TIME**, 맞는 첫 번째를 쓴다.
+
+| 코드 | 조건 |
+|---|---|
+| NO_PROVIDER | 7개 서비스에서 모두 "없음"(NOT_AVAILABLE) |
+| UNKNOWN | "있음"은 없고 "모름"이 하나 이상 있음 |
+| BUDGET | 덮는 상품은 있으나 **선택된 구독 조합의 어느 달에도 그 상품이 없음**(도출) |
+| TIME | 덮는 상품이 선택된 달이 있으나 **시청 시간이 모자라** 끝내지 못함(도출) |
+
+## 4. 구조 제안 (이름·모양은 사용자가 정한다)
+
+`engine`은 다른 패키지를 참조하지 않는다(backend.md). 엔티티를 import하지 않고, 엔티티와의 변환은 나중에 `plan`이 한다.
+
+```
+com.ottnavi.engine
+├── model/        # 입력·출력 record와 enum
+├── rule/         # 커버·배정·이유 코드·비교기
+└── (039에서) solver/
+```
+
+**입력**(record, 불변)
+```java
+enum Priority { MUST, WANT, MAYBE }               // score: WANT 2, MAYBE 1 (D5)
+enum UnitReason { NO_PROVIDER, UNKNOWN, BUDGET, TIME }
+enum ProductCondition { NONE, SUBSCRIBED, FREE }  // 사용자의 현재 구독 상태
+
+record WatchUnit(long id, Priority priority, int requiredMinutes,
+                 Set<Long> coveringProductIds,     // 덮는 상품 ID. FREE 상품 포함 여부는 D1
+                 boolean hasUnknownProvider) {}    // NO_PROVIDER와 UNKNOWN을 가르는 용도
+record Product(long id, int monthlyPrice, ProductCondition condition) {}
+record PlanInput(List<WatchUnit> units, List<Product> products,
+                 int monthlyBudget, int monthlyWatchMinutes) {}
+```
+
+**한 번의 평가**: "구독 조합 = 달마다 선택한 상품 ID 집합 3개"를 받아 결과를 돌려준다.
+```java
+record Selection(List<Set<Long>> productIdsByMonth) {}  // 길이 3
+record UnitResult(long watchUnitId, boolean scheduled, Integer completedMonthIndex,
+                  UnitReason reason, List<Assignment> assignments) {}   // 미배정이면 reason
+record Assignment(int monthIndex, int minutes) {}
+record Evaluation(int mustCompleted, int score, int totalCost, List<UnitResult> units) {}
+// Evaluation evaluate(PlanInput input, Selection selection)   <- 039의 Solver가 부르는 함수
+```
+- **예산 검사는 평가기의 일이 아니다.** 달마다 선택 상품의 가격 합이 `monthlyBudget` 이하인 조합만 Solver가 고른다(039). 평가기는 받은 조합을 그대로 평가한다(D7).
+
+## 5. 단계 (단계마다 멈춰서 확인하고 넘어간다)
+
+### ① 브랜치
+```powershell
+cd C:\Users\swmoo\workspace\ottnavi-backend
+git status                                   # 변경이 없어야 한다
+git fetch origin
+git switch -c feature/b2-engine-assignment origin/develop
+```
+
+### ② 모델 record·enum (`engine/model`)
+- 3절 용어를 4절 모양으로 옮긴다. record는 불변이고 Spring·JPA·Lombok을 쓰지 않는다(backend.md는 Lombok을 허용하지만 record에는 필요 없다).
+- 확인: `.\gradlew.bat compileJava`가 통과한다. `engine`에서 `com.ottnavi.<다른 패키지>`를 import하지 않았는지 검색한다.
+
+### ③ 커버 규칙
+- "이번 달 이 단위를 덮는 상품이 선택됐나"를 판정하는 함수. FREE는 선택 여부와 무관하게 덮는다(3.2).
+- 확인: 5.1의 T12(FREE 상시 커버)·T13("모름"은 커버 아님) 테스트가 통과한다.
+
+### ④ 배정 규칙 (`evaluate`의 핵심)
+- 정렬 → 단위마다 가장 이른 달부터 → 일반 단위(한 달 이내) / 긴 시즌(연속 달 분할)으로 나눠 구현한다.
+- 평가 1회가 O(n log n)이어야 하므로(TECH 1절) 단위 수에 대해 정렬 한 번 + 한 번 훑기를 목표로 한다.
+- **규칙 구현부마다 PRD 5.4의 어느 규칙인지 한 줄 주석**을 남긴다(ROADMAP).
+- 확인: T1·T2·T5~T10(배정·분할·정렬·시간 풀기)이 통과한다.
+
+### ⑤ 이유 코드·점수·비용
+- 미배정 단위에 3.5 순서로 이유를 붙인다. `score`·`mustCompleted`·`totalCost`를 계산한다(SUBSCRIBED는 0번째 달 0원).
+- 확인: T3(BUDGET)·T4(NO_PROVIDER·UNKNOWN)·T11(구독 상태 비용)이 통과한다.
+
+### ⑥ 목적함수 비교기
+- `Comparator<Evaluation>` 또는 `compare` 함수. 3.4 순서대로 사전식.
+- 확인: T14(비교기)가 통과한다.
+
+### ⑦ 불변식 점검과 빌드
+- 모든 테스트에 공통으로 단언한다: ① 달마다 배정 분 합 ≤ `monthlyWatchMinutes`, ② 배정된 단위의 배정 분 합 = `requiredMinutes`, ③ 미배정 단위는 배정 행이 없다.
+```powershell
+cd backend
+.\gradlew.bat test --tests "com.ottnavi.engine.*"
+.\gradlew.bat clean build
+```
+- 커밋 예: `feat(backend): 계산 엔진 입력 모델과 배정 규칙 (Task 038)`. `gh pr create --base develop`. 병합 후 ROADMAP Task 038에 `기록:`(결정 D1~D8, 테스트 결과)을 남긴다.
+
+## 5.1 정답 테스트 케이스 (손으로 계산해 답을 먼저 정해 둔 것)
+
+공통: `monthlyWatchMinutes = 600`(M). 상품 p1(10,000원)은 아래에서 말하는 단위를 덮는다. 달 0·1·2 중 어느 달에 선택하는지가 `Selection`이다.
+
+| # | 상황 | 입력 | 기대 결과 |
+|---|---|---|---|
+| T1 | 모두 한 달에 들어감 | A(MUST,120), B(WANT,100), C(MAYBE,90) 모두 p1이 덮음. p1을 **0번째 달만** 선택 | 모두 0번째 달 배정(310분), `mustCompleted`=1, `score`=3(WANT 2+MAYBE 1), `totalCost`=10,000 |
+| T2 | 시간 초과(TIME) | M=200. A(MUST,120), B(WANT,100) 모두 p1. p1 0번째 달만 | A 배정(120). 남은 80 < 100이고 B는 한 달 이내 단위라 나눌 수 없음, p1이 다른 달에 없음 → B 미배정, 이유 **TIME**. `score`=0 |
+| T3 | 예산(BUDGET) | D(WANT,60)을 p2만 덮음. 선택 조합에 p2가 어느 달에도 없음 | D 미배정, 이유 **BUDGET** |
+| T4 | NO_PROVIDER / UNKNOWN | E: 덮는 상품 없음, `hasUnknownProvider`=false → **NO_PROVIDER**. F: 덮는 상품 없음, `hasUnknownProvider`=true → **UNKNOWN**. 선택 조합은 무엇이든 | 판정 순서가 BUDGET·TIME보다 앞서는지 확인 |
+| T5 | 긴 시즌 분할 | S(MUST,1200)를 p1이 덮음. p1을 **0·1번째 달**에 선택 | 0번째 달 600분 + 1번째 달 600분, `completedMonthIndex`=1, `mustCompleted`=1, `totalCost`=20,000 |
+| T6 | 분할 불가(연속 아님) | 같은 S. p1을 **0·2번째 달**에 선택(1번째 달 없음) | 연속이 아니라 못 나눔 → 미배정, 이유 **TIME**, 배정 행 0개 |
+| T7 | 3개월 안에 안 끝남 | S2(WANT,2000). p1을 **0·1·2번째 달 모두** 선택(용량 1800) | 미배정, 이유 **TIME** |
+| T8 | 동점: `watchUnitId` | M=100. X(WANT,90,id=5), Y(WANT,90,id=3). p1 0번째 달만 | **Y(id 3)** 가 먼저 배정(90), X는 남은 10분으로 못 들어가 미배정 TIME. `score`=2 |
+| T9 | 짧은 순 정렬 | M=250. U1(WANT,200,id=1), U2(WANT,100,id=2). p1 0번째 달만 | 짧은 순이므로 **U2가 먼저**(100). 남은 150 < 200이라 U1 미배정. (id 순이었다면 U1이 먼저 배정되어 결과가 달라진다) |
+| T10 | 미배정 시 시간 풀기 | M=600. S(WANT,1200), L(MAYBE,300). p1 0번째 달만 | S는 완주 불가라 미배정이고 **배정했던 600분이 풀려** L이 0번째 달에 배정된다(D4) |
+| T11 | 구독 상태 비용 | SUBSCRIBED p1(10,000원)을 0·1번째 달 선택 | `totalCost` = 0(0번째 달) + 10,000(1번째 달) = **10,000** |
+| T12 | FREE 상시 커버 | G(WANT,60)를 FREE 상품 p3만 덮음. **선택 조합이 비어 있음** | G 0번째 달 배정, `totalCost`=0 |
+| T13 | "모름"은 커버 아님 | H의 p1 제공 상태가 UNKNOWN(덮는 상품 없음, `hasUnknownProvider`=true). p1 선택 | H 미배정, 이유 **UNKNOWN** |
+| T14 | 비교기 | (a) `mustCompleted` 2·score 0·비용 20,000 vs 1·10·0 → 앞이 좋다. (b) 같은 must, score 5 vs 4 → 5. (c) 같은 must·score, 비용 10,000 vs 15,000 → 10,000. (d) 모두 같고 상품 ID `[1],[2],[]` vs `[1],[3],[]` → 앞(월별로 사전순, D6) | 위 판정 그대로 |
+
+> T9·T10의 입력은 **결과가 규칙에 따라 달라지도록** 일부러 만들었다. 정렬 기준이나 시간 해제 규칙을 빼먹으면 이 테스트가 실패한다.
+
+## 6. 정확해가 부르는 방식과 성능 메모 (039 대비)
+- 039의 정확해는 달마다 예산 이하 상품 부분집합(MVP 7개 단품이면 최대 128개)을 만들고 3개월을 중첩해서 순회한다 → 최대 약 128³ ≈ 210만 번 `evaluate`를 부른다(TECH 1절).
+- 그래서 `evaluate`는 **새 객체를 많이 만들지 않고** 단위 정렬은 호출 밖(입력 준비 때 한 번)에서 해 두는 설계가 유리하다. 정렬된 단위 목록을 `PlanInput`에 미리 정렬해서 넣을지 `evaluate`가 정렬할지는 D8이다.
+- 성능 측정은 040·Task 100에서 한다. 038에서는 **정확성이 우선**이다(최적화는 측정 뒤).
+
+## 7. 사용자 결정 사항 (모두 추천안, 미확정)
+
+| ID | 내용 | 추천안 | 이유 |
+|---|---|---|---|
+| D1 | FREE 상품을 `coveringProductIds`에 넣을까, 별도 필드로 둘까 | `Product.condition = FREE`로 표시하고 단위의 덮는 상품 집합에도 그대로 넣는다. 커버 판정에서 "FREE면 선택 여부와 무관하게 덮는다"로 처리 | 변환(`plan`)이 단순하고 3.2의 "상시 커버"를 한 곳에서 처리 |
+| D2 | SUBSCRIBED 상품은 0번째 달에 자동으로 구독된 것으로 볼까 | 예. 0번째 달에 비용 0으로 **항상 포함**, 1·2번째 달은 Solver가 유지 여부를 선택 | 이미 낸 돈이라 0번째 달에 쓰지 않을 이유가 없고 PRD "이번 달 비용 0, 다음 달부터 유지·해지 계산"과 일치 |
+| D3 | 한 달 이내 단위가 이번 달 남은 시간에 못 들어갈 때 | 나눠 보지 않고 **다음에 덮이는 달**로 넘긴다 | PRD "긴 시즌만 나눠 볼 수 있다"(한 달보다 긴 시즌) |
+| D4 | 3개월 안에 못 끝나 미배정이 된 단위가 일부 배정했던 시간 | **전부 풀어 주고** 이후 단위가 쓴다 | 못 끝낼 단위가 시간만 차지하면 결과가 나빠진다. T10으로 고정 |
+| D5 | `score`에 MUST를 넣을까 | **넣지 않는다.** MUST는 ①`mustCompleted`로만 세고 `score`는 WANT 2·MAYBE 1(TECH 1절 표기) | 사전식 비교에서 MUST 완주가 이미 최우선이라 이중 계산이 된다 |
+| D6 | 비교기 ④(상품 ID 집합 사전순) 정의 | 달 0→1→2 순서로 **정렬된 ID 리스트를 차례로 비교**해 먼저 다른 쪽이 작은 쪽이 좋다 | 정답 테스트가 결정적이어야 한다 |
+| D7 | `evaluate`가 예산 초과 조합을 거를까 | **거르지 않는다.** 예산은 Solver(039)가 조합을 만들 때 적용 | 평가기를 가볍게(210만 번 호출) 하고 책임을 분리 |
+| D8 | 정렬을 어디서 할까 | `PlanInput`을 만들 때 **미리 정렬해 불변으로 보관**하고 `evaluate`는 정렬하지 않는다 | 평가 210만 번마다 정렬하면 낭비. 단, 정렬 규칙은 038이 소유하므로 정렬 함수를 공개한다 |
+
+## 8. 확인하지 못한 것 (이 Task에서 확인)
+- D1~D8은 문서에 명시되지 않은 도출이라 구현하면서 모호하면 PRD 5.4와 대조해 이 표를 고친다.
+- "다 본 달에 점수" 시 긴 시즌이 이번 달 중간에 끝나는 경우 같은 달의 남은 시간을 다른 단위가 쓸 수 있다고 본다(D4와 같은 맥락). 테스트로 한 번 더 확인한다.
+- 같은 서비스가 아닌 **서로 다른 상품이 같은 시즌을 번갈아 덮는** 경우(예: 0번째 달은 p1, 1번째 달은 p2로 같은 시즌 제공)의 분할 가능 여부. PRD는 "같은 서비스를 연속 구독하는 달"이라 했으므로 **같은 상품이 연속**일 때만 허용하는 쪽으로 구현하고, 필요하면 결정으로 올린다.
+- 번들·광고형(2단계)의 `in_ad_tier` 커버는 이 Task 범위가 아니다.

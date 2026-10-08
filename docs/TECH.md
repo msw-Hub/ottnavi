@@ -67,7 +67,9 @@ stateDiagram-v2
 
 **비동기 202와 중복 실행 409.**
 - 관리자 실행 API는 `TaskExecutor`를 가진 `JobOperator`로 Job을 비동기 시작하고 즉시 **202 + `jobExecutionId`**를 반환한다(c7 Batch 6). Cloudtype HTTP 타임아웃(프리티어 1분, 하비 5분)과 무관하게 동작한다(T-6 종결).
-- 식별 파라미터는 `targetDate`(LocalDate) + `tier`(DAILY/WEEKLY)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
+- 식별 파라미터는 `targetDate`(LocalDate) + `tier`(`DAILY`/`WEEKLY`/`ALL`)다. 같은 날짜·tier가 실행 중이면 **409 `BATCH_ALREADY_RUNNING`**, 이미 완료면 **409 `BATCH_ALREADY_COMPLETED`**다. 실패한 실행은 같은 파라미터로 restart하고, 완료된 날짜를 다시 돌리려고 파라미터를 바꾸지 않는다(도출).
+- **`tier`란(R-16 확정, 2026-10-09 — 나중에 헷갈리지 않도록 기록).** 갱신 주기는 두 종류다. 사용자가 **찜한 작품**은 정보가 바뀌면 바로 반영돼야 해서 **매일(`DAILY`)**, 아무도 찜하지 않은 **나머지 후보 작품**은 TMDB 호출을 아끼려고 **주 1회(`WEEKLY`)** 갱신한다. 이 등급이 tier이고 작품마다 `title.refresh_tier`로 붙는다(ERD). 수집 Job은 "이번에 어느 등급을 수집하나"를 Job 파라미터 `tier`로 받고, `날짜 + tier`가 같은 실행인지(중복인지)를 가르는 키다. 예를 들어 "10월 9일의 DAILY 수집"과 "10월 9일의 WEEKLY 수집"은 서로 다른 실행이다. **MVP는 등급을 나누지 않고 전체를 한 번에 일괄 수집하므로 새 값 `ALL`을 쓴다**(`DAILY`·`WEEKLY`로 표기하면 이름과 실제가 달라 헷갈리기 때문). 2단계(O3, Task 077)에서 등급별 갱신을 도입할 때 `DAILY`·`WEEKLY` 실행을 추가한다. 영향: 관리자 수집 API(Task 045)의 `tier` 파라미터 enum에 `ALL`을 넣고(계약), 확인할 것은 Job 파라미터 `tier`와 `title.refresh_tier`가 같은 enum을 공유하는지다(별개 개념으로 보이며 Task 043 구현 때 정한다. 공유하지 않으면 `ALL`은 Job 파라미터에만 있다).
+- **TMDB는 언제 호출하나(요청 제한 버킷을 두 개로 나눈 이유 — 기록).** 평소 사용자 요청은 **우리 DB를 읽을 뿐 TMDB를 호출하지 않는다.** TMDB 호출은 두 경우뿐이다. ① **수집 배치**(서버가 정한 시간에 자동, 속도를 서버가 조절) ② **단건 수집**(사용자가 검색했는데 DB에 없는 작품이면 그 순간 TMDB에서 가져와 저장, FR-01). ②는 익명 사용자가 일으킬 수 있는 TMDB 호출이라 TMDB 한도(초당 약 40회)를 배치와 나눠 쓰는 문제가 생기므로, 공개 요청 제한에 **단건 수집 검색 버킷을 일반 버킷보다 낮게** 따로 둔다(R11-12 확정: 일반 IP당 분당 60회, 단건 수집 IP당 분당 10회). 일반 버킷은 서버·Redis를 보호하는 용도다. 한 번 저장된 작품은 이후 DB에서 바로 나오므로 다시 단건 수집하지 않는다.
 - GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
 
 **중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(예: `POST /api/admin/collect/{executionId}/recover`, 제안).
@@ -113,7 +115,7 @@ sequenceDiagram
 
 - 인가 시작·콜백 경로를 `/api` 아래로 옮긴다: `authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`. `redirect-uri`는 `{baseUrl}/api/login/oauth2/code/{registrationId}` 템플릿(X-Forwarded로 펼쳐짐, c7) 또는 `OAUTH2_REDIRECT_BASE_URL`(R11-3)로 고정한다. Cloudtype이 `X-Forwarded-Host`를 통과시키는 것으로 관찰됐으므로(Task 020 실험, 1회) 템플릿 대신 **`OAUTH2_REDIRECT_BASE_URL` 고정**을 쓴다(도출).
 - **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
-- RT 서버 측 저장은 R11-21 미결정이다. `RefreshTokenStore` 인터페이스로 "Redis 저장 + 회전·폐기"와 "서명 검증만" 구현을 교체 가능하게 둔다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
+- **RT 서버 측 저장(R11-21 확정, 2026-10-09)**: **Redis(TTL)에 해시로 저장**하고 재발급 때 **회전**(새 RT 발급, 이전 RT 폐기), 이미 쓴 RT가 다시 쓰이면(**재사용 감지**) 해당 계열을 무효화한다. 서명 검증만 하는 방식은 한 번 발급한 RT를 만료 전에 무효화할 수 없고 회전의 재사용 감지도 못 하므로 택하지 않았다(Auth0 등 refresh token rotation 문서, 2차 자료). `RefreshTokenStore` 인터페이스는 유지해 저장소를 교체할 수 있게 둔다(예: PostgreSQL 구현). **알려진 한계**: Redis Cloud 무료는 영속성이 없고 메모리가 차면 키가 지워질 수 있으며(`allkeys-lru`) 14일 접속이 없으면 DB가 삭제되므로(Task 003·020 기록) 그때 모든 사용자가 다시 로그인해야 한다. 규모가 작아 수용하고, 사용자가 늘어 불편해지면 PostgreSQL 구현으로 바꾼다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
 - 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
 - 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출).
 
