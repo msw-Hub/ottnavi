@@ -256,4 +256,4 @@ git grep -n -i -E "secret|password|token" -- . ':!docs' ':!.env.example'   # 값
 
 ## 사용자가 직접 실행하는 Git/배포 작업 (Claude는 요청 시에만)
 - Task 021: feature → `develop` PR(squash) 후 `develop` → `main` PR(merge commit) 병합 = 첫 배포, 이후 `main` 태그
-- Task 022: 일회성 Cloudtype 서비스 배포·시험·삭제, 시험 브랜치 삭제, R11-11 결정
+- Task 022: 일회성 Cloudtype 서비스 배포·시험·삭제, 시험 브랜치 삭제, R11-11 결정 → **완료(2026-10-09)**: SMTP 587 발송 성공, 서비스·브랜치 삭제, R11-11 SMTP(Gmail) 채택(ROADMAP Task 022 `기록:`)
