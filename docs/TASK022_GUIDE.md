@@ -53,16 +53,21 @@
 - [ ] Gmail 앱 비밀번호가 비밀번호 관리자에 있다(Task 002). `MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`
 - [ ] 받는 주소(본인 메일)를 정한다. 다른 사람 주소로 보내지 않는다
 - [ ] Docker Desktop이 켜져 있다(로컬 사전 시험·빌드 테스트용)
-- [ ] `develop`이 최신이다: `git switch develop; git pull`
+- [ ] 원격 `develop`이 최신이다: `git fetch origin`. 워크트리 구성(프론트 `ottnavi`, 백엔드 `ottnavi-backend`)에서는 `develop`이 이미 `ottnavi` 폴더에 체크아웃돼 있어 백엔드 워크트리에서 `git switch develop`을 할 수 없다("already used by worktree" 오류). 그래서 원격 `origin/develop`에서 바로 브랜치를 만든다(①)
 
 ## 5. 단계 (단계마다 멈춰서 확인하고 넘어간다)
 
 ### ① 시험 브랜치 만들기
 
 ```powershell
-git switch develop; git pull
-git switch -c feature/b1-smtp-trial
+cd C:\Users\swmoo\workspace\ottnavi-backend   # 백엔드 워크트리에서 작업한다
+git status                                    # 변경이 없어야 한다(이전 Task 브랜치의 미커밋 변경이 남아 있으면 먼저 정리)
+git fetch origin
+git switch -c feature/b1-smtp-trial origin/develop
 ```
+
+- `develop`을 체크아웃하지 않고 원격 `develop`에서 곧바로 새 브랜치를 만든다. 워크트리 방식에서 `git switch develop; git pull`이 막히는 문제를 피한다.
+- 이전 Task 브랜치(예: `feature/b0-redis-feign-config`)가 병합된 뒤라면 그 브랜치에서 그대로 새 브랜치로 옮겨 가도 된다.
 
 - 이 브랜치는 **PR을 만들지 않는다**. Cloudtype이 원격 브랜치를 빌드하므로 푸시는 필요하다(⑤). 푸시하면 CI(`backend-ci`)가 돌 수 있지만 PR이 없으므로 병합될 일은 없다.
 
@@ -215,7 +220,7 @@ $env:SMTP_TRIAL_TO = '받는 주소'
 
 - [ ] Cloudtype에서 `ottnavi-smtp-trial` 서비스 **삭제**(비밀 값이 들어 있으므로 시험이 끝나면 바로)
 - [ ] 운영 서비스를 중지했었다면 다시 시작하고 `/actuator/health` 200 확인
-- [ ] 시험 브랜치 삭제: `git switch develop; git branch -D feature/b1-smtp-trial; git push origin --delete feature/b1-smtp-trial`
+- [ ] 시험 브랜치 삭제: 먼저 다른 브랜치로 옮긴다(현재 체크아웃 중인 브랜치는 `-D`로 지울 수 없다. 워크트리에서는 `develop`을 쓸 수 없으니 `git switch -c feature/b0-after-smtp-trial origin/develop`처럼 임시 브랜치로 옮기거나 다음 Task 브랜치를 바로 만든다). 이어서 `git branch -D feature/b1-smtp-trial; git push origin --delete feature/b1-smtp-trial`
 - [ ] 로그 전체를 저장소에 붙이지 않는다. 예외 클래스·메시지 한 줄과 소요 시간만 기록한다
 
 ### ⑩ SMTP가 막힌 경우에만: HTTPS 메일 API 시험

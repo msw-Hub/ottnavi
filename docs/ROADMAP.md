@@ -605,14 +605,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
 - F1 목업으로 전체 흐름을 확정하고(Phase 1~2만으로 목업 흐름 확인 가능) OpenAPI 초안 → ERD 보정 → 스키마 순으로 고정한다.
 
-#### Task 024: Redis·캐시·Feign 공통 설정 구성으로 외부 연동 기반 마련 ⬜
+#### Task 024: Redis·캐시·Feign 공통 설정 구성으로 외부 연동 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-redis-feign-config`
 - 구현 사항
-  - [ ] `global/config/RedisConfig`: 캐시 값 JSON 직렬화(Jackson 3용 클래스명은 구현 시 확인), 캐시 이름·TTL 자리(`titleDetail`, `planCalc`, `exclusiveTitles`)
-  - [ ] `global/config/FeignConfig`: `spring.cloud.openfeign.client.config.tmdb.*` 타임아웃. 앱 직렬화는 Jackson 3만
+  - [x] `global/config/RedisConfig`: 캐시 값 JSON 직렬화(Jackson 3용 클래스명은 구현 시 확인), 캐시 이름·TTL 자리(`titleDetail`, `planCalc`, `exclusiveTitles`)
+  - [x] `global/config/FeignConfig`: `spring.cloud.openfeign.client.config.tmdb.*` 타임아웃. 앱 직렬화는 Jackson 3만
 - 완료 기준
   - V-B: Testcontainers Redis에 캐시를 저장·조회하고 값이 JSON인지 확인하는 테스트가 통과한다.
 - 안내서(2026-10-08): `docs/TASK024_GUIDE.md`. 주의: Jackson 3의 `GenericJacksonJsonRedisSerializer`는 기본으로 타입 정보를 넣지 않아 record가 Map으로 돌아올 수 있으므로, 추천안(미확정, 안내서 D1)은 캐시별 타입 지정(`JacksonJsonRedisSerializer<T>`)이고 record 왕복 테스트를 포함한다. 사용자가 직접 작성하고 `backend-dev`가 검수한다.
+- 기록: 2026-10-09 완료(`feature/b0-redis-feign-config`, PR #17 develop 병합 9ba0ae5). 결정(안내서 5절): D1 값 직렬화 B(캐시별 `JacksonJsonRedisSerializer<T>`, 기본은 타입 정보 없는 `GenericJacksonJsonRedisSerializer`), D2 `spring-boot-starter-cache` 추가(Boot 4는 캐시 자동 구성이 `spring-boot-cache` 모듈이고 `RedisCacheManagerBuilderCustomizer`가 `org.springframework.boot.cache.autoconfigure`에 있다), D3 Feign `tmdb` 연결 3초·읽기 5초(Task 048 첫 전체 수집에서 실측 후 조정), D4 TTL 기본 1시간·세 캐시 24시간(실측 86400초), D5 Redis 명령 2초·연결 5초, **D6 캐시 쓰기 즉시 반영(`immediateWrites`)**(구현 중 발견: Spring Data Redis 4에서 Lettuce면 기본 `RedisCacheWriter`의 `put`·`evict`·`clear`가 비동기라 수집 직후 clear해도 옛 값이 읽힐 수 있다. 블로킹 비용은 규모가 작아 수용, 운영 응답 시간은 첫 배포 뒤 로그로 확인). 테스트 `RedisCacheConfigTest` 8건(저장·조회, JSON, 키 접두사, TTL, 실제 캐시 TTL, 즉시 반영, null 미저장) 통과, 전체 `clean build` 8개 클래스 46건 통과, CI 4건과 CodeRabbit 통과(지적 0건). 로컬 기동에서 오류 없이 `/actuator/health` 200 `UP`, `@EnableFeignClients`는 클라이언트 없이도 뜬다. 첫 Redis 연결 때 Netty `TCP_KEEPCOUNT`·`TCP_KEEPIDLE`·`TCP_KEEPINTERVAL` WARN 3건이 나오나 영향이 없어 무시(Windows·Java 17 추정, 운영 로그에서 다시 나오면 판단). 확인하지 못한 것: Feign 기본 디코더의 Jackson 3 사용 여부(Task 042 WireMock 테스트), 운영(Redis Cloud) 블로킹 쓰기 응답 시간.
+  - 이후 Task에 넘길 내용: ① 캐시에 DTO를 쓰는 Task(049·051·062 등)는 `RedisConfig`에 그 캐시의 `JacksonJsonRedisSerializer<DTO>`를 한 줄씩 등록한다(기본 직렬화기로는 꺼낸 값이 `LinkedHashMap`이 되어 `ClassCastException`). ② `cache.put(key, null)`은 `IllegalArgumentException`이므로 `@Cacheable`에 `unless = "#result == null"`을 붙인다. ③ CodeRabbit이 짚은 일반론: 운영 스키마 호환(DTO 변경 시 기존 캐시 값)과 동시 무효화는 TTL만으로 보장되지 않으니 해당 Task에서 다룬다.
 
 #### Task 025: 공통 유틸과 에러 인터셉터 작성으로 화면 표시 규칙 통일 ⬜
 - 태그: [F] · PRD: F1~F2, FR-05 · 선행: 018 · 브랜치: `feature/f1-common-lib-components`(Task 026과 합침, 2026-10-08 결정. 원래 `feature/f1-common-lib`)
