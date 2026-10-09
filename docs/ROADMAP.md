@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 3/14 | 🔄 진행 중 |
-| 3 | 핵심 기능 개발 | 0/30 | ⬜ 대기 |
+| 2 | 공통 모듈/컴포넌트 개발 | 4/14 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 1/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 25/105 | |
+| 합계 | | 27/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -604,7 +604,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 3/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 4/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -652,19 +652,26 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 027: 공개 화면 목업 구현(SCR-01·02·04·06)으로 공개 흐름 확정 ⬜
 - 태그: [F] · PRD: F1, FR-01~03, 05, 06 · 선행: 018, 026 · 브랜치: `feature/f1-public-screens`
 - 구현 사항
-  - [ ] `src/mocks/fixtures/`: 실제 작품명, 7개 서비스, 영화·드라마 동명 작품, 시즌별 제공처가 다른 드라마
-  - [ ] `features/search`, `features/title-detail`(영어 대체 표시, 출연진 10명, 시즌별 제공처·총 시간, 기준일, 시즌 단위 찜)
-  - [ ] About(TMDB 로고·고지문 자리, JustWatch, 비영리), 로그인(버튼, 콜백 로딩·실패)
-  - [ ] SCR-03·05는 자리표시 유지(3절)
+  - [x] `src/mocks/fixtures/`: 실제 작품명, 7개 서비스, 영화·드라마 동명 작품, 시즌별 제공처가 다른 드라마
+  - [x] `features/search`, `features/title-detail`(영어 대체 표시, 출연진 10명, 시즌별 제공처·총 시간, 기준일, 시즌 단위 찜)
+  - [x] About(TMDB 로고·고지문 자리, JustWatch, 비영리), 로그인(버튼, 콜백 로딩·실패)
+  - [x] SCR-03·05는 자리표시 유지(3절)
 - 완료 기준
   - V-F: 검색 → 결과 → 상세 → 찜(비로그인 시 로그인 화면) 흐름을 클릭으로 재현했고 콘솔 에러가 0건이다.
 - 결정(2026-10-08): ① 목업의 로그인 상태는 목업 모드(`VITE_USE_MOCK=true`)에서만 보이는 전환 토글(비로그인/회원/관리자)로 바꾼다. 실제 인증 저장소(Task 057)와 분리한다(P2). ② 포스터는 실제 TMDB 이미지 URL 없이 대체 이미지 표시를 기본으로 해 외부 요청 없이 콘솔 에러 0건을 유지한다(P4). ③ 계약에 아직 없는 API의 타입은 `features/*/mockTypes.ts`에만 임시로 둔다(P1, `frontend.md` "목업 단계의 임시 타입 예외"). ④ 화면의 시각 방향 수정 요청은 `ui-designer`가 맡는다.
+- 기록: 2026-10-09 완료(브랜치 `feature/f1-public-screens`, PR #23 develop 병합 0d0f8b2). CodeRabbit 지적 3건 중 2건(비로그인 찜 상태·변경·해제 가드, `useIsLoggedIn` 판단 기준 통일)을 반영했고, 1건(`SettingsPage`가 `from`을 읽지 않음)은 Task 028로 이월했다. 검증 4종 통과(테스트 14개 파일 172건), 사용자가 화면을 확인했다(검색 → 상세 → 찜 → 로그인 → 복귀, 토글, About).
+  - 결정(사용자, 2026-10-09): ① 검색은 포스터 중심 그리드(데스크톱 5열·태블릿 3열·모바일 2열), 처음 10개 + "더보기"(페이지 나누기 `page`·`size`), 카드 전체 클릭, 카드에는 찜·시리즈 정보 없이 제공처 칩만 둔다. 쿠팡플레이 "데이터 부족" 안내는 결과 위에 한 번만 보인다. ② 상세는 "볼 수 있는 곳" 요약 + 시즌 줄에서 바로 찜한다(접이식 없음). 찜은 기본 "보고 싶음"으로 들어가고 찜한 뒤 우선순위 변경·해제를 한다. 시즌 제공처가 모두 같으면 줄 칩을 생략하고, 시즌이 6개 이상이면 처음 5개 + 더 보기로 접는다. ③ 로그인은 목업 모드에서만 동작하고(목업이 아니면 버튼 비활성), 목업 로그인 상태 전환 토글(비로그인/회원/관리자)을 둔다. 비로그인 찜 → `/login`(`from`) → 콜백 → 상세 복귀, 첫 로그인은 `/settings`(SCR-07 자리표시)로 보낸다.
+  - 구현: `features/search`, `features/title-detail`, `features/about`, `features/auth`, `src/hooks`(`useOttServices`·`useIsLoggedIn`·`useMockRole`), `mocks/fixtures`(작품 12편, "(예시)" 표시 가상 작품 2개), `mocks/mockSession.ts`, 목업 핸들러(검색·상세·찜 추가/변경/해제), `lib/safeRedirect.ts`(내부 경로만 허용), 목업 확인 장치(`?mockPageSize=`, 검색어 `*`, `?mockScenario=login-failed|collect-failed|error`).
+  - **이후 Task에 넘길 내용**: (a) Task 031 계약에 필요한 operation: 작품 검색 `GET /public/titles`(`page` 0부터·`size` 기본 20·최대 100, 응답 `{content,page,size,totalElements,totalPages}`에 수집 실패 여부·기준일 포함), 작품 상세(시즌이 많은 작품의 시즌 요약을 상세 응답에 담을지, 시즌 상세를 펼칠 때 따로 부를지 설계), 찜 추가 `POST /me/wishlist-items`·우선순위 변경 PATCH·삭제 DELETE·내 찜 목록 GET, 포스터는 `posterPath` + `lib/tmdbImage`로 조립. 제거 대상: `features/*/mockTypes.ts`, `mocks/fixtures`, `mockSession`, 공개 화면 핸들러, `getMockPageSize`, 검색어 `*` 확인 장치. (b) Task 057: `useIsLoggedIn`·`useMockRole` → authStore, `HeaderAccountNav`의 로그인 상태·로그아웃(`POST /api/auth/logout`), `LoginScreen` → `GET /api/oauth2/authorization/google`(페이지가 통째로 바뀌어 router state가 사라지므로 `from`은 sessionStorage에 임시 보관하고 콜백에서 `safeRedirect`로 다시 검사), `AuthCallbackScreen` → `POST /api/auth/refresh`. (c) Task 028: 온보딩 저장 후 `location.state.from`(`getSafeRedirectPath` 검사)으로 이동하고 `setMockOnboardingDone(true)`를 호출한다. SCR-10 긴 시즌 분할 표시는 이미 추가돼 있으니 확인만 한다. (d) 토스트 offset이 머리글 높이를 손수 계산한 값(데스크톱 65px, 모바일 103px)이라 머리글이 바뀌면 같이 고친다(Task 037 이월 ⑨와 연결).
+  - 확인하지 못한 것: 승인된 TMDB 로고 사용 조건(TASK003 "미확인"), About 화면 스크린샷, `authFlow.test.tsx`가 실제 lazy 라우터 대신 작은 경로표를 쓰는 이유(같은 주소를 한 파일에서 두 번 열면 두 번째부터 404, react-router 8, 원인 미확인), 화면 낭독기, 601~639px 폭의 토스트 위치.
+  - 작업 방식 메모: `frontend-dev`는 sonnet으로 쓰고, 에이전트 정리 시 node 전체 종료를 금지하는 규칙을 `.claude/agents/frontend-dev.md`에 추가했다(MCP 연결 끊김의 유력 원인).
 
 #### Task 028: 회원 화면 목업 구현(SCR-07~10)으로 계산 흐름 확정 ⬜
 - 태그: [F] · PRD: F1, FR-08~12, 14 · 선행: 027 · 브랜치: `feature/f1-member-screens`
 - 구현 사항
   - [ ] `features/onboarding`(7개 서비스 상태, 요금제·결제일, 시청 시간 프리셋·환산·직접 입력, 예산), `features/wishlist`, `features/pricing`, `features/plan`
   - [ ] 저장 시 409 `PLAN_DRAFT_STALE` 목업 → 자동 재계산 흐름
+  - [ ] 온보딩 저장 후 로그인 전 화면으로 복귀한다(`location.state.from`을 `getSafeRedirectPath`로 검사한 내부 경로, 없으면 `/`). 이때 `setMockOnboardingDone(true)`를 호출한다(Task 027 CodeRabbit 이월: `SettingsPage`가 `from`을 읽지 않음)
   - [ ] 플랜 결과(SCR-10)에서 긴 시즌의 분할을 달별로 보여 준다(예: "시즌 2: 1월 넷플릭스 앞부분, 2월 티빙에서 이어서", "이어 보기" 라벨, 한 달 최소 2시간 규칙 안내). 문구는 "확정"이 아니라 "확인된 범위" 규칙을 따른다
   - [ ] 작품 상세의 시즌 줄 총 시간이 월 시청 시간보다 크면(회원 상태일 때만) "여러 달에 나눠 봐야 해요" 같은 짧은 안내
   - [ ] SCR-11~13은 자리표시 유지
@@ -760,22 +767,27 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 0/30
+## 7. Phase 3 — 핵심 기능 개발 · 1/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
 - 계산 엔진(038~040)은 1주차에 착수한다. 각 백엔드 API Task는 Task 031이 `openapi.yaml`에 `x-planned: true`로 넣은 해당 operation을 구현하고 같은 PR에서 표시를 지운다(4.2). 초안에 없던 API(제안 경로)는 계약에 먼저 추가한다.
 
-#### Task 038: 계산 엔진 입력 모델과 배정 규칙 구현으로 계산 기반 마련 ⬜
+#### Task 038: 계산 엔진 입력 모델과 배정 규칙 구현으로 계산 기반 마련 ✅
 - 태그: [B] · PRD: B2, FR-12, 5.4 · 선행: 006, 012 · 브랜치: `feature/b2-engine-assignment`
 - 관련: TECH 1절(쿠팡플레이 포함 여부는 입력 단계 필터라 엔진은 바뀌지 않음)
 - 구현 사항
-  - [ ] `engine/` 순수 Java record: 시청 단위, 상품, 계산 조건, 결과
-  - [ ] 배정 규칙: 시청 가능 상품이 없는 단위(NO_PROVIDER·UNKNOWN)는 맨 뒤 → 우선순위 → 필요 분 짧은 순 → `watchUnitId`(정렬은 `PlanInput` 생성자가 한 번), 가장 이른 달부터, 긴 시즌은 서비스와 상관없이 연속된 달(그 시즌을 볼 수 있는 상품이 선택된 달)에 이어서 분할하고 다 본 달에 점수(2026-10-09 결정, 예: 1월 넷플릭스·2월 티빙), 실제 시청 달도 연속(가운데 달 배정이 0분이면 분할 불가), 마지막 조각 외 한 달 최소 120분(`MIN_LONG_SEASON_SEGMENT_MINUTES`, PRD 11절 34번), 3개월 안에 안 끝나면 미배정(일부 배정 시간은 풀림)
-  - [ ] 시청 가능 규칙(FREE 상시 0원, SUBSCRIBED 이번 달 0원(평가기가 0번째 달에 선택 없이도 시청 가능으로 취급), "모름"은 시청 가능 아님), `Evaluator`(`new Evaluator(planInput)` 후 `evaluate(selection)` 반복 호출, 상품 32개 초과 시 생성자 예외)와 목적함수 비교기(`EvaluationComparator`)(must 완주 → 점수 → 총비용 → 결제를 미루는 쪽(이른 달 새로 결제하는 상품이 적은 쪽, 2026-10-09 결정) → 상품 ID 사전순), 이유 코드(`NO_PROVIDER` → `UNKNOWN` → `BUDGET` → `TIME`)
-  - [ ] 규칙 구현부에 PRD 5.4 규칙 주석
+  - [x] `engine/` 순수 Java record: 시청 단위, 상품, 계산 조건, 결과
+  - [x] 배정 규칙: 시청 가능 상품이 없는 단위(NO_PROVIDER·UNKNOWN)는 맨 뒤 → 우선순위 → 필요 분 짧은 순 → `watchUnitId`(정렬은 `PlanInput` 생성자가 한 번), 가장 이른 달부터, 긴 시즌은 서비스와 상관없이 연속된 달(그 시즌을 볼 수 있는 상품이 선택된 달)에 이어서 분할하고 다 본 달에 점수(2026-10-09 결정, 예: 1월 넷플릭스·2월 티빙), 실제 시청 달도 연속(가운데 달 배정이 0분이면 분할 불가), 마지막 조각 외 한 달 최소 120분(`MIN_LONG_SEASON_SEGMENT_MINUTES`, PRD 11절 34번), 3개월 안에 안 끝나면 미배정(일부 배정 시간은 풀림)
+  - [x] 시청 가능 규칙(FREE 상시 0원, SUBSCRIBED 이번 달 0원(평가기가 0번째 달에 선택 없이도 시청 가능으로 취급), "모름"은 시청 가능 아님), `Evaluator`(`new Evaluator(planInput)` 후 `evaluate(selection)` 반복 호출, 상품 32개 초과 시 생성자 예외)와 목적함수 비교기(`EvaluationComparator`)(must 완주 → 점수 → 총비용 → 결제를 미루는 쪽(이른 달 새로 결제하는 상품이 적은 쪽, 2026-10-09 결정) → 상품 ID 사전순), 이유 코드(`NO_PROVIDER` → `UNKNOWN` → `BUDGET` → `TIME`)
+  - [x] 규칙 구현부에 PRD 5.4 규칙 주석
 - 완료 기준
   - V-B: Spring 컨텍스트 없는 정답 테스트(긴 시즌 분할, 분할 불가, 실제 시청 달 끊김, 한 달 최소 2시간, 이유 코드 4종, 동점)가 통과한다.
+- 기록: 2026-10-09 완료(사용자 작성 1차 → `backend-dev` 검수 → 재작성, 브랜치 `feature/b2-engine-assignment`, PR #25 develop 병합 cab7a56). CodeRabbit 지적 1건(비용 `int` 합산 오버플로)은 타입을 `long`으로 바꾸지 않고 `OttProduct`에 월 가격 상한 100만 원 검증을 두어 처리했다(상품 32개 × 3개월 × 100만 원이 `int` 범위 안). 검증: 엔진 테스트 66건(`EngineModelTest` 17·`EvaluationComparatorTest` 10·`EvaluatorTest` 39), `clean build` 전체 112건 통과(Docker 포함, `backend-dev` 보고).
+  - 검수에서 찾아 고친 것: 정렬 누락(`WatchUnitComparator`를 만들고 쓰지 않아 T8·T9 실패), 입력 검증 없음, 최적화(호출마다 집합·Map 재생성, 해시 조회 → 비트마스크·사전 계산). 속도(대략적, 노트북 1회 측정): 단위 30개 기준 옛 구현 대비 5~7배, 210만 번 환산 약 12초 → 약 2.3초(정식 측정은 Task 040).
+  - 결정(사용자, 2026-10-09): 결정 1(긴 시즌은 실제 시청 달도 연속, 몰아보기 개념), 결정 2(SUBSCRIBED는 평가기가 0번째 달에 시청 가능으로 처리), 결정 3(시청 가능 상품 ID가 `products`에 없으면 `PlanInput` 생성자 예외), 결정 4(긴 시즌은 마지막 조각 제외 한 달 최소 120분). 정렬 기준 맨 앞 키로 "시청 가능 상품이 없는 단위는 맨 뒤"를 추가하고 기준은 `WatchUnit.ASSIGNMENT_ORDER`에 둔다. "덮는/커버" 용어를 "시청 가능 상품"으로 통일했고, `hasUnknownProvider` → `isProviderUnknown`으로 바꿨다. 월 시청 분 120 이상은 Task 055 설정 API 검증으로 보고(엔진은 그대로), 월 가격 상한은 100만 원으로 정했고, `build.gradle`의 `starter-cache` 위치를 정리했다.
+  - **Task 039로 넘길 내용**: Solver 호출 방식은 `new PlanInput(...)` → `new Evaluator(input)`(한 번) → `evaluate(selection)` 반복이고, `new EvaluationComparator(input.products())`로 `compare(e1,e2) > 0`이면 e1이 더 좋다. 예산 필터는 Solver가 한다(D7). 0번째 달 후보에서 SUBSCRIBED·FREE를 빼면 평가가 같아서 탐색 낭비를 줄인다. 2단계 평가 확장(마스크 진입점, 점수만 계산하는 가벼운 함수, 비교기 ④·⑤ 마스크 계산)은 039에서 측정 후 결정한다. 정확해 지배 제거의 동점은 ⑤로 가른다(TECH 1절, 안내서 T20 정답 테스트 후보). 최선 조합 예시는 `docs/TASK038_GUIDE.md` 9절. 상품 수 한계는 32개(`int` 비트마스크, 2단계에서 64개가 필요하면 `long`)이고, 월 가격 상한 100만 원을 바꾸면 합산 타입을 다시 본다.
+  - 확인하지 못한 것: Javadoc 도구 실행, 정식 속도 측정(Task 040·100), Cloudtype 환경 속도, DB 가격이 상한을 넘을 때 서비스 계층 처리(Task 063에서 정함).
 
 #### Task 039: 정확해·그리디 Solver 구현으로 조합 탐색 완성 ⬜
 - 태그: [B] · PRD: B2, FR-12, 13, TECH T-4 · 선행: 038 · 브랜치: `feature/b2-engine-solvers`
