@@ -50,3 +50,61 @@ export function getMockPageSize(): number | undefined {
   const size = Number(raw)
   return raw !== null && Number.isInteger(size) && size >= 1 && size <= 100 ? size : undefined
 }
+
+/*
+ * ===== 목업 안 전환 (Task 028) =====
+ * R11-18(환산 입력 저장)과 R11-19(드라마 찜 단위)는 사용자가 Task 030에서 정한다. 그때까지 두 안을 화면에서 비교할 수 있게
+ * 결정마다 따로 주소 파라미터로 바꾼다(목업 모드에서만 동작). 기본은 둘 다 a(PRD 추천안)다.
+ * - ?mockVariantWatch=a|b  R11-18  a: 환산 결과를 분(monthlyWatchMinutes)으로만 저장 / b: "주 N회 × 회당 M시간" 입력값도 함께 저장
+ * - ?mockVariant=a|b       R11-19  a: 드라마를 시즌 단위로 찜 / b: 드라마를 작품 단위로 표시
+ */
+
+// R11-19(드라마 찜 단위) 안을 고르는 쿼리 파라미터 이름. 예: /wishlist?mockVariant=b
+export const MOCK_VARIANT_PARAM = 'mockVariant'
+
+// R11-18(환산 입력 저장) 안을 고르는 쿼리 파라미터 이름. 예: /settings?mockVariantWatch=b
+export const MOCK_VARIANT_WATCH_PARAM = 'mockVariantWatch'
+
+// 목업 안의 종류
+export type MockVariant = 'a' | 'b'
+
+// 문자열을 목업 안으로 바꾼다. 'b'가 아니면 모두 기본(a)이다
+export function parseMockVariant(value: string | null | undefined): MockVariant {
+  return value === 'b' ? 'b' : 'a'
+}
+
+// 화면 주소에서 파라미터 하나를 목업 안으로 읽는다. 목업 모드(VITE_USE_MOCK=true)가 아니면 항상 'a'다
+// (운영에서 누가 주소에 붙여도 화면 동작이 바뀌지 않게 하기 위함이다. getMockScenarioParams와 같은 이유)
+function readMockVariant(paramName: string): MockVariant {
+  if (import.meta.env.VITE_USE_MOCK !== 'true') return 'a'
+  return parseMockVariant(new URLSearchParams(window.location.search).get(paramName))
+}
+
+// R11-19(드라마 찜 단위) 안: 화면 주소의 mockVariant 값
+export function getMockVariant(): MockVariant {
+  return readMockVariant(MOCK_VARIANT_PARAM)
+}
+
+// R11-18(환산 입력 저장) 안: 화면 주소의 mockVariantWatch 값
+export function getMockWatchVariant(): MockVariant {
+  return readMockVariant(MOCK_VARIANT_WATCH_PARAM)
+}
+
+/**
+ * 목업 안을 API 요청 파라미터로 넘길 객체로 돌려준다. 목업 모드가 아니면 빈 객체다.
+ * 목업 핸들러(mocks/memberHandlers.ts)가 이 값을 보고 응답 모양을 바꾼다. 안 a(기본)는 붙이지 않는다.
+ */
+export function getMockVariantParams(): Record<string, string> {
+  return {
+    ...(getMockVariant() === 'b' ? { [MOCK_VARIANT_PARAM]: 'b' } : {}),
+    ...(getMockWatchVariant() === 'b' ? { [MOCK_VARIANT_WATCH_PARAM]: 'b' } : {}),
+  }
+}
+
+/**
+ * 시나리오와 목업 안 파라미터를 합쳐 API 요청에 실을 객체로 돌려준다. 회원 화면 훅(설정·찜·요금·플랜)이 모든 요청에 붙인다.
+ * 목업 모드가 아니면 빈 객체라 운영에는 영향이 없다.
+ */
+export function getMockRequestParams(): Record<string, string> {
+  return { ...getMockScenarioParams(), ...getMockVariantParams() }
+}

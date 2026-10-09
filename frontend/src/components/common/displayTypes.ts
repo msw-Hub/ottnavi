@@ -53,3 +53,16 @@ export const WISHLIST_PRIORITY_LABELS: Record<WishlistPriority, string> = {
   WANT: '보고 싶음',
   MAYBE: '여유될 때',
 }
+
+// 임시: 계약 반영 후 생성 타입으로 교체 (ERD user_subscription.status는 SUBSCRIBED / FREE이고 미구독은 행이 없다)
+// 온보딩에서 사용자가 서비스마다 고르는 이용 상태. UNKNOWN은 "아직 모르겠음"을 담는 화면 전용 값이다(ERD에는 없어 계약에서 확정 필요)
+// - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독
+export type ServiceSubscriptionStatus = 'SUBSCRIBED' | 'FREE' | 'NOT_SUBSCRIBED' | 'UNKNOWN'
+
+// 이용 상태별 화면 글자
+export const SUBSCRIPTION_STATUS_LABELS: Record<ServiceSubscriptionStatus, string> = {
+  SUBSCRIBED: '구독 중',
+  FREE: '무료 이용',
+  NOT_SUBSCRIBED: '미구독',
+  UNKNOWN: '잘 모르겠음',
+}
