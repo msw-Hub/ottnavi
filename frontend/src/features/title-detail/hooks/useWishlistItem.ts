@@ -54,7 +54,7 @@ const UNAUTHORIZED_STATUS = 401
  * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
  * queryFn을 skipToken으로 둔 이유: 서버에서 가져올 값이 없고 initialData(빈 객체)가 시작값이라 요청을 보내지 않기 위함이다.
  * 비로그인이면 오류 토스트 대신 로그인 화면(/login)으로 보내고, 지금 화면을 from으로 넘겨 로그인이 끝나면 이 작품 상세로 돌아오게 한다(Task 027).
- * 판단은 두 겹이다. ① 요청 전: 공통 훅 useIsLoggedIn이 비로그인이면 요청을 보내지 않고 바로 이동한다(401은 브라우저 콘솔에 오류로 남기 때문).
+ * 판단은 두 겹이다. ① 요청 전: 공통 훅 useIsLoggedIn이 비로그인이면 추가·우선순위 변경·해제 모두 요청을 보내지 않고 바로 이동한다(401은 브라우저 콘솔에 오류로 남기 때문).
  * ② 요청 후: 서버가 401을 주면(로그인이 만료된 경우 등) 같은 이동을 한다. 목업 역할(mockSession)을 직접 보지 않고 공통 훅을 쓰므로
  * features가 목업 모듈에 의존하지 않고, Task 057에서 훅 내부만 authStore로 바꾸면 된다.
  * 화면 가드(RequireAuth)와 달리 찜은 공개 화면 안의 동작이라, 막는 쪽이 아니라 "로그인을 권하는" 쪽으로 처리한다.
@@ -83,9 +83,9 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
     notifyError(error)
   }
 
-  // 로그인이 필요한 동작을 감싼다. 비로그인이면 요청을 보내지 않고 로그인 화면으로 보낸다
-  function requireLogin(action: () => void) {
-    return () => (isLoggedIn ? action() : redirectToLogin())
+  // 로그인이 필요한 동작을 감싼다. 비로그인이면 요청을 보내지 않고 로그인 화면으로 보낸다(인자가 있는 동작도 감쌀 수 있게 제네릭으로 둔다)
+  function requireLogin<Args extends unknown[]>(action: (...args: Args) => void) {
+    return (...args: Args) => (isLoggedIn ? action(...args) : redirectToLogin())
   }
 
   const { data: state } = useQuery<WishlistState>({
@@ -122,7 +122,10 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
     onError: handleError,
   })
 
-  const entry = state?.[entryKey] ?? null
+  // 비로그인이면 캐시에 이전 찜이 남아 있어도 "찜하지 않음"으로 본다.
+  // 상태로 따로 두지 않고 매 렌더에서 파생하는 이유: 로그아웃·역할 전환 때 따로 동기화할 곳이 없어야 낡은 "찜함"이 남지 않는다.
+  // 로그인 판단은 useIsLoggedIn 한 곳만 거치므로 Task 057에서 훅 내부를 authStore로 바꾸면 이 가드도 그대로 따라간다.
+  const entry = isLoggedIn ? (state?.[entryKey] ?? null) : null
 
   const changePriority = useMutation<unknown, ApiError, WishlistPriority>({
     mutationFn: (priority) => {
@@ -153,7 +156,7 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
     priority: entry?.priority ?? null, // 찜하지 않았으면 null
     isPending: add.isPending || changePriority.isPending || remove.isPending,
     onAdd: requireLogin(() => add.mutate()),
-    onChangePriority: (priority: WishlistPriority) => changePriority.mutate(priority),
-    onRemove: () => remove.mutate(),
+    onChangePriority: requireLogin((priority: WishlistPriority) => changePriority.mutate(priority)),
+    onRemove: requireLogin(() => remove.mutate()),
   }
 }

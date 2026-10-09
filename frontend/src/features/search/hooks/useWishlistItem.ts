@@ -1,6 +1,8 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { customInstance, type ApiError } from '@/api/http'
+import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import type {
   AddWishlistItemRequest,
   CommonResponseAddWishlistItem,
@@ -41,6 +43,9 @@ function notifyError(error: ApiError) {
   if (!error.hasNotifiedUser) toast.error(error.userMessage)
 }
 
+// 비로그인 요청에 서버가 돌려주는 상태 코드
+const UNAUTHORIZED_STATUS = 401
+
 /**
  * 작품(영화) 또는 시즌(드라마) 하나의 찜 상태와 찜 추가·우선순위 변경·해제를 돌려준다.
  *
@@ -51,13 +56,37 @@ function notifyError(error: ApiError) {
  * 찜 상태를 TanStack Query 캐시에 두는 이유: 목업 단계에는 "내 찜 목록 조회" API가 아직 없다. 요청이 성공할 때마다 캐시를 고쳐
  * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
  * queryFn을 skipToken으로 둔 이유: 서버에서 가져올 값이 없고 initialData(빈 객체)가 시작값이라 요청을 보내지 않기 위함이다.
- * 비로그인이면 서버가 401을 주어 오류 토스트("로그인이 필요합니다.")가 뜨고 캐시는 바뀌지 않는다.
+ * 비로그인이면 추가·우선순위 변경·해제 모두 요청을 보내지 않고 로그인 화면(/login)으로 보낸다(from 포함). 서버가 401을 줘도 같다.
+ * 찜 상태(priority)도 비로그인이면 null이다. features/title-detail의 같은 이름 훅과 같은 방식이다.
  * mutation은 TanStack Query 기본값이 재시도 0번이라 같은 요청이 두 번 저장되지 않는다.
  * features/title-detail에도 같은 훅이 있는 이유: 기능 폴더끼리는 서로 import하지 않기 때문이다.
  */
 export function useWishlistItem(target: WishlistTarget, targetName: string) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const location = useLocation()
   const entryKey = toEntryKey(target)
+
+  const isLoggedIn = useIsLoggedIn()
+
+  // 로그인 화면으로 보낸다. 지금 화면을 from으로 넘겨 로그인 뒤 돌아오게 한다(로그인 화면이 내부 경로만 허용하도록 다시 검사한다)
+  function redirectToLogin() {
+    navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
+  }
+
+  // 요청이 실패했을 때: 401이면 로그인 화면으로 보내고, 그 밖의 오류는 토스트로 알린다
+  function handleError(error: ApiError) {
+    if (error.status === UNAUTHORIZED_STATUS) {
+      redirectToLogin()
+      return
+    }
+    notifyError(error)
+  }
+
+  // 로그인이 필요한 동작을 감싼다. 비로그인이면 요청을 보내지 않고 로그인 화면으로 보낸다(인자가 있는 동작도 감쌀 수 있게 제네릭으로 둔다)
+  function requireLogin<Args extends unknown[]>(action: (...args: Args) => void) {
+    return (...args: Args) => (isLoggedIn ? action(...args) : redirectToLogin())
+  }
 
   const { data: state } = useQuery<WishlistState>({
     queryKey: WISHLIST_STATE_KEY,
@@ -90,10 +119,13 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
       writeEntry({ wishlistItemId: res.data.wishlistItemId, priority: DEFAULT_WISHLIST_PRIORITY })
       toast.success(`${targetName}을(를) 찜했습니다.`)
     },
-    onError: notifyError,
+    onError: handleError,
   })
 
-  const entry = state?.[entryKey] ?? null
+  // 비로그인이면 캐시에 이전 찜이 남아 있어도 "찜하지 않음"으로 본다.
+  // 상태로 따로 두지 않고 매 렌더에서 파생하는 이유: 로그아웃·역할 전환 때 따로 동기화할 곳이 없어야 낡은 "찜함"이 남지 않는다.
+  // 로그인 판단은 useIsLoggedIn 한 곳만 거치므로 Task 057에서 훅 내부를 authStore로 바꾸면 이 가드도 그대로 따라간다.
+  const entry = isLoggedIn ? (state?.[entryKey] ?? null) : null
 
   const changePriority = useMutation<unknown, ApiError, WishlistPriority>({
     mutationFn: (priority) => {
@@ -107,7 +139,7 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
     onSuccess: (_res, priority) => {
       if (entry) writeEntry({ ...entry, priority })
     },
-    onError: notifyError,
+    onError: handleError,
   })
 
   const remove = useMutation<unknown, ApiError, void>({
@@ -117,14 +149,14 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
       writeEntry(null)
       toast.success(`${targetName} 찜을 해제했습니다.`)
     },
-    onError: notifyError,
+    onError: handleError,
   })
 
   return {
     priority: entry?.priority ?? null, // 찜하지 않았으면 null
     isPending: add.isPending || changePriority.isPending || remove.isPending,
-    onAdd: () => add.mutate(),
-    onChangePriority: (priority: WishlistPriority) => changePriority.mutate(priority),
-    onRemove: () => remove.mutate(),
+    onAdd: requireLogin(() => add.mutate()),
+    onChangePriority: requireLogin((priority: WishlistPriority) => changePriority.mutate(priority)),
+    onRemove: requireLogin(() => remove.mutate()),
   }
 }

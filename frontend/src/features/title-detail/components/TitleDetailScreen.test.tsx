@@ -1,8 +1,8 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/providers'
 import { TitleDetailScreen } from '@/features/title-detail/components/TitleDetailScreen'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
@@ -17,7 +17,10 @@ import { setMockRole } from '@/mocks/mockSession'
 const server = setupServer(...handlers)
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' })) // 핸들러 없는 요청이 실제 네트워크로 나가지 않게 막는다
+// 로그인 판단(useIsLoggedIn)은 목업 모드에서만 목업 역할을 믿으므로, 회원 상태 테스트를 위해 목업 모드를 흉내 낸다(.env.local이 없는 CI에서도 같게)
+beforeEach(() => vi.stubEnv('VITE_USE_MOCK', 'true'))
 afterEach(() => {
+  vi.unstubAllEnvs()
   server.resetHandlers()
   setMockRole('GUEST') // 로그인 역할은 모듈 변수라 테스트마다 비로그인으로 되돌린다
   resetMockWishlist()
@@ -199,6 +202,23 @@ describe('작품 상세 화면', () => {
     // 해제하면 다시 "찜하기"로 돌아간다
     await user.click(screen.getByRole('button', { name: /^찜 해제/ }))
     expect(await screen.findByRole('button', { name: '시즌 2 찜하기' })).toBeInTheDocument()
+  })
+
+  it('찜한 뒤 비로그인으로 바뀌면 "찜함" 표시가 사라지고 "찜하기"로 돌아간다', async () => {
+    setMockRole('USER')
+    const user = userEvent.setup()
+    renderDetailOf('오징어 게임', 'tv')
+    await screen.findByRole('heading', { level: 1, name: '오징어 게임' })
+
+    await user.click(screen.getByRole('button', { name: '시즌 2 찜하기' }))
+    expect(
+      await screen.findByRole('button', { name: '시즌 2 찜함 · 보고 싶음' }),
+    ).toBeInTheDocument()
+
+    // 머리글 전환(로그아웃)과 같은 경로로 역할만 바꾼다. 캐시에는 찜이 남아 있지만 화면은 비로그인 기준으로 그린다
+    act(() => setMockRole('GUEST'))
+    expect(await screen.findByRole('button', { name: '시즌 2 찜하기' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /찜함/ })).not.toBeInTheDocument()
   })
 
   it('영화는 상세 상단에 찜 버튼 하나가 있고, 비로그인이면 토스트 대신 로그인 화면으로 이동한다', async () => {
