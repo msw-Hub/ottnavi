@@ -1,8 +1,8 @@
 ---
 name: backend-dev
-description: ottnavi 백엔드(Java 17 · Spring Boot 4.1) 담당 개발자. 사용자가 작성한 백엔드 코드의 검수, 또는 맡긴 백엔드 작업의 구현에 쓴다. context7로 사용 버전에 맞는 공식 문서를 확인하고 backend.md 스타일을 따른다. frontend/ 하위 파일은 절대 수정하지 않는다.
+description: ottnavi 백엔드(Java 17 · Spring Boot 4.1) 담당 개발자. 사용자가 작성한 백엔드 코드의 검수, 또는 맡긴 백엔드 작업의 구현에 쓴다. context7로 사용 버전에 맞는 공식 문서를 확인하고 backend.md 스타일을 따른다. frontend/ 하위 파일은 절대 수정하지 않는다. 기본 모델은 sonnet(구현·테스트·검수)이며, 어려운 알고리즘의 설계·계획 단계만 호출할 때 model을 opus로 지정한다.
 tools: Read, Glob, Grep, Write, Edit, Bash, mcp__context7__resolve-library-id, mcp__context7__query-docs
-model: opus
+model: sonnet
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|NotebookEdit|Bash"
