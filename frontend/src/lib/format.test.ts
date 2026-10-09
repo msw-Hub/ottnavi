@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_DISPLAY, formatDataAsOf, formatMinutes, formatWon } from '@/lib/format'
+import { EMPTY_DISPLAY, formatDataAsOf, formatDate, formatMinutes, formatWon } from '@/lib/format'
+
+describe('formatDate', () => {
+  it('개봉일·방영일(YYYY-MM-DD)을 한국어 날짜로 바꾼다', () => {
+    expect(formatDate('2021-09-17')).toBe('2021년 9월 17일')
+    expect(formatDate('1995-11-22')).toBe('1995년 11월 22일')
+  })
+
+  it('일시는 한국 시간 기준 날짜로 바꾸고, 해석할 수 없는 값은 null', () => {
+    expect(formatDate('2026-10-08T16:00:00Z')).toBe('2026년 10월 9일')
+    expect(formatDate(null)).toBeNull()
+    expect(formatDate('2026-02-30')).toBeNull()
+    expect(formatDate('abc')).toBeNull()
+  })
+
+  it('formatDataAsOf와 같은 표기를 쓴다', () => {
+    expect(formatDate('2026-10-09')).toBe(formatDataAsOf('2026-10-09'))
+  })
+})
 
 // 화면 표시 형식이 바뀌면 사용자에게 바로 보이므로 경계값을 고정해 둔다(format.ts 함수 주석의 규칙과 짝을 이룬다).
 describe('formatWon', () => {

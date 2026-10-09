@@ -35,3 +35,21 @@ export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
   ALREADY_PAID: '이미 결제',
   FREE: '무료',
 }
+
+// 임시: 계약 반영 후 생성 타입으로 교체 (PRD FR-09 찜 우선순위: 꼭 볼 작품 / 보고 싶음 / 여유될 때)
+// 찜 표시 컴포넌트(WishlistButton)가 받는 값이다. 기능 폴더(features/*/mockTypes.ts)의 같은 이름 타입과 문자열이 같다
+export type WishlistPriority = 'MUST' | 'WANT' | 'MAYBE'
+
+// 우선순위 선택지. 순서가 화면에 보이는 순서다
+export const WISHLIST_PRIORITY_OPTIONS: { value: WishlistPriority; label: string }[] = [
+  { value: 'MUST', label: '꼭 볼 작품' },
+  { value: 'WANT', label: '보고 싶음' },
+  { value: 'MAYBE', label: '여유될 때' },
+]
+
+// 우선순위별 화면 글자
+export const WISHLIST_PRIORITY_LABELS: Record<WishlistPriority, string> = {
+  MUST: '꼭 볼 작품',
+  WANT: '보고 싶음',
+  MAYBE: '여유될 때',
+}
