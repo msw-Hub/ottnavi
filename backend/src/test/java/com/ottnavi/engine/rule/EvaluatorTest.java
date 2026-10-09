@@ -508,6 +508,23 @@ class EvaluatorTest {
 	}
 
 	@Test
+	void 상한_가격_상품_32개를_3개월_모두_선택해도_총비용이_넘치지_않는다() {
+		// CodeRabbit PR #25: 상품 수 상한(32) × 3개월 × 월 가격 상한(100만 원)이 int 범위 안인지 확인한다.
+		// FREE·SUBSCRIBED의 0원 처리와 겹치지 않도록 모두 구독하지 않은(NONE) 상품으로 만든다
+		List<OttProduct> products = new ArrayList<>();
+		Set<Long> allIds = new HashSet<>();
+		for (long id = 1; id <= 32; id++) {
+			products.add(product(id, OttProduct.MAX_MONTHLY_PRICE));
+			allIds.add(id);
+		}
+		PlanInput input = input(600, products);
+
+		Evaluation evaluation = evaluate(input, selection(allIds, allIds, allIds));
+
+		assertThat(evaluation.totalCost()).isPositive().isEqualTo(32 * 3 * 1_000_000);
+	}
+
+	@Test
 	void 같은_평가기를_여러_번_불러도_앞선_평가가_다음_평가에_영향을_주지_않는다() {
 		PlanInput input = input(600, P1_ONLY, unit(1, MUST, 1200, P1), unit(2, WANT, 300, P1));
 		Evaluator evaluator = new Evaluator(input);

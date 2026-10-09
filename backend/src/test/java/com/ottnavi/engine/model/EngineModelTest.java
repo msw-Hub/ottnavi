@@ -110,6 +110,16 @@ class EngineModelTest {
 		assertThatThrownBy(() -> new OttProduct(1, 1_000, null)).isInstanceOf(IllegalArgumentException.class);
 	}
 
+	@Test
+	void 상품_월_가격은_100만_원까지_허용하고_넘으면_예외() {
+		// CodeRabbit PR #25: 엔진의 int 비용 합산 오버플로를 입력 단계에서 막는다
+		assertThat(new OttProduct(1, OttProduct.MAX_MONTHLY_PRICE, OttProductCondition.NONE).monthlyPrice()).isEqualTo(1_000_000);
+		assertThatThrownBy(() -> new OttProduct(1, 1_000_001, OttProductCondition.NONE))
+				.isInstanceOf(IllegalArgumentException.class)
+				.hasMessageContaining("100만 원 이하")
+				.hasMessageContaining("monthlyPrice=1000001");
+	}
+
 	// Selection
 
 	@Test

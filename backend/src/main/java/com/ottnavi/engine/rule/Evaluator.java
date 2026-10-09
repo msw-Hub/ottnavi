@@ -41,6 +41,8 @@ public final class Evaluator {
 
 	private static final int MONTH_COUNT = Selection.MONTH_COUNT; // 플랜은 항상 3개월
 	private static final int MAX_PRODUCT_COUNT = Integer.SIZE;    // int 비트마스크로 담을 수 있는 상품 수(32)
+	// 비용을 int로 합산해도 안전한 근거: 상품 수 상한(MAX_PRODUCT_COUNT 32개) × 3개월 × 월 가격 상한(OttProduct.MAX_MONTHLY_PRICE 100만 원)
+	// = 9,600만 원 < int 최댓값(약 21억). 주의: 둘 중 하나라도 늘리면(예: long 비트마스크로 64개) 합산 타입(int)을 다시 검토해야 한다
 
 	/**
 	 * 긴 시즌을 나눠 볼 때 마지막 조각을 뺀 각 달 조각의 최소 시간(분). 120분은 영화 한 편 정도다.
@@ -135,7 +137,7 @@ public final class Evaluator {
 
 		// 달별 "지금 볼 수 있는 상품" 마스크와 비용을 먼저 구한다
 		int[] availableMasks = new int[MONTH_COUNT];
-		int totalCost = 0;
+		int totalCost = 0; // 최대 9,600만 원이라 int로 넘치지 않는다(MAX_PRODUCT_COUNT 옆 주석)
 		for (int month = 0; month < MONTH_COUNT; month++) {
 			int selectedMask = toMask(selection.productIdsOf(month));
 			totalCost += monthlyCost(month, selectedMask);
