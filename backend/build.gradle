@@ -32,6 +32,7 @@ dependencies {
 	runtimeOnly 'org.postgresql:postgresql'
 	// Redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-cache' // Task 024: Boot 4는 캐시 자동 구성이 별도 모듈이라 필요하다(RedisCacheManagerBuilderCustomizer 등)
 	// 보안·JWT (jjwt-jackson은 Jackson 2라 런타임에만 둔다, TECH 6절)
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
@@ -61,9 +62,6 @@ dependencies {
 	testImplementation 'org.wiremock:wiremock-standalone:3.13.2'
 	testImplementation 'org.yaml:snakeyaml'   // 계약 대조 테스트의 YAML 파싱(T-5). 버전은 Boot BOM 관리, 전이 의존에 기대지 않고 명시
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-
-	implementation 'org.springframework.boot:spring-boot-starter-cache'
 }
 
 dependencyManagement {
