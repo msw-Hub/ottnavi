@@ -40,7 +40,7 @@ class ExactSolverTest {
 	// ---------------------------------------------------------------- 손 계산 정답
 
 	@Test
-	@DisplayName("추천형 완전탐색: 그리디가 나쁜 케이스에서 점수 4·비용 28,000원, 조합은 ⑤ 사전순으로 ({1},{1},{2})")
+	@DisplayName("추천형 완전탐색: 그리디가 나쁜 케이스에서 점수 4·비용 28,000원, 조합은 ④ 조기 시청으로 ({2},{1},{1})")
 	void 추천형_그리디_나쁜_케이스() {
 		SolveResult result = exact.solve(SolverCases.greedyWorse());
 
@@ -52,7 +52,7 @@ class ExactSolverTest {
 	}
 
 	@Test
-	@DisplayName("동치 제거 동점(T20): 같은 가격·같은 단위를 보는 두 상품이면 결제를 미루고 ID가 작은 p1을 고른다")
+	@DisplayName("동치 제거 동점(T20): 같은 가격·같은 단위를 보는 두 상품이면 가장 이른 달에 보고 ID가 작은 p1을 고른다")
 	void 동치_제거_동점() {
 		assertThat(exact.solve(SolverCases.tiePair()).selection()).isEqualTo(SolverCases.tiePairSelection());
 	}
@@ -118,7 +118,7 @@ class ExactSolverTest {
 	@DisplayName("S6 후보 제외(성질 20): FREE, 0번째 달 SUBSCRIBED, 어떤 단위도 못 보는 상품, 예산 초과 상품은 결과에 나타나지 않는다")
 	void 후보_제외() {
 		// 상품 1 일반 3,000원, 2 FREE, 3 SUBSCRIBED 2,000원, 4 일반 3,000원(아무도 못 봄), 5 일반 20,000원(예산 10,000원 초과)
-		// U1(WANT 100)은 1·5, U2는 FREE 2, U3는 SUBSCRIBED 3으로만 볼 수 있다. U2·U3는 선택 없이 0번째 달부터 보고 U1만 1이 필요하다 → ({},{},{1}), 점수 6, 3,000원
+		// U1(WANT 100)은 1·5, U2는 FREE 2, U3는 SUBSCRIBED 3으로만 볼 수 있다. U2·U3는 선택 없이 0번째 달부터 보고 U1만 1이 필요하다 → ({1},{},{}), 점수 6, 3,000원
 		PlanInput input = in(10_000, 600,
 				List.of(product(1, 3_000), free(2), subscribed(3, 2_000), product(4, 3_000), product(5, 20_000)),
 				unit(1, Priority.WANT, 100, 1L, 5L), unit(2, Priority.WANT, 100, 2L), unit(3, Priority.WANT, 100, 3L));
@@ -127,7 +127,7 @@ class ExactSolverTest {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			SolveResult result = exact.solve(input, SolverCases.objective(type, input, recommended));
 
-			assertThat(result.selection()).as(type.name()).isEqualTo(sel(ids(), ids(), ids(1L)));
+			assertThat(result.selection()).as(type.name()).isEqualTo(sel(ids(1L), ids(), ids()));
 			assertThat(result.evaluation().score()).isEqualTo(6);
 			assertThat(result.evaluation().totalCost()).isEqualTo(3_000);
 		}
@@ -175,7 +175,7 @@ class ExactSolverTest {
 
 		assertThat(result.evaluation().score()).isEqualTo(2);
 		assertThat(result.evaluation().totalCost()).isEqualTo(5_000);
-		assertThat(result.selection()).isEqualTo(sel(ids(), ids(), ids(1L)));
+		assertThat(result.selection()).isEqualTo(sel(ids(1L), ids(), ids()));
 	}
 
 	@Test
@@ -213,10 +213,10 @@ class ExactSolverTest {
 	void 절약형_간편형_손_계산() {
 		PlanInput dropB = SolverCases.saverAndSimpleDropB();
 		Evaluation dropBRecommended = BruteForceOracle.bestRecommended(dropB);
-		assertThat(exact.solve(dropB, PlanObjective.recommended(dropB.products())).selection())
+		assertThat(exact.solve(dropB, PlanObjective.recommended(dropB)).selection())
 				.isEqualTo(SolverCases.saverAndSimpleDropBRecommended());
-		SolveResult saver = exact.solve(dropB, PlanObjective.saver(dropB.products(), dropBRecommended));
-		SolveResult simple = exact.solve(dropB, PlanObjective.simple(dropB.products(), dropBRecommended));
+		SolveResult saver = exact.solve(dropB, PlanObjective.saver(dropB, dropBRecommended));
+		SolveResult simple = exact.solve(dropB, PlanObjective.simple(dropB, dropBRecommended));
 		assertThat(saver.selection()).isEqualTo(SolverCases.saverAndSimpleDropBSelection());
 		assertThat(saver.evaluation().totalCost()).isEqualTo(6_000);
 		assertThat(saver.planType()).isEqualTo(PlanType.SAVER);
@@ -226,9 +226,9 @@ class ExactSolverTest {
 		PlanInput vs = SolverCases.saverVsSimple();
 		Evaluation vsRecommended = BruteForceOracle.bestRecommended(vs);
 		assertThat(exact.solve(vs).selection()).isEqualTo(SolverCases.saverVsSimpleRecommended());
-		assertThat(exact.solve(vs, PlanObjective.saver(vs.products(), vsRecommended)).selection())
+		assertThat(exact.solve(vs, PlanObjective.saver(vs, vsRecommended)).selection())
 				.isEqualTo(SolverCases.saverVsSimpleRecommended());
-		SolveResult vsSimple = exact.solve(vs, PlanObjective.simple(vs.products(), vsRecommended));
+		SolveResult vsSimple = exact.solve(vs, PlanObjective.simple(vs, vsRecommended));
 		assertThat(vsSimple.selection()).isEqualTo(SolverCases.saverVsSimpleSimple());
 		assertThat(vsSimple.evaluation().totalCost()).isEqualTo(9_000);
 	}
@@ -262,7 +262,7 @@ class ExactSolverTest {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			for (PlanType type : PlanType.values()) {
-				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input.products(), recommended.score());
+				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input, recommended.score());
 				Evaluation expected = BruteForceOracle.best(input, type, recommended.score());
 				Selection baseline = type == PlanType.RECOMMENDED ? null : recommended.selection();
 
@@ -279,10 +279,10 @@ class ExactSolverTest {
 		// saverVsSimple에서 P({1}, 9,000원)와 Q+R({2,3}, 4,000원)은 같은 작품 두 개를 본다(같은 동치 그룹). 추천형은 비용이 싼 Q+R만 남기지만
 		// 간편형은 가입 횟수가 적은 비싼 P를 골라야 하므로, 간편형에서 동치 제거를 쓰면 이 정답이 사라진다.
 		PlanInput vs = SolverCases.saverVsSimple();
-		SolveResult simple = exact.solve(vs, PlanObjective.simple(vs.products(), BruteForceOracle.bestRecommended(vs)));
+		SolveResult simple = exact.solve(vs, PlanObjective.simple(vs, BruteForceOracle.bestRecommended(vs)));
 
 		assertThat(simple.evaluation().totalCost()).isEqualTo(9_000);
-		assertThat(simple.selection().productIdsOf(2)).containsExactly(1L);
+		assertThat(simple.selection().productIdsOf(0)).containsExactly(1L);
 	}
 
 	// ---------------------------------------------------------------- 절약형·간편형 성질(5절 12·13)
@@ -294,7 +294,7 @@ class ExactSolverTest {
 			SolveResult recommended = exact.solve(input);
 			int floor = BruteForceOracle.scoreFloor(recommended.evaluation().score());
 
-			SolveResult saver = exact.solve(input, PlanObjective.saver(input.products(), recommended.evaluation()));
+			SolveResult saver = exact.solve(input, PlanObjective.saver(input, recommended.evaluation()));
 
 			assertThat(saver.evaluation().score()).as("%s", input).isGreaterThanOrEqualTo(floor);
 			assertThat(saver.evaluation().totalCost()).as("%s", input).isLessThanOrEqualTo(recommended.evaluation().totalCost());
@@ -309,7 +309,7 @@ class ExactSolverTest {
 			SolveResult recommended = exact.solve(input);
 			int floor = BruteForceOracle.scoreFloor(recommended.evaluation().score());
 
-			SolveResult simple = exact.solve(input, PlanObjective.simple(input.products(), recommended.evaluation()));
+			SolveResult simple = exact.solve(input, PlanObjective.simple(input, recommended.evaluation()));
 
 			assertThat(simple.evaluation().score()).as("%s", input).isGreaterThanOrEqualTo(floor);
 			assertThat(BruteForceOracle.joinTotal(simple.selection(), input.products())).as("%s", input)
@@ -355,7 +355,7 @@ class ExactSolverTest {
 		PlanInput input = SolverCases.singleProduct();
 
 		assertThatThrownBy(() -> exact.solve(null)).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> exact.solve(null, PlanObjective.recommended(input.products()))).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> exact.solve(null, PlanObjective.recommended(input))).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> exact.solve(input, null)).isInstanceOf(IllegalArgumentException.class);
 	}
 
@@ -365,7 +365,7 @@ class ExactSolverTest {
 	@DisplayName("후보 상품이 20개를 넘으면 solve와 countCandidateCombinations가 IllegalArgumentException이다")
 	void 후보_상품_21개는_예외() {
 		PlanInput input = SolverCases.manyProducts(21, 0);
-		PlanObjective recommended = PlanObjective.recommended(input.products());
+		PlanObjective recommended = PlanObjective.recommended(input);
 
 		assertThat(ExactSolver.MAX_PRODUCT_COUNT).isEqualTo(20);
 		assertThatThrownBy(() -> exact.solve(input, recommended)).isInstanceOf(IllegalArgumentException.class);
@@ -378,7 +378,7 @@ class ExactSolverTest {
 	void 후보_상품_20개는_풀린다() {
 		// 상품 21개 중 1개는 아무 작품도 못 봐서 후보가 아니다. 예산 1,000원이라 한 달에 하나씩, 달마다 부분집합 21개(빈 집합 + 단일 20개)
 		PlanInput input = SolverCases.manyProducts(20, 1);
-		PlanObjective recommended = PlanObjective.recommended(input.products());
+		PlanObjective recommended = PlanObjective.recommended(input);
 
 		assertThat(exact.countCandidateCombinations(input, recommended)).isEqualTo(21L * 21 * 21);
 		SolveResult result = exact.solve(input, recommended);
@@ -397,8 +397,8 @@ class ExactSolverTest {
 		PlanInput input = in(10_000, 600, List.of(product(1, 3_000), product(2, 3_000)), unit(1, Priority.WANT, 200, 1L, 2L));
 		Evaluation recommended = BruteForceOracle.bestRecommended(input);
 
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input.products(), recommended))).isEqualTo(64L);
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.simple(input.products(), recommended))).isEqualTo(64L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input, recommended))).isEqualTo(64L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.simple(input, recommended))).isEqualTo(64L);
 	}
 
 	@Test
@@ -407,7 +407,7 @@ class ExactSolverTest {
 		// 달마다 {}, {1}, {2}만 가능(합 6,000 > 5,000) → 3^3 = 27
 		PlanInput input = in(5_000, 600, List.of(product(1, 3_000), product(2, 3_000)), unit(1, Priority.WANT, 200, 1L, 2L));
 
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input))))
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input, BruteForceOracle.bestRecommended(input))))
 				.isEqualTo(27L);
 	}
 
@@ -417,12 +417,12 @@ class ExactSolverTest {
 		// 상품 둘이 같은 단위를 보므로 {1}, {2}, {1,2}가 한 그룹 → 달마다 {}, 그룹 = 2개, 2^3 = 8. 절약형은 4^3 = 64
 		PlanInput input = in(10_000, 600, List.of(product(1, 3_000), product(2, 3_000)), unit(1, Priority.WANT, 200, 1L, 2L));
 
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input.products()))).isEqualTo(8L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input))).isEqualTo(8L);
 
 		// P({1})와 Q+R({2,3})가 같은 그룹이 되는 입력: 달마다 그룹 4개 → 64, 전체 부분집합 5개 → 125
 		PlanInput vs = SolverCases.saverVsSimple();
-		assertThat(exact.countCandidateCombinations(vs, PlanObjective.recommended(vs.products()))).isEqualTo(64L);
-		assertThat(exact.countCandidateCombinations(vs, PlanObjective.saver(vs.products(), BruteForceOracle.bestRecommended(vs))))
+		assertThat(exact.countCandidateCombinations(vs, PlanObjective.recommended(vs))).isEqualTo(64L);
+		assertThat(exact.countCandidateCombinations(vs, PlanObjective.saver(vs, BruteForceOracle.bestRecommended(vs))))
 				.isEqualTo(125L);
 	}
 
@@ -432,8 +432,8 @@ class ExactSolverTest {
 		PlanInput input = in(10_000, 600, List.of(product(1, 3_000), product(2, 3_000)), unit(1, Priority.WANT, 200, 1L));
 		Evaluation recommended = BruteForceOracle.bestRecommended(input);
 
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input.products()))).isEqualTo(8L);
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input.products(), recommended))).isEqualTo(8L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input))).isEqualTo(8L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input, recommended))).isEqualTo(8L);
 	}
 
 	@Test
@@ -442,11 +442,11 @@ class ExactSolverTest {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 
-			assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input.products()))).as("추천형 %s", input)
+			assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input))).as("추천형 %s", input)
 					.isEqualTo(BruteForceOracle.equivalenceCombinationCount(input));
-			assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input.products(), recommended))).as("절약형 %s", input)
+			assertThat(exact.countCandidateCombinations(input, PlanObjective.saver(input, recommended))).as("절약형 %s", input)
 					.isEqualTo(BruteForceOracle.fullCombinationCount(input));
-			assertThat(exact.countCandidateCombinations(input, PlanObjective.simple(input.products(), recommended))).as("간편형 %s", input)
+			assertThat(exact.countCandidateCombinations(input, PlanObjective.simple(input, recommended))).as("간편형 %s", input)
 					.isEqualTo(BruteForceOracle.fullCombinationCount(input));
 		}
 	}
@@ -456,6 +456,6 @@ class ExactSolverTest {
 	void 후보_조합_수_빈_입력() {
 		PlanInput input = in(10_000, 600, List.of());
 
-		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input.products()))).isEqualTo(1L);
+		assertThat(exact.countCandidateCombinations(input, PlanObjective.recommended(input))).isEqualTo(1L);
 	}
 }

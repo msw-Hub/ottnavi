@@ -60,9 +60,9 @@ class PlanTypeSolverTest {
 
 			assertThat(results.get(PlanType.RECOMMENDED).selection()).as("%s", input).isEqualTo(recommended.selection());
 			assertThat(results.get(PlanType.SAVER).selection()).as("%s", input)
-					.isEqualTo(selector.solve(input, PlanObjective.saver(input.products(), recommended.evaluation())).selection());
+					.isEqualTo(selector.solve(input, PlanObjective.saver(input, recommended.evaluation())).selection());
 			assertThat(results.get(PlanType.SIMPLE).selection()).as("%s", input)
-					.isEqualTo(selector.solve(input, PlanObjective.simple(input.products(), recommended.evaluation())).selection());
+					.isEqualTo(selector.solve(input, PlanObjective.simple(input, recommended.evaluation())).selection());
 			// 오라클과도 대조한다: 완전탐색으로 풀리는 상한이므로 세 유형 모두 무차별 대입 최선이다
 			int recommendedScore = BruteForceOracle.bestRecommended(input).score();
 			for (PlanType type : PlanType.values()) {
@@ -102,9 +102,9 @@ class PlanTypeSolverTest {
 
 			assertThat(results.get(PlanType.RECOMMENDED).selection()).as("%s", input).isEqualTo(recommended.selection());
 			assertThat(results.get(PlanType.SAVER).selection()).as("%s", input)
-					.isEqualTo(greedy.solve(input, PlanObjective.saver(input.products(), greedyEvaluation)).selection());
+					.isEqualTo(greedy.solve(input, PlanObjective.saver(input, greedyEvaluation)).selection());
 			assertThat(results.get(PlanType.SIMPLE).selection()).as("%s", input)
-					.isEqualTo(greedy.solve(input, PlanObjective.simple(input.products(), greedyEvaluation)).selection());
+					.isEqualTo(greedy.solve(input, PlanObjective.simple(input, greedyEvaluation)).selection());
 			results.values().forEach(result -> assertThat(result.solverType()).isEqualTo(SolverType.GREEDY));
 		}
 	}
@@ -146,7 +146,7 @@ class PlanTypeSolverTest {
 
 		assertThat(results).hasSize(3);
 		for (PlanType type : PlanType.values()) {
-			assertThat(results.get(type).selection()).as(type.name()).isEqualTo(sel(ids(), ids(), ids(1L)));
+			assertThat(results.get(type).selection()).as(type.name()).isEqualTo(sel(ids(1L), ids(), ids()));
 		}
 	}
 

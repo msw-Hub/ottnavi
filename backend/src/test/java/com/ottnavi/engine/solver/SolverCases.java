@@ -41,9 +41,9 @@ public final class SolverCases {
 	public static com.ottnavi.engine.rule.PlanObjective objective(
 			com.ottnavi.engine.model.PlanType type, PlanInput input, com.ottnavi.engine.model.Evaluation recommended) {
 		return switch (type) {
-			case RECOMMENDED -> com.ottnavi.engine.rule.PlanObjective.recommended(input.products());
-			case SAVER -> com.ottnavi.engine.rule.PlanObjective.saver(input.products(), recommended);
-			case SIMPLE -> com.ottnavi.engine.rule.PlanObjective.simple(input.products(), recommended);
+			case RECOMMENDED -> com.ottnavi.engine.rule.PlanObjective.recommended(input);
+			case SAVER -> com.ottnavi.engine.rule.PlanObjective.saver(input, recommended);
+			case SIMPLE -> com.ottnavi.engine.rule.PlanObjective.simple(input, recommended);
 		};
 	}
 
@@ -82,11 +82,12 @@ public final class SolverCases {
 	/**
 	 * 완전탐색(추천형): 점수 4(X 2 + Y 2), 비용 28,000원.
 	 * 한 달 예산이 10,000원이라 p1+p2(18,000원)를 한 달에 못 담는다. X(1000분)는 p1이 연속 두 달 있어야 600+400분으로 끝나고,
-	 * Y는 p2가 남은 한 달에 있어야 한다. 두 배치 (p2,p1,p1)와 (p1,p1,p2)가 점수 4·비용 28,000으로 같고 결제 미루기 [1,1,1]도 같아
-	 * ⑤ 상품 ID 사전순으로 0번째 달 {1} < {2}인 (p1,p1,p2)가 남는다. (명세 예시는 0번째 달 p2라고 적었으나 ⑤를 따르면 ID 1이 앞선다.)
+	 * Y는 p2가 남은 한 달에 있어야 한다. 두 배치 (p2,p1,p1)와 (p1,p1,p2)가 점수 4·비용 28,000으로 같다.
+	 * ④ 조기 시청이 가른다(2026-10-10 규칙): (p2,p1,p1)은 Y(300분)를 0번째 달에 시청 완료해 0번째 달까지 점수 2이고,
+	 * (p1,p1,p2)는 X를 1번째 달에 끝내고 Y를 2번째 달에 끝내 0번째 달까지 점수 0이다. 그래서 (p2,p1,p1)이 남는다(결제 미루기·ID 순까지 가지 않음).
 	 */
 	public static Selection greedyWorseExactSelection() {
-		return sel(ids(1L), ids(1L), ids(2L));
+		return sel(ids(2L), ids(1L), ids(1L));
 	}
 
 	/**
@@ -99,20 +100,20 @@ public final class SolverCases {
 	}
 
 	/**
-	 * T20 지배 제거 동점 + 결제 미루기: 같은 가격 9,000원 단품 p2·p1(목록 순서는 일부러 p2 먼저)이 같은 WANT 200분 하나를 둘 다 볼 수 있다. 예산 10,000원.
-	 * 점수 2는 어느 달에 어느 하나를 골라도 같고 비용 9,000원도 같다. ④ 결제를 미루는 쪽이 이기므로 2번째 달, ⑤로 ID가 작은 p1이 남는다.
+	 * T20 동치 제거 동점 + 조기 시청: 같은 가격 9,000원 단품 p2·p1(목록 순서는 일부러 p2 먼저)이 같은 WANT 200분 하나를 둘 다 볼 수 있다. 예산 10,000원.
+	 * 점수 2는 어느 달에 어느 하나를 골라도 같고 비용 9,000원도 같다. ④ 조기 시청이 가장 이른 달(0번째 달)에 보는 쪽을 이기게 하고, ⑥으로 ID가 작은 p1이 남는다.
 	 */
 	public static PlanInput tiePair() {
 		return in(10_000, 600, List.of(product(2, 9_000), product(1, 9_000)), unit(1, Priority.WANT, 200, 1L, 2L));
 	}
 
 	public static Selection tiePairSelection() {
-		return sel(ids(), ids(), ids(1L));
+		return sel(ids(1L), ids(), ids());
 	}
 
 	/**
 	 * SUBSCRIBED 시작: 구독 중인 s(id 1, 50,000원)가 예산(10,000원)보다 비싸지만 0번째 달 비용은 0원이다.
-	 * WANT 200분 하나를 s로 본다. 선택하지 않아도 0번째 달에 볼 수 있어 점수 2·비용 0이고, 같은 조건에서 ⑤로 빈 집합이 {1}보다 앞서 전부 빈 조합이다.
+	 * WANT 200분 하나를 s로 본다. 선택하지 않아도 0번째 달에 볼 수 있어 점수 2·비용 0이고, 같은 조건에서 ⑥으로 빈 집합이 {1}보다 앞서 전부 빈 조합이다(후보에서도 빠진다).
 	 */
 	public static PlanInput subscribedStart() {
 		return in(10_000, 600, List.of(subscribed(1, 50_000)), unit(1, Priority.WANT, 200, 1L));
@@ -128,8 +129,8 @@ public final class SolverCases {
 
 	/**
 	 * FREE 상품: f(id 3, 무료)는 선택하지 않아도 모든 달에 본다. p(id 2, 5,000원). A(WANT 200)는 f·p 둘 다, B(WANT 200)는 p만. 예산 10,000원.
-	 * B 때문에 p가 한 번 필요하다. 가장 늦은 2번째 달에 p만 고르면 점수 4·비용 5,000원.
-	 * FREE는 S6에 따라 후보가 아니므로 결과에 나타나지 않는다. 기대 ({},{},{2}).
+	 * B 때문에 p가 한 번 필요하다. 가장 이른 0번째 달에 p만 고르면 점수 4·비용 5,000원이고 조기 시청(④)에서 이긴다(0번째 달까지 점수 4).
+	 * FREE는 S6에 따라 후보가 아니므로 결과에 나타나지 않는다. 기대 ({2},{},{}).
 	 */
 	public static PlanInput freeProduct() {
 		return in(10_000, 600, List.of(free(3), product(2, 5_000)),
@@ -137,12 +138,12 @@ public final class SolverCases {
 	}
 
 	public static Selection freeProductSelection() {
-		return sel(ids(), ids(), ids(2L));
+		return sel(ids(2L), ids(), ids());
 	}
 
 	/**
 	 * FREE 상품의 ID가 더 작은 경우: f(id 1, 무료), p(id 2, 5,000원). 입력은 freeProduct와 같다.
-	 * 후보에 남겼다면 ⑤ 사전순에서 [1,2]가 [2]보다 앞서 f를 함께 고른 조합이 이겼을 것이다. S6은 FREE를 후보에서 빼므로 기대는 ({},{},{2})다.
+	 * 후보에 남겼다면 ⑥ 사전순에서 [1,2]가 [2]보다 앞서 f를 함께 고른 조합이 이겼을 것이다. S6은 FREE를 후보에서 빼므로 기대는 ({2},{},{})다(p를 가장 이른 달에 고른다).
 	 */
 	public static PlanInput freeProductLowId() {
 		return in(10_000, 600, List.of(free(1), product(2, 5_000)),
@@ -150,7 +151,7 @@ public final class SolverCases {
 	}
 
 	public static Selection freeProductLowIdSelection() {
-		return sel(ids(), ids(), ids(2L));
+		return sel(ids(2L), ids(), ids());
 	}
 
 	/**
@@ -186,7 +187,8 @@ public final class SolverCases {
 	/**
 	 * 결정 1(실제 시청 달도 연속): 월 600분, q(id 1, 5,000원), p(id 2, 5,000원). X(MUST 600)는 q만, S(WANT 1200)는 p만. 예산 10,000원.
 	 * X가 한 달 600분을 다 쓰고 S는 남은 두 달 600+600분으로 끝나야 하므로 q 한 번, p 두 번이 필요하고 15,000원이다.
-	 * 배치는 (q,p,p)와 (p,p,q)가 점수 2·MUST 1·15,000원·결제 [1,1,1]로 같아 ⑤로 0번째 달 {1} < {2}인 (q,p,p)가 남는다. 기대 ({1},{2},{2}).
+	 * 배치는 (q,p,p)와 (p,p,q)가 점수 2·MUST 1·15,000원으로 같다. ④ 조기 시청에서 (q,p,p)는 X를 0번째 달에 끝내 0번째 달까지 (꼭 1, 점수 0),
+	 * (p,p,q)는 0번째 달까지 (꼭 0, 점수 0)이라 (q,p,p)가 남는다. 기대 ({1},{2},{2}).
 	 * (q를 p와 같은 달에 두면 그 달 600분을 X가 써서 S가 이어지지 않는다.)
 	 */
 	public static PlanInput decisionOne() {
@@ -201,8 +203,8 @@ public final class SolverCases {
 	/**
 	 * 절약형·간편형이 추천형·서로와 다른 케이스 1(SV): a(id 1, 6,000원), b(id 2, 3,000원), 예산 10,000원, 월 600분.
 	 * U1·U2·U3(WANT 100분)는 a만, U4(MAYBE 100분)는 b만. 한 달에 a+b(9,000원)를 담을 수 있다.
-	 * 추천형: 점수 7(2+2+2+1), 최소 비용 a+b = 9,000원, 결제를 가장 늦게(둘 다 2번째 달) → ({},{},{1,2}).
-	 * 하한 = ceil(7×0.7) = 5. 절약형: a만으로 점수 6 ≥ 5, 6,000원 → ({},{},{1}). 간편형: a만 결제 1건 → ({},{},{1}).
+	 * 추천형: 점수 7(2+2+2+1), 최소 비용 a+b = 9,000원, 둘 다 가장 이른 0번째 달에 고르면 조기 시청(④)이 최대 → ({1,2},{},{}).
+	 * 하한 = ceil(7×0.7) = 5. 절약형: a만으로 점수 6 ≥ 5, 6,000원 → ({1},{},{}). 간편형: a만 가입 1회 → ({1},{},{}).
 	 */
 	public static PlanInput saverAndSimpleDropB() {
 		return in(10_000, 600, List.of(product(1, 6_000), product(2, 3_000)),
@@ -211,19 +213,19 @@ public final class SolverCases {
 	}
 
 	public static Selection saverAndSimpleDropBRecommended() {
-		return sel(ids(), ids(), ids(1L, 2L));
+		return sel(ids(1L, 2L), ids(), ids());
 	}
 
 	public static Selection saverAndSimpleDropBSelection() {
-		return sel(ids(), ids(), ids(1L));
+		return sel(ids(1L), ids(), ids());
 	}
 
 	/**
 	 * 절약형과 간편형이 서로 다른 케이스(SS): P(id 1, 9,000원), Q(id 2, 2,000원), R(id 3, 2,000원). 예산 10,000원, 월 600분.
 	 * U1(WANT 100)은 P 또는 Q로, U2(WANT 100)는 P 또는 R로 볼 수 있다.
 	 * 점수 4는 P 하나(9,000원, 결제 1건) 또는 Q+R(4,000원, 결제 2건)로 얻는다.
-	 * 추천형: 비용 4,000원인 Q+R을 가장 늦게 → ({},{},{2,3}), 점수 4. 하한 = ceil(2.8) = 3이라 점수 4만 통과한다.
-	 * 절약형: 비용 최소 → 추천형과 같은 ({},{},{2,3}). 간편형: 결제 1건인 P를 가장 늦게 → ({},{},{1}) (비용 9,000원).
+	 * 추천형: 비용 4,000원인 Q+R을 가장 이른 달에(조기 시청 ④) → ({2,3},{},{}), 점수 4. 하한 = ceil(2.8) = 3이라 점수 4만 통과한다.
+	 * 절약형: 비용 최소 → 추천형과 같은 ({2,3},{},{}). 간편형: 가입 1회인 P를 가장 이른 달에 → ({1},{},{}) (비용 9,000원).
 	 */
 	public static PlanInput saverVsSimple() {
 		return in(10_000, 600, List.of(product(1, 9_000), product(2, 2_000), product(3, 2_000)),
@@ -231,35 +233,35 @@ public final class SolverCases {
 	}
 
 	public static Selection saverVsSimpleRecommended() {
-		return sel(ids(), ids(), ids(2L, 3L));
+		return sel(ids(2L, 3L), ids(), ids());
 	}
 
 	public static Selection saverVsSimpleSimple() {
-		return sel(ids(), ids(), ids(1L));
+		return sel(ids(1L), ids(), ids());
 	}
 
 	/**
-	 * saverVsSimple의 추천형 그리디(S4): 결제를 미루지 못한다(0번째 달부터 확정).
-	 * m=0 후보 중 점수 4가 {1}(9,000원)과 {2,3}(4,000원)이라 비용이 낮은 {2,3} → ({2,3},{},{}).
+	 * saverVsSimple의 추천형 그리디(S4): 0번째 달부터 확정한다.
+	 * m=0 후보 중 점수 4가 {1}(9,000원)과 {2,3}(4,000원)이라 비용이 낮은 {2,3} → ({2,3},{},{}). 새 규칙(조기 시청)에서는 완전탐색 결과와 같다.
 	 */
 	public static Selection saverVsSimpleGreedyRecommended() {
 		return sel(ids(2L, 3L), ids(), ids());
 	}
 
 	/**
-	 * saverVsSimple의 절약형 그리디(S8): baseline ({},{},{2,3})(점수 4, 4,000원)에서 출발한다. 어느 달을 바꿔도 비용이 늘거나 점수 하한(3) 미만이라
+	 * saverVsSimple의 절약형 그리디(S8): baseline ({2,3},{},{})(점수 4, 4,000원)에서 출발한다. 어느 달을 바꿔도 비용이 늘거나 점수 하한(3) 미만이라
 	 * 바뀌지 않는다 → baseline 그대로.
 	 */
 	public static Selection saverVsSimpleGreedySaver() {
-		return sel(ids(), ids(), ids(2L, 3L));
+		return sel(ids(2L, 3L), ids(), ids());
 	}
 
 	/**
-	 * saverVsSimple의 간편형 그리디(S8): baseline ({},{},{2,3})(가입 2회)에서 출발한다. 0·1번째 달을 바꾸면 가입 횟수가 늘어 그대로이고,
-	 * 2번째 달을 {1}로 바꾸면 점수 4 ≥ 하한 3에 가입 1회로 좋아져 교체한다. 두 번째 바퀴에서는 바뀐 달이 없다 → ({},{},{1}).
+	 * saverVsSimple의 간편형 그리디(S8): baseline ({2,3},{},{})(가입 2회)에서 출발한다. 1·2번째 달에 상품을 더하면 가입 횟수·비용이 늘어 그대로이고,
+	 * 0번째 달을 {1}로 바꾸면 점수 4 ≥ 하한 3에 가입 1회로 좋아져 교체한다. 두 번째 바퀴에서는 바뀐 달이 없다 → ({1},{},{}).
 	 */
 	public static Selection saverVsSimpleGreedySimple() {
-		return sel(ids(), ids(), ids(1L));
+		return sel(ids(1L), ids(), ids());
 	}
 
 	/** 시청 가능 상품이 없는 단위(NO_PROVIDER·UNKNOWN)는 조합에 영향이 없다: 상품 p(id 1, 5,000원)와 A(WANT 200, p), B(WANT 200, 없음), C(MAYBE 200, 없음, 모름). */
@@ -268,13 +270,13 @@ public final class SolverCases {
 				unit(2, Priority.WANT, 200), com.ottnavi.engine.EngineFixtures.unknownUnit(3, Priority.MAYBE, 200));
 	}
 
-	/** 상품이 하나뿐이고 예산이 넉넉하며 작품 하나: 세 유형의 조합이 모두 ({},{},{1}). 점수 2·5,000원이 하한 2를 넘고 결제 1건이라 같다. */
+	/** 상품이 하나뿐이고 예산이 넉넉하며 작품 하나: 세 유형의 조합이 모두 ({1},{},{}). 점수 2·5,000원이 하한 2를 넘고 가입 1회라 같다(가장 이른 달에 본다). */
 	public static PlanInput singleProduct() {
 		return in(10_000, 600, List.of(product(1, 5_000)), unit(1, Priority.WANT, 200, 1L));
 	}
 
 	public static Selection singleProductSelection() {
-		return sel(ids(), ids(), ids(1L));
+		return sel(ids(1L), ids(), ids());
 	}
 
 	/** 예산 0원: 유료 상품 p(id 1)는 어느 달에도 못 고르고 FREE f(id 2)만 가능하다. A(WANT 200)는 p만, B(WANT 200)는 f로 볼 수 있다. 점수 2, 비용 0, 전부 빈 조합. */

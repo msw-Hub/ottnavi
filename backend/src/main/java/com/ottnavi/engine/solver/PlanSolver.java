@@ -17,6 +17,6 @@ public interface PlanSolver {
 		if (input == null) {
 			throw new IllegalArgumentException("입력은 null일 수 없다");
 		}
-		return solve(input, PlanObjective.recommended(input.products()));
+		return solve(input, PlanObjective.recommended(input));
 	}
 }

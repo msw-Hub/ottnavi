@@ -5,7 +5,9 @@ import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.OttProductCondition;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
+import com.ottnavi.engine.model.Priority;
 import com.ottnavi.engine.model.Selection;
+import com.ottnavi.engine.model.UnitResult;
 import com.ottnavi.engine.model.WatchUnit;
 import com.ottnavi.engine.rule.Evaluator;
 import java.util.ArrayList;
@@ -177,7 +179,7 @@ public final class BruteForceOracle {
 
 	/** 유형별 최선(무차별 대입). recommendedScore는 절약형·간편형의 점수 하한 기준이며 추천형에서는 쓰지 않는다. */
 	public static Evaluation best(PlanInput input, PlanType type, int recommendedScore) {
-		return Collections.max(allEvaluations(input), comparator(type, input.products(), recommendedScore));
+		return Collections.max(allEvaluations(input), comparator(type, input, recommendedScore));
 	}
 
 	/** S4를 독립적으로 구현한 그리디(추천형): 앞선 달은 고정, 뒤의 달은 빈 집합으로 두고 그 달의 후보 부분집합을 모두 평가해 최선을 확정한다. */
@@ -257,7 +259,7 @@ public final class BruteForceOracle {
 		return total;
 	}
 
-	/** 그 달에 새로 돈이 드는 상품 수(038 정의, 결제 미루기 ④에 쓴다). 가입 횟수와 다른 값이다. */
+	/** 그 달에 새로 돈이 드는 상품 수(038 정의, 결제 미루기 ⑤에 쓴다). 가입 횟수와 다른 값이다. */
 	public static int newPayments(Selection selection, int month, List<OttProduct> products) {
 		int count = 0;
 		for (long productId : selection.productIdsOf(month)) {
@@ -270,8 +272,32 @@ public final class BruteForceOracle {
 		return count;
 	}
 
+	/**
+	 * 조기 시청(④) 값: month번째 달까지(포함) 시청 완료한 MUST 수와 점수 합(WANT 2, MAYBE 1, MUST는 점수에 넣지 않음).
+	 * 시청 단위 ID로 입력의 우선순위를 찾아 직접 센다(실제 비교기의 인덱스 매칭·long 묶음과 독립인 구현). 반환은 {MUST 수, 점수 합}.
+	 */
+	public static int[] completedUpTo(Evaluation evaluation, int month, PlanInput input) {
+		int mustCount = 0;
+		int scoreSum = 0;
+		for (UnitResult result : evaluation.units()) {
+			if (!result.scheduled() || result.completedMonthIndex() > month) {
+				continue;
+			}
+			Priority priority = input.units().stream().filter(unit -> unit.id() == result.watchUnitId()).findFirst().orElseThrow().priority();
+			if (priority == Priority.MUST) {
+				mustCount++;
+			} else if (priority == Priority.WANT) {
+				scoreSum += 2;
+			} else {
+				scoreSum += 1;
+			}
+		}
+		return new int[] {mustCount, scoreSum};
+	}
+
 	/** 명세 3절 표대로 직접 구현한 유형별 비교기(양수 = 첫 번째가 더 좋다). */
-	public static Comparator<Evaluation> comparator(PlanType type, List<OttProduct> products, int recommendedScore) {
+	public static Comparator<Evaluation> comparator(PlanType type, PlanInput input, int recommendedScore) {
+		List<OttProduct> products = input.products();
 		int floor = scoreFloor(recommendedScore);
 		return (a, b) -> {
 			int must = Integer.compare(a.mustCompleted(), b.mustCompleted());
@@ -316,7 +342,18 @@ public final class BruteForceOracle {
 				default:
 					throw new IllegalStateException("알 수 없는 유형: " + type);
 			}
-			// 결제 미루기: 달 0→1→2 순서로 새 결제 수가 먼저 다른 달에서 적은 쪽이 좋다
+			// 조기 시청(④): 달 0→1→2 순서로 "그 달까지 시청 완료한 MUST 수, 같으면 점수 합"이 먼저 다른 달에서 큰 쪽이 좋다
+			for (int month = 0; month < Selection.MONTH_COUNT; month++) {
+				int[] x = completedUpTo(a, month, input);
+				int[] y = completedUpTo(b, month, input);
+				if ((order = Integer.compare(x[0], y[0])) != 0) {
+					return order;
+				}
+				if ((order = Integer.compare(x[1], y[1])) != 0) {
+					return order;
+				}
+			}
+			// 결제 미루기(⑤): 달 0→1→2 순서로 새 결제 수가 먼저 다른 달에서 적은 쪽이 좋다
 			for (int month = 0; month < Selection.MONTH_COUNT; month++) {
 				order = Integer.compare(newPayments(b.selection(), month, products), newPayments(a.selection(), month, products));
 				if (order != 0) {

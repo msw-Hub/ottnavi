@@ -1,13 +1,11 @@
 package com.ottnavi.engine.solver;
 
-import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
 import com.ottnavi.engine.model.SolveResult;
 import com.ottnavi.engine.rule.PlanObjective;
 import java.util.Collections;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,11 +29,10 @@ public final class PlanTypeSolver {
 		if (input == null) {
 			throw new IllegalArgumentException("입력은 null일 수 없다");
 		}
-		List<OttProduct> products = input.products();
 		// PRD 11절 35번: 추천형을 먼저 푼다. 그리디로 풀렸어도 그 결과의 점수·조합을 그대로 기준으로 쓴다
-		SolveResult recommended = solver.solve(input, PlanObjective.recommended(products));
-		SolveResult saver = solver.solve(input, PlanObjective.saver(products, recommended.evaluation()));
-		SolveResult simple = solver.solve(input, PlanObjective.simple(products, recommended.evaluation()));
+		SolveResult recommended = solver.solve(input, PlanObjective.recommended(input));
+		SolveResult saver = solver.solve(input, PlanObjective.saver(input, recommended.evaluation()));
+		SolveResult simple = solver.solve(input, PlanObjective.simple(input, recommended.evaluation()));
 
 		// EnumMap은 enum 선언 순서(RECOMMENDED, SAVER, SIMPLE)로 순회된다. 세 유형의 조합이 같아도 합치지 않는다(호출하는 쪽의 몫)
 		Map<PlanType, SolveResult> results = new EnumMap<>(PlanType.class);

@@ -40,7 +40,7 @@ class GreedySolverTest {
 	@DisplayName("그리디가 완전탐색과 다른 입력: 점수 2·비용 8,000원 대 완전탐색 점수 4·비용 28,000원, 차이를 compare로 단언한다")
 	void 그리디가_완전탐색보다_나쁜_케이스() {
 		PlanInput input = SolverCases.greedyWorse();
-		PlanObjective objective = PlanObjective.recommended(input.products());
+		PlanObjective objective = PlanObjective.recommended(input);
 
 		SolveResult greedyResult = greedy.solve(input);
 		SolveResult exactResult = exact.solve(input);
@@ -52,24 +52,24 @@ class GreedySolverTest {
 		assertThat(greedyResult.planType()).isEqualTo(PlanType.RECOMMENDED);
 		assertThat(exactResult.evaluation().score()).isEqualTo(4);
 		assertThat(exactResult.evaluation().totalCost()).isEqualTo(28_000);
-		assertThat(exactResult.selection()).isEqualTo(sel(ids(1L), ids(1L), ids(2L)));
+		assertThat(exactResult.selection()).isEqualTo(sel(ids(2L), ids(1L), ids(1L)));
 		assertThat(objective.comparator().compare(exactResult.evaluation(), greedyResult.evaluation())).isPositive();
-		assertThat(BruteForceOracle.comparator(PlanType.RECOMMENDED, input.products(), 0)
+		assertThat(BruteForceOracle.comparator(PlanType.RECOMMENDED, input, 0)
 				.compare(exactResult.evaluation(), greedyResult.evaluation())).isPositive();
 	}
 
 	@Test
-	@DisplayName("추천형 그리디는 결제를 미루지 못한다, 절약형·간편형 그리디는 baseline에서 개선한다(손 계산)")
+	@DisplayName("추천형 그리디는 0번째 달부터 확정하고, 절약형·간편형 그리디는 baseline에서 개선한다(손 계산)")
 	void 유형별_그리디_손_계산() {
 		PlanInput input = SolverCases.saverVsSimple();
 		Evaluation baseline = BruteForceOracle.bestRecommended(input);
 
 		SolveResult recommended = greedy.solve(input);
-		SolveResult simple = greedy.solve(input, PlanObjective.simple(input.products(), baseline));
-		SolveResult saver = greedy.solve(input, PlanObjective.saver(input.products(), baseline));
+		SolveResult simple = greedy.solve(input, PlanObjective.simple(input, baseline));
+		SolveResult saver = greedy.solve(input, PlanObjective.saver(input, baseline));
 
 		assertThat(recommended.selection()).isEqualTo(SolverCases.saverVsSimpleGreedyRecommended());
-		assertThat(recommended.selection()).isNotEqualTo(exact.solve(input).selection());
+		assertThat(recommended.selection()).isEqualTo(exact.solve(input).selection()); // 조기 시청(④) 규칙에서는 0번째 달부터 확정하는 그리디가 이 입력의 완전탐색과 같다
 		assertThat(saver.selection()).isEqualTo(SolverCases.saverVsSimpleGreedySaver());
 		assertThat(simple.selection()).isEqualTo(SolverCases.saverVsSimpleGreedySimple());
 		assertThat(simple.planType()).isEqualTo(PlanType.SIMPLE);
@@ -83,7 +83,7 @@ class GreedySolverTest {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			for (PlanType type : PlanType.values()) {
-				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input.products(), recommended.score());
+				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input, recommended.score());
 				Evaluation expected = type == PlanType.RECOMMENDED
 						? BruteForceOracle.greedy(input, comparator)
 						: BruteForceOracle.improve(input, comparator, recommended.selection());
@@ -107,7 +107,7 @@ class GreedySolverTest {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			for (PlanType type : PlanType.values()) {
 				PlanObjective objective = SolverCases.objective(type, input, recommended);
-				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input.products(), recommended.score());
+				Comparator<Evaluation> comparator = BruteForceOracle.comparator(type, input, recommended.score());
 
 				SolveResult greedyResult = greedy.solve(input, objective);
 				Evaluation exactBest = BruteForceOracle.best(input, type, recommended.score());
@@ -150,8 +150,8 @@ class GreedySolverTest {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			int floor = BruteForceOracle.scoreFloor(recommended.score());
 
-			SolveResult saver = greedy.solve(input, PlanObjective.saver(input.products(), recommended));
-			SolveResult simple = greedy.solve(input, PlanObjective.simple(input.products(), recommended));
+			SolveResult saver = greedy.solve(input, PlanObjective.saver(input, recommended));
+			SolveResult simple = greedy.solve(input, PlanObjective.simple(input, recommended));
 
 			assertThat(saver.evaluation().score()).as("%s", input).isGreaterThanOrEqualTo(floor);
 			assertThat(saver.evaluation().totalCost()).as("%s", input).isLessThanOrEqualTo(recommended.totalCost());
@@ -249,7 +249,7 @@ class GreedySolverTest {
 		PlanInput input = SolverCases.singleProduct();
 
 		assertThatThrownBy(() -> greedy.solve(null)).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> greedy.solve(null, PlanObjective.recommended(input.products()))).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> greedy.solve(null, PlanObjective.recommended(input))).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> greedy.solve(input, null)).isInstanceOf(IllegalArgumentException.class);
 	}
 }

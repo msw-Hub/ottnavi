@@ -6,7 +6,7 @@ import java.util.List;
  * 구독 조합 하나를 평가한 결과. 비교기(EvaluationComparator)는 이 값만 보고 두 조합의 우열을 가린다.
  */
 public record Evaluation(
-		Selection selection,    // 평가한 구독 조합. 비교기 ④ 결제 미루기·⑤ 상품 ID 순(D6)이 쓴다
+		Selection selection,    // 평가한 구독 조합. 비교기 ⑤ 결제 미루기·⑥ 상품 ID 순(D6)이 쓴다(④ 조기 시청은 units의 시청 완료 달을 쓴다)
 		int mustCompleted,      // 시청 완료한 MUST 수(목적함수 ①)
 		int score,              // 시청 완료한 WANT 2점·MAYBE 1점의 합(목적함수 ②, MUST는 넣지 않음, D5)
 		int totalCost,          // 3개월 비용 합(원, 목적함수 ③). FREE는 0, SUBSCRIBED는 0번째 달 0

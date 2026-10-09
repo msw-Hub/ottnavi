@@ -28,7 +28,7 @@ class BruteForceOracleTest {
 	}
 
 	@Test
-	@DisplayName("오라클: 그리디가 나쁜 케이스의 완전탐색 결과는 점수 4·비용 28,000원, 조합은 ({1},{1},{2})다")
+	@DisplayName("오라클: 그리디가 나쁜 케이스의 완전탐색 결과는 점수 4·비용 28,000원, 조합은 ({2},{1},{1})다")
 	void 그리디_나쁜_케이스_완전탐색() {
 		Evaluation exact = BruteForceOracle.bestRecommended(SolverCases.greedyWorse());
 
@@ -42,7 +42,7 @@ class BruteForceOracleTest {
 	void 그리디_나쁜_케이스_그리디() {
 		PlanInput input = SolverCases.greedyWorse();
 
-		Evaluation greedy = BruteForceOracle.greedy(input, BruteForceOracle.comparator(PlanType.RECOMMENDED, input.products(), 0));
+		Evaluation greedy = BruteForceOracle.greedy(input, BruteForceOracle.comparator(PlanType.RECOMMENDED, input, 0));
 
 		assertThat(greedy.score()).isEqualTo(2);
 		assertThat(greedy.totalCost()).isEqualTo(8_000);
@@ -103,11 +103,11 @@ class BruteForceOracleTest {
 		PlanInput vs = SolverCases.saverVsSimple();
 		Selection baseline = SolverCases.saverVsSimpleRecommended();
 
-		assertThat(BruteForceOracle.greedy(vs, BruteForceOracle.comparator(PlanType.RECOMMENDED, vs.products(), 0)).selection())
+		assertThat(BruteForceOracle.greedy(vs, BruteForceOracle.comparator(PlanType.RECOMMENDED, vs, 0)).selection())
 				.isEqualTo(SolverCases.saverVsSimpleGreedyRecommended());
-		assertThat(BruteForceOracle.improve(vs, BruteForceOracle.comparator(PlanType.SIMPLE, vs.products(), 4), baseline).selection())
+		assertThat(BruteForceOracle.improve(vs, BruteForceOracle.comparator(PlanType.SIMPLE, vs, 4), baseline).selection())
 				.isEqualTo(SolverCases.saverVsSimpleGreedySimple());
-		assertThat(BruteForceOracle.improve(vs, BruteForceOracle.comparator(PlanType.SAVER, vs.products(), 4), baseline).selection())
+		assertThat(BruteForceOracle.improve(vs, BruteForceOracle.comparator(PlanType.SAVER, vs, 4), baseline).selection())
 				.isEqualTo(SolverCases.saverVsSimpleGreedySaver());
 	}
 

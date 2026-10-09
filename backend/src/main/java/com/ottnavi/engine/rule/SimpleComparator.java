@@ -3,6 +3,7 @@ package com.ottnavi.engine.rule;
 import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.OttProductCondition;
+import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.Selection;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,23 +16,23 @@ import java.util.Set;
  *
  * <p>반환 규칙은 EvaluationComparator와 같다: 양수 = 첫 번째가 더 좋다.
  * 사전식 순서: ① mustCompleted 큰 쪽 → ② 점수 하한(minScore) 이상인 쪽 → ③ 가입 횟수 적은 쪽 → ④ totalCost 작은 쪽
- * → ⑤ score 큰 쪽 → ⑥ 결제 미루기 → ⑦ 달별 상품 ID 사전순.
- * ⑥·⑦은 추천형 비교기(EvaluationComparator)에 맡긴다. ①~⑤가 같으면 must·score·cost가 모두 같으므로
- * 추천형 비교기의 ①②③은 0이 되고 결과가 정확히 그 ④ 결제 미루기 → ⑤ ID 순이 된다.
+ * → ⑤ score 큰 쪽 → ⑥ 조기 시청 → ⑦ 결제 미루기 → ⑧ 달별 상품 ID 사전순.
+ * ⑥~⑧은 추천형 비교기(EvaluationComparator)에 맡긴다. ①~⑤가 같으면 must·score·cost가 모두 같으므로
+ * 추천형 비교기의 ①②③은 0이 되고 결과가 정확히 그 ④ 조기 시청 → ⑤ 결제 미루기 → ⑥ ID 순이 된다.
  */
 final class SimpleComparator implements Comparator<Evaluation> {
 
 	private final int minScore;                       // 점수 하한: 추천형 점수의 70% 올림
-	private final EvaluationComparator recommended;   // 마지막 동점(결제 미루기·ID 순)을 가르는 추천형 비교기
+	private final EvaluationComparator recommended;   // 마지막 동점(조기 시청·결제 미루기·ID 순)을 가르는 추천형 비교기
 	private final long[] productIds;                  // 상품 ID 오름차순(구독 상태를 이진 탐색으로 찾는 용도)
 	private final OttProductCondition[] conditions;   // productIds와 같은 위치의 구독 상태
 	private final Set<Long> subscribedProductIds;     // 이미 구독 중(SUBSCRIBED)인 상품 ID. 0번째 달에는 선택하지 않아도 구독 중이다
 
-	/** 상품 목록과 점수 하한으로 비교기를 만든다. */
-	SimpleComparator(List<OttProduct> products, int minScore) {
+	/** 입력과 점수 하한으로 비교기를 만든다. */
+	SimpleComparator(PlanInput input, int minScore) {
 		this.minScore = minScore;
-		this.recommended = new EvaluationComparator(products); // products가 null이면 여기서 IllegalArgumentException
-		List<OttProduct> sorted = new ArrayList<>(products);
+		this.recommended = new EvaluationComparator(input); // input이 null이면 여기서 IllegalArgumentException
+		List<OttProduct> sorted = new ArrayList<>(input.products());
 		sorted.sort(Comparator.comparingLong(OttProduct::id));
 		this.productIds = new long[sorted.size()];
 		this.conditions = new OttProductCondition[sorted.size()];
@@ -74,7 +75,7 @@ final class SimpleComparator implements Comparator<Evaluation> {
 		if (scoreOrder != 0) {
 			return scoreOrder;
 		}
-		// ⑥ 결제 미루기 → ⑦ 달별 상품 ID 사전순: 추천형 비교기의 ④·⑤와 같은 정의라 위임한다(클래스 설명 참고)
+		// ⑥ 조기 시청 → ⑦ 결제 미루기 → ⑧ 달별 상품 ID 사전순: 추천형 비교기의 ④·⑤·⑥과 같은 정의라 위임한다(클래스 설명 참고)
 		return recommended.compare(first, second);
 	}
 

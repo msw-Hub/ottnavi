@@ -421,7 +421,7 @@ class EvaluatorTest {
 		PlanInput input = input(600, products,
 				unit(10, WANT, 1000, P1, P2), unit(11, MUST, 400, P2), unit(12, MAYBE, 100, P3), unknownUnit(13, WANT, 300));
 		Evaluator evaluator = new Evaluator(input);
-		EvaluationComparator comparator = new EvaluationComparator(products);
+		EvaluationComparator comparator = new EvaluationComparator(input);
 
 		// 배정 순서: U11(MUST) → U10(WANT) → U12(MAYBE) → U13(시청 가능 상품 없음, 맨 뒤)
 		Evaluation p2p2p2 = evaluator.evaluate(selection(ids(P2), ids(P2), ids(P2)));

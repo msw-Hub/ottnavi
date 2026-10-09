@@ -1,11 +1,10 @@
 package com.ottnavi.engine.rule;
 
 import com.ottnavi.engine.model.Evaluation;
-import com.ottnavi.engine.model.OttProduct;
+import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
 import com.ottnavi.engine.model.Selection;
 import java.util.Comparator;
-import java.util.List;
 
 /**
  * 플랜 유형 하나의 목적함수: 유형, 그 유형의 비교기(양수 = 첫 번째가 더 좋다), 그리고 시작 조합.
@@ -30,8 +29,8 @@ public record PlanObjective(
 	}
 
 	/** 추천형 목적함수를 만든다(기존 EvaluationComparator, 시작 조합 없음). */
-	public static PlanObjective recommended(List<OttProduct> products) {
-		return new PlanObjective(PlanType.RECOMMENDED, new EvaluationComparator(products), null);
+	public static PlanObjective recommended(PlanInput input) {
+		return new PlanObjective(PlanType.RECOMMENDED, new EvaluationComparator(input), null);
 	}
 
 	/** 추천형 점수의 70%를 올림한 점수 하한을 돌려준다. 예: 10 → 7, 3 → 3(2.1 올림), 0 → 0. 음수면 IllegalArgumentException. */
@@ -44,15 +43,15 @@ public record PlanObjective(
 	}
 
 	/** 절약형 목적함수를 만든다. 점수 하한은 recommended.score()로 정하고 recommended.selection()을 시작 조합으로 담는다. */
-	public static PlanObjective saver(List<OttProduct> products, Evaluation recommended) {
+	public static PlanObjective saver(PlanInput input, Evaluation recommended) {
 		requireRecommended(recommended);
-		return new PlanObjective(PlanType.SAVER, new SaverComparator(products, scoreFloor(recommended.score())), recommended.selection());
+		return new PlanObjective(PlanType.SAVER, new SaverComparator(input, scoreFloor(recommended.score())), recommended.selection());
 	}
 
 	/** 간편형 목적함수를 만든다. 점수 하한은 recommended.score()로 정하고 recommended.selection()을 시작 조합으로 담는다. */
-	public static PlanObjective simple(List<OttProduct> products, Evaluation recommended) {
+	public static PlanObjective simple(PlanInput input, Evaluation recommended) {
 		requireRecommended(recommended);
-		return new PlanObjective(PlanType.SIMPLE, new SimpleComparator(products, scoreFloor(recommended.score())), recommended.selection());
+		return new PlanObjective(PlanType.SIMPLE, new SimpleComparator(input, scoreFloor(recommended.score())), recommended.selection());
 	}
 
 	/** 추천형 결과가 있는지 확인한다(절약형·간편형은 그 점수와 조합이 필요하다). */
