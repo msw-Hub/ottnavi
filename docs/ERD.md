@@ -365,7 +365,7 @@ erDiagram
 | plan_month_product | id, plan_month_id FK, product_id FK, applied_price, price_source | 그 달에 구독할 상품. price_source = ADMIN / USER_OVERRIDE / ALREADY_PAID / FREE. 가격 스냅샷이라 이후 가격 변경에 영향받지 않음. 가입·해지 안내는 인접 월을 비교해 도출 |
 | plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천 |
 | plan_assignment | id, plan_item_id FK, plan_month_id FK, ott_service_id FK, minutes | `UNIQUE(plan_item_id, plan_month_id)`. 긴 시즌은 연속된 달에 걸쳐 여러 행으로 나뉨 |
-| calc_run | id, plan_id FK NULL, input_hash, plan_type, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 정확해와 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
+| calc_run | id, plan_id FK NULL, input_hash, plan_type, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 완전탐색과 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
 
 ---
 
