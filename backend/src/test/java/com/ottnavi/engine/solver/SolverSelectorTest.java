@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 정확해 → 그리디 전환 테스트(명세 S5·S9, 5절 4·10). 후보 조합 수가 상한 이하면 EXACT, 초과면 GREEDY, 같으면 EXACT다.
+ * 완전탐색 → 그리디 전환 테스트(명세 S5·S9, 5절 4·10). 후보 조합 수가 상한 이하면 EXACT, 초과면 GREEDY, 같으면 EXACT다.
  */
 class SolverSelectorTest {
 
@@ -31,8 +31,8 @@ class SolverSelectorTest {
 	}
 
 	@Test
-	@DisplayName("상한이 후보 조합 수와 같으면 정확해(경계값)")
-	void 경계값은_정확해() {
+	@DisplayName("상한이 후보 조합 수와 같으면 완전탐색(경계값)")
+	void 경계값은_완전탐색() {
 		PlanInput input = sixtyFourCandidates();
 		PlanObjective saver = PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input));
 
@@ -55,8 +55,8 @@ class SolverSelectorTest {
 	}
 
 	@Test
-	@DisplayName("상한이 후보 조합 수보다 크면 정확해, 상한이 1이어도 후보가 1개면 정확해")
-	void 상한이_넉넉하면_정확해() {
+	@DisplayName("상한이 후보 조합 수보다 크면 완전탐색, 상한이 1이어도 후보가 1개면 완전탐색")
+	void 상한이_넉넉하면_완전탐색() {
 		PlanInput input = sixtyFourCandidates();
 		PlanObjective saver = PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input));
 
@@ -68,8 +68,8 @@ class SolverSelectorTest {
 	}
 
 	@Test
-	@DisplayName("후보 수는 실제 정확해가 세는 값과 같은 기준이다: 그 값이 상한이면 정확해, 하나 작으면 그리디")
-	void 정확해가_세는_값이_기준이다() {
+	@DisplayName("후보 수는 실제 완전탐색이 세는 값과 같은 기준이다: 그 값이 상한이면 완전탐색, 하나 작으면 그리디")
+	void 완전탐색이_세는_값이_기준이다() {
 		PlanInput input = SolverCases.greedyWorse();
 		PlanObjective objective = PlanObjective.recommended(input.products());
 		long count = exact.countCandidateCombinations(input, objective);
@@ -84,7 +84,7 @@ class SolverSelectorTest {
 	}
 
 	@Test
-	@DisplayName("전환은 푸는 유형마다 따로 정해진다: 추천형은 후보 8개라 정확해, 절약형·간편형은 64개라 그리디")
+	@DisplayName("전환은 푸는 유형마다 따로 정해진다: 추천형은 후보 8개라 완전탐색, 절약형·간편형은 64개라 그리디")
 	void 유형마다_전환이_다르다() {
 		PlanInput input = sixtyFourCandidates();
 		Evaluation recommended = BruteForceOracle.bestRecommended(input);
@@ -113,7 +113,7 @@ class SolverSelectorTest {
 	void 기본_상한() {
 		assertThat(SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS).isEqualTo(2_097_152L);
 		assertThat(SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS).isEqualTo(128L * 128 * 128);
-		// 기본 상한이면 후보 수가 작은 입력은 정확해로 푼다
+		// 기본 상한이면 후보 수가 작은 입력은 완전탐색으로 푼다
 		assertThat(new SolverSelector(exact, greedy, SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS)
 				.solve(SolverCases.greedyWorse()).solverType()).isEqualTo(SolverType.EXACT);
 	}

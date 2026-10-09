@@ -20,7 +20,7 @@ import java.util.Set;
  * 구독 조합 하나가 주어졌을 때 작품을 어느 달에 보는지 배정하고 그 결과를 평가한다(PRD 5.4 배정 규칙·목적함수 값).
  *
  * <p>사용법: 입력 하나로 한 번 만들고({@code new Evaluator(input)}) 조합마다 {@link #evaluate(Selection)}만 부른다.
- * 정확해(039)는 조합을 최대 약 210만 번(128³) 평가하므로, 매번 달라지지 않는 준비물은 생성자에서 한 번만 만든다.
+ * 완전탐색(039)은 조합을 최대 약 210만 번(128³) 평가하므로, 매번 달라지지 않는 준비물은 생성자에서 한 번만 만든다.
  * 생성 후에는 상태가 바뀌지 않아 여러 스레드가 같은 Evaluator를 동시에 불러도 된다.
  *
  * <h2>비트마스크를 쓰는 이유</h2>
@@ -156,7 +156,7 @@ public final class Evaluator {
 			UnitResult result = assign(i, availableMasks, remainingMinutes);
 			results.add(result);
 			if (result.scheduled()) {
-				// PRD 5.4 목적함수 ①·②: MUST는 완주 수로, WANT 2·MAYBE 1은 점수로 센다(D5)
+				// PRD 5.4 목적함수 ①·②: MUST는 시청 완료 수로, WANT 2·MAYBE 1은 점수로 센다(D5)
 				Priority priority = units.get(i).priority();
 				if (priority == Priority.MUST) {
 					mustCompleted++;

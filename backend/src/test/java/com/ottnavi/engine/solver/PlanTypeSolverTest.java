@@ -63,7 +63,7 @@ class PlanTypeSolverTest {
 					.isEqualTo(selector.solve(input, PlanObjective.saver(input.products(), recommended.evaluation())).selection());
 			assertThat(results.get(PlanType.SIMPLE).selection()).as("%s", input)
 					.isEqualTo(selector.solve(input, PlanObjective.simple(input.products(), recommended.evaluation())).selection());
-			// 오라클과도 대조한다: 정확해로 풀리는 상한이므로 세 유형 모두 무차별 대입 최선이다
+			// 오라클과도 대조한다: 완전탐색으로 풀리는 상한이므로 세 유형 모두 무차별 대입 최선이다
 			int recommendedScore = BruteForceOracle.bestRecommended(input).score();
 			for (PlanType type : PlanType.values()) {
 				assertThat(results.get(type).selection()).as("%s %s", type, input)
@@ -110,7 +110,7 @@ class PlanTypeSolverTest {
 	}
 
 	@Test
-	@DisplayName("그리디 추천형의 점수가 정확해보다 낮으면 하한도 낮아진다(그리디 열세 케이스)")
+	@DisplayName("그리디 추천형의 점수가 완전탐색보다 낮으면 하한도 낮아진다(그리디 열세 케이스)")
 	void 그리디_열세_케이스의_하한() {
 		PlanTypeSolver solver = new PlanTypeSolver(greedy);
 
@@ -124,7 +124,7 @@ class PlanTypeSolverTest {
 	}
 
 	@Test
-	@DisplayName("전환 상한이 유형마다 다르게 작동한다: 상한 8이면 추천형은 정확해, 절약형·간편형은 그리디")
+	@DisplayName("전환 상한이 유형마다 다르게 작동한다: 상한 8이면 추천형은 완전탐색, 절약형·간편형은 그리디")
 	void 유형별로_다른_알고리즘() {
 		PlanInput input = SolverCases.in(10_000, 600, List.of(product(1, 3_000), product(2, 3_000)),
 				unit(1, Priority.WANT, 200, 1L, 2L));

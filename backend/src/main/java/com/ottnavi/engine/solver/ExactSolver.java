@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 정확해 Solver: 후보 상품에서 쓸모없는 상품을 빼고, 달마다 예산 이하 상품 부분집합을 만들어 3개월을 중첩 순회한다(TECH 1절).
+ * 완전탐색 Solver: 후보 상품에서 쓸모없는 상품을 빼고, 달마다 예산 이하 상품 부분집합을 만들어 3개월을 중첩 순회한다(TECH 1절).
  * 동치 제거는 추천형에서만 쓴다(다른 유형은 전부 훑는다). 후보 상품이 MAX_PRODUCT_COUNT를 넘으면 IllegalArgumentException.
  *
  * <p>비유: 권투 토너먼트에서 링 위에 현재 챔피언 한 명만 둔다. 도전자(조합 하나)가 이기면 챔피언이 바뀌고 지면 바로 집에 간다.
@@ -24,7 +24,7 @@ public final class ExactSolver implements PlanSolver {
 
 	public static final int MAX_PRODUCT_COUNT = 20; // 후보 상품 수 한도. 넘으면 2^P 열거가 불가능하고 후보 수의 곱이 long을 넘는다(MVP는 7개)
 
-	/** 이 목적함수로 정확해가 순회할 3개월 조합 수(달별 후보 수의 곱)를 센다. 추천형은 동치 제거 후, 다른 유형은 제거 없이 센다. */
+	/** 이 목적함수로 완전탐색이 순회할 3개월 조합 수(달별 후보 수의 곱)를 센다. 추천형은 동치 제거 후, 다른 유형은 제거 없이 센다. */
 	public long countCandidateCombinations(PlanInput input, PlanObjective objective) {
 		requireArguments(input, objective);
 		// S5: solve와 같은 코드로 후보를 만들어 "센 수 = 실제로 훑는 수"를 보장한다
@@ -58,7 +58,7 @@ public final class ExactSolver implements PlanSolver {
 	private static List<List<Set<Long>>> candidates(PlanInput input, Evaluator evaluator, PlanObjective objective) {
 		List<List<Set<Long>>> subsets = MonthCandidates.budgetSubsets(input);
 		if (objective.planType() != PlanType.RECOMMENDED) {
-			// 절약형·간편형은 비용·볼 수 있는 단위만으로 우열을 정할 수 없어 제거하지 않는다(PRD 5.4 정확해와 그리디)
+			// 절약형·간편형은 비용·볼 수 있는 단위만으로 우열을 정할 수 없어 제거하지 않는다(PRD 5.4 완전탐색과 그리디)
 			return subsets;
 		}
 		return MonthCandidates.representatives(input, evaluator, objective.comparator(), subsets);

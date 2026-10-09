@@ -115,7 +115,7 @@ public final class BruteForceOracle {
 		return true;
 	}
 
-	/** 절약형·간편형 정확해가 훑는 조합 수(S5): 달별 예산 이하 부분집합 수의 곱(동치 제거 없음). */
+	/** 절약형·간편형 완전탐색이 훑는 조합 수(S5): 달별 예산 이하 부분집합 수의 곱(동치 제거 없음). */
 	public static long fullCombinationCount(PlanInput input) {
 		long count = 1;
 		for (int month = 0; month < Selection.MONTH_COUNT; month++) {
@@ -125,7 +125,7 @@ public final class BruteForceOracle {
 	}
 
 	/**
-	 * 추천형 정확해가 훑는 조합 수(S5·S7): 달마다 "그 달에 볼 수 있게 되는 단위 집합"이 같은 부분집합을 한 그룹으로 묶고 그룹 수의 곱.
+	 * 추천형 완전탐색이 훑는 조합 수(S5·S7): 달마다 "그 달에 볼 수 있게 되는 단위 집합"이 같은 부분집합을 한 그룹으로 묶고 그룹 수의 곱.
 	 * 볼 수 있는 상품은 선택 상품에 FREE 상품과 0번째 달의 SUBSCRIBED 상품을 더한 것이다.
 	 */
 	public static long equivalenceCombinationCount(PlanInput input) {

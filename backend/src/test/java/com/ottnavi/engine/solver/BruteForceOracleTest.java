@@ -28,8 +28,8 @@ class BruteForceOracleTest {
 	}
 
 	@Test
-	@DisplayName("오라클: 그리디가 나쁜 케이스의 정확해는 점수 4·비용 28,000원, 조합은 ({1},{1},{2})다")
-	void 그리디_나쁜_케이스_정확해() {
+	@DisplayName("오라클: 그리디가 나쁜 케이스의 완전탐색 결과는 점수 4·비용 28,000원, 조합은 ({1},{1},{2})다")
+	void 그리디_나쁜_케이스_완전탐색() {
 		Evaluation exact = BruteForceOracle.bestRecommended(SolverCases.greedyWorse());
 
 		assertThat(exact.score()).isEqualTo(4);

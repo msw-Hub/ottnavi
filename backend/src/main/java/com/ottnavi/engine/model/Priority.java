@@ -7,16 +7,16 @@ package com.ottnavi.engine.model;
 public enum Priority {
 
 	MUST(0),  // 꼭 볼 작품. 점수 대신 mustCompleted(목적함수 ①)로 따로 센다(D5)
-	WANT(2),  // 보고 싶은 작품. 완주하면 2점
-	MAYBE(1); // 여유될 때 볼 작품. 완주하면 1점
+	WANT(2),  // 보고 싶은 작품. 시청 완료하면 2점
+	MAYBE(1); // 여유될 때 볼 작품. 시청 완료하면 1점
 
-	private final int score; // 완주했을 때 score(목적함수 ②)에 더하는 점수
+	private final int score; // 시청 완료했을 때 score(목적함수 ②)에 더하는 점수
 
 	Priority(int score) {
 		this.score = score;
 	}
 
-	/** 완주했을 때 score에 더하는 점수를 돌려준다(PRD 5.4 목적함수 ②, MUST는 0). */
+	/** 시청 완료했을 때 score에 더하는 점수를 돌려준다(PRD 5.4 목적함수 ②, MUST는 0). */
 	public int score() {
 		return score;
 	}

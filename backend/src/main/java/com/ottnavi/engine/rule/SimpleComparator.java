@@ -49,7 +49,7 @@ final class SimpleComparator implements Comparator<Evaluation> {
 	/** 양수면 first가, 음수면 second가 더 좋은 결과다. */
 	@Override
 	public int compare(Evaluation first, Evaluation second) {
-		// PRD 5.4 간편형 ①: "꼭" 작품 완주 수가 큰 쪽
+		// PRD 5.4 간편형 ①: "꼭" 작품 시청 완료 수가 큰 쪽
 		int mustOrder = Integer.compare(first.mustCompleted(), second.mustCompleted());
 		if (mustOrder != 0) {
 			return mustOrder;
