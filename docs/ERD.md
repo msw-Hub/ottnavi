@@ -232,7 +232,7 @@ erDiagram
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
 | subscription_product | id, name, product_type, active | 관리자가 등록. 판매 종료 상품은 active=false (삭제하지 않음) |
-| product_component | PK(product_id, ott_service_id), tier | 상품에 포함된 서비스와 tier. tier=AD면 해당 서비스 작품 중 in_ad_tier만 커버. MVP는 STANDARD 단품만 다루고, AD tier는 2단계(O3)에서 번들과 함께 추가한다(스키마는 미리 준비) |
+| product_component | PK(product_id, ott_service_id), tier | 상품에 포함된 서비스와 tier. tier=AD면 해당 서비스 작품 중 in_ad_tier만 시청 가능으로 본다. MVP는 STANDARD 단품만 다루고, AD tier는 2단계(O3)에서 번들과 함께 추가한다(스키마는 미리 준비) |
 | product_price | id, product_id FK, monthly_price, effective_from, effective_to | `UNIQUE(product_id, effective_from)`. 적용 시작일 기준으로 가격을 고르고, 기간이 겹치지 않게 서비스에서 검증 (FR-19) |
 
 ---
