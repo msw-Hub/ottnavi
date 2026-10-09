@@ -298,7 +298,7 @@ erDiagram
 
 ## D. 플랜 영역
 
-계산 결과는 그 시점의 가격과 조건을 스냅샷으로 저장한다. 계산과 저장은 분리되어 있다. 계산하면 `DRAFT` plan이 생기고(사용자당 1개, 새로 계산하면 덮어씀), 사용자가 저장하면 `DRAFT`가 `ACTIVE`가 되면서 기존 `ACTIVE`는 `ARCHIVED`로 바뀐다. 매월 자동 재계산은 `DRAFT`를 거치지 않고 바로 새 `ACTIVE`를 만들고 이전 plan을 `ARCHIVED`로 바꾼다. 이렇게 하면 "무엇이 왜 바뀌었는지"를 두 plan을 비교해서 설명할 수 있다.
+계산 결과는 그 시점의 가격과 조건을 스냅샷으로 저장한다. 계산과 저장은 분리되어 있다. 계산하면 플랜 유형(추천형·절약형·간편형)마다 `DRAFT` plan이 생기고(사용자당 유형마다 1개로 최대 3개, 새로 계산하면 전부 덮어씀), 사용자가 하나를 골라 저장하면 그 `DRAFT`가 `ACTIVE`가 되면서 기존 `ACTIVE`는 `ARCHIVED`로 바뀌고 나머지 `DRAFT`는 삭제된다. 매월 자동 재계산은 `DRAFT`를 거치지 않고 저장한 유형의 기준으로 바로 새 `ACTIVE`를 만들고 이전 plan을 `ARCHIVED`로 바꾼다. 이렇게 하면 "무엇이 왜 바뀌었는지"를 두 plan을 비교해서 설명할 수 있다.
 
 ```mermaid
 erDiagram
@@ -317,6 +317,7 @@ erDiagram
     bigint user_id FK
     bigint previous_plan_id FK
     varchar status "DRAFT / ACTIVE / ARCHIVED"
+    varchar plan_type "RECOMMENDED / SAVER / SIMPLE"
     date start_month
     varchar algorithm "EXACT / GREEDY"
     int total_cost
@@ -351,6 +352,7 @@ erDiagram
   calc_run {
     bigint id PK
     bigint plan_id FK
+    varchar plan_type
     varchar algorithm
     bigint elapsed_ms
   }
@@ -358,12 +360,12 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| plan | id, user_id FK, previous_plan_id FK NULL, status, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT도 하나: `UNIQUE(user_id) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost |
+| plan | id, user_id FK, previous_plan_id FK NULL, status, plan_type, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). plan_type = RECOMMENDED(추천형) / SAVER(절약형) / SIMPLE(간편형, PRD 5.4, 11절 35번). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT는 유형마다 하나: `UNIQUE(user_id, plan_type) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost |
 | plan_month | id, plan_id FK, month_index, month, confirmed, cost | `UNIQUE(plan_id, month_index)`. month_index 0은 확정(이번 달), 1·2는 예상 |
 | plan_month_product | id, plan_month_id FK, product_id FK, applied_price, price_source | 그 달에 구독할 상품. price_source = ADMIN / USER_OVERRIDE / ALREADY_PAID / FREE. 가격 스냅샷이라 이후 가격 변경에 영향받지 않음. 가입·해지 안내는 인접 월을 비교해 도출 |
 | plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천 |
 | plan_assignment | id, plan_item_id FK, plan_month_id FK, ott_service_id FK, minutes | `UNIQUE(plan_item_id, plan_month_id)`. 긴 시즌은 연속된 달에 걸쳐 여러 행으로 나뉨 |
-| calc_run | id, plan_id FK NULL, input_hash, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 정확해와 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
+| calc_run | id, plan_id FK NULL, input_hash, plan_type, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 정확해와 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
 
 ---
 

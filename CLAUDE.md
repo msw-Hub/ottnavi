@@ -43,9 +43,9 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 
 **백엔드 패키지(`com.ottnavi`)**: `global`(config·security·ratelimit·error·common) / `infra`(tmdb·mail·llm 외부 연동) / 도메인별(`catalog`, `provider`, `product`, `user`, `wishlist`, `plan`, `notification` — 각각 `api` → `application` → `domain` 단방향) / `engine` / `collect` / `admin`. 다른 도메인의 리포지토리를 직접 쓰지 않고 서비스를 호출한다.
 
-**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(가지치기 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식(꼭 볼 작품 완료 수 → 점수 → 총비용 → 상품 ID 순). 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 상세는 TECH 1절.
+**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(가지치기 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기를 `solve(input, comparator)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 볼 작품 완료 수 → 점수 → 총비용 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 상세는 TECH 1절.
 
-**플랜 상태**: DRAFT(계산 결과) → ACTIVE(저장) → ARCHIVED. 사용자당 DRAFT·ACTIVE는 각각 최대 1개(부분 유니크 인덱스). 활성화 시 **기존 ACTIVE를 ARCHIVED로 바꾸고 명시적 flush한 뒤** 새 ACTIVE로 전환해야 인덱스 위반이 나지 않는다(TECH 2절). 삭제는 FK `ON DELETE CASCADE` + 벌크 JPQL(JPA cascade 삭제 미사용, TECH T-1).
+**플랜 상태**: DRAFT(계산 결과) → ACTIVE(저장) → ARCHIVED. 사용자당 ACTIVE는 최대 1개, DRAFT는 플랜 유형마다 최대 1개(부분 유니크 인덱스 `(user_id, plan_type)`). 저장하면 고른 유형만 ACTIVE가 되고 나머지 DRAFT는 삭제된다. 활성화 시 **기존 ACTIVE를 ARCHIVED로 바꾸고 명시적 flush한 뒤** 새 ACTIVE로 전환해야 인덱스 위반이 나지 않는다(TECH 2절). 삭제는 FK `ON DELETE CASCADE` + 벌크 JPQL(JPA cascade 삭제 미사용, TECH T-1).
 
 **수집 배치(`collect`)**: Spring Batch Job을 GitHub Actions cron이 관리자 API로 호출(202 비동기, 같은 `targetDate`+`tier`는 409). cron은 Vercel을 거치지 않고 Cloudtype에 직접 호출하며 `x-origin-secret` + 관리자 배치 토큰을 보낸다. Cloudtype 무료 기간에는 cron을 끈다(TECH 3절).
 

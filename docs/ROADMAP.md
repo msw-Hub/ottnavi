@@ -671,6 +671,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `features/onboarding`(7개 서비스 상태, 요금제·결제일, 시청 시간 프리셋·환산·직접 입력, 예산), `features/wishlist`, `features/pricing`, `features/plan`
   - [ ] 저장 시 409 `PLAN_DRAFT_STALE` 목업 → 자동 재계산 흐름
+  - [ ] 플랜 결과(SCR-10)에 **플랜 유형 3종(추천형·절약형·간편형, PRD 11절 35번)** 을 보여 주고 하나를 골라 저장한다. 세 유형의 선택이 같으면 하나로 합쳐 유형 이름을 함께 표시한다(목업에 같은 경우와 다른 경우를 모두 준비). 유형별 한 줄 설명(예: 절약형은 추천형 점수의 70% 이상 중 가장 싸게)을 보여 준다
   - [ ] 온보딩 저장 후 로그인 전 화면으로 복귀한다(`location.state.from`을 `getSafeRedirectPath`로 검사한 내부 경로, 없으면 `/`). 이때 `setMockOnboardingDone(true)`를 호출한다(Task 027 CodeRabbit 이월: `SettingsPage`가 `from`을 읽지 않음)
   - [ ] 플랜 결과(SCR-10)에서 긴 시즌의 분할을 달별로 보여 준다(예: "시즌 2: 1월 넷플릭스 앞부분, 2월 티빙에서 이어서", "이어 보기" 라벨, 한 달 최소 2시간 규칙 안내). 문구는 "확정"이 아니라 "확인된 범위" 규칙을 따른다
   - [ ] 작품 상세의 시즌 줄 총 시간이 월 시청 시간보다 크면(회원 상태일 때만) "여러 달에 나눠 봐야 해요" 같은 짧은 안내
@@ -703,6 +704,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 승인된 목업에서 MVP API를 `docs/api/openapi.yaml`에 정의(경로 규칙, operationId, tags, `CommonResponseXxx`, example, nullable·required·enum). 별도 초안 파일은 두지 않는다(R-20 확정)
   - [ ] 아직 구현되지 않은 operation마다 `x-planned: true`를 달고 description에 "제안"을 표시한다. 이미 구현된 API(Task 019 서비스 목록 등)에는 달지 않는다. 이 표시는 각 구현 Task가 지운다(4.2)
   - [ ] `npm run api:generate`(입력은 `openapi.yaml` 하나, Task 017 설정 그대로)로 생성 훅·MSW로 바꾸고, 화면 전용 데이터만 `src/mocks/fixtures/`에 남긴다. `features/*/hooks`에서 `select: (res) => res.data`
+  - [ ] 플랜 계산 응답은 플랜 유형(`planType`: RECOMMENDED / SAVER / SIMPLE)별 플랜 목록이고, 저장 요청은 고른 유형의 DRAFT id를 가리킨다(PRD 11절 35번). 세 유형의 선택이 같을 때의 표시는 응답이 아니라 프론트가 합친다
   - [ ] 사용자(백엔드 담당)가 계약 초안을 승인
 - 완료 기준
   - `npm run build` 성공, V-F: Task 027~029 흐름이 생성된 목업으로 그대로 동작한다.
@@ -733,9 +735,10 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 관련: ERD C·D·E, "FK 삭제 동작"·"참조 컬럼 인덱스", TECH T-1
 - 구현 사항
   - [ ] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
-  - [ ] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`·`…'DRAFT'`, `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
+  - [ ] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
   - [ ] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_month_product(plan_month_id)`, `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
-  - [ ] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반
+  - [ ] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
+  - [ ] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
 - 완료 기준
   - V-B: 위 테스트가 통과한다(`ddl-auto=validate`는 ON DELETE를 검사하지 않으므로 이 테스트가 기준).
 
@@ -792,17 +795,19 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 039: 정확해·그리디 Solver 구현으로 조합 탐색 완성 ⬜
 - 태그: [B] · PRD: B2, FR-12, 13, TECH T-4 · 선행: 038 · 브랜치: `feature/b2-engine-solvers`
 - 구현 사항
-  - [ ] `engine/PlanSolver`, `ExactSolver`(지배 조합 제거, 3개월 중첩 순회), `GreedySolver`
-  - [ ] 후보 조합 수 상한 초과 시 그리디 전환(상한은 설정 값, R11-30 전까지 잠정값), 선택 알고리즘을 결과에 남김
+  - [ ] `engine/solver/PlanSolver`(`solve(input, objective)`), `ExactSolver`(3개월 중첩 순회, 지배 조합 제거는 추천형만), `GreedySolver`. 명세는 `docs/TASK039_GUIDE.md`
+  - [ ] 후보 조합 수 상한 초과 시 그리디 전환(`SolverSelector`, 상한은 설정 값, R11-30 전까지 잠정값), 선택 알고리즘을 결과에 남김
+  - [ ] 플랜 유형 3종의 목적함수(`PlanObjective`: 추천형·절약형·간편형, 점수 하한 = 추천형 점수의 70% 올림, PRD 5.4·11절 35번)와 `PlanTypeSolver.solveAll`(추천형을 먼저 풀고 그 점수로 절약형·간편형 기준 생성)
 - 완료 기준
-  - V-B: 두 Solver가 정답과 일치하는 케이스, 그리디가 정확해보다 나쁜 케이스(차이 단언), 상한 초과 시 GREEDY 전환 테스트가 통과한다.
+  - V-B: 세 유형 모두 두 Solver가 정답(무차별 대입 최선)과 일치하는 케이스, 그리디가 정확해보다 나쁜 케이스(차이 단언), 상한 초과 시 GREEDY 전환, `solveAll`(절약형 비용 ≤ 추천형, 간편형 새 결제 ≤ 추천형) 테스트가 통과한다.
+- 진행 방식(2026-10-09 결정): 구현은 backend-dev가 설계 승인 후 하고, 테스트는 별도 워크트리(`ottnavi-backend-test`, 브랜치 `feature/b2-engine-solvers-tests`)에서 명세만 보고 구현 코드를 읽지 않은 다른 backend-dev가 작성한다.
 
 #### Task 040: 정답 테스트 세트와 알고리즘 비교 측정 작성으로 엔진 품질 근거 확보 ⬜
 - 태그: [B] · PRD: B2, FR-13, MVP 완료 기준 ③(정답 테스트) · 선행: 039 · 브랜치: `feature/b2-engine-benchmark`
 - 구현 사항
   - [ ] 정답 입력·기대 결과 세트(예산·찜·구독 상태 조합). Task 065가 같은 세트를 쓰도록 위치를 정한다(제안: `backend/src/main/resources/engine-benchmark/`)
   - [ ] 입력 정규화와 `input_hash`(SHA-256) 계산기(정렬된 단위·상품·가격, 예산, 시청 분, `data_as_of`)
-  - [ ] 두 Solver 점수·비용 차이와 계산 시간(3회 중앙값) 비교 테스트, 최악 입력(단품 7개, 큰 찜) 탐색 시간 측정
+  - [ ] 두 Solver 점수·비용 차이와 계산 시간(3회 중앙값) 비교 테스트, 최악 입력(단품 7개, 큰 찜) 탐색 시간 측정. 플랜 유형 3종을 모두 푼 시간도 측정한다(절약형·간편형은 지배 제거가 없어 추천형의 약 3배, 필요하면 한 번의 순회로 합치는 최적화 결정)
   - [ ] 최악 입력과 후보 상한 근처에서 **힙 사용량**을 함께 기록한다(메모리 예산 측정 지점, 4.6)
 - 완료 기준
   - V-B: 정답 세트 전체 통과. 비교 결과표(점수 차, 비용 차, 시간)와 R11-30 잠정 상한 근거를 `기록:`에 남겼다. `calc_run` 기록은 Task 065.
@@ -1013,7 +1018,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B7 · 선행: 034, 035 · 브랜치: `feature/b7-plan-entities`
 - 관련: TECH T-1, ERD D·"벌크 삭제 전제"
 - 구현 사항
-  - [ ] `plan/domain`: Plan, PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun
+  - [ ] `plan/domain`: Plan(`planType` 포함), PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun(`planType` 포함)
   - [ ] JPA cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`) 금지, 자식 `@ManyToOne`에 `@OnDelete(action = OnDeleteAction.CASCADE)` 표기
   - [ ] DRAFT 벌크 삭제 쿼리 `@Modifying(flushAutomatically = true, clearAutomatically = true)`
 - 완료 기준
@@ -1032,19 +1037,18 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B7, FR-12, SCR-09·10 · 선행: 063, 040, 031 · 브랜치: `feature/b7-plan-calculate`
 - 관련: TECH 1·2절, T-4
 - 구현 사항
-  - [ ] `POST /api/plans/calculate`(`calculatePlan`): 엔진은 트랜잭션 밖, 정확해 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
-  - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT 벌크 삭제(첫 동작) → DRAFT·하위 행·`calc_run` 1행 저장
+  - [ ] `POST /api/plans/calculate`(`calculatePlan`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 정확해 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
+  - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
   - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
-  - [ ] 응답: 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
-- 완료 기준
-  - V-B: 동시 계산 2건 직렬화(유니크 위반 없음), 재계산 후 이전 DRAFT 하위 행 0행, 설정 누락 400.
+  - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일- 완료 기준
+  - V-B: 동시 계산 2건 직렬화(유니크 위반 없음), 재계산 후 이전 DRAFT 하위 행 0행이고 유형마다 DRAFT 1개(최대 3개), 설정 누락 400.
   - V-API: 결과가 정답 세트 한 케이스와 일치하고 `calc_run`에 선택된 알고리즘 1행이 남는다.
 
 #### Task 065: FR-13 비교 측정 경로 구현으로 정확해·그리디 비교 기록 확보 ⬜
 - 태그: [B] · PRD: B2·B7, FR-13, MVP 완료 기준 ③ · 선행: 062, 040, 054 · 브랜치: `feature/b7-algorithm-benchmark`
 - 관련: TECH T-4(비교 기록은 측정 경로에서만)
 - 구현 사항
-  - [ ] 관리자 측정 API(제안: `POST /api/admin/plans/benchmark`): Task 040 테스트 세트를 같은 `input_hash`로 두 Solver에 3회씩 돌려 `calc_run`에 EXACT·GREEDY 행 저장(`plan_id` NULL)
+  - [ ] 관리자 측정 API(제안: `POST /api/admin/plans/benchmark`): Task 040 테스트 세트를 같은 `input_hash`로 두 Solver에 3회씩 돌려 `calc_run`에 EXACT·GREEDY 행 저장(`plan_id` NULL, 비교 기준은 추천형 `plan_type`)
   - [ ] 결과 요약(점수 차, 비용 차, 시간 중앙값) 응답
 - 완료 기준
   - V-API: ADMIN으로 호출 후 `calc_run`에 같은 `input_hash`의 EXACT·GREEDY 행이 남는다(MVP ③ 충족). 결과표를 `기록:`에 남겼다.
@@ -1052,17 +1056,17 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 066: 플랜 저장·현재 플랜 조회 API 구현으로 ACTIVE 플랜 관리 ⬜
 - 태그: [B] · PRD: B7, FR-14(MVP 저장) · 선행: 064, 045 · 기한 전제: R-6(2026-10-29) · 브랜치: `feature/b7-plan-activate`
 - 구현 사항
-  - [ ] `POST /api/plans/{id}/activate`: DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
-  - [ ] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`
+  - [ ] `POST /api/plans/{id}/activate`: 고른 유형의 DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
+  - [ ] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`. 저장 후 같은 사용자의 나머지 DRAFT는 벌크 삭제한다(PRD 11절 35번)
   - [ ] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6
 - 완료 기준
-  - V-B: 저장 후 ACTIVE 1·ARCHIVED 1(유니크 위반 없음), 수집이 더 늦으면 409, 다른 사용자 DRAFT 404. V-API: 계산 → 저장 → 조회.
+  - V-B: 저장 후 ACTIVE 1·ARCHIVED 1(유니크 위반 없음)이고 나머지 유형 DRAFT는 삭제됨, 수집이 더 늦으면 409, 다른 사용자 DRAFT 404. V-API: 계산 → 저장 → 조회.
 
 #### Task 067: 요금 확인·계산·결과 흐름 실제 API 연결로 핵심 흐름 완성 ⬜
 - 태그: [F] · PRD: F7, FR-11, 12, 14, MVP 완료 기준 ① · 선행: 064, 066, 058, 060, 045 · 브랜치: `feature/f7-plan-flow`
 - 구현 사항
   - [ ] 요금 확인(요금표, 금액 수정, 예산·시간 요약, 기준일), 계산 진행·실패·재시도
-  - [ ] 결과(요약, 월별 카드·가격 출처, 남은 작품·이유, 절감액, 해지 예약 권장, 기준일·출처·"확인된 범위"·추정)
+  - [ ] 결과(플랜 유형 3종 선택·같은 선택이면 합쳐 표시, 요약, 월별 카드·가격 출처, 남은 작품·이유, 절감액, 해지 예약 권장, 기준일·출처·"확인된 범위"·추정)
   - [ ] 저장: 409 `PLAN_DRAFT_STALE`이면 자동 재계산 후 안내. RTL 테스트: 요금 수정, 결과 표시
 - 완료 기준
   - V-FS: 로그인 → 설정 → 찜 → 요금 수정 → 계산 → 결과 → 저장을 실제 값으로 재현했고, 화면 금액이 API 응답과 같다.
