@@ -43,7 +43,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 
 **백엔드 패키지(`com.ottnavi`)**: `global`(config·security·ratelimit·error·common) / `infra`(tmdb·mail·llm 외부 연동) / 도메인별(`catalog`, `provider`, `product`, `user`, `wishlist`, `plan`, `notification` — 각각 `api` → `application` → `domain` 단방향) / `engine` / `collect` / `admin`. 다른 도메인의 리포지토리를 직접 쓰지 않고 서비스를 호출한다.
 
-**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(가지치기 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기를 `solve(input, comparator)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 볼 작품 완료 수 → 점수 → 총비용 → 조기 시청 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 상세는 TECH 1절.
+**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(가지치기 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기를 `solve(input, comparator)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 볼 작품 완료 수 → 점수 → 총비용 → 조기 시청 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 같은 시리즈의 시즌은 번호 순서대로 시청 완료한다는 규칙(PRD 11절 37번, 2026-10-10)은 확정됐지만 아직 구현 전이다(ROADMAP Task 040 후속 항목 S). 찜은 최대 20개(11절 36번), 절감액 = 전체 구독 비용 − 플랜 총비용(11절 38번). 상세는 TECH 1절.
 
 **플랜 상태**: DRAFT(계산 결과) → ACTIVE(저장) → ARCHIVED. 사용자당 ACTIVE는 최대 1개, DRAFT는 플랜 유형마다 최대 1개(부분 유니크 인덱스 `(user_id, plan_type)`). 저장하면 고른 유형만 ACTIVE가 되고 나머지 DRAFT는 삭제된다. 활성화 시 **기존 ACTIVE를 ARCHIVED로 바꾸고 명시적 flush한 뒤** 새 ACTIVE로 전환해야 인덱스 위반이 나지 않는다(TECH 2절). 삭제는 FK `ON DELETE CASCADE` + 벌크 JPQL(JPA cascade 삭제 미사용, TECH T-1).
 

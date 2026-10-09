@@ -16,7 +16,7 @@
 ## 2. 계약 (코드에 있는 시그니처)
 
 - `PlanType`: `RECOMMENDED`(추천형), `SAVER`(절약형), `SIMPLE`(간편형).
-- `PlanObjective(planType, comparator, baseline)`: 유형과 그 유형의 비교기(양수 = 첫 번째가 더 좋다), 그리고 시작 조합 `baseline`(추천형은 `null`, 절약형·간편형은 추천형 결과의 조합이며 `null`이면 `IllegalArgumentException`). 팩토리 `recommended(products)`, `saver(products, recommendedEvaluation)`, `simple(products, recommendedEvaluation)`(추천형 `Evaluation`의 점수로 하한을 정하고 조합을 `baseline`으로 담는다), 정적 `scoreFloor(recommendedScore)`(음수면 `IllegalArgumentException`).
+- `PlanObjective(planType, comparator, baseline)`: 유형과 그 유형의 비교기(양수 = 첫 번째가 더 좋다), 그리고 시작 조합 `baseline`(추천형은 `null`, 절약형·간편형은 추천형 결과의 조합이며 `null`이면 `IllegalArgumentException`). 팩토리 `recommended(planInput)`, `saver(planInput, recommendedEvaluation)`, `simple(planInput, recommendedEvaluation)`(2026-10-10 변경: 첫 인자가 `products` 목록에서 `PlanInput`으로 바뀌었다. 조기 시청 ④가 시청 단위의 우선순위(꼭 여부·점수)를 쓰기 때문이며, 비교기 `EvaluationComparator`도 `new EvaluationComparator(planInput)`으로 만든다)(추천형 `Evaluation`의 점수로 하한을 정하고 조합을 `baseline`으로 담는다), 정적 `scoreFloor(recommendedScore)`(음수면 `IllegalArgumentException`).
 - `PlanSolver.solve(PlanInput, PlanObjective) → SolveResult`. `solve(PlanInput)`은 추천형 목적함수로 위임하는 기본 메서드다. `null` 입력·목적함수는 `IllegalArgumentException`.
 - `SolveResult(evaluation, planType, solverType)`이고 `selection()`은 `evaluation.selection()`이다. `planType`은 푼 목적함수의 유형.
 - `ExactSolver`: 인자 없는 생성자, `countCandidateCombinations(PlanInput, PlanObjective) → long`(S5).
@@ -89,6 +89,7 @@
 16. **동치 제거 회귀(옛 지배 제거가 틀리는 입력)**: 월 시청 300분, 예산 1,000원, pA(id 1, 1,000원)·pB(id 2, 1,000원). 단위 A(MUST, 200분, pB로만), B(MAYBE, 300분, pB로만), C(MAYBE, 400분, pA·pB로 볼 수 있음). 완전탐색(추천형)의 최선은 `[{1},{2},{2}]`(A는 1번째 달, B는 2번째 달, C는 0번째 달 300분+1번째 달 100분으로 시청 완료), mustCompleted 1, score 2, 비용 3,000원이다. 옛 제거식으로는 `{1}`이 지워져 score 1이 된다.
 17. **그리디(S8) baseline 개선**: 절약형·간편형을 `GreedySolver`로 풀면 `compare(result, baseline) >= 0`이고, `mustCompleted`가 baseline과 같으면 하한을 지킨다.
 18. **가입 횟수 정의**(3절 예시): 연속 유지는 1회, 갈아타기는 3회, 이미 구독 중인 상품을 1월에 선택하면 0회. 간편형 비교기가 이 값으로 ③을 가른다.
+    - **정답 세트(Task 040) 케이스 14**(2026-10-10 반영, 비교기 ①의 꼭 우선 확인): 꼭 시청 완료 3·점수 5·총비용 20,000원인 조합과 꼭 시청 완료 2·점수 6·총비용 15,000원인 조합을 비교하면 **앞쪽이 이긴다**. 점수가 더 높고 비용이 더 낮아도 꼭 시청 완료 수가 많은 쪽이 먼저다(세 유형 모두 ①이 꼭 시청 완료 수 최대화이기 때문). 절약형·간편형도 ①이 앞이라 같은 결과다.
 19. **상품 수 한도(S9)**: 후보 상품이 20개를 넘으면 `ExactSolver.solve`와 `countCandidateCombinations`가 `IllegalArgumentException`.
 20. **S6 후보 제외**: FREE 상품은 결과의 어느 달에도 나타나지 않고, SUBSCRIBED 상품은 0번째 달 선택에 나타나지 않으며, 어떤 단위도 볼 수 없는 상품과 가격이 예산을 넘는 상품도 나타나지 않는다.
 
