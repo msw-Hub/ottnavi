@@ -18,6 +18,8 @@ import type { AvailabilityStatus, PriceSource } from '@/components/common/displa
 import { Button } from '@/components/ui/button'
 import { getErrorMessage } from '@/lib/errorMessages'
 import { formatMinutes } from '@/lib/format'
+import { useMockRole } from '@/hooks/useMockRole'
+import { switchMockRole, type MockRole } from '@/mocks/mockSession'
 
 /*
  * 개발 모드에서만 열리는 공통 컴포넌트 확인 화면(/__dev/components, Task 026).
@@ -149,6 +151,19 @@ export function ComponentsPreviewPage() {
   const [isGrayscale, setIsGrayscale] = useState(false)
   // 다시 시도 버튼을 누른 횟수. 버튼이 실제로 onRetry를 부르는지 화면에서 확인하려고 둔다
   const [retryCount, setRetryCount] = useState(0)
+  // 목업의 로그인 역할. 머리글의 개발용 전환(app/MockRoleSwitcher)과 같은 값을 구독해 둘이 항상 같은 값을 보인다(Task 027 2회차)
+  const mockRole = useMockRole()
+
+  // 목업 역할을 바꾼다. 머리글 전환과 같은 함수(switchMockRole)를 쓴다
+  function handleMockRoleChange(role: MockRole) {
+    switchMockRole(role)
+  }
+  // 1회차의 임시 구현(역할을 useState로 복사해 둠). 머리글 전환이 생겨 같은 변수를 구독하도록 바꿨다. 참고용으로 남긴다
+  // const [mockRole, setMockRoleState] = useState<MockRole>(getMockRole)
+  // function handleMockRoleChange(role: MockRole) {
+  //   setMockRole(role)
+  //   setMockRoleState(role)
+  // }
 
   return (
     <div className={isGrayscale ? 'grid gap-5 grayscale' : 'grid gap-5'}>
@@ -284,6 +299,32 @@ export function ComponentsPreviewPage() {
           <DataAsOf value={null} />
           <p className="-mt-1 text-[0.8125rem] text-muted-foreground">위 줄: 빈 값(날짜 없음)</p>
         </div>
+      </PreviewSection>
+
+      <PreviewSection id="preview-mock-role" title="7. 목업 로그인 역할 (개발 확인용)">
+        <p className="mb-3 text-sm text-muted-foreground">
+          머리글의 &ldquo;개발용&rdquo; 전환과 같은 값입니다. 비로그인(GUEST)에서 작품 상세의 찜을
+          누르면 로그인 화면으로 이동하고, 회원(USER)에서는 찜이 됩니다. 이 값은 새로고침하면
+          비로그인으로 돌아갑니다.
+        </p>
+        <div role="group" aria-label="목업 로그인 역할" className="flex flex-wrap gap-2">
+          {(['GUEST', 'USER'] as const).map((role) => (
+            <Button
+              key={role}
+              type="button"
+              variant="outline"
+              size="lg"
+              className="border-input bg-transparent"
+              aria-pressed={mockRole === role}
+              onClick={() => handleMockRoleChange(role)}
+            >
+              {role === 'GUEST' ? '비로그인(GUEST)' : '회원(USER)'}
+            </Button>
+          ))}
+        </div>
+        <p className="mt-3 text-[0.8125rem] text-muted-foreground" aria-live="polite">
+          현재 역할: {mockRole}
+        </p>
       </PreviewSection>
     </div>
   )

@@ -72,7 +72,7 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
 })
 
 /**
- * 데이터 기준일을 "2026년 10월 9일" 형식으로 바꾼다. 해석할 수 없으면 null을 돌려준다.
+ * 일반 날짜(개봉일·첫 방영일 등)를 "2026년 10월 9일" 형식으로 바꾼다. 해석할 수 없으면 null을 돌려준다.
  *
  * 받을 수 있는 값:
  * - 'YYYY-MM-DD' (계약의 날짜 형식)
@@ -87,7 +87,7 @@ const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
  * 기준일은 "확인된 범위"를 알려 주는 중요한 정보라 엉뚱한 날짜를 보이느니 표시하는 쪽(DataAsOf 등)이
  * "기준일 정보 없음"처럼 따로 안내하게 하기 위함이다. 금액·시간처럼 "-"로 바꾸지 않고 null을 돌려준다.
  */
-export function formatDataAsOf(value: string | Date | null | undefined): string | null {
+export function formatDate(value: string | Date | null | undefined): string | null {
   if (value == null) return null
 
   if (value instanceof Date) {
@@ -115,4 +115,14 @@ export function formatDataAsOf(value: string | Date | null | undefined): string 
   // 날짜만 있는 형식이 아니면 일시(ISO-8601)로 본다. 'abc'처럼 해석할 수 없으면 Invalid Date가 된다
   const dateTime = new Date(trimmed)
   return Number.isNaN(dateTime.getTime()) ? null : DATE_TIME_FORMATTER.format(dateTime)
+}
+
+/**
+ * 데이터 기준일을 "2026년 10월 9일" 형식으로 바꾼다(해석할 수 없으면 null).
+ *
+ * 표기는 formatDate와 같지만 이름을 나눈 이유: "기준일"은 확인된 범위를 알리는 정보라 개봉일 같은 일반 날짜와 의미가 다르고,
+ * 나중에 기준일 표기만 바꾸고 싶을 때(예: 시각 추가) 개봉일 표기까지 흔들리지 않게 하기 위함이다.
+ */
+export function formatDataAsOf(value: string | Date | null | undefined): string | null {
+  return formatDate(value)
 }

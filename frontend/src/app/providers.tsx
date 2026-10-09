@@ -51,14 +51,29 @@ const TOASTER_CLASS_NAME = 'toaster group md:[--width:var(--container-md)]!'
  * 공유하려면 머리글 높이를 고정값으로 묶어야 해 레이아웃이 바뀐다. 쓰는 곳이 이 한 곳뿐이라 여기 두는 편이 단순하다.
  * 머리글의 여백·높이·줄 수를 바꾸면 이 값도 함께 고친다(바꾸지 않으면 토스트가 다시 머리글을 덮는다).
  */
-const HEADER_HEIGHT = 'calc(var(--spacing) * 14 + 1px)'
+// (Task 027 확인 때 값을 고쳤다) 머리글 입력창·버튼이 Task 026에서 h-10(40px)으로 커져 머리글이 57px → 65px이 되었다.
+// 65px = py-3(24px) + 입력창·버튼 h-10(40px) + 아래 테두리 1px. 이전 값(14칸 = 56px + 1px)이면 토스트가 머리글 바로 아래 4px밖에
+// 떨어지지 않아 간격이 거의 없었다.
+// const HEADER_HEIGHT = 'calc(var(--spacing) * 14 + 1px)'
+const HEADER_HEIGHT = 'calc(var(--spacing) * 16 + 1px)'
+
+/*
+ * 모바일(RootLayout의 max-sm, 640px 미만)은 머리글이 두 줄이다: 윗줄(로고·로그인 26px) + 줄 간격 gap-3(12px) + 검색창 줄(40px).
+ * 65px 기준 값으로는 두 번째 줄(검색창)을 토스트가 덮었다(375px 폭에서 머리글 실측 103px).
+ * 103px = py-3(24px) + 윗줄 26px + gap 12px + 검색창 줄 40px + 테두리 1px. 윗줄 높이는 로고 글자 줄 높이(26px)에서 나온 값이다.
+ * 간격 토큰 한 칸이 4px이라 26px은 6.5칸이다. 로고 글자 크기나 머리글 줄 구성을 바꾸면 이 값도 함께 고친다.
+ */
+const HEADER_HEIGHT_MOBILE = 'calc(var(--spacing) * 25.5 + 1px)'
 
 /*
  * 토스트 묶음의 위쪽 시작 위치. 머리글 바로 아래에 12px(간격 토큰 3칸) 띄워 로고·검색창·로그인을 덮지 않게 한다.
  * sonner는 offset(601px 이상)과 mobileOffset(600px 이하)을 따로 받는다. 둘 다 top만 정하고, 정하지 않은
  * 좌우·아래는 sonner 기본값(큰 화면 24px, 모바일 16px)이 그대로 들어가 폭·좌우 여백은 이전과 같다.
+ * 한계: sonner의 모바일 기준(600px 이하)과 머리글의 두 줄 기준(640px 미만)이 달라 601~639px 폭에서는 한 줄 값이 적용된다.
+ * 이 폭은 드문 태블릿 세로 크기 근처라 두고, 필요하면 머리글 기준(640px)을 맞춘다.
  */
 const TOASTER_OFFSET = { top: `calc(${HEADER_HEIGHT} + var(--spacing) * 3)` }
+const TOASTER_MOBILE_OFFSET = { top: `calc(${HEADER_HEIGHT_MOBILE} + var(--spacing) * 3)` }
 
 const TOAST_OPTIONS = {
   classNames: {
@@ -118,7 +133,7 @@ export function Providers({ children }: ProvidersProps) {
         theme="dark"
         position="top-center"
         offset={TOASTER_OFFSET}
-        mobileOffset={TOASTER_OFFSET}
+        mobileOffset={TOASTER_MOBILE_OFFSET}
         className={TOASTER_CLASS_NAME}
         toastOptions={TOAST_OPTIONS}
       />

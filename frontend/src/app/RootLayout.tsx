@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import { createSearchParams, Link, Outlet, useNavigate, useSearchParams } from 'react-router'
+import { HeaderAccountNav } from '@/app/HeaderAccountNav'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -27,12 +28,8 @@ export function RootLayout() {
             OTT내비
           </Link>
           <HeaderSearchForm />
-          <nav aria-label="계정" className="ml-auto">
-            {/* TODO(Task 057): 로그인 상태면 로그인 링크 대신 내 메뉴(설정·찜·로그아웃)를 보여준다 */}
-            <Link to="/login" className="text-sm underline-offset-4 hover:underline">
-              로그인
-            </Link>
-          </nav>
+          {/* 계정 영역(로그인 링크 / 사용자 표시·로그아웃 / 목업 모드의 개발용 전환). 상태별 표시는 HeaderAccountNav가 맡는다 */}
+          <HeaderAccountNav />
         </div>
       </header>
 
