@@ -69,9 +69,29 @@ dependencyManagement {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'benchmark' // 성능 측정 테스트(@Tag("benchmark"))는 일반 빌드에서 제외한다. ./gradlew benchmark로 따로 돌린다
+	}
 	// 계약 대조·오류 코드 일치 테스트가 읽는 문서. 입력으로 등록해 문서만 바뀌어도 테스트가 다시 돈다
 	def apiDocsDir = file('../docs/api')
 	inputs.dir(apiDocsDir).withPathSensitivity(PathSensitivity.RELATIVE)
 	systemProperty 'ottnavi.docs.api-dir', apiDocsDir.absolutePath
+}
+
+// Task 040: 엔진 성능 측정. 결과 표는 콘솔과 build/benchmark-results/*.md에 남는다. 측정치는 실행한 PC 기준이라 운영(Cloudtype)과 다르다
+tasks.register('benchmark', Test) {
+	group = 'verification'
+	description = '@Tag("benchmark") 엔진 성능 측정 테스트만 실행한다(일반 test·build에는 포함되지 않는다)'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'benchmark'
+	}
+	maxHeapSize = findProperty('benchmarkHeap') ?: '1g' // 기본 1g, -PbenchmarkHeap=512m처럼 바꿔 후보 상품 20개 근처의 메모리 위험을 같은 조건으로 잰다
+	outputs.upToDateWhen { false } // 측정은 매번 다시 돈다
+	testLogging {
+		showStandardStreams = true // 결과 표를 콘솔에 보여 준다
+		events 'passed', 'failed', 'skipped'
+		exceptionFormat = 'full'
+	}
 }
