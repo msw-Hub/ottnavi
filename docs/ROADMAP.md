@@ -795,7 +795,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 039: 정확해·그리디 Solver 구현으로 조합 탐색 완성 ⬜
 - 태그: [B] · PRD: B2, FR-12, 13, TECH T-4 · 선행: 038 · 브랜치: `feature/b2-engine-solvers`
 - 구현 사항
-  - [ ] `engine/solver/PlanSolver`(`solve(input, objective)`), `ExactSolver`(3개월 중첩 순회, 지배 조합 제거는 추천형만), `GreedySolver`. 명세는 `docs/TASK039_GUIDE.md`
+  - [ ] `engine/solver/PlanSolver`(`solve(input, objective)`), `ExactSolver`(후보 상품에서 쓸모없는 상품 제외 후 3개월 중첩 순회, 동치 제거는 추천형만, 후보 상품 20개 초과 시 예외), `GreedySolver`(절약형·간편형은 추천형 결과에서 출발해 개선). 명세는 `docs/TASK039_GUIDE.md`
   - [ ] 후보 조합 수 상한 초과 시 그리디 전환(`SolverSelector`, 상한은 설정 값, R11-30 전까지 잠정값), 선택 알고리즘을 결과에 남김
   - [ ] 플랜 유형 3종의 목적함수(`PlanObjective`: 추천형·절약형·간편형, 점수 하한 = 추천형 점수의 70% 올림, PRD 5.4·11절 35번)와 `PlanTypeSolver.solveAll`(추천형을 먼저 풀고 그 점수로 절약형·간편형 기준 생성)
 - 완료 기준
@@ -1040,7 +1040,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `POST /api/plans/calculate`(`calculatePlan`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 정확해 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
   - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
   - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
-  - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일- 완료 기준
+  - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
+- 완료 기준
   - V-B: 동시 계산 2건 직렬화(유니크 위반 없음), 재계산 후 이전 DRAFT 하위 행 0행이고 유형마다 DRAFT 1개(최대 3개), 설정 누락 400.
   - V-API: 결과가 정답 세트 한 케이스와 일치하고 `calc_run`에 선택된 알고리즘 1행이 남는다.
 
