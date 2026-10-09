@@ -158,6 +158,7 @@ src/
 ├── components/
 │   ├── ui/           # shadcn/ui 원본 컴포넌트
 │   └── common/       # 여러 기능이 쓰는 공통 컴포넌트 (제공 상태 배지, 포스터 카드, 가격 표시, 출처 표기)
+├── hooks/            # 여러 기능이 함께 쓰는 훅 (예: useOttServices, useIsLoggedIn, useMockRole). 기능 폴더끼리 import 금지라 공유가 필요한 훅은 여기에 둔다
 ├── api/
 │   ├── http.ts       # axios 인스턴스, 인증·에러 인터셉터
 │   └── generated/    # orval 생성물 (수정 금지)
