@@ -1,7 +1,16 @@
 import type { FormEvent } from 'react'
-import { createSearchParams, Link, Outlet, useNavigate, useSearchParams } from 'react-router'
+import {
+  createSearchParams,
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
+import { WishlistAddedDialog } from '@/components/common/WishlistAddedDialog'
 import { Button } from '@/components/ui/button'
+import { isMockMode } from '@/lib/mockScenario'
 
 /**
  * 모든 화면이 공유하는 바깥 틀(헤더 · 본문 · 푸터)이다.
@@ -11,6 +20,8 @@ import { Button } from '@/components/ui/button'
  * 시각 디자인은 Task 037에서 확정하므로 지금은 shadcn 기본 토큰(bg-background, text-muted-foreground 등)만 쓴다.
  */
 export function RootLayout() {
+  // 개발용 이동 링크가 목업 확인용 주소 파라미터(?mockScenario=… 등)를 이어 붙이도록 현재 주소의 쿼리를 읽는다
+  const { search } = useLocation()
   return (
     <div className="flex min-h-svh flex-col">
       {/* 키보드 사용자가 헤더 링크를 매번 거치지 않고 본문으로 바로 가도록 하는 링크. 포커스를 받을 때만 보인다 */}
@@ -49,8 +60,45 @@ export function RootLayout() {
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>
+          {/*
+            목업 확인용 이동 링크(Task 028). 로그인 후 화면(SCR-07~10)으로 가는 메뉴가 아직 없고(Task 057에서 "내 메뉴"를 만든다),
+            주소를 직접 입력하면 새로고침으로 목업 로그인·찜 상태가 사라져 화면 사이를 옮겨 다니며 확인할 수 없어 둔다.
+            목업 모드에서만 보이고 운영에서는 그려지지 않는다. Task 057에서 실제 메뉴가 생기면 이 줄은 지운다.
+          */}
+          {isMockMode() && (
+            <nav aria-label="개발용 이동" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>개발용 이동</span>
+              <Link
+                to={{ pathname: '/settings', search }}
+                className="underline-offset-4 hover:underline"
+              >
+                내 설정
+              </Link>
+              <Link
+                to={{ pathname: '/wishlist', search }}
+                className="underline-offset-4 hover:underline"
+              >
+                찜 목록
+              </Link>
+              <Link
+                to={{ pathname: '/pricing', search }}
+                className="underline-offset-4 hover:underline"
+              >
+                요금 확인
+              </Link>
+              <Link
+                to={{ pathname: '/plan', search }}
+                className="underline-offset-4 hover:underline"
+              >
+                플랜 결과
+              </Link>
+            </nav>
+          )}
         </div>
       </footer>
+
+      {/* 찜 추가 직후 팝업. 앱에 한 번만 둔다(열림 상태는 hooks/useWishlistAddedDialog). Link를 쓰므로 라우터 안인 여기에 둔다 */}
+      <WishlistAddedDialog />
     </div>
   )
 }

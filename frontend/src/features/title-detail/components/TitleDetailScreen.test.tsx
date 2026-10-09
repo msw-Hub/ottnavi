@@ -7,7 +7,8 @@ import { Providers } from '@/app/providers'
 import { TitleDetailScreen } from '@/features/title-detail/components/TitleDetailScreen'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { TITLE_FIXTURES } from '@/mocks/fixtures/titles'
-import { setMockRole } from '@/mocks/mockSession'
+import { resetMockMemberState } from '@/mocks/memberHandlers'
+import { resetMockSession, setMockOnboardingDone, setMockRole } from '@/mocks/mockSession'
 
 /*
  * 작품 상세 화면 테스트(Task 027). 사용자가 보는 글자 중심으로 확인하고, API는 앱의 목업 핸들러(MSW)로 대체한다.
@@ -22,7 +23,8 @@ beforeEach(() => vi.stubEnv('VITE_USE_MOCK', 'true'))
 afterEach(() => {
   vi.unstubAllEnvs()
   server.resetHandlers()
-  setMockRole('GUEST') // 로그인 역할은 모듈 변수라 테스트마다 비로그인으로 되돌린다
+  resetMockSession() // 로그인 역할·온보딩 여부는 모듈 변수라 테스트마다 처음(비로그인, 온보딩 미완료)으로 되돌린다
+  resetMockMemberState() // 저장한 내 설정 등도 지운다
   resetMockWishlist()
 })
 afterAll(() => server.close())
@@ -244,6 +246,56 @@ describe('작품 상세 화면', () => {
     // 로그인이 끝나면 돌아올 작품 상세 경로가 함께 넘어간다
     expect(router.state.location.state).toEqual({
       from: `/titles/${fixture.mediaType}/${fixture.tmdbId}`,
+    })
+  })
+
+  describe('긴 시즌 안내("여러 달에 나눠 봐야 해요")', () => {
+    // 목업 내 설정의 월 시청 시간은 900분(15시간)이다. 예시 드라마 A는 시즌 1·2가 1140분·1170분이라 한 달에 다 못 본다
+    const LONG_SEASON_NOTICE = '여러 달에 나눠 봐야 해요'
+
+    it('온보딩을 마친 회원이면 월 시청 시간보다 긴 시즌 줄에만 안내가 보인다', async () => {
+      setMockRole('USER')
+      setMockOnboardingDone(true)
+      renderDetailOf('예시 드라마 A (시즌별 제공처 다름)', 'tv')
+      await screen.findByRole('heading', { level: 1, name: /예시 드라마 A/ })
+
+      // 설정을 불러온 뒤에 안내가 나타난다. 시즌 2개 모두 900분보다 길다
+      expect(await screen.findAllByText(LONG_SEASON_NOTICE)).toHaveLength(2)
+    })
+
+    it('시즌이 월 시청 시간 이하면 회원이어도 안내가 보이지 않는다', async () => {
+      setMockRole('USER')
+      setMockOnboardingDone(true)
+      renderDetailOf('오징어 게임', 'tv') // 시즌 총 시간이 500·425·270분이라 모두 900분 이하
+      await screen.findByRole('heading', { level: 1, name: '오징어 게임' })
+      // 설정이 도착할 시간을 준 뒤에도 없는지 확인한다(찜 버튼이 회원 상태로 바뀐 것을 기다리는 대신 요청 완료를 기다린다)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(screen.queryByText(LONG_SEASON_NOTICE)).not.toBeInTheDocument()
+    })
+
+    it('비회원이면 안내가 없고 내 설정 요청도 보내지 않는다', async () => {
+      setMockOnboardingDone(true) // 역할은 GUEST
+      const settingsRequests: string[] = []
+      server.events.on('request:start', ({ request }) => {
+        if (new URL(request.url).pathname === '/api/me/settings') settingsRequests.push(request.url)
+      })
+      renderDetailOf('예시 드라마 A (시즌별 제공처 다름)', 'tv')
+      await screen.findByRole('heading', { level: 1, name: /예시 드라마 A/ })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(screen.queryByText(LONG_SEASON_NOTICE)).not.toBeInTheDocument()
+      expect(settingsRequests).toHaveLength(0)
+      server.events.removeAllListeners()
+    })
+
+    it('온보딩을 마치지 않은 회원(설정 없음)이면 안내를 숨긴다', async () => {
+      setMockRole('USER') // 온보딩 미완료 → 내 설정이 비어 있다
+      renderDetailOf('예시 드라마 A (시즌별 제공처 다름)', 'tv')
+      await screen.findByRole('heading', { level: 1, name: /예시 드라마 A/ })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(screen.queryByText(LONG_SEASON_NOTICE)).not.toBeInTheDocument()
     })
   })
 

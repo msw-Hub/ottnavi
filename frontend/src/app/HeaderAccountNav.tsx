@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router'
 import { MockRoleSwitcher } from '@/app/MockRoleSwitcher'
 import { useMockRole } from '@/hooks/useMockRole'
-import { isMockMode } from '@/lib/mockScenario'
+import { getMockRequestParams, isMockMode } from '@/lib/mockScenario'
 import { setMockRole } from '@/mocks/mockSession'
 
 /**
@@ -18,6 +18,10 @@ export function HeaderAccountNav() {
   const navigate = useNavigate()
   // 운영에서는 목업 역할을 믿지 않는다(역할 값이 남아 있어도 비로그인으로 본다)
   const effectiveRole = isMockMode() ? role : 'GUEST'
+
+  // 찜 목록 링크에 이어 붙일 목업 확인용 파라미터(없으면 빈 문자열). 운영(목업 아님)에서는 빈 객체라 아무것도 붙지 않는다
+  const mockParams = new URLSearchParams(getMockRequestParams()).toString()
+  const wishlistSearch = mockParams ? `?${mockParams}` : ''
 
   // 목업 로그아웃: 역할을 비로그인으로 되돌리고 첫 화면으로 보낸다. 서버·토큰이 없어 이 한 줄이 전부다
   function handleLogout() {
@@ -39,6 +43,17 @@ export function HeaderAccountNav() {
         </Link>
       ) : (
         <>
+          {/*
+            임시 진입점(Task 057에서 실제 "내 메뉴"(설정·찜·요금·플랜)로 확정되면 이 링크는 그 메뉴 안으로 옮긴다).
+            지금은 찜 목록으로 가는 길이 푸터의 개발용 이동뿐이라 회원일 때 머리글에서 바로 갈 수 있게 둔다.
+            목업 확인용 파라미터(?mockScenario=… 등)는 이어 붙이고, 검색어 같은 다른 쿼리는 가져가지 않는다.
+          */}
+          <Link
+            to={{ pathname: '/wishlist', search: wishlistSearch }}
+            className="text-sm underline-offset-4 hover:underline"
+          >
+            찜 목록
+          </Link>
           <span className="text-sm text-muted-foreground">
             {effectiveRole === 'ADMIN' ? '관리자' : '회원'}
           </span>

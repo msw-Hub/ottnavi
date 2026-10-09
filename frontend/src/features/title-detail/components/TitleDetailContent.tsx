@@ -49,6 +49,7 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
               tmdbId={detail.tmdbId}
               seasonNumber={null}
               targetName={detail.title}
+              posterUrl={detail.posterUrl}
             />
           )}
 
@@ -99,7 +100,13 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
       </section>
 
       {isTv && (
-        <SeasonSection tmdbId={detail.tmdbId} seasons={detail.seasons} services={services} />
+        <SeasonSection
+          tmdbId={detail.tmdbId}
+          title={detail.title}
+          posterUrl={detail.posterUrl}
+          seasons={detail.seasons}
+          services={services}
+        />
       )}
 
       <CastList cast={detail.cast} />
