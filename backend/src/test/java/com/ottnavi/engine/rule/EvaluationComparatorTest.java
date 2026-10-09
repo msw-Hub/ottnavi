@@ -30,7 +30,7 @@ class EvaluationComparatorTest {
 	}
 
 	@Test
-	void T14a_MUST_완주_수가_많으면_점수와_비용보다_우선한다() {
+	void T14a_MUST_시청_완료_수가_많으면_점수와_비용보다_우선한다() {
 		Evaluation more = evaluation(EMPTY, 2, 0, 20_000);
 		Evaluation less = evaluation(EMPTY, 1, 10, 0);
 

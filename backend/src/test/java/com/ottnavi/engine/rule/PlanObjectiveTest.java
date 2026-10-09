@@ -102,8 +102,8 @@ class PlanObjectiveTest {
 	}
 
 	@Test
-	@DisplayName("세 유형 모두 ① 꼭 완주 수가 많은 쪽이 점수와 비용보다 우선한다")
-	void 꼭_완주_수_우선() {
+	@DisplayName("세 유형 모두 ① 꼭 시청 완료 수가 많은 쪽이 점수와 비용보다 우선한다")
+	void 꼭_시청_완료_수_우선() {
 		Evaluation more = evaluation(EMPTY, 1, 0, 50_000);
 		Evaluation less = evaluation(EMPTY, 0, 10, 0);
 

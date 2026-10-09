@@ -37,8 +37,8 @@ class GreedySolverTest {
 	}
 
 	@Test
-	@DisplayName("그리디가 정확해와 다른 입력: 점수 2·비용 8,000원 대 정확해 점수 4·비용 28,000원, 차이를 compare로 단언한다")
-	void 그리디가_정확해보다_나쁜_케이스() {
+	@DisplayName("그리디가 완전탐색과 다른 입력: 점수 2·비용 8,000원 대 완전탐색 점수 4·비용 28,000원, 차이를 compare로 단언한다")
+	void 그리디가_완전탐색보다_나쁜_케이스() {
 		PlanInput input = SolverCases.greedyWorse();
 		PlanObjective objective = PlanObjective.recommended(input.products());
 
@@ -101,8 +101,8 @@ class GreedySolverTest {
 	}
 
 	@Test
-	@DisplayName("그리디는 달마다 예산을 지키고 후보 상품(S6)만 쓰며 같은 목적함수의 정확해보다 좋지 않다")
-	void 예산을_지키고_정확해보다_좋지_않다() {
+	@DisplayName("그리디는 달마다 예산을 지키고 후보 상품(S6)만 쓰며 같은 목적함수의 완전탐색보다 좋지 않다")
+	void 예산을_지키고_완전탐색보다_좋지_않다() {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
 			for (PlanType type : PlanType.values()) {
@@ -144,7 +144,7 @@ class GreedySolverTest {
 	}
 
 	@Test
-	@DisplayName("성질 12·13이 그리디에도 성립한다: 절약형은 비용 ≤ 추천형, 간편형은 가입 횟수 ≤ 추천형, 꼭 완주 수는 추천형과 같다")
+	@DisplayName("성질 12·13이 그리디에도 성립한다: 절약형은 비용 ≤ 추천형, 간편형은 가입 횟수 ≤ 추천형, 꼭 시청 완료 수는 추천형과 같다")
 	void 절약형_간편형_성질() {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);

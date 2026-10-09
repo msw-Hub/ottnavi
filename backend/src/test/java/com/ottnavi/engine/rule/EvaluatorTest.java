@@ -64,7 +64,7 @@ class EvaluatorTest {
 	// 안내서 5.1 T1~T13
 
 	@Test
-	void T1_모두_한_달에_들어가면_0번째_달에_배정되고_MUST는_완주_수로_나머지는_점수로_센다() {
+	void T1_모두_한_달에_들어가면_0번째_달에_배정되고_MUST는_시청_완료_수로_나머지는_점수로_센다() {
 		PlanInput input = input(600, P1_ONLY, unit(1, MUST, 120, P1), unit(2, WANT, 100, P1), unit(3, MAYBE, 90, P1));
 
 		Evaluation evaluation = evaluate(input, selection(ids(P1), ids(), ids()));
@@ -139,7 +139,7 @@ class EvaluatorTest {
 	}
 
 	@Test
-	void T5_긴_시즌은_연속된_달에_나눠_배정하고_다_본_달에_완주한다() {
+	void T5_긴_시즌은_연속된_달에_나눠_배정하고_다_본_달에_시청_완료한다() {
 		PlanInput input = input(600, P1_ONLY, unit(1, MUST, 1200, P1));
 
 		Evaluation evaluation = evaluate(input, selection(ids(P1), ids(P1), ids()));
@@ -195,7 +195,7 @@ class EvaluatorTest {
 	}
 
 	@Test
-	void T10_완주하지_못한_긴_시즌이_차지했던_시간은_풀려서_다음_단위가_쓴다() {
+	void T10_시청_완료하지_못한_긴_시즌이_차지했던_시간은_풀려서_다음_단위가_쓴다() {
 		PlanInput input = input(600, P1_ONLY, unit(1, WANT, 1200, P1), unit(2, MAYBE, 300, P1));
 
 		Evaluation evaluation = evaluate(input, selection(ids(P1), ids(), ids()));
@@ -413,7 +413,7 @@ class EvaluatorTest {
 				new Assignment(0, P1, 120), new Assignment(1, P1, 120), new Assignment(2, P1, 60));
 	}
 
-	// 평가기 + 비교기로 최선 조합 고르기(정확해 039의 축소판)
+	// 평가기 + 비교기로 최선 조합 고르기(완전탐색 039의 축소판)
 
 	@Test
 	void 여러_조합을_평가하면_비교기가_꼭_볼_작품과_점수가_같을_때_더_싼_조합을_고른다() {

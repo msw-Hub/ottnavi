@@ -25,7 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 정확해 Solver 테스트(명세 S3·S5·S6·S7·S9, 5절 1·5~10·12·13·16·18~20). 기대값은 손 계산 또는 무차별 대입 오라클이다.
+ * 완전탐색 Solver 테스트(명세 S3·S5·S6·S7·S9, 5절 1·5~10·12·13·16·18~20). 기대값은 손 계산 또는 무차별 대입 오라클이다.
  */
 class ExactSolverTest {
 
@@ -40,7 +40,7 @@ class ExactSolverTest {
 	// ---------------------------------------------------------------- 손 계산 정답
 
 	@Test
-	@DisplayName("추천형 정확해: 그리디가 나쁜 케이스에서 점수 4·비용 28,000원, 조합은 ⑤ 사전순으로 ({1},{1},{2})")
+	@DisplayName("추천형 완전탐색: 그리디가 나쁜 케이스에서 점수 4·비용 28,000원, 조합은 ⑤ 사전순으로 ({1},{1},{2})")
 	void 추천형_그리디_나쁜_케이스() {
 		SolveResult result = exact.solve(SolverCases.greedyWorse());
 
@@ -179,7 +179,7 @@ class ExactSolverTest {
 	}
 
 	@Test
-	@DisplayName("예산 0원: 비용이 드는 상품은 고를 수 없고 FREE로 볼 수 있는 작품만 완주한다")
+	@DisplayName("예산 0원: 비용이 드는 상품은 고를 수 없고 FREE로 볼 수 있는 작품만 시청 완료한다")
 	void 예산_0원() {
 		SolveResult result = exact.solve(SolverCases.zeroBudget());
 
@@ -209,7 +209,7 @@ class ExactSolverTest {
 	}
 
 	@Test
-	@DisplayName("절약형·간편형 정확해: 추천형과 달라지는 손 계산 정답")
+	@DisplayName("절약형·간편형 완전탐색: 추천형과 달라지는 손 계산 정답")
 	void 절약형_간편형_손_계산() {
 		PlanInput dropB = SolverCases.saverAndSimpleDropB();
 		Evaluation dropBRecommended = BruteForceOracle.bestRecommended(dropB);
@@ -236,7 +236,7 @@ class ExactSolverTest {
 	// ---------------------------------------------------------------- 무차별 대입 비교(S3)
 
 	@Test
-	@DisplayName("정확해는 세 유형 모두 무차별 대입 최선과 정확히 같다(손 계산 케이스 + 무작위 입력 60개)")
+	@DisplayName("완전탐색은 세 유형 모두 무차별 대입 최선과 정확히 같다(손 계산 케이스 + 무작위 입력 60개)")
 	void 무차별_대입과_같다() {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
@@ -257,7 +257,7 @@ class ExactSolverTest {
 	}
 
 	@Test
-	@DisplayName("정확해는 PlanObjective 구현과 무관하게 주어진 비교기를 따른다(오라클 비교기를 직접 넘겨도 같은 결과)")
+	@DisplayName("완전탐색은 PlanObjective 구현과 무관하게 주어진 비교기를 따른다(오라클 비교기를 직접 넘겨도 같은 결과)")
 	void 주어진_비교기를_따른다() {
 		for (PlanInput input : oracleInputs()) {
 			Evaluation recommended = BruteForceOracle.bestRecommended(input);
@@ -288,7 +288,7 @@ class ExactSolverTest {
 	// ---------------------------------------------------------------- 절약형·간편형 성질(5절 12·13)
 
 	@Test
-	@DisplayName("절약형: 점수 하한 이상이고 비용이 추천형 이하이며 꼭 완주 수가 추천형과 같다")
+	@DisplayName("절약형: 점수 하한 이상이고 비용이 추천형 이하이며 꼭 시청 완료 수가 추천형과 같다")
 	void 절약형_성질() {
 		for (PlanInput input : oracleInputs()) {
 			SolveResult recommended = exact.solve(input);
@@ -303,7 +303,7 @@ class ExactSolverTest {
 	}
 
 	@Test
-	@DisplayName("간편형: 점수 하한 이상이고 가입 횟수가 추천형 이하이며 꼭 완주 수가 추천형과 같다")
+	@DisplayName("간편형: 점수 하한 이상이고 가입 횟수가 추천형 이하이며 꼭 시청 완료 수가 추천형과 같다")
 	void 간편형_성질() {
 		for (PlanInput input : oracleInputs()) {
 			SolveResult recommended = exact.solve(input);

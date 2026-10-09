@@ -5,7 +5,7 @@ import com.ottnavi.engine.model.SolveResult;
 import com.ottnavi.engine.rule.PlanObjective;
 
 /**
- * 입력에서 3개월 구독 조합 중 최선을 고르는 Solver(TECH 1절). 정확해와 그리디가 이 인터페이스를 공유한다.
+ * 입력에서 3개월 구독 조합 중 최선을 고르는 Solver(TECH 1절). 완전탐색과 그리디가 이 인터페이스를 공유한다.
  */
 public interface PlanSolver {
 
