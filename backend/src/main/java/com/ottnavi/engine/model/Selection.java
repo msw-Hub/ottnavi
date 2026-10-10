@@ -10,6 +10,7 @@ import java.util.TreeSet;
  * 평가할 구독 조합 하나: 달마다 선택한 상품 ID 집합 3개(0=이번 달, 1·2=다음 두 달).
  * 각 달의 집합은 상품 ID 오름차순으로 순회되는 불변 집합으로 바꿔 보관한다.
  * 비교기 ⑥(달별 상품 ID 사전순)가 비교할 때마다 정렬하지 않도록 생성 때 한 번 정렬해 두는 것이다.
+ * 이미 {@link SortedIdSet}인 집합은 복사하지 않고 그대로 쓴다(Solver가 후보 집합을 한 번만 만들어 수백만 조합이 공유한다).
  * 선택 상품 ID가 입력 상품 목록에 있는지는 Selection이 상품 목록을 모르므로 평가기가 상품 위치로 바꿀 때 확인한다.
  */
 public record Selection(
@@ -28,6 +29,14 @@ public record Selection(
 			Set<Long> productIds = productIdsByMonth.get(monthIndex);
 			if (productIds == null) {
 				throw new IllegalArgumentException("구독 조합의 달별 상품 집합은 null일 수 없다: monthIndex=" + monthIndex);
+			}
+			if (productIds instanceof SortedIdSet) {
+				sortedByMonth.add(productIds); // 이미 정렬된 불변 집합이면 복사하지 않는다(완전탐색이 조합마다 만드는 비용)
+				continue;
+			}
+			if (productIds.isEmpty()) {
+				sortedByMonth.add(SortedIdSet.EMPTY);
+				continue;
 			}
 			// Set이라 같은 달 안에서 상품 ID는 중복될 수 없다. null만 따로 막는다
 			TreeSet<Long> sorted = new TreeSet<>();

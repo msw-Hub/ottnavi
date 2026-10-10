@@ -5,6 +5,7 @@ import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.OttProductCondition;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.Selection;
+import com.ottnavi.engine.model.SortedIdSet;
 import com.ottnavi.engine.model.WatchUnit;
 import com.ottnavi.engine.rule.Evaluator;
 import java.util.ArrayList;
@@ -146,9 +147,14 @@ final class MonthCandidates {
 	 * 후보 상품의 부분집합 중 비용 합이 예산 이하인 것을 비트마스크 오름차순으로 만든다(S1·S2).
 	 * 마스크 0(빈 집합)은 비용이 0이라 항상 첫 번째로 들어간다.
 	 * 집합은 여기서 한 번만 만들고 Solver가 수백만 번 재사용한다(조합마다 새로 만들지 않기 위함).
+	 * 정렬된 불변 집합(SortedIdSet)으로 만들어, Selection이 조합마다 달별 집합을 다시 정렬 복사하지 않게 한다(Task 040 이월 최적화 ②).
 	 */
 	private static List<Set<Long>> subsetsOf(List<OttProduct> candidates, int monthlyBudget) {
 		int productCount = candidates.size();
+		Long[] boxedIds = new Long[productCount]; // 상품 ID를 한 번만 박싱해 부분집합이 같은 Long 객체를 공유하게 한다
+		for (int bit = 0; bit < productCount; bit++) {
+			boxedIds[bit] = candidates.get(bit).id();
+		}
 		List<Set<Long>> subsets = new ArrayList<>();
 		for (int mask = 0; mask < (1 << productCount); mask++) {
 			int cost = 0;
@@ -156,12 +162,12 @@ final class MonthCandidates {
 			for (int bit = 0; bit < productCount; bit++) {
 				if ((mask & (1 << bit)) != 0) {
 					cost += candidates.get(bit).monthlyPrice();
-					ids.add(candidates.get(bit).id());
+					ids.add(boxedIds[bit]);
 				}
 			}
 			// S1: 달별 예산은 달마다 따로 적용한다(3개월 합산 한도 없음)
 			if (cost <= monthlyBudget) {
-				subsets.add(Set.copyOf(ids));
+				subsets.add(SortedIdSet.of(ids));
 			}
 		}
 		return List.copyOf(subsets);
