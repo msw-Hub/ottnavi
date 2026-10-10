@@ -157,7 +157,11 @@ public final class BruteForceOracle {
 
 	/** 예산 이하 모든 후보 조합(S6)을 평가한 결과(명세 S3). */
 	public static List<Evaluation> allEvaluations(PlanInput input) {
-		Evaluator evaluator = new Evaluator(input);
+		return allEvaluations(input, new Evaluator(input)::evaluate);
+	}
+
+	/** 평가 함수를 주입하는 전수 탐색: 예산 이하 모든 후보 조합(S6)을 evaluate로 평가한다(예: 독립 구현 OracleAssigner). */
+	public static List<Evaluation> allEvaluations(PlanInput input, java.util.function.Function<Selection, Evaluation> evaluate) {
 		List<Set<Long>> month0 = monthOptions(input, 0);
 		List<Set<Long>> month1 = monthOptions(input, 1);
 		List<Set<Long>> month2 = monthOptions(input, 2);
@@ -165,7 +169,7 @@ public final class BruteForceOracle {
 		for (Set<Long> first : month0) {
 			for (Set<Long> second : month1) {
 				for (Set<Long> third : month2) {
-					all.add(evaluator.evaluate(Selection.of(first, second, third)));
+					all.add(evaluate.apply(Selection.of(first, second, third)));
 				}
 			}
 		}
