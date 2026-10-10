@@ -1,0 +1,79 @@
+{
+  "name" : "case-16-prev-season-unscheduled",
+  "note" : "시즌 순서 ② 앞 시즌이 미배정이면 뒤 시즌은 TIME(소규모, 상품 2개). 월 예산 10,000원, 월 시청 200분. 서비스1은 9,000원, 서비스2는 12,000원이라 서비스2는 월 예산을 넘어 어느 달에도 구독할 수 없다. 작품B 1시즌(WANT 100분)은 서비스2에만, 2시즌(MUST 60분)은 서비스1에만 있고, 영화Y(WANT 50분)는 서비스1에 있다. 손계산: 1시즌은 서비스2를 구독할 수 없어(정적 불가능) 어느 달에도 볼 수 없으므로 이유 BUDGET이다(정적 불가능이라 2시즌 앞에 끌어올려지지도 않는다). 2시즌은 서비스1을 구독한 달에 혼자라면 60분이라 볼 수 있지만 앞 시즌인 1시즌이 미배정이라 시청 완료할 수 없다. 2시즌 자신의 서비스(서비스1)는 선택된 달이 있으므로 이유는 TIME이다(BUDGET이 아니다). 서비스1을 구독해 얻는 것은 영화Y(WANT 2점)뿐이라 꼭 시청 완료 0, 점수 2, 9,000원이다. 한 달만 구독하면 되고 어느 달이든 비용이 같으므로 조기 시청으로 0번째 달 [[1],[],[]]이다. 세 유형이 같다. 앞 시즌 규칙이 없다면 2시즌(MUST)도 볼 수 있어 꼭 1개가 되므로 이 규칙이 결과를 바꾸는 케이스다. 기대값은 OracleAssigner 기반 전수 탐색으로 생성했다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 200,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 12000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품B 1시즌",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 1
+  }, {
+    "id" : 2,
+    "name" : "작품B 2시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 60,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 2
+  }, {
+    "id" : 3,
+    "name" : "영화Y",
+    "priority" : "WANT",
+    "requiredMinutes" : 50,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 2,
+      "totalCost" : 9000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 2,
+      "totalCost" : 9000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 2,
+      "totalCost" : 9000
+    }
+  },
+  "expectedUnitReasons" : {
+    "RECOMMENDED" : {
+      "1" : "BUDGET",
+      "2" : "TIME"
+    },
+    "SAVER" : {
+      "1" : "BUDGET",
+      "2" : "TIME"
+    },
+    "SIMPLE" : {
+      "1" : "BUDGET",
+      "2" : "TIME"
+    }
+  }
+}

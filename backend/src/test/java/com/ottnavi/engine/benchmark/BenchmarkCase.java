@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ottnavi.engine.model.OttProductCondition;
 import com.ottnavi.engine.model.PlanType;
 import com.ottnavi.engine.model.Priority;
+import com.ottnavi.engine.model.UnitReason;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +23,8 @@ public record BenchmarkCase(
 		List<ProductSpec> products,          // 후보 상품
 		List<UnitSpec> units,                // 시청 단위
 		Map<PlanType, ExpectedPlan> expected, // 유형 3종별 기대 결과(완전탐색 기준). 생성 전 입력 파일에는 없다
-		ExpectedPlan greedyExpected          // 그리디(추천형)가 완전탐색보다 나쁜 케이스에서만: 그리디의 기대 결과
+		ExpectedPlan greedyExpected,         // 그리디(추천형)가 완전탐색보다 나쁜 케이스에서만: 그리디의 기대 결과
+		Map<PlanType, Map<Long, UnitReason>> expectedUnitReasons // 선택 필드: 유형별 미배정 시청 단위 ID → 기대 이유 코드(배정된 단위는 넣지 않는다). 없으면 이유 코드는 검증하지 않는다
 ) {
 
 	/** 기대값의 근거. */
@@ -40,14 +42,17 @@ public record BenchmarkCase(
 	) {
 	}
 
-	/** 시청 단위 하나. */
+	/** 시청 단위 하나. 영화는 titleId·seasonNumber가 null이라 파일에 쓰지 않는다(기존 파일과 같은 모양을 유지). */
+	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public record UnitSpec(
 			long id,                          // 시청 단위 ID
 			String name,                      // 가상 작품 이름(설명용)
 			Priority priority,                // MUST / WANT / MAYBE
 			int requiredMinutes,              // 필요 시간(분)
 			List<Long> watchableProductIds,   // 시청 가능 상품 ID
-			boolean providerUnknown           // 제공 상태가 "모름"인 서비스가 있는지
+			boolean providerUnknown,          // 제공 상태가 "모름"인 서비스가 있는지
+			Long titleId,                     // 선택 필드: 작품(시리즈) ID. 영화는 없다(null). seasonNumber와 둘 다 있거나 둘 다 없어야 한다
+			Integer seasonNumber              // 선택 필드: 시즌 번호(1 이상). 영화는 없다(null)
 	) {
 	}
 

@@ -2,10 +2,13 @@ package com.ottnavi.engine.benchmark;
 
 import com.ottnavi.engine.benchmark.BenchmarkCase.Basis;
 import com.ottnavi.engine.benchmark.BenchmarkCase.ExpectedPlan;
+import com.ottnavi.engine.benchmark.BenchmarkCase.UnitSpec;
 import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
 import com.ottnavi.engine.model.SolveResult;
+import com.ottnavi.engine.model.UnitReason;
+import com.ottnavi.engine.oracle.OracleAssigner;
 import com.ottnavi.engine.rule.PlanObjective;
 import com.ottnavi.engine.solver.BruteForceOracle;
 import com.ottnavi.engine.solver.ExactSolver;
@@ -16,7 +19,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -28,8 +33,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>정답 세트 파일(src/main/resources/engine-benchmark)을 <b>절대 덮어쓰지 않는다</b>. 입력 파일에서 기대값을 계산해
  * {@code build/engine-benchmark-generated/} 아래에 새 파일로만 쓴다. 결과를 눈으로 확인한 뒤 사람이 직접 복사한다.
- * 기대값 근거는 케이스의 {@code expectationBasis}를 따른다: ORACLE이면 무차별 대입 오라클, REGRESSION이면 SolverSelector(완전탐색).
+ * 기대값 근거는 케이스의 {@code expectationBasis}를 따른다: ORACLE이면 평가기와 독립 구현한 {@link OracleAssigner}로 만든 전수 탐색(무차별 대입),
+ * REGRESSION이면 SolverSelector(완전탐색).
  * 그리디(추천형)가 완전탐색과 다른 결과를 내는 케이스에는 그리디의 기대 결과를 {@code greedyExpected}로 함께 쓴다.
+ * 시즌(titleId)이 있는 케이스에는 유형별 미배정 단위의 이유 코드를 {@code expectedUnitReasons}로 함께 쓴다(시즌이 없는 기존 케이스는 쓰지 않는다).
  */
 @EnabledIfEnvironmentVariable(named = "ENGINE_BENCHMARK_GENERATE", matches = "1")
 class EngineBenchmarkGenerator {
@@ -43,40 +50,58 @@ class EngineBenchmarkGenerator {
 		Files.createDirectories(OUTPUT_DIR);
 		for (BenchmarkCase benchmarkCase : BenchmarkLoader.loadAll()) {
 			PlanInput input = BenchmarkLoader.toInput(benchmarkCase);
-			Map<PlanType, ExpectedPlan> expected = benchmarkCase.expectationBasis() == Basis.ORACLE
+			Map<PlanType, Evaluation> evaluations = benchmarkCase.expectationBasis() == Basis.ORACLE
 					? fromOracle(input)
 					: fromSolver(input);
+			Map<PlanType, ExpectedPlan> expected = new EnumMap<>(PlanType.class);
+			evaluations.forEach((type, evaluation) -> expected.put(type, BenchmarkLoader.toExpected(evaluation)));
 			ExpectedPlan greedyExpected = greedyIfDifferent(input, expected.get(PlanType.RECOMMENDED));
+			Map<PlanType, Map<Long, UnitReason>> reasons = hasSeason(benchmarkCase) ? reasonsOf(evaluations) : null;
 
 			BenchmarkCase generated = new BenchmarkCase(benchmarkCase.name(), benchmarkCase.note(), benchmarkCase.expectationBasis(),
 					benchmarkCase.dataAsOf(), benchmarkCase.monthlyBudget(), benchmarkCase.monthlyWatchMinutes(),
-					benchmarkCase.products(), benchmarkCase.units(), expected, greedyExpected);
+					benchmarkCase.products(), benchmarkCase.units(), expected, greedyExpected, reasons);
 			String json = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(generated);
 			Files.writeString(OUTPUT_DIR.resolve(benchmarkCase.name() + ".json"), json + System.lineSeparator(), StandardCharsets.UTF_8);
 			System.out.println("[engine-benchmark] 생성: " + benchmarkCase.name() + " (" + benchmarkCase.expectationBasis() + ") "
-					+ summary(expected) + " greedy=" + greedyExpected);
+					+ summary(expected) + " greedy=" + greedyExpected + " reasons=" + reasons);
 		}
 	}
 
-	/** 오라클(무차별 대입)로 세 유형의 기대값을 만든다. 절약형·간편형의 점수 하한은 추천형 점수로 정한다. */
-	private static Map<PlanType, ExpectedPlan> fromOracle(PlanInput input) {
-		Evaluation recommended = BruteForceOracle.bestRecommended(input);
-		Map<PlanType, ExpectedPlan> expected = new EnumMap<>(PlanType.class);
-		expected.put(PlanType.RECOMMENDED, BenchmarkLoader.toExpected(recommended));
-		expected.put(PlanType.SAVER, BenchmarkLoader.toExpected(BruteForceOracle.best(input, PlanType.SAVER, recommended.score())));
-		expected.put(PlanType.SIMPLE, BenchmarkLoader.toExpected(BruteForceOracle.best(input, PlanType.SIMPLE, recommended.score())));
-		return expected;
+	private static boolean hasSeason(BenchmarkCase benchmarkCase) {
+		List<UnitSpec> units = benchmarkCase.units();
+		return units.stream().anyMatch(unit -> unit.titleId() != null);
+	}
+
+	private static Map<PlanType, Map<Long, UnitReason>> reasonsOf(Map<PlanType, Evaluation> evaluations) {
+		Map<PlanType, Map<Long, UnitReason>> reasons = new EnumMap<>(PlanType.class);
+		evaluations.forEach((type, evaluation) -> reasons.put(type, BenchmarkLoader.unscheduledReasons(evaluation)));
+		return reasons;
+	}
+
+	/**
+	 * OracleAssigner로 평가한 전수 탐색(예산 이하 모든 후보 조합)에서 세 유형의 최선을 고른다. 비교기는 BruteForceOracle의 독립 구현(명세 3절 표)이다.
+	 * 절약형·간편형의 점수 하한 기준은 추천형 점수로 정한다.
+	 */
+	private static Map<PlanType, Evaluation> fromOracle(PlanInput input) {
+		List<Evaluation> all = BruteForceOracle.allEvaluations(input, selection -> OracleAssigner.evaluate(input, selection));
+		Evaluation recommended = Collections.max(all, BruteForceOracle.comparator(PlanType.RECOMMENDED, input, 0));
+		Map<PlanType, Evaluation> result = new EnumMap<>(PlanType.class);
+		result.put(PlanType.RECOMMENDED, recommended);
+		result.put(PlanType.SAVER, Collections.max(all, BruteForceOracle.comparator(PlanType.SAVER, input, recommended.score())));
+		result.put(PlanType.SIMPLE, Collections.max(all, BruteForceOracle.comparator(PlanType.SIMPLE, input, recommended.score())));
+		return result;
 	}
 
 	/** 운영과 같은 구성(SolverSelector)으로 세 유형을 풀어 회귀 기준을 만든다. */
-	private static Map<PlanType, ExpectedPlan> fromSolver(PlanInput input) {
+	private static Map<PlanType, Evaluation> fromSolver(PlanInput input) {
 		PlanTypeSolver solver = new PlanTypeSolver(new SolverSelector(new ExactSolver(), new GreedySolver(),
 				SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS));
-		Map<PlanType, ExpectedPlan> expected = new EnumMap<>(PlanType.class);
+		Map<PlanType, Evaluation> result = new EnumMap<>(PlanType.class);
 		for (Map.Entry<PlanType, SolveResult> entry : solver.solveAll(input).entrySet()) {
-			expected.put(entry.getKey(), BenchmarkLoader.toExpected(entry.getValue().evaluation()));
+			result.put(entry.getKey(), entry.getValue().evaluation());
 		}
-		return expected;
+		return result;
 	}
 
 	/** 그리디(추천형) 결과가 완전탐색 결과와 다르면 그리디 결과를, 같으면 null을 돌려준다. */

@@ -1,0 +1,70 @@
+{
+  "name" : "case-15-season-order-same-month",
+  "note" : "시즌 순서 ① 같은 달 순서: 시즌 2가 정렬상 먼저 오지만 앞 시즌(시즌 1)이 먼저 배정되어야 하는 소규모(상품 2개, 시리즈 1개+영화 1편). 월 예산 10,000원, 월 시청 200분. 서비스1(9,000원)과 서비스2(4,000원)는 합치면 13,000원이라 한 달에 하나만 구독할 수 있다. 작품A 1시즌(MAYBE 100분, 서비스1)·2시즌(MUST 60분, 서비스1), 영화X(MUST 90분, 서비스1·2). 기본 정렬은 MUST 중 짧은 순이라 2시즌(60분)→영화X(90분)→1시즌(MAYBE 100분)이다. 2시즌이 나올 때 아직 안 나온 앞 시즌 1시즌이 끌어올려져 배정 순서는 1시즌→2시즌→영화X가 된다. 손계산: 세 작품 합이 250분이라 한 달(200분)에 다 못 담는다. 서비스1을 구독한 달에 1시즌(100분)과 2시즌(60분)이 160분으로 같은 달에 들어가고(남은 40분이라 영화X 90분은 못 들어간다), 영화X는 다른 달에 서비스2(4,000원) 또는 서비스1로 본다. 끌어올림이 없다면 2시즌→영화X(합 150분)가 먼저 달을 채워 1시즌(100분)이 다음 달로 밀려 2시즌보다 늦게 끝나므로 규칙 위반이다(그 경우 1시즌을 놓친다). 꼭 시청 완료 2개(2시즌·영화X)와 점수 1(1시즌 MAYBE)을 얻는 최저 비용은 서비스1 한 달 + 서비스2 한 달 = 13,000원이다. 추천형·절약형(점수 하한 1 충족)은 같은 13,000원 조합 6개 중 조기 시청에서 0번째 달에 1시즌·2시즌이 끝나고(꼭 1·점수 1) 1번째 달에 영화X가 끝나는 [[1],[2],[]]를 고른다. 간편형은 가입 횟수가 가장 적은 [[1],[1],[]](서비스1만 두 달 연속, 가입 1회, 18,000원)을 고른다. 세 유형 모두 미배정 작품이 없다. 기대값은 OracleAssigner 기반 전수 탐색으로 생성했다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 200,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 4000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A 1시즌",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 1
+  }, {
+    "id" : 2,
+    "name" : "작품A 2시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 60,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 2
+  }, {
+    "id" : 3,
+    "name" : "영화X",
+    "priority" : "MUST",
+    "requiredMinutes" : 90,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 2,
+      "score" : 1,
+      "totalCost" : 13000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 2,
+      "score" : 1,
+      "totalCost" : 13000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 1 ], [ ] ],
+      "mustCompleted" : 2,
+      "score" : 1,
+      "totalCost" : 18000
+    }
+  },
+  "expectedUnitReasons" : {
+    "RECOMMENDED" : { },
+    "SAVER" : { },
+    "SIMPLE" : { }
+  }
+}

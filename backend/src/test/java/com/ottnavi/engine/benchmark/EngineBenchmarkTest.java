@@ -1,14 +1,20 @@
 package com.ottnavi.engine.benchmark;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ottnavi.engine.InputHasher;
 import com.ottnavi.engine.benchmark.BenchmarkCase.Basis;
 import com.ottnavi.engine.benchmark.BenchmarkCase.ExpectedPlan;
 import com.ottnavi.engine.model.Evaluation;
+import com.ottnavi.engine.model.OttProductCondition;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
+import com.ottnavi.engine.model.Priority;
 import com.ottnavi.engine.model.SolveResult;
+import com.ottnavi.engine.model.UnitReason;
+import com.ottnavi.engine.oracle.OracleAssigner;
+import com.ottnavi.engine.oracle.PlanInvariants;
 import com.ottnavi.engine.rule.PlanObjective;
 import com.ottnavi.engine.solver.BruteForceOracle;
 import com.ottnavi.engine.solver.ExactSolver;
@@ -51,6 +57,78 @@ class EngineBenchmarkTest {
 		}
 		assertThat(hashes).as("케이스마다 input_hash가 달라야 한다").hasSize(cases.size());
 		assertThat(cases).extracting(BenchmarkCase::note).allSatisfy(note -> assertThat(note).isNotBlank());
+	}
+
+	@Test
+	@DisplayName("시즌 순서 케이스가 7개 이상이고 시즌 번호만 달라져도 input_hash(v2)가 달라진다")
+	void 시즌_번호만_달라도_해시가_다르다() {
+		List<BenchmarkCase> seasonCases = BenchmarkLoader.loadAll().stream()
+				.filter(benchmarkCase -> benchmarkCase.units().stream().anyMatch(unit -> unit.titleId() != null))
+				.toList();
+		assertThat(seasonCases).hasSizeGreaterThanOrEqualTo(7);
+
+		for (BenchmarkCase benchmarkCase : seasonCases) {
+			// 시즌 번호만 10씩 올린 같은 케이스(titleId·우선순위·시간·상품은 그대로)
+			BenchmarkCase shifted = new BenchmarkCase(benchmarkCase.name(), benchmarkCase.note(), benchmarkCase.expectationBasis(),
+					benchmarkCase.dataAsOf(), benchmarkCase.monthlyBudget(), benchmarkCase.monthlyWatchMinutes(), benchmarkCase.products(),
+					benchmarkCase.units().stream()
+							.map(unit -> new BenchmarkCase.UnitSpec(unit.id(), unit.name(), unit.priority(), unit.requiredMinutes(),
+									unit.watchableProductIds(), unit.providerUnknown(), unit.titleId(),
+									unit.seasonNumber() == null ? null : unit.seasonNumber() + 10))
+							.toList(),
+					null, null, null);
+
+			String original = InputHasher.hash(BenchmarkLoader.toInput(benchmarkCase), BenchmarkLoader.dataAsOf(benchmarkCase));
+			String changed = InputHasher.hash(BenchmarkLoader.toInput(shifted), BenchmarkLoader.dataAsOf(shifted));
+			assertThat(changed).as("%s 시즌 번호만 바꾼 입력의 해시", benchmarkCase.name()).isNotEqualTo(original);
+			assertThat(InputHasher.canonicalize(BenchmarkLoader.toInput(benchmarkCase), BenchmarkLoader.dataAsOf(benchmarkCase)))
+					.as("v2 정규화 문자열에 시즌 정보가 들어간다").startsWith("v2|");
+		}
+	}
+
+	@Test
+	@DisplayName("정답 세트 스키마: titleId와 seasonNumber 중 하나만 있는 단위는 거부한다")
+	void 시즌_필드는_둘_다_있거나_둘_다_없어야_한다() {
+		BenchmarkCase onlyTitle = withUnit(new BenchmarkCase.UnitSpec(1, "작품", Priority.WANT, 60, List.of(1L), false, 3L, null));
+		BenchmarkCase onlySeason = withUnit(new BenchmarkCase.UnitSpec(1, "작품", Priority.WANT, 60, List.of(1L), false, null, 2));
+		BenchmarkCase both = withUnit(new BenchmarkCase.UnitSpec(1, "작품", Priority.WANT, 60, List.of(1L), false, 3L, 2));
+		BenchmarkCase neither = withUnit(new BenchmarkCase.UnitSpec(1, "작품", Priority.WANT, 60, List.of(1L), false, null, null));
+
+		assertThatThrownBy(() -> BenchmarkLoader.toInput(onlyTitle)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("둘 다");
+		assertThatThrownBy(() -> BenchmarkLoader.toInput(onlySeason)).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("둘 다");
+		assertThat(BenchmarkLoader.toInput(both).units()).hasSize(1);
+		assertThat(BenchmarkLoader.toInput(neither).units()).hasSize(1);
+	}
+
+	private static BenchmarkCase withUnit(BenchmarkCase.UnitSpec unit) {
+		return new BenchmarkCase("schema-check", "스키마 검사용", Basis.REGRESSION, "2026-10-01", 10_000, 600,
+				List.of(new BenchmarkCase.ProductSpec(1, "서비스1", 5_000, OttProductCondition.NONE)),
+				List.of(unit), null, null, null);
+	}
+
+	@ParameterizedTest(name = "{0}")
+	@MethodSource("cases")
+	@DisplayName("미배정 단위의 이유 코드가 기대와 같고(있는 케이스만), 독립 구현 OracleAssigner로 기대 조합을 다시 평가해도 같다")
+	void 이유_코드와_독립_평가가_기대와_같다(BenchmarkCase benchmarkCase) {
+		PlanInput input = BenchmarkLoader.toInput(benchmarkCase);
+		Map<PlanType, SolveResult> results = planTypeSolver.solveAll(input);
+
+		for (PlanType type : PlanType.values()) {
+			ExpectedPlan expected = benchmarkCase.expected().get(type);
+			// 기대 조합을 독립 구현으로 다시 평가하면 달별 상품·꼭 시청 완료 수·점수·비용이 기대와 같아야 한다
+			Evaluation reevaluated = OracleAssigner.evaluate(input, BenchmarkLoader.toSelection(expected));
+			assertThat(BenchmarkLoader.toExpected(reevaluated)).as("%s %s OracleAssigner 재평가", benchmarkCase.name(), type).isEqualTo(expected);
+			assertThat(PlanInvariants.violations(input, reevaluated)).as("%s %s 불변식", benchmarkCase.name(), type).isEmpty();
+
+			if (benchmarkCase.expectedUnitReasons() != null) {
+				Map<Long, UnitReason> expectedReasons = benchmarkCase.expectedUnitReasons().get(type);
+				assertThat(expectedReasons).as("%s %s 기대 이유 코드가 유형 3종 모두 있어야 한다", benchmarkCase.name(), type).isNotNull();
+				assertThat(BenchmarkLoader.unscheduledReasons(results.get(type).evaluation()))
+						.as("%s %s 완전탐색 이유 코드", benchmarkCase.name(), type).isEqualTo(expectedReasons);
+				assertThat(BenchmarkLoader.unscheduledReasons(reevaluated))
+						.as("%s %s OracleAssigner 이유 코드", benchmarkCase.name(), type).isEqualTo(expectedReasons);
+			}
+		}
 	}
 
 	@ParameterizedTest(name = "{0}")

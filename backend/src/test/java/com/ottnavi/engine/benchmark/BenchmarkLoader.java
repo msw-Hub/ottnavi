@@ -7,6 +7,8 @@ import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.Selection;
+import com.ottnavi.engine.model.UnitReason;
+import com.ottnavi.engine.model.UnitResult;
 import com.ottnavi.engine.model.WatchUnit;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +19,9 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import tools.jackson.databind.DeserializationFeature;
@@ -48,7 +52,9 @@ public final class BenchmarkLoader {
 			List<BenchmarkCase> cases = new ArrayList<>();
 			for (Resource resource : sorted) {
 				try (InputStream in = resource.getInputStream()) {
-					cases.add(MAPPER.readValue(in, BenchmarkCase.class));
+					BenchmarkCase benchmarkCase = MAPPER.readValue(in, BenchmarkCase.class);
+					validate(benchmarkCase);
+					cases.add(benchmarkCase);
 				}
 			}
 			return cases;
@@ -57,14 +63,25 @@ public final class BenchmarkLoader {
 		}
 	}
 
+	/** 스키마 검사: 시청 단위의 titleId와 seasonNumber는 둘 다 있거나 둘 다 없어야 한다(영화는 둘 다 없음). 어긋나면 케이스 이름과 단위 ID를 넣어 예외를 던진다. */
+	public static void validate(BenchmarkCase benchmarkCase) {
+		for (UnitSpec unit : benchmarkCase.units()) {
+			if ((unit.titleId() == null) != (unit.seasonNumber() == null)) {
+				throw new IllegalArgumentException("정답 세트 단위의 titleId와 seasonNumber는 둘 다 있거나 둘 다 없어야 한다: case="
+						+ benchmarkCase.name() + ", unitId=" + unit.id());
+			}
+		}
+	}
+
 	/** 케이스의 입력 부분을 엔진 입력으로 바꾼다. */
 	public static PlanInput toInput(BenchmarkCase benchmarkCase) {
+		validate(benchmarkCase);
 		List<OttProduct> products = benchmarkCase.products().stream()
 				.map((ProductSpec spec) -> new OttProduct(spec.id(), spec.monthlyPrice(), spec.condition()))
 				.toList();
 		List<WatchUnit> units = benchmarkCase.units().stream()
 				.map((UnitSpec spec) -> new WatchUnit(spec.id(), spec.priority(), spec.requiredMinutes(),
-						new HashSet<>(spec.watchableProductIds()), spec.providerUnknown()))
+						new HashSet<>(spec.watchableProductIds()), spec.providerUnknown(), spec.titleId(), spec.seasonNumber()))
 				.toList();
 		return new PlanInput(units, products, benchmarkCase.monthlyBudget(), benchmarkCase.monthlyWatchMinutes());
 	}
@@ -81,6 +98,17 @@ public final class BenchmarkLoader {
 			months.add(new ArrayList<>(evaluation.selection().productIdsOf(month))); // Selection이 이미 오름차순
 		}
 		return new ExpectedPlan(months, evaluation.mustCompleted(), evaluation.score(), evaluation.totalCost());
+	}
+
+	/** 평가 결과에서 미배정 단위의 이유 코드를 단위 ID 오름차순으로 모은다(파일의 expectedUnitReasons 한 유형분과 같은 모양). */
+	public static Map<Long, UnitReason> unscheduledReasons(Evaluation evaluation) {
+		Map<Long, UnitReason> reasons = new TreeMap<>();
+		for (UnitResult result : evaluation.units()) {
+			if (!result.scheduled()) {
+				reasons.put(result.watchUnitId(), result.reason());
+			}
+		}
+		return reasons;
 	}
 
 	/** 기대 결과의 달별 상품 ID를 구독 조합으로 바꾼다. */
