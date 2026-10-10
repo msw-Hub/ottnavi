@@ -11,7 +11,6 @@ import com.ottnavi.engine.model.Priority;
 import com.ottnavi.engine.model.Selection;
 import com.ottnavi.engine.model.UnitResult;
 import com.ottnavi.engine.model.WatchUnit;
-import com.ottnavi.engine.rule.Evaluator;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -99,7 +98,7 @@ public final class EngineFixtures {
 				// 결정 4: 긴 시즌의 마지막 조각을 뺀 조각은 120분 이상
 				if (i < assignments.size() - 1) {
 					assertThat(assignment.minutes()).as("긴 시즌 %d의 마지막이 아닌 조각", unit.id())
-							.isGreaterThanOrEqualTo(Evaluator.MIN_LONG_SEASON_SEGMENT_MINUTES);
+							.isGreaterThanOrEqualTo(WatchUnit.MIN_LONG_SEASON_SEGMENT_MINUTES);
 				}
 				assertThat(unit.watchableProductIds()).as("배정 상품은 시청 가능 상품").contains(assignment.productId());
 				minutesByMonth.merge(assignment.monthIndex(), assignment.minutes(), Integer::sum);

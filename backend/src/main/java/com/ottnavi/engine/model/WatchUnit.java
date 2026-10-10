@@ -18,6 +18,14 @@ public record WatchUnit(
 		Integer seasonNumber           // 시즌 번호(1 이상). 영화는 null. titleId와 함께 둘 다 null이거나 둘 다 있어야 한다
 ) {
 
+	/**
+	 * 긴 시즌을 나눠 볼 때 마지막 조각을 뺀 각 달 조각의 최소 시간(분). 120분은 영화 한 편 정도다.
+	 * 사용자 결정 2026-10-09(결정 4, PRD 5.4·안내서에 반영 필요): 한 달에 몇 분만 찔끔 보는 배정을 막는다.
+	 * 한계: 월 시청 가능 시간 M이 120분 미만이면 어느 달도 120분을 채울 수 없어 긴 시즌(필요 시간 &gt; M)은 시작할 수 없다(항상 TIME).
+	 * 평가기(rule)와 입력 검증(model)이 함께 쓰므로 model→rule 의존을 만들지 않으려고 모델 쪽에 둔다.
+	 */
+	public static final int MIN_LONG_SEASON_SEGMENT_MINUTES = 120;
+
 	/** 영화 등 시즌이 없는 단위를 만든다(titleId·seasonNumber가 null). 시즌 순서 도입 전 호출부를 그대로 쓰기 위한 생성자다. */
 	public WatchUnit(long id, Priority priority, int requiredMinutes, Set<Long> watchableProductIds, boolean isProviderUnknown) {
 		this(id, priority, requiredMinutes, watchableProductIds, isProviderUnknown, null, null);

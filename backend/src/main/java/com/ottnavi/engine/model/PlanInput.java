@@ -1,6 +1,5 @@
 package com.ottnavi.engine.model;
 
-import com.ottnavi.engine.rule.Evaluator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -131,8 +130,9 @@ public record PlanInput(
 	 * 어떤 구독 조합으로도 3개월 안에 시청 완료할 수 없는 시청 단위인지 입력만 보고 판단한다.
 	 * ① FREE·SUBSCRIBED 상품이 시청 가능 상품에 없고 월 예산 이하 가격의 시청 가능 상품도 없다(시청 가능 상품이 아예 없는 경우 포함, 후보 상품 정의 S6과 같은 기준)
 	 * ② 필요 시간이 월 시청 시간의 3배를 넘는다 ③ 긴 시즌(필요 시간 &gt; 월 시청 시간)인데 월 시청 시간이 최소 조각 120분 미만이다.
+	 * 끌어올림 판정과 평가기의 시즌 순서 판정이 같은 기준을 쓰도록 공개한다(productsById는 상품 ID → 상품).
 	 */
-	private static boolean isStaticallyImpossible(WatchUnit unit, int monthlyBudget, int monthlyWatchMinutes, Map<Long, OttProduct> productsById) {
+	public static boolean isStaticallyImpossible(WatchUnit unit, int monthlyBudget, int monthlyWatchMinutes, Map<Long, OttProduct> productsById) {
 		boolean hasUsableProduct = false;
 		for (long productId : unit.watchableProductIds()) {
 			OttProduct product = productsById.get(productId);
@@ -147,6 +147,6 @@ public record PlanInput(
 		if ((long) unit.requiredMinutes() > 3L * monthlyWatchMinutes) {
 			return true; // ②
 		}
-		return unit.requiredMinutes() > monthlyWatchMinutes && monthlyWatchMinutes < Evaluator.MIN_LONG_SEASON_SEGMENT_MINUTES; // ③
+		return unit.requiredMinutes() > monthlyWatchMinutes && monthlyWatchMinutes < WatchUnit.MIN_LONG_SEASON_SEGMENT_MINUTES; // ③
 	}
 }
