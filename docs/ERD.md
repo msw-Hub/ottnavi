@@ -292,7 +292,7 @@ erDiagram
 | user_setting | user_id PK·FK, monthly_budget, monthly_watch_minutes, watch_preset, notification_enabled | 1:1. 예산·시청 시간 필수(FR-10). watch_preset = LIGHT / NORMAL / HEAVY / CUSTOM |
 | user_subscription | id, user_id FK, ott_service_id FK, status, product_id FK NULL, billing_day | `UNIQUE(user_id, ott_service_id)`. 미구독은 행을 두지 않는다. billing_day 기본값 1. 번들 이용 시 구성 서비스 행들이 같은 product_id를 가리킨다 |
 | user_price_override | id, user_id FK, product_id FK, monthly_price | `UNIQUE(user_id, product_id)`. 관리자 가격을 바꾸지 않는 사용자별 덮어쓰기(FR-11) |
-| wishlist_item | id, user_id FK, watch_unit_id FK, priority, watched_at NULL | `UNIQUE(user_id, watch_unit_id)`. 드라마 찜은 시즌별 행으로 저장. watched_at이 있으면 계산에서 제외. **사용자당 찜은 최대 20개**(`watched_at`이 없는 행만 센다, PRD 11절 36번, 2026-10-10)이며 **애플리케이션 규칙이라 DB 제약(CHECK·트리거)을 두지 않는다**. 초과하면 서비스 계층이 `WISHLIST_LIMIT_EXCEEDED`(제안)로 막는다. 같은 시리즈의 시즌 순서(PRD 11절 37번)는 `watch_unit.title_id`·`season_number`로 판단하므로 스키마 변경은 없다 |
+| wishlist_item | id, user_id FK, watch_unit_id FK, priority, watched_at NULL | `UNIQUE(user_id, watch_unit_id)`. 드라마 찜은 시즌별 행으로 저장. watched_at이 있으면 계산에서 제외. **사용자당 찜은 최대 20개**(`watched_at`이 없는 행만 센다, PRD 11절 36번, 2026-10-10)이며 **애플리케이션 규칙이라 DB 제약(CHECK·트리거)을 두지 않는다**(같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화, 예: 사용자 행 잠금 또는 같은 트랜잭션에서 개수 확인·저장으로 검사·저장하며 방식은 Task 056 구현에서 정한다). 초과하면 서비스 계층이 `WISHLIST_LIMIT_EXCEEDED`(제안)로 막는다. 같은 시리즈의 시즌 순서(PRD 11절 37번)는 `watch_unit.title_id`·`season_number`로 판단하므로 스키마 변경은 없다 |
 
 ---
 
