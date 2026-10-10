@@ -71,6 +71,34 @@ describe('onboardingFormSchema 서비스 상태', () => {
     expect(onboardingFormSchema.safeParse(values).success).toBe(true)
   })
 
+  it('NOT_SUBSCRIBED인데 숨겨진 결제일 40·요금제 이름 31자가 남아 있어도 통과한다', () => {
+    const values = createValidValues()
+    values.services[1] = {
+      ottServiceId: 2,
+      status: 'NOT_SUBSCRIBED',
+      planName: 'a'.repeat(31),
+      billingDay: 40,
+    }
+    expect(onboardingFormSchema.safeParse(values).success).toBe(true)
+  })
+
+  it('SUBSCRIBED이면 같은 값(결제일 40·요금제 이름 31자)이 한국어 오류가 된다', () => {
+    const values = createValidValues()
+    values.services[0] = {
+      ottServiceId: 1,
+      status: 'SUBSCRIBED',
+      planName: 'a'.repeat(31),
+      billingDay: 40,
+    }
+    const result = onboardingFormSchema.safeParse(values)
+    expect(result.success).toBe(false)
+    if (result.success) return
+    expect(result.error.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([
+      ['services.0.planName', '요금제 이름은 30자 이하로 입력해 주세요.'],
+      ['services.0.billingDay', '결제일은 1일부터 31일 사이로 입력해 주세요.'],
+    ])
+  })
+
   it('알 수 없는 상태 값은 거절한다', () => {
     const values = { ...createValidValues(), services: [{ ottServiceId: 1, status: 'PAUSED' }] }
     expect(getIssuePaths(values)).toEqual(['services.0.status'])

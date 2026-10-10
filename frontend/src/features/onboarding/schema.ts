@@ -53,17 +53,11 @@ const serviceSubscriptionSchema = z
   .object({
     ottServiceId: z.number({ error: '서비스 정보가 올바르지 않습니다.' }).int().positive(),
     status: z.enum(SUBSCRIPTION_STATUS_VALUES, { error: '이용 상태를 골라 주세요.' }),
-    planName: z
-      .string()
-      .trim()
-      .max(PLAN_NAME_MAX_LENGTH, `요금제 이름은 ${PLAN_NAME_MAX_LENGTH}자 이하로 입력해 주세요.`)
-      .optional(),
-    billingDay: z
-      .number({ error: '결제일은 숫자로 입력해 주세요.' })
-      .int('결제일은 정수로 입력해 주세요.')
-      .min(1, '결제일은 1일부터 31일 사이로 입력해 주세요.')
-      .max(31, '결제일은 1일부터 31일 사이로 입력해 주세요.')
-      .optional(),
+    // 길이·범위 검사는 필드가 아니라 아래 superRefine(구독 중일 때만)에서 한다.
+    // 이유: 상태를 구독 중이 아닌 쪽으로 바꾸면 이 칸들은 hidden으로 숨겨질 뿐 값이 남는다. 필드 스키마에 범위 검사를 두면
+    // 눈에 보이지 않는 칸의 값(예: 결제일 40) 때문에 저장이 막히고 오류도 보이지 않는다.
+    planName: z.string().trim().optional(),
+    billingDay: z.number({ error: '결제일은 숫자로 입력해 주세요.' }).optional(),
   })
   .superRefine((service, ctx) => {
     if (service.status !== 'SUBSCRIBED') return
@@ -74,12 +68,30 @@ const serviceSubscriptionSchema = z
         path: ['planName'],
         message: `${SUBSCRIPTION_STATUS_LABELS.SUBSCRIBED}이면 요금제 이름을 입력해 주세요.`,
       })
+    } else if (service.planName.length > PLAN_NAME_MAX_LENGTH) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['planName'],
+        message: `요금제 이름은 ${PLAN_NAME_MAX_LENGTH}자 이하로 입력해 주세요.`,
+      })
     }
     if (service.billingDay === undefined) {
       ctx.addIssue({
         code: 'custom',
         path: ['billingDay'],
         message: `${SUBSCRIPTION_STATUS_LABELS.SUBSCRIBED}이면 결제일을 입력해 주세요.`,
+      })
+    } else if (!Number.isInteger(service.billingDay)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['billingDay'],
+        message: '결제일은 정수로 입력해 주세요.',
+      })
+    } else if (service.billingDay < 1 || service.billingDay > 31) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['billingDay'],
+        message: '결제일은 1일부터 31일 사이로 입력해 주세요.',
       })
     }
   })

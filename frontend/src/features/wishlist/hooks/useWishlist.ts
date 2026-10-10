@@ -57,7 +57,19 @@ export function useUpdateWishlistItem() {
         method: 'PATCH',
         data: body,
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      // 검색·상세 화면의 찜 버튼은 이 캐시에서 우선순위를 읽는다. 목록만 다시 불러오면 거기엔 옛 값이 남으므로,
+      // 응답의 같은 항목(wishlistItemId)만 새 우선순위로 바꾼다. 캐시에 없는 항목은 새로 만들지 않는다(키 정보가 없다).
+      // "다 봤음"(watchedAt)만 바꾼 요청이어도 응답 priority는 그대로라 같은 값으로 덮어쓸 뿐이다.
+      const { wishlistItemId, priority } = res.data
+      queryClient.setQueryData<WishlistState>(WISHLIST_STATE_KEY, (current = {}) =>
+        Object.fromEntries(
+          Object.entries(current).map(([key, entry]) => [
+            key,
+            entry.wishlistItemId === wishlistItemId ? { ...entry, priority } : entry,
+          ]),
+        ),
+      )
       void queryClient.invalidateQueries({ queryKey: ['/me/wishlist-items'] })
       void queryClient.invalidateQueries({ queryKey: ['/me/plans/drafts'] })
     },
