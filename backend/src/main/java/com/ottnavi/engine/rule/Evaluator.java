@@ -13,8 +13,11 @@ import com.ottnavi.engine.model.WatchUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * 구독 조합 하나가 주어졌을 때 작품을 어느 달에 보는지 배정하고 그 결과를 평가한다(PRD 5.4 배정 규칙·목적함수 값).
@@ -44,12 +47,7 @@ public final class Evaluator {
 	// 비용을 int로 합산해도 안전한 근거: 상품 수 상한(MAX_PRODUCT_COUNT 32개) × 3개월 × 월 가격 상한(OttProduct.MAX_MONTHLY_PRICE 100만 원)
 	// = 9,600만 원 < int 최댓값(약 21억). 주의: 둘 중 하나라도 늘리면(예: long 비트마스크로 64개) 합산 타입(int)을 다시 검토해야 한다
 
-	/**
-	 * 긴 시즌을 나눠 볼 때 마지막 조각을 뺀 각 달 조각의 최소 시간(분). 120분은 영화 한 편 정도다.
-	 * 사용자 결정 2026-10-09(결정 4, PRD 5.4·안내서에 반영 필요): 한 달에 몇 분만 찔끔 보는 배정을 막는다.
-	 * 한계: 월 시청 가능 시간 M이 120분 미만이면 어느 달도 120분을 채울 수 없어 긴 시즌(필요 시간 &gt; M)은 시작할 수 없다(항상 TIME).
-	 */
-	public static final int MIN_LONG_SEASON_SEGMENT_MINUTES = 120;
+	private static final int MIN_LONG_SEASON_SEGMENT_MINUTES = WatchUnit.MIN_LONG_SEASON_SEGMENT_MINUTES; // 긴 시즌 조각 최소 시간(결정 4). 값은 WatchUnit이 정의한다
 
 	private final int monthlyWatchMinutes;  // 월 시청 가능 시간(분)
 
@@ -68,6 +66,11 @@ public final class Evaluator {
 	private final List<UnitResult> fixedResults; // 뒤쪽 단위들의 결과(NO_PROVIDER/UNKNOWN). 조합과 무관하게 정해진다
 	private final UnitResult[] budgetResults;    // BUDGET 미배정 결과(뒤쪽 단위 자리는 null)
 	private final UnitResult[] timeResults;      // TIME 미배정 결과(뒤쪽 단위 자리는 null)
+
+	// 시즌 순서 준비물(PRD 5.4 시즌 순서). 같은 시리즈의 입력에 있는 바로 아래 시즌 번호 단위를 "앞 시즌"이라 한다
+	private final int[] prereqIndexes;      // 단위별 앞 시즌의 입력(units) 인덱스. 앞 시즌이 없거나 시즌이 아니면 -1
+	// 앞 시즌 사슬 어딘가가 정적으로 시청 완료 불가능해 조합과 무관하게 앞 시즌을 끝낼 수 없는지. 시즌 번호 오름차순으로 전이시켜 계산한다
+	private final boolean[] blockedAlways;
 
 	/** 입력 하나에 대한 평가 준비물(상품 위치·비트마스크·고정 결과)을 한 번 만든다. */
 	public Evaluator(PlanInput input) {
@@ -124,6 +127,43 @@ public final class Evaluator {
 		}
 		this.watchableUnitCount = watchableCount;
 		this.fixedResults = List.copyOf(fixed);
+
+		this.prereqIndexes = new int[unitCount];
+		Arrays.fill(prereqIndexes, -1);
+		this.blockedAlways = new boolean[unitCount];
+		prepareSeasonOrder(input);
+	}
+
+	/**
+	 * 단위마다 앞 시즌 인덱스(prereqIndexes)와 "항상 막힘" 여부(blockedAlways)를 채운다. 조합과 무관해 한 번만 계산한다.
+	 * blockedAlways[i] = i 자신이 정적으로 불가능 || 앞 시즌이 항상 막힘. 시즌 번호 오름차순으로 훑으므로 앞 시즌 값이 먼저 정해진다.
+	 * <p>알려진 모서리: 예산 밖 조합을 평가기에 직접 넣으면 사슬 판정이 조합과 무관해 어긋날 수 있다.
+	 * Solver는 달마다 예산 이하 조합만 넘기므로 운영 경로에는 영향이 없다(KnownCornerOffBudgetTest로 고정).
+	 */
+	private void prepareSeasonOrder(PlanInput input) {
+		Map<Long, TreeMap<Integer, Integer>> indexesByTitle = new HashMap<>(); // 작품 ID → (시즌 번호 → 단위 인덱스)
+		for (int i = 0; i < units.size(); i++) {
+			WatchUnit unit = units.get(i);
+			if (unit.titleId() != null) {
+				indexesByTitle.computeIfAbsent(unit.titleId(), key -> new TreeMap<>()).put(unit.seasonNumber(), i);
+			}
+		}
+		if (indexesByTitle.isEmpty()) {
+			return; // 시즌이 없는 입력: 모든 단위의 앞 시즌이 -1이라 평가 때 시즌 순서 분기를 타지 않는다
+		}
+		Map<Long, OttProduct> productsById = new HashMap<>();
+		for (OttProduct product : input.products()) {
+			productsById.put(product.id(), product);
+		}
+		for (TreeMap<Integer, Integer> seasons : indexesByTitle.values()) {
+			int previous = -1; // 바로 아래 시즌 번호 단위의 인덱스(시즌 1·3만 찜이면 3의 앞은 1)
+			for (int index : seasons.values()) {
+				prereqIndexes[index] = previous;
+				blockedAlways[index] = PlanInput.isStaticallyImpossible(units.get(index), input.monthlyBudget(), monthlyWatchMinutes, productsById)
+						|| (previous >= 0 && blockedAlways[previous]);
+				previous = index;
+			}
+		}
 	}
 
 	/**
@@ -153,7 +193,7 @@ public final class Evaluator {
 		// PRD 5.4 배정 규칙 1: 정렬된 순서대로 한 단위씩 배정한다(정렬은 PlanInput 생성 때 끝남).
 		// 시청 가능 상품이 없는 뒤쪽 단위는 시간을 쓰지 않으므로 루프에서 빼고, 끝에 미리 만든 결과를 순서대로 붙인다
 		for (int i = 0; i < watchableUnitCount; i++) {
-			UnitResult result = assign(i, availableMasks, remainingMinutes);
+			UnitResult result = assign(i, availableMasks, remainingMinutes, results);
 			results.add(result);
 			if (result.scheduled()) {
 				// PRD 5.4 목적함수 ①·②: MUST는 시청 완료 수로, WANT 2·MAYBE 1은 점수로 센다(D5)
@@ -170,8 +210,14 @@ public final class Evaluator {
 		return new Evaluation(selection, mustCompleted, score, totalCost, results);
 	}
 
-	/** 시청 가능 상품이 있는 i번째 단위를 배정하고 결과를 돌려준다. 배정하면 remainingMinutes를 줄인다. */
-	private UnitResult assign(int unitIndex, int[] availableMasks, int[] remainingMinutes) {
+	/**
+	 * 시청 가능 상품이 있는 i번째 단위를 배정하고 결과를 돌려준다. 배정하면 remainingMinutes를 줄인다.
+	 * results에는 0~i-1번째 단위의 결과가 순서대로 들어 있다(앞 시즌의 시청 완료 달을 읽는 데 쓴다).
+	 *
+	 * <p>PRD 5.4 시즌 순서: 판정 순서는 ① 볼 수 있는 달이 없으면 기존 BUDGET ② 앞 시즌이 막혔거나 미배정이면 TIME
+	 * ③ 아니면 앞 시즌의 시청 완료 달 이상에서만 시청 완료하도록 배정한다(시작 달은 제약하지 않는다).
+	 */
+	private UnitResult assign(int unitIndex, int[] availableMasks, int[] remainingMinutes, List<UnitResult> results) {
 		int watchableMask = watchableMasks[unitIndex];
 		// 달 3개를 비트 3개로: 비트 m이 1이면 m번째 달에 이 단위를 볼 수 있는 상품이 있다(예: 0b011 = 0·1번째 달)
 		int watchableMonths = 0;
@@ -185,10 +231,29 @@ public final class Evaluator {
 			return budgetResults[unitIndex];
 		}
 
+		// 시즌 순서: 이 단위가 시청 완료할 수 있는 가장 이른 달(앞 시즌의 시청 완료 달). 앞 시즌이 없으면 0이라 제약이 없다
+		int minCompletedMonth = 0;
+		int prereqIndex = prereqIndexes[unitIndex];
+		if (prereqIndex >= 0) {
+			// 앞 시즌의 결과를 읽어도 되는 때는 앞 시즌이 이 단위보다 먼저 평가됐을 때뿐이다(prereqIndex < unitIndex).
+			// PlanInput은 같은 시리즈의 앞 시즌을 뒤 시즌 바로 앞으로 끌어올려 두므로 보통 먼저 평가된다.
+			// 끌어올림이 제외된 경우(사슬에 정적 불가능 시즌이 낀 경우)만 앞 시즌이 뒤에 평가될 수 있는데, 그때는 앞 시즌이
+			// blockedAlways이므로(불가능 시즌 이후의 모든 시즌이 전이로 막힘) 결과를 읽기 전에 TIME으로 끝낸다.
+			// prereqIndex > unitIndex는 이 단위 자체가 정적 불가능일 때만 생기는 방어 분기다(아직 평가되지 않은 결과를 읽지 않는다)
+			if (blockedAlways[prereqIndex] || prereqIndex > unitIndex) {
+				return timeResults[unitIndex];
+			}
+			UnitResult prereqResult = results.get(prereqIndex);
+			if (!prereqResult.scheduled()) {
+				return timeResults[unitIndex]; // 앞 시즌이 3개월 안에 시청 완료되지 못하면 뒤 시즌도 못 본다
+			}
+			minCompletedMonth = prereqResult.completedMonthIndex();
+		}
+
 		WatchUnit unit = units.get(unitIndex);
 		UnitResult scheduled = unit.requiredMinutes() > monthlyWatchMinutes
-				? assignLongSeason(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes)
-				: assignWithinMonth(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes);
+				? assignLongSeason(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes, minCompletedMonth)
+				: assignWithinMonth(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes, minCompletedMonth);
 		// 이유 코드 TIME(TECH 1절, 도출): 볼 수 있는 달은 있으나 시간이 모자라 3개월 안에 다 보지 못한다
 		return scheduled != null ? scheduled : timeResults[unitIndex];
 	}
@@ -196,11 +261,12 @@ public final class Evaluator {
 	/**
 	 * 한 달 안에 볼 수 있는 단위를 나누지 않고 한 달에 통째로 배정한다. 못 하면 null.
 	 * PRD 5.4 배정 규칙 2: 볼 수 있는 가장 이른 달부터, 규칙 4(D3): 남은 시간이 모자라면 나누지 않고 다음에 볼 수 있는 달로 넘어간다.
+	 * 시즌 순서: 한 달 안에 끝나므로 시작 달이 곧 시청 완료 달이라 minCompletedMonth(앞 시즌의 시청 완료 달) 이상에서만 찾는다.
 	 */
 	private UnitResult assignWithinMonth(WatchUnit unit, int watchableMask, int watchableMonths,
-			int[] availableMasks, int[] remainingMinutes) {
+			int[] availableMasks, int[] remainingMinutes, int minCompletedMonth) {
 		int requiredMinutes = unit.requiredMinutes();
-		for (int month = 0; month < MONTH_COUNT; month++) {
+		for (int month = minCompletedMonth; month < MONTH_COUNT; month++) {
 			if (isWatchableMonth(watchableMonths, month) && remainingMinutes[month] >= requiredMinutes) {
 				remainingMinutes[month] -= requiredMinutes;
 				Assignment assignment = new Assignment(month, recordedProductId(availableMasks[month] & watchableMask), requiredMinutes);
@@ -221,7 +287,7 @@ public final class Evaluator {
 	 * 시청 가능한 달이 이어져 있어도 중간 달의 남은 시간이 0이라 0분 배정이 되면, 이어 보기가 한 달 끊긴 것으로 보고 그 시작 달은 실패로 친다.
 	 * (예: 0·1·2번째 달 모두 볼 수 있지만 1번째 달이 이미 꽉 찼으면 0번째·2번째 달에 나눠 보는 것은 허용하지 않는다.)
 	 *
-	 * <p>결정 4(사용자 결정 2026-10-09, PRD 5.4·안내서에 반영 필요): 시즌을 끝내는 마지막 조각을 뺀 각 달 조각은
+	 * <p>결정 4(사용자 결정 2026-10-09, PRD 5.4 배정 규칙 3과 ENGINE_ALGORITHM 3.4절에 반영됨): 시즌을 끝내는 마지막 조각을 뺀 각 달 조각은
 	 * {@value #MIN_LONG_SEASON_SEGMENT_MINUTES}분 이상이어야 한다. 시작 달의 남은 시간이 120분 미만이면 그 달에서 시작하지 않고 다음 시작 달을 시도하고,
 	 * 이어 가는 달의 남은 시간이 잔여 분보다 적으면서 120분 미만이면 이어 보기가 끊긴 것으로 보고(결정 1과 같은 처리) 그 시작 달은 실패로 친다.
 	 * 마지막 조각은 120분보다 작아도 된다(예: 잔여 30분). 결정 1의 0분 배정 금지는 이 규칙에 포함된다.
@@ -229,16 +295,19 @@ public final class Evaluator {
 	 * <p>되돌리기(D4) 방식: 단순한 방법은 남은 시간 배열을 복제해 시험 배정하고 성공하면 원래 배열에 옮겨 적는 것인데, 시작 달마다 배열과 목록을 새로 만든다.
 	 * 여기서는 먼저 남은 시간을 바꾸지 않고 "끝까지 볼 수 있는지"만 계산하고, 성공한 경우에만 같은 계산을 다시 하며 실제로 줄인다.
 	 * 실패하면 아무것도 바꾸지 않았으므로 일부 배정 시간을 따로 풀어 줄 필요가 없다(규칙 6: 미배정이면 일부 배정 시간은 풀어 준다).
+	 *
+	 * <p>시즌 순서(시작 달은 제약하지 않음): 시작 달은 자유롭게 두되, 그 시작 달로 시청 완료되는 달이 minCompletedMonth(앞 시즌의 시청 완료 달)
+	 * 미만이면 그 시작 달은 건너뛰고 다음 시작 달을 시도한다. 달 용량·연속 시청(결정 1)·최소 조각(결정 4) 규칙은 그대로다.
 	 */
 	private UnitResult assignLongSeason(WatchUnit unit, int watchableMask, int watchableMonths,
-			int[] availableMasks, int[] remainingMinutes) {
+			int[] availableMasks, int[] remainingMinutes, int minCompletedMonth) {
 		int requiredMinutes = unit.requiredMinutes();
 		for (int startMonth = 0; startMonth < MONTH_COUNT; startMonth++) {
 			if (!isWatchableMonth(watchableMonths, startMonth)) {
 				continue;
 			}
 			int completedMonth = findCompletedMonth(startMonth, requiredMinutes, watchableMonths, remainingMinutes);
-			if (completedMonth < 0) {
+			if (completedMonth < minCompletedMonth) { // 시청 완료 불가(-1)이거나 앞 시즌보다 먼저 끝나는 시작 달
 				continue;
 			}
 			// 성공이 확인됐으니 시작 달부터 다 본 달까지 실제로 배정한다(시험 계산과 같은 순서·같은 값)

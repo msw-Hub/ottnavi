@@ -143,6 +143,36 @@ class EngineModelTest {
 		assertThatThrownBy(() -> selection.productIdsOf(0).add(1L)).isInstanceOf(UnsupportedOperationException.class);
 	}
 
+	@Test
+	void 이미_정렬된_SortedIdSet은_구독_조합이_복사하지_않고_그대로_쓴다() {
+		SortedIdSet month1 = SortedIdSet.of(Set.of(30L, 10L, 20L));
+
+		Selection selection = Selection.of(Set.of(), month1, new HashSet<>(Set.of(2L, 1L)));
+
+		assertThat(selection.productIdsOf(1)).isSameAs(month1); // 같은 인스턴스를 공유한다(조합마다 정렬 복사하지 않음)
+		assertThat(selection.productIdsOf(1)).containsExactly(10L, 20L, 30L);
+		assertThat(selection.productIdsOf(2)).containsExactly(1L, 2L); // 정렬 안 된 집합은 기존대로 정렬해 보관한다
+		assertThat(selection).isEqualTo(Selection.of(Set.of(), Set.of(10L, 20L, 30L), Set.of(1L, 2L))); // 다른 Set 구현과도 같다
+	}
+
+	@Test
+	void SortedIdSet은_오름차순_불변_집합이고_다른_Set과_같다() {
+		SortedIdSet ids = SortedIdSet.of(List.of(5L, 3L, 5L, 9L)); // 중복은 한 번만 남는다
+
+		assertThat(ids).containsExactly(3L, 5L, 9L);
+		assertThat(ids).hasSize(3);
+		assertThat(ids.contains(5L)).isTrue();
+		assertThat(ids.contains(4L)).isFalse();
+		assertThat(ids.contains("5")).isFalse();
+		assertThat(ids).isEqualTo(Set.of(3L, 5L, 9L));
+		assertThat(Set.of(3L, 5L, 9L)).isEqualTo(ids);
+		assertThat(ids.hashCode()).isEqualTo(Set.of(3L, 5L, 9L).hashCode());
+		assertThat(SortedIdSet.of(Set.of())).isSameAs(SortedIdSet.EMPTY);
+		assertThatThrownBy(() -> ids.add(1L)).isInstanceOf(UnsupportedOperationException.class);
+		assertThatThrownBy(() -> ids.iterator().remove()).isInstanceOf(UnsupportedOperationException.class);
+		assertThatThrownBy(() -> SortedIdSet.of(Arrays.asList(1L, null))).isInstanceOf(IllegalArgumentException.class);
+	}
+
 	// Assignment·UnitResult
 
 	@Test

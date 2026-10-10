@@ -1,0 +1,54 @@
+{
+  "name" : "case-08-tie-product-id-order",
+  "note" : "동점일 때 상품 ID 사전순(비교기 마지막 기준)으로 가리는 소규모(상품 2개). 손계산: 서비스1·2는 가격(7,000원)과 볼 수 있는 작품이 완전히 같아 둘 중 어느 쪽을 구독해도 꼭 시청 완료 1, 점수 2, 7,000원이다. 시청 완료 달이 같아 가장 이른 달(0번째 달)에 구독하는 쪽이 조기 시청으로 앞서고, 마지막 동점은 ID가 작은 서비스1로 정해 [[1],[],[]]이다. 입력의 상품 목록 순서를 [2,1]로 뒤집어 입력 순서와 무관함도 확인한다. 세 유형이 같다. 같은 가격 서비스는 ID가 작은 쪽으로 쏠림(알려진 편중), 같은 조건 대안 표시는 Task 030·031 안건",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 7000,
+    "condition" : "NONE"
+  }, {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 7000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 7000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 7000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 7000
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name" : "case-06-long-season-split",
+  "note" : "한 달 시청 시간보다 긴 시즌을 달별로 나눠 보는 소규모(상품 2개). 손계산: 월 시청 300분인데 작품S(MUST)는 700분이라 300+300+100분으로 3개월 연속 서비스1을 구독해야 한다(비용 9,000x3=27,000원, 월 예산 10,000원이라 한 달에 서비스1 하나만 가능). 마지막 달 남은 200분에 작품U(WANT 100분, 서비스1)가 들어가 점수 2다. 작품T(서비스2)는 월 예산 때문에 서비스1과 같은 달에 구독할 수 없어 못 본다. 결과 [[1],[1],[1]], 꼭 시청 완료 1, 점수 2이고 세 유형이 같다. 그리디(추천형)는 꼭 볼 작품S를 놓치고 [[2],[1],[]](꼭 시청 완료 0, 점수 4)을 고른다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 300,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 6000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품S",
+    "priority" : "MUST",
+    "requiredMinutes" : 700,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품T",
+    "priority" : "WANT",
+    "requiredMinutes" : 200,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품U",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 27000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 27000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 27000
+    }
+  },
+  "greedyExpected" : {
+    "months" : [ [ 2 ], [ 1 ], [ ] ],
+    "mustCompleted" : 0,
+    "score" : 4,
+    "totalCost" : 15000
+  }
+}
