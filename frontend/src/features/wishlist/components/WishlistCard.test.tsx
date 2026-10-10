@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
@@ -31,22 +32,40 @@ function entry(
   return { service: { ottServiceId: id, name, dataQuality }, status }
 }
 
+// 펼침 상태는 실제로는 목록(WishlistScreen)이 들고 있다. 행 단독 테스트에서는 같은 규칙의 작은 상태 보관 컴포넌트로 대신한다
+function ExpandedStateHost({ children }: { children: (props: RowStateProps) => ReactNode }) {
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+  return children({
+    expandedId,
+    onToggleExpanded: (id) => setExpandedId((current) => (current === id ? null : id)),
+  })
+}
+interface RowStateProps {
+  expandedId: number | null
+  onToggleExpanded: (id: number) => void
+}
+
 // 있음 2곳, 없음 1곳, 모름 1곳(쿠팡플레이, 데이터 부족)
 function renderCard(entries: ServiceStatusEntry[], items: WishlistListItem[] = [ITEM]) {
   render(
     <MemoryRouter>
-      <WishlistRow
-        items={items}
-        getCardProps={(item) => ({
-          item,
-          statusEntries: entries,
-          detailSearch: '',
-          isBusy: false,
-          onChangePriority: vi.fn(),
-          onToggleWatched: vi.fn(),
-          onRemove: vi.fn(),
-        })}
-      />
+      <ExpandedStateHost>
+        {(rowState) => (
+          <WishlistRow
+            {...rowState}
+            items={items}
+            getCardProps={(item) => ({
+              item,
+              statusEntries: entries,
+              detailSearch: '',
+              isBusy: false,
+              onChangePriority: vi.fn(),
+              onToggleWatched: vi.fn(),
+              onRemove: vi.fn(),
+            })}
+          />
+        )}
+      </ExpandedStateHost>
     </MemoryRouter>,
   )
 }

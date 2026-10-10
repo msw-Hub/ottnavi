@@ -39,7 +39,7 @@ const STATUS_APPEARANCE: Record<AvailabilityStatus, { icon: LucideIcon; classNam
     className:
       'border-solid border-status-unavailable-border bg-status-unavailable-bg text-status-unavailable',
   },
-  // 모름: 바탕 없는 점선 테두리 + 물음표 아이콘
+  // 모름: 옅은 중립색 바탕 + 점선 테두리 + 물음표 아이콘(노랑에서 차분한 슬레이트 톤으로 바꿈, tokens.css 참고)
   UNKNOWN: {
     icon: QuestionMarkIcon,
     className:

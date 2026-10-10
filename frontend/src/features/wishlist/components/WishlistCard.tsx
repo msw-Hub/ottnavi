@@ -26,7 +26,7 @@ export interface WishlistCardProps {
   statusEntries: ServiceStatusEntry[] // 서비스별 제공 상태(서비스 이름과 합쳐진 모양)
   detailSearch: string // 작품 상세로 이동할 때 이어 붙일 주소 파라미터(location.search, 목업 확인용 파라미터 보존)
   isBusy: boolean // 이 항목에 대한 변경 요청이 진행 중인지. true면 조작을 잠시 막는다
-  isExpanded: boolean // 이 카드의 서비스별 상태 패널이 펼쳐져 있는지(상태는 행 컴포넌트가 들고 있다)
+  isExpanded: boolean // 이 카드의 서비스별 상태 패널이 펼쳐져 있는지(상태는 목록 화면이 들고 있다)
   panelId: string // 펼쳐지는 패널의 id. 펼침 버튼의 aria-controls가 가리킨다
   onToggleExpanded: () => void // "자세히 보기/접기"를 눌렀을 때
   onChangePriority: (priority: WishlistPriority) => void // 우선순위를 바꿨을 때

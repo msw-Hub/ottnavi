@@ -18,7 +18,7 @@ const CHIP_APPEARANCE: Record<AvailabilityStatus, { icon: LucideIcon; className:
     className:
       'border-solid border-status-unavailable-border bg-status-unavailable-bg text-status-unavailable',
   },
-  // 모름: 바탕 없는 점선 테두리 + 물음표
+  // 모름: 옅은 중립색 바탕 + 점선 테두리 + 물음표(노랑에서 차분한 슬레이트 톤으로 바꿈, tokens.css 참고)
   UNKNOWN: {
     icon: CircleQuestionMarkIcon,
     className:

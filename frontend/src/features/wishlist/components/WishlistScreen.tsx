@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { CalculatorIcon, SearchIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
@@ -62,6 +62,8 @@ export function WishlistScreen() {
 interface CardListProps {
   items: WishlistList['items'] // 한 구역(계산에 쓸 작품 또는 다 봤음)의 항목
   getCardProps: (item: WishlistList['items'][number]) => WishlistRowCardProps // 항목 하나의 카드 props
+  expandedId: number | null // 목록 전체에서 펼쳐진 항목의 id(두 구역을 통틀어 하나)
+  onToggleExpanded: (wishlistItemId: number) => void // 카드의 "자세히 보기/접기"를 눌렀을 때
 }
 
 /**
@@ -70,7 +72,7 @@ interface CardListProps {
  * 단순히 전체를 하나의 2열 grid로 두면 한쪽 카드의 패널이 다음 카드를 밀어 열이 어긋난다.
  * 묶는 일은 순수 계산이라 상태 없이 렌더링 중에 한다.
  */
-function CardList({ items, getCardProps }: CardListProps) {
+function CardList({ items, getCardProps, expandedId, onToggleExpanded }: CardListProps) {
   const rows: WishlistList['items'][] = []
   for (let index = 0; index < items.length; index += 2) {
     rows.push(items.slice(index, index + 2))
@@ -82,6 +84,8 @@ function CardList({ items, getCardProps }: CardListProps) {
           key={rowItems.map((item) => item.wishlistItemId).join('-')}
           items={rowItems}
           getCardProps={getCardProps}
+          expandedId={expandedId}
+          onToggleExpanded={onToggleExpanded}
         />
       ))}
     </div>
@@ -98,6 +102,20 @@ function WishlistContent({ list, services }: WishlistContentProps) {
   const location = useLocation()
   const update = useUpdateWishlistItem()
   const remove = useRemoveWishlistItem()
+  // 펼쳐진 항목의 id(없으면 null). 목록 전체에서 한 번에 하나만 펼치므로 행이 아니라 여기서 든다.
+  // 행마다 들고 있으면 다른 행의 패널이 남는다. 펼침 여부는 컴포넌트 내부 UI 상태라 useState로 둔다(frontend.md 상태 관리 원칙)
+  const [rawExpandedId, setRawExpandedId] = useState<number | null>(null)
+
+  // 같은 버튼을 다시 누르면 닫히고, 다른 카드를 누르면 그 카드로 바뀐다(이전 패널은 자동으로 닫힌다)
+  function toggleExpanded(wishlistItemId: number) {
+    setRawExpandedId((current) => (current === wishlistItemId ? null : wishlistItemId))
+  }
+
+  // 찜 해제 등으로 항목이 목록에서 사라졌다면 펼침도 없는 것으로 본다. 상태를 따로 정리하는 effect 대신
+  // 렌더링 중 계산으로 처리한다(파생 가능한 값은 state로 두지 않는다). 사라진 id는 다시 쓰이지 않아 남은 값은 무해하다
+  const expandedId = list.items.some((item) => item.wishlistItemId === rawExpandedId)
+    ? rawExpandedId
+    : null
 
   // 다 본 작품은 계산에서 빠지므로(PRD FR-09) 구역을 나눈다. 같은 목록에서 걸러내는 값이라 상태로 두지 않고 계산한다
   const activeItems = list.items.filter((item) => item.watchedAt === null)
@@ -142,7 +160,9 @@ function WishlistContent({ list, services }: WishlistContentProps) {
           { wishlistItemId: item.wishlistItemId, priority },
           { onError: notifyFailure },
         ),
-      onToggleWatched: () =>
+      onToggleWatched: () => {
+        // 다 봤음 이동은 카드가 다른 구역으로 옮겨 가므로 펼침을 닫는다(패널이 엉뚱한 구역에 남지 않게)
+        if (expandedId === item.wishlistItemId) setRawExpandedId(null)
         update.mutate(
           { wishlistItemId: item.wishlistItemId, isWatched: item.watchedAt === null },
           {
@@ -152,7 +172,8 @@ function WishlistContent({ list, services }: WishlistContentProps) {
               ),
             onError: notifyFailure,
           },
-        ),
+        )
+      },
       onRemove: () =>
         remove.mutate(item.wishlistItemId, {
           // 바로 삭제되므로(되돌리기 없음) 무엇을 뺐는지 이름으로 알린다
@@ -197,7 +218,12 @@ function WishlistContent({ list, services }: WishlistContentProps) {
           계산에 쓸 작품
         </h2>
         {activeItems.length > 0 ? (
-          <CardList items={activeItems} getCardProps={getCardProps} />
+          <CardList
+            items={activeItems}
+            getCardProps={getCardProps}
+            expandedId={expandedId}
+            onToggleExpanded={toggleExpanded}
+          />
         ) : (
           <EmptyState
             title="계산할 작품이 없어요"
@@ -222,7 +248,12 @@ function WishlistContent({ list, services }: WishlistContentProps) {
           <p className="-mt-1 text-sm text-muted-foreground">
             다 본 작품은 다음 계산에서 빠져요. 카드의 '다 봤음 취소'로 되돌릴 수 있어요.
           </p>
-          <CardList items={watchedItems} getCardProps={getCardProps} />
+          <CardList
+            items={watchedItems}
+            getCardProps={getCardProps}
+            expandedId={expandedId}
+            onToggleExpanded={toggleExpanded}
+          />
         </section>
       )}
 

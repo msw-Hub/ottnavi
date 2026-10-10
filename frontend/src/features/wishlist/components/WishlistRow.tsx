@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { ServiceStatusChips } from '@/features/wishlist/components/ServiceStatusChips'
 import { WishlistCard, type WishlistCardProps } from '@/features/wishlist/components/WishlistCard'
 import type { WishlistListItem } from '@/features/wishlist/mockTypes'
@@ -12,6 +12,8 @@ export type WishlistRowCardProps = Omit<
 interface WishlistRowProps {
   items: WishlistListItem[] // 이 행에 놓일 항목. 1~2개(데스크톱 2열의 한 행, 홀수 개의 마지막 행은 1개)
   getCardProps: (item: WishlistListItem) => WishlistRowCardProps // 항목 하나의 카드 props를 만드는 함수
+  expandedId: number | null // 목록 전체에서 지금 펼쳐진 항목의 id(없으면 null). 상태는 목록(WishlistScreen)이 들고 있다
+  onToggleExpanded: (wishlistItemId: number) => void // 어느 카드의 "자세히 보기/접기"를 눌렀는지 목록에 알린다
 }
 
 /**
@@ -26,11 +28,15 @@ interface WishlistRowProps {
  * 화면 낭독기·키보드 순서(DOM 순서)와 시각 순서가 다르지만, 패널은 aria-controls로 연결돼 있고 펼침 버튼 다음에 오는
  * 내용이 같은 카드의 것이라는 점은 패널 제목("○○의 서비스별 시청 가능 여부")이 알려 준다.
  *
- * 펼침 상태: 한 행에서 한 번에 하나만 펼친다(구현이 단순하고, 두 패널이 한꺼번에 열려 화면이 길어지는 것을 막는다).
+ * 펼침 상태: 목록 전체에서 한 번에 하나만 펼친다. 행마다 따로 들고 있으면 다른 행의 패널이 남아 화면이 길어지므로
+ * 상태는 목록(WishlistScreen)이 들고, 이 행은 받은 expandedId와 같은 카드의 패널만 그린다.
  */
-export function WishlistRow({ items, getCardProps }: WishlistRowProps) {
-  // 펼쳐진 항목의 id(없으면 null). 이 행 안에서만 의미 있는 UI 상태라 useState로 둔다
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+export function WishlistRow({
+  items,
+  getCardProps,
+  expandedId,
+  onToggleExpanded,
+}: WishlistRowProps) {
   // 같은 화면에 행이 여러 개라 id가 겹치지 않도록 useId로 접두어를 만든다
   const baseId = useId()
 
@@ -48,11 +54,7 @@ export function WishlistRow({ items, getCardProps }: WishlistRowProps) {
               {...getCardProps(item)}
               isExpanded={expandedId === item.wishlistItemId}
               panelId={panelId}
-              onToggleExpanded={() =>
-                setExpandedId((current) =>
-                  current === item.wishlistItemId ? null : item.wishlistItemId,
-                )
-              }
+              onToggleExpanded={() => onToggleExpanded(item.wishlistItemId)}
             />
           </li>
         )
