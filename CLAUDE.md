@@ -22,6 +22,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/PRD.md` | 요구사항·계산 규칙(5.4)·개발 단계·결정 현황(11절, `R11-N`)의 단일 기준 |
 | `docs/ERD.md` | 스키마·상태값·삭제 정책 |
 | `docs/TECH.md` | rules에 없는 설계 결정과 함정(`T-N`, 계산 엔진·플랜 저장·배치·인증·outbox·호환성) |
+| `docs/ENGINE_ALGORITHM.md` | 계산 엔진 알고리즘 상세 설명(평가기·완전탐색·그리디·플랜 유형 3종·시즌 순서·측정 결과). 쉬운 설명과 작은 예시. 규칙의 근거는 PRD 5.4·TECH 1절이고 이 문서는 구현을 설명한다 |
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
 | `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
@@ -43,7 +44,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 
 **백엔드 패키지(`com.ottnavi`)**: `global`(config·security·ratelimit·error·common) / `infra`(tmdb·mail·llm 외부 연동) / 도메인별(`catalog`, `provider`, `product`, `user`, `wishlist`, `plan`, `notification` — 각각 `api` → `application` → `domain` 단방향) / `engine` / `collect` / `admin`. 다른 도메인의 리포지토리를 직접 쓰지 않고 서비스를 호출한다.
 
-**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(가지치기 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기를 `solve(input, comparator)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 볼 작품 완료 수 → 점수 → 총비용 → 조기 시청 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 상세는 TECH 1절.
+**계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(후보 상품 제외 S6와 추천형 동치 제거 S7 뒤 남은 조합을 전부 훑고 챔피언 한 명만 들고 가는 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기와 시작 조합(baseline)을 묶은 `PlanObjective`를 `solve(input, PlanObjective)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 시청 완료 수 → 점수 → 총비용 → 조기 시청 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 같은 시리즈의 시즌은 번호 순서대로 시청 완료한다는 규칙(PRD 11절 37번, 2026-10-10)은 구현됐다(정렬 뒤 한 번 훑으며 앞 시즌을 끼워 넣는 방식, ROADMAP Task 040 후속 항목 S). 찜은 최대 20개(11절 36번), 절감액 = 전체 구독 비용 − 플랜 총비용(11절 38번). 상세는 TECH 1절.
 
 **플랜 상태**: DRAFT(계산 결과) → ACTIVE(저장) → ARCHIVED. 사용자당 ACTIVE는 최대 1개, DRAFT는 플랜 유형마다 최대 1개(부분 유니크 인덱스 `(user_id, plan_type)`). 저장하면 고른 유형만 ACTIVE가 되고 나머지 DRAFT는 삭제된다. 활성화 시 **기존 ACTIVE를 ARCHIVED로 바꾸고 명시적 flush한 뒤** 새 ACTIVE로 전환해야 인덱스 위반이 나지 않는다(TECH 2절). 삭제는 FK `ON DELETE CASCADE` + 벌크 JPQL(JPA cascade 삭제 미사용, TECH T-1).
 

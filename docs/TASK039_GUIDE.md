@@ -9,21 +9,21 @@
 |---|---|
 | 목적 | 구독 조합이 주어졌을 때 평가하는 일(038)에 이어, **월 예산 안에서 플랜 유형(추천형·절약형·간편형)별로 최선의 3개월 구독 조합을 고르는 일**을 만든다 |
 | 브랜치 | `feature/b2-engine-solvers`(구현), `feature/b2-engine-solvers-tests`(테스트, 구현 코드를 보지 않고 작성) |
-| 만드는 것 | `ExactSolver`, `GreedySolver`, `SolverSelector`(완전탐색 → 그리디 전환), `PlanObjective`(유형별 비교기: 절약형·간편형 구현), `PlanTypeSolver`(3종을 한 번에). 껍데기(시그니처)는 이미 코드에 있다 |
+| 만드는 것 | `ExactSolver`, `GreedySolver`, `SolverSelector`(완전탐색 → 그리디 전환), `PlanObjective`(유형별 비교기: 절약형·간편형 구현), `PlanTypeSolver`(3종을 한 번에). 껍데기(시그니처)는 작업 시작 때 이미 코드에 있었고, 전부 구현이 끝났다(Task 039 완료) |
 | 만들지 않는 것 | 입력 변환(`plan` 서비스, 063), `input_hash` 캐시(040·064), 번들·광고형 일반화(2단계), 계산 시간 측정(040), 세 유형 결과가 같을 때 화면에서 합치는 일(plan 서비스·프론트) |
 | 패키지 | `com.ottnavi.engine.solver`(`PlanSolver`, `ExactSolver`, `GreedySolver`, `SolverSelector`, `PlanTypeSolver`), `com.ottnavi.engine.rule`(`PlanObjective` + 유형별 비교기), `com.ottnavi.engine.model`(`SolveResult`, `SolverType`, `PlanType`). ROADMAP은 `engine/PlanSolver`로 적었으나 `model`·`rule`과 같은 하위 패키지 구조에 맞춰 `solver`로 둔다 |
 
 ## 2. 계약 (코드에 있는 시그니처)
 
 - `PlanType`: `RECOMMENDED`(추천형), `SAVER`(절약형), `SIMPLE`(간편형).
-- `PlanObjective(planType, comparator, baseline)`: 유형과 그 유형의 비교기(양수 = 첫 번째가 더 좋다), 그리고 시작 조합 `baseline`(추천형은 `null`, 절약형·간편형은 추천형 결과의 조합이며 `null`이면 `IllegalArgumentException`). 팩토리 `recommended(products)`, `saver(products, recommendedEvaluation)`, `simple(products, recommendedEvaluation)`(추천형 `Evaluation`의 점수로 하한을 정하고 조합을 `baseline`으로 담는다), 정적 `scoreFloor(recommendedScore)`(음수면 `IllegalArgumentException`).
+- `PlanObjective(planType, comparator, baseline)`: 유형과 그 유형의 비교기(양수 = 첫 번째가 더 좋다), 그리고 시작 조합 `baseline`(추천형은 `null`, 절약형·간편형은 추천형 결과의 조합이며 `null`이면 `IllegalArgumentException`). 팩토리 `recommended(planInput)`, `saver(planInput, recommendedEvaluation)`, `simple(planInput, recommendedEvaluation)`(2026-10-10 변경: 첫 인자가 `products` 목록에서 `PlanInput`으로 바뀌었다. 조기 시청 ④가 시청 단위의 우선순위(꼭 여부·점수)를 쓰기 때문이며, 비교기 `EvaluationComparator`도 `new EvaluationComparator(planInput)`으로 만든다)(추천형 `Evaluation`의 점수로 하한을 정하고 조합을 `baseline`으로 담는다), 정적 `scoreFloor(recommendedScore)`(음수면 `IllegalArgumentException`).
 - `PlanSolver.solve(PlanInput, PlanObjective) → SolveResult`. `solve(PlanInput)`은 추천형 목적함수로 위임하는 기본 메서드다. `null` 입력·목적함수는 `IllegalArgumentException`.
 - `SolveResult(evaluation, planType, solverType)`이고 `selection()`은 `evaluation.selection()`이다. `planType`은 푼 목적함수의 유형.
 - `ExactSolver`: 인자 없는 생성자, `countCandidateCombinations(PlanInput, PlanObjective) → long`(S5).
 - `GreedySolver`: 인자 없는 생성자.
 - `SolverSelector(ExactSolver, GreedySolver, long maxCandidateCombinations)`: 푸는 목적함수 기준의 `countCandidateCombinations`가 상한 **초과**면 그리디, 이하면 완전탐색. 상한이 0 이하면 `IllegalArgumentException`.
 - `PlanTypeSolver(PlanSolver)`, `solveAll(PlanInput) → Map<PlanType, SolveResult>`: 항상 세 유형을 모두 담고 `PlanType` 순서(`RECOMMENDED`, `SAVER`, `SIMPLE`)로 순회된다. 추천형을 먼저 풀고 그 결과(`Evaluation`)로 절약형·간편형 목적함수를 만든다. 생성자에 `null` Solver를 넘기면 `IllegalArgumentException`.
-- 상수: `ExactSolver.MAX_PRODUCT_COUNT = 20`(후보 상품이 20개를 넘는 입력은 `IllegalArgumentException`, S9), `SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS = 2_097_152`(= 128³, R11-30 측정 전 잠정값, S9). `SolverSelector` 생성자의 `null` Solver도 `IllegalArgumentException`.
+- 상수: `ExactSolver.MAX_PRODUCT_COUNT = 20`(후보 상품이 20개를 넘는 입력은 `IllegalArgumentException`, S9), `SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS = 2_097_152`(= 128³, R11-30 잠정 확정: Task 040 측정 뒤 유지, Cloudtype 실측은 Task 100, S9). `SolverSelector` 생성자의 `null` Solver도 `IllegalArgumentException`.
 - `solverType`: `ExactSolver`는 항상 `EXACT`, `GreedySolver`는 항상 `GREEDY`, `SolverSelector`는 실제로 푼 쪽. 유형마다 전환 여부가 달라질 수 있다(후보 수가 유형마다 다르다).
 - 같은 입력에는 항상 같은 결과(결정적). 입력 `units` 순서가 달라도 같다(`PlanInput`이 정렬하므로 자동).
 - 입력을 바꾸거나 전역 상태를 쓰지 않는다. `Evaluator`는 풀이마다 `new Evaluator(input)` 한 번 만들고 `evaluate`를 반복 호출한다(038 호출 규칙).
@@ -53,7 +53,7 @@
 - SUBSCRIBED 상품: 0번째 달에서만 뺀다(0번째 달은 선택 없이도 0원으로 볼 수 있다). 1·2번째 달은 유지하려면 선택해야 하고 가격이 드니 후보다.
 - 어떤 시청 단위의 시청 가능 상품 집합에도 들어 있지 않은 상품: 모든 달에서 뺀다.
 - 그 달 비용이 월 예산을 넘는 상품: 그 달에서 뺀다(혼자서도 S1을 어긴다).
-- 사용자가 입력으로 서비스 수를 줄이는 방안("한 달 최대 N개", 제외·유지 서비스)은 MVP에서는 넣지 않는다. Task 040 측정 후 필요하면 검토한다.
+- 사용자가 입력으로 서비스 수를 줄이는 방안("한 달 최대 N개", 제외·유지 서비스)은 MVP에서는 넣지 않는다. Task 040 측정에서 MVP(후보 상품 최대 7개)는 상한 안에서 완전탐색으로 충분했으므로 필요하면 2단계에서 검토한다.
 
 **S3. 완전탐색의 정의(가장 중요).** `ExactSolver` 결과의 `selection`은 **후보 상품(S6 적용 후)으로 만든 예산 이하 모든 조합(달별 부분집합의 곱)을 `Evaluator`로 평가해, 해당 목적함수의 비교기로 가장 좋은 것**과 정확히 같아야 한다(`Collections.max`). 이것은 세 유형 모두에 성립한다. 동치 제거(S7)는 속도를 위한 최적화이며 **추천형에서만** 쓰고 결과를 바꾸면 안 된다. 그러므로 테스트는 작은 입력에서 무차별 대입과 비교할 수 있다.
 
@@ -65,9 +65,9 @@
 **S8(확정, 2026-10-09). 절약형·간편형 그리디.** S4의 "빈 상태에서 달마다 확정"은 점수 하한이 3개월 기준이라 대부분의 후보가 하한 미달이 되고 ③에서 가장 싼 빈 집합이 매달 뽑힌다. 그래서 `objective.baseline()`이 있는(절약형·간편형) 그리디는 **baseline을 시작 조합으로 삼아 개선**한다: 달 0, 1, 2 순서로 그 달의 선택만 후보 부분집합(예산 이하, S6 적용)으로 바꿔 보며 **3개월 전체를 평가**하고, 비교기로 더 좋은 후보가 있으면 교체한다. 이를 한 바퀴(0→1→2) 돌리고 바뀐 달이 있으면 다시 돌리며, 한 바퀴에서 바뀐 달이 없으면 멈춘다. 순서와 동점 처리가 결정적이다(비교기가 서로 다른 조합을 동점으로 보지 않는다). baseline이 없는 추천형은 S4 방식이다.
 - 결과: baseline보다 비교기상 나쁘지 않다(`compare(result, baseline) >= 0`). 따라서 baseline이 하한을 만족하면(추천형 점수로 만들었으므로 항상 만족) 결과도 만족하고, 같은 `mustCompleted`에서 절약형은 비용이, 간편형은 가입 횟수가 baseline 이하다. 추천형이 그리디라 최적이 아니면 `mustCompleted`가 더 큰 조합으로 교체될 수 있는데, 유형 비교기 ①(꼭 시청 완료 수 최우선)에 맞는 개선이라 막지 않으며 이때는 하한·비용·가입 횟수 보장을 적용하지 않는다(추천형이 완전탐색이면 `mustCompleted`가 이미 최대라 이런 교체가 생기지 않는다).
 
-**S5(확정). 그리디 전환 기준.** 푸는 목적함수 기준으로 완전탐색이 훑을 3개월 조합 수 `c0 × c1 × c2`(달별 후보 수의 곱)를 센다. 후보는 S6을 적용한 뒤의 상품으로 만든다. 추천형은 동치 제거(S7) 후 개수, 절약형·간편형은 제거 없이 예산 이하 부분집합 수다. 이 값이 상한보다 **크면** 그리디, **같거나 작으면** 완전탐색이다. 상한은 설정 값으로 받는다(R11-30 측정 전까지 잠정값).
+**S5(확정). 그리디 전환 기준.** 푸는 목적함수 기준으로 완전탐색이 훑을 3개월 조합 수 `c0 × c1 × c2`(달별 후보 수의 곱)를 센다. 후보는 S6을 적용한 뒤의 상품으로 만든다. 추천형은 동치 제거(S7) 후 개수, 절약형·간편형은 제거 없이 예산 이하 부분집합 수다. 이 값이 상한보다 **크면** 그리디, **같거나 작으면** 완전탐색이다. 상한은 설정 값으로 받는다(Task 040 로컬 측정으로 2_097_152 유지: 후보 7개일 때 절약형·간편형 조합 수 = 128³, 단위 30개 기준 이 PC에서 절약형 약 1.6초·간편형 약 1.8초. Cloudtype 환경 검증은 Task 100에서 하고 그때까지 잠정 확정).
 
-**S9(확정, 2026-10-09). 한도와 기본값.** 후보 상품(S6 적용 후)이 20개를 넘으면 `ExactSolver`와 `GreedySolver`는 `IllegalArgumentException`을 던진다(둘 다 같은 후보 생성 코드로 달마다 2^P개를 훑기 때문. 시작 조합 baseline은 같은 Solver가 만든 추천형 결과라 따로 검증하지 않는다)(2^P 열거가 불가능하고 후보 수의 곱이 `long`을 넘는다. MVP는 7개). 단, 20개는 "예외를 던지지 않는 한계"일 뿐 실용 한계가 아니다: 후보 상품 20개면 한 달에 2^20개 집합을 만들어 두 목록에 보관하므로 수백 MB가 필요해 Cloudtype 1GB에서는 메모리가 모자랄 수 있다. 2단계에서 상품이 늘면 한도를 12~16으로 낮출지 Task 040 측정 후 다시 정한다. 그리디 전환 기본 상한은 128³ = 2,097,152(`SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS`)로 MVP는 항상 완전탐색으로 풀린다.
+**S9(확정, 2026-10-09). 한도와 기본값.** 후보 상품(S6 적용 후)이 20개를 넘으면 `ExactSolver`와 `GreedySolver`는 `IllegalArgumentException`을 던진다(둘 다 같은 후보 생성 코드로 달마다 2^P개를 훑기 때문. 시작 조합 baseline은 같은 Solver가 만든 추천형 결과라 따로 검증하지 않는다)(2^P 열거가 불가능하고 후보 수의 곱이 `long`을 넘는다. MVP는 7개). 단, 20개는 "예외를 던지지 않는 한계"일 뿐 실용 한계가 아니다: 후보 상품 20개면 한 달에 2^20개 집합을 만들어 두 목록에 보관하므로 수백 MB가 필요해 Cloudtype 1GB에서는 메모리가 모자랄 수 있다. Task 040에서 측정해 한도 20은 유지하기로 했고(P=20 힙 약 800MB대, `docs/ENGINE_ALGORITHM.md` 12절), 2단계에서 상품이 늘면 12~16으로 낮출지 다시 정한다. 그리디 전환 기본 상한은 128³ = 2,097,152(`SolverSelector.DEFAULT_MAX_CANDIDATE_COMBINATIONS`)로 MVP는 항상 완전탐색으로 풀린다.
 
 ## 5. 반드시 지켜야 할 성질 (테스트 기준)
 
@@ -89,12 +89,13 @@
 16. **동치 제거 회귀(옛 지배 제거가 틀리는 입력)**: 월 시청 300분, 예산 1,000원, pA(id 1, 1,000원)·pB(id 2, 1,000원). 단위 A(MUST, 200분, pB로만), B(MAYBE, 300분, pB로만), C(MAYBE, 400분, pA·pB로 볼 수 있음). 완전탐색(추천형)의 최선은 `[{1},{2},{2}]`(A는 1번째 달, B는 2번째 달, C는 0번째 달 300분+1번째 달 100분으로 시청 완료), mustCompleted 1, score 2, 비용 3,000원이다. 옛 제거식으로는 `{1}`이 지워져 score 1이 된다.
 17. **그리디(S8) baseline 개선**: 절약형·간편형을 `GreedySolver`로 풀면 `compare(result, baseline) >= 0`이고, `mustCompleted`가 baseline과 같으면 하한을 지킨다.
 18. **가입 횟수 정의**(3절 예시): 연속 유지는 1회, 갈아타기는 3회, 이미 구독 중인 상품을 1월에 선택하면 0회. 간편형 비교기가 이 값으로 ③을 가른다.
+    - **정답 세트(Task 040) 케이스 14**(2026-10-10 반영, 비교기 ①의 꼭 우선 확인): 꼭 시청 완료 3·점수 5·총비용 20,000원인 조합과 꼭 시청 완료 2·점수 6·총비용 15,000원인 조합을 비교하면 **앞쪽이 이긴다**. 점수가 더 높고 비용이 더 낮아도 꼭 시청 완료 수가 많은 쪽이 먼저다(세 유형 모두 ①이 꼭 시청 완료 수 최대화이기 때문). 절약형·간편형도 ①이 앞이라 같은 결과다.
 19. **상품 수 한도(S9)**: 후보 상품이 20개를 넘으면 `ExactSolver.solve`와 `countCandidateCombinations`가 `IllegalArgumentException`.
 20. **S6 후보 제외**: FREE 상품은 결과의 어느 달에도 나타나지 않고, SUBSCRIBED 상품은 0번째 달 선택에 나타나지 않으며, 어떤 단위도 볼 수 없는 상품과 가격이 예산을 넘는 상품도 나타나지 않는다.
 
-## 6. 성능 메모 (정확성 우선, 측정은 040)
+## 6. 성능 메모 (정확성 우선, 측정은 040에서 완료)
 
-- MVP 7개 단품이면 달마다 최대 128개 부분집합, 3개월 최대 약 210만 번 `evaluate`다(S6으로 후보 상품이 줄면 훨씬 적다. 예: 후보 4개면 달마다 16개, 3개월 약 4천 번). 추천형은 동치 제거로 줄일 수 있고(같은 작품 목록을 보는 상품이 많을수록 효과가 크며, 상품마다 볼 수 있는 작품이 모두 달라 쌍둥이가 없으면 줄지 않는다), 절약형·간편형은 제거 없이 약 210만 번씩이라 세 유형을 풀면 약 3배다. 측정(040) 결과로 "한 번의 순회에서 평가를 재사용해 유형별 최선을 함께 고르는 최적화"가 필요한지 정한다. 지금은 단순하게 유형마다 따로 푼다.
+- MVP 7개 단품이면 달마다 최대 128개 부분집합, 3개월 최대 약 210만 번 `evaluate`다(S6으로 후보 상품이 줄면 훨씬 적다. 예: 후보 4개면 달마다 16개, 3개월 약 4천 번). 추천형은 동치 제거로 줄일 수 있고(같은 작품 목록을 보는 상품이 많을수록 효과가 크며, 상품마다 볼 수 있는 작품이 모두 달라 쌍둥이가 없으면 줄지 않는다), 절약형·간편형은 제거 없이 약 210만 번씩이라 세 유형을 풀면 약 3배다. "한 번의 순회에서 평가를 재사용해 유형별 최선을 함께 고르는 최적화"는 구현하지 않았고 지금도 유형마다 따로 푼다. Task 040 측정에서 최악 입력의 3종 합계가 5초 안팎이었다(`docs/ENGINE_ALGORITHM.md` 12절).
 - 모든 `Evaluation`을 보관하지 않는다. 지금까지의 최선 하나만 갖고 가며 비교기로 갱신한다(210만 객체 보관 금지).
 - 상한 값은 설정 값으로 받는다. 코드 기본값이 필요하면 상수로 두고 `R11-30`을 주석에 적는다.
 
