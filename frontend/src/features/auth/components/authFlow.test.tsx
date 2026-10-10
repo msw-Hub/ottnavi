@@ -142,6 +142,9 @@ describe('비로그인 찜 → 로그인 → 원래 화면', () => {
     expect(getMockRole()).toBe('USER')
     // 로그인 뒤에는 찜이 된다
     await user.click(screen.getByRole('button', { name: '기생충 찜하기' }))
+    // 찜하면 선택지 팝업이 뜬다(팝업이 열린 동안 뒤 화면은 낭독기에서 가려지므로 닫은 뒤 버튼을 확인한다)
+    expect(await screen.findByRole('dialog', { name: '기생충을 찜했어요' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '더 둘러보기' }))
     expect(
       await screen.findByRole('button', { name: '기생충 찜함 · 보고 싶음' }),
     ).toBeInTheDocument()

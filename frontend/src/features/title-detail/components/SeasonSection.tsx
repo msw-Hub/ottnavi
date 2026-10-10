@@ -1,10 +1,13 @@
 import { useState } from 'react'
+import { InfoIcon } from 'lucide-react'
 import type { OttService } from '@/api/generated/model'
 import { AvailableServiceBadges } from '@/components/common/AvailableServiceBadges'
 import { EstimatedTag } from '@/components/common/EstimatedTag'
 import { Button } from '@/components/ui/button'
 import { WishlistControl } from '@/features/title-detail/components/WishlistControl'
 import type { TitleSeason } from '@/features/title-detail/mockTypes'
+import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
+import { useUserSettings } from '@/hooks/useUserSettings'
 import { formatMinutes } from '@/lib/format'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
 
@@ -13,6 +16,8 @@ const INITIAL_VISIBLE_SEASONS = 5
 
 interface SeasonSectionProps {
   tmdbId: number // 드라마의 TMDB ID(시즌 단위 찜 요청에 쓴다)
+  title?: string // 드라마 제목(찜 추가 팝업에서 "제목 시즌 2"로 보이게 하는 데 쓴다)
+  posterUrl?: string | null // 드라마 포스터 주소(찜 추가 팝업 썸네일)
   seasons: TitleSeason[] // 드라마의 시즌들
   services: OttService[] // 서비스 목록 API의 7개 서비스
 }
@@ -36,12 +41,25 @@ function toAvailableKey(season: TitleSeason): string {
  * 제공처 칩을 시즌 제공처가 서로 다를 때만 보이는 이유: 전 시즌이 같으면 줄마다 같은 칩이 반복되어 소음일 뿐이고,
  * 위 "볼 수 있는 곳" 요약과 같은 정보다. 이 값은 seasons에서 계산해 쓰는 파생 값이라 상태로 두지 않는다.
  */
-export function SeasonSection({ tmdbId, seasons, services }: SeasonSectionProps) {
+export function SeasonSection({
+  tmdbId,
+  title,
+  posterUrl = null,
+  seasons,
+  services,
+}: SeasonSectionProps) {
   // 모두 보기 여부는 이 화면 안에서만 의미가 있는 값이라 서버 상태도 URL도 아닌 useState로 둔다(frontend.md 상태 관리 원칙)
   const [isShowingAll, setIsShowingAll] = useState(false)
 
   const visibleSeasons = isShowingAll ? seasons : seasons.slice(0, INITIAL_VISIBLE_SEASONS)
   const hiddenCount = seasons.length - visibleSeasons.length
+
+  // 월 시청 시간(내 설정)은 회원일 때만 불러온다. 비로그인으로 요청하면 401이 오고 콘솔에 오류가 남기 때문이다.
+  // 설정이 없거나(온보딩 전) 불러오지 못하면 값이 null이라 안내를 보이지 않는다(안내는 있으면 도움 되는 정보라 실패해도 화면을 막지 않는다)
+  const isLoggedIn = useIsLoggedIn()
+  const settings = useUserSettings({ enabled: isLoggedIn })
+  const monthlyWatchMinutes =
+    isLoggedIn && settings.data?.isOnboardingDone ? settings.data.monthlyWatchMinutes : null
 
   const hasDifferentProviders = new Set(seasons.map(toAvailableKey)).size > 1
   const totalRuntimeMin = seasons.reduce((sum, season) => sum + season.totalRuntimeMin, 0)
@@ -78,9 +96,12 @@ export function SeasonSection({ tmdbId, seasons, services }: SeasonSectionProps)
               <li key={season.seasonNumber}>
                 <SeasonItem
                   tmdbId={tmdbId}
+                  title={title}
+                  posterUrl={posterUrl}
                   season={season}
                   services={services}
                   isShowingProviders={hasDifferentProviders}
+                  monthlyWatchMinutes={monthlyWatchMinutes}
                 />
               </li>
             ))}
@@ -103,9 +124,12 @@ export function SeasonSection({ tmdbId, seasons, services }: SeasonSectionProps)
 
 interface SeasonItemProps {
   tmdbId: number
+  title?: string // 드라마 제목(찜 추가 팝업용)
+  posterUrl: string | null // 드라마 포스터 주소(찜 추가 팝업용)
   season: TitleSeason
   services: OttService[]
   isShowingProviders: boolean // 시즌마다 제공처가 달라 이 줄에 "볼 수 있는 곳" 칩을 보일지
+  monthlyWatchMinutes: number | null // 내 월 시청 시간(분). 비로그인·온보딩 전·불러오지 못함이면 null(안내를 보이지 않는다)
 }
 
 /**
@@ -115,8 +139,18 @@ interface SeasonItemProps {
  * h3에는 이름 글자만 둔다: 버튼이 안에 있으면 화면 낭독기의 제목 목록에 "시즌 2 찜하기"까지 읽혀 번잡하다. 버튼은 h3의 형제 요소다.
  * 안쪽 여백은 모바일 12px(p-3), 데스크톱 16px(sm:p-4)다.
  */
-function SeasonItem({ tmdbId, season, services, isShowingProviders }: SeasonItemProps) {
+function SeasonItem({
+  tmdbId,
+  title,
+  posterUrl,
+  season,
+  services,
+  isShowingProviders,
+  monthlyWatchMinutes,
+}: SeasonItemProps) {
   const statusEntries = buildServiceStatusEntries(services, season.availabilities)
+  // 시즌 총 시간이 한 달에 볼 수 있는 시간보다 길면 한 달에 다 못 본다 → 플랜이 여러 달에 나눠 배정한다(PRD 5.4 긴 시즌)
+  const isLongSeason = monthlyWatchMinutes !== null && season.totalRuntimeMin > monthlyWatchMinutes
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">
@@ -127,6 +161,8 @@ function SeasonItem({ tmdbId, season, services, isShowingProviders }: SeasonItem
           tmdbId={tmdbId}
           seasonNumber={season.seasonNumber}
           targetName={season.name}
+          popupName={title ? `${title} ${season.name}` : season.name}
+          posterUrl={posterUrl}
           panelAlign="end"
         />
       </div>
@@ -141,6 +177,13 @@ function SeasonItem({ tmdbId, season, services, isShowingProviders }: SeasonItem
           </>
         )}
       </p>
+      {isLongSeason && (
+        // 색만으로 전달하지 않도록 정보 아이콘과 글자를 함께 둔다. 색은 기존 info 토큰(플랜 안내 띠와 같은 색)이다
+        <p className="flex items-start gap-1.5 text-sm text-info">
+          <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>여러 달에 나눠 봐야 해요</span>
+        </p>
+      )}
       {isShowingProviders && (
         <div className="mt-1">
           <AvailableServiceBadges entries={statusEntries} label={`${season.name} 볼 수 있는 곳`} />

@@ -6,11 +6,19 @@ import type {
   CommonResponseAddWishlistItem,
   CommonResponseTitleSearchResult,
   TitleSearchItem,
-  UpdateWishlistPriorityRequest,
 } from '@/features/search/mockTypes'
 import type { CommonResponseTitleDetail } from '@/features/title-detail/mockTypes'
+import type { UpdateWishlistItemRequest } from '@/features/wishlist/mockTypes'
 import { MOCK_SCENARIO_PARAM } from '@/lib/mockScenario'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
+import {
+  hasMockScenario,
+  issueWishlistItemId,
+  mockWishlist,
+  problemResponse,
+  resetMockWishlist,
+} from '@/mocks/handlerUtils'
+import { memberHandlers } from '@/mocks/memberHandlers'
 import { getMockRole } from '@/mocks/mockSession'
 
 // MSW 요청 핸들러 모음. 목업 모드(VITE_USE_MOCK=true)에서 브라우저가 이 핸들러로 /api 요청을 가로챈다.
@@ -28,10 +36,9 @@ import { getMockRole } from '@/mocks/mockSession'
 // 검색·상세 API 요청에 실려 간다. 여기서는 다시 내보내 기존 import 경로를 유지한다.
 export { MOCK_SCENARIO_PARAM }
 
-// 요청 URL에 지정한 시나리오가 붙어 있는지 확인한다
-function hasMockScenario(request: Request, scenario: string): boolean {
-  return new URL(request.url).searchParams.get(MOCK_SCENARIO_PARAM) === scenario
-}
+// hasMockScenario·problemResponse·찜 목록 저장소는 회원 화면 핸들러(memberHandlers.ts)와 함께 쓰려고 handlerUtils.ts로 옮겼다(Task 028).
+// 찜 목록을 비우는 함수는 기존 테스트의 import 경로(@/mocks/handlers)를 유지하려고 다시 내보낸다
+export { resetMockWishlist }
 
 /*
  * 시나리오 핸들러. 생성 핸들러(getProductMock)보다 배열 앞에 둔다.
@@ -69,7 +76,7 @@ const scenarioHandlers: RequestHandler[] = [
  *              응답은 페이지 형태 { content, page, size, totalElements, totalPages } + 수집 실패 여부·기준일)
  * - 작품 상세: GET  /api/public/titles/{mediaType}/{tmdbId}   (api-contract.md 경로 규칙: 작품은 TMDB 기준)
  * - 찜 추가:   POST   /api/me/wishlist-items          (로그인 필요. 임시 경로, Task 031에서 확정)
- * - 우선순위 변경: PATCH  /api/me/wishlist-items/{id}  (로그인 필요. 임시 경로, Task 031에서 확정)
+ * - 우선순위 변경·다 봤음: PATCH  /api/me/wishlist-items/{id}  ({ priority?, isWatched? } 보낸 것만 바꾼다. 로그인 필요. 임시 경로, Task 031에서 확정. 다 봤음은 Task 028에서 추가)
  * - 찜 해제:   DELETE /api/me/wishlist-items/{id}  (로그인 필요. 임시 경로, Task 031에서 확정)
  * 시나리오(?mockScenario=): collect-failed(검색, 외부 수집 실패 → DB 결과만), error(검색·상세, 500 오류).
  */
@@ -84,38 +91,6 @@ function toSearchItem(detail: (typeof TITLE_FIXTURES)[number]): TitleSearchItem 
     posterUrl: detail.posterUrl,
     availabilities: detail.availabilities,
   }
-}
-
-// 백엔드 ProblemDetail과 같은 모양의 오류 응답을 만든다(Content-Type이 problem+json이어야 api/http.ts가 인식한다)
-function problemResponse(
-  request: Request,
-  status: number,
-  title: string,
-  errorCode: string,
-  detail: string,
-) {
-  const body: ProblemDetail = {
-    title,
-    status,
-    detail,
-    instance: new URL(request.url).pathname,
-    errorCode,
-  }
-  return HttpResponse.json(body, {
-    status,
-    headers: { 'Content-Type': 'application/problem+json' },
-  })
-}
-
-// 목업 서버가 메모리에 들고 있는 찜 목록(찜 항목 ID → 내용). 새로고침(모듈 다시 읽기) 전까지만 유지된다.
-// 화면의 찜 상태는 요청이 성공할 때마다 프론트 캐시를 고쳐 맞춘다(features/*/hooks/useWishlistItem)
-const mockWishlist = new Map<number, AddWishlistItemRequest>()
-let nextWishlistItemId = 1
-
-// 목업 찜 목록을 비운다(테스트가 서로 영향을 주지 않게 쓴다)
-export function resetMockWishlist(): void {
-  mockWishlist.clear()
-  nextWishlistItemId = 1
 }
 
 const publicScreenHandlers: RequestHandler[] = [
@@ -238,8 +213,8 @@ const publicScreenHandlers: RequestHandler[] = [
         item.tmdbId === requestBody.tmdbId &&
         item.seasonNumber === requestBody.seasonNumber,
     )
-    const wishlistItemId = existing ? existing[0] : nextWishlistItemId++
-    if (!existing) mockWishlist.set(wishlistItemId, requestBody)
+    const wishlistItemId = existing ? existing[0] : issueWishlistItemId()
+    if (!existing) mockWishlist.set(wishlistItemId, { ...requestBody, watchedAt: null })
     const body: CommonResponseAddWishlistItem = { success: true, data: { wishlistItemId } }
     return HttpResponse.json(body, { status: existing ? 200 : 201 })
   }),
@@ -261,9 +236,13 @@ const publicScreenHandlers: RequestHandler[] = [
         '찜 항목을 찾을 수 없습니다.',
       )
     }
-    const { priority } = (await request.json()) as UpdateWishlistPriorityRequest
-    mockWishlist.set(id, { ...current, priority })
-    return HttpResponse.json({ success: true, data: { wishlistItemId: id, priority } })
+    // 우선순위(priority)와 "다 봤음"(isWatched)을 보낸 것만 바꾼다(Task 028에서 다 봤음을 추가). 다 봤음 시각은 목업이라 요청 시각을 그대로 쓴다
+    const { priority = current.priority, isWatched } =
+      (await request.json()) as UpdateWishlistItemRequest
+    const watchedAt =
+      isWatched === undefined ? current.watchedAt : isWatched ? new Date().toISOString() : null
+    mockWishlist.set(id, { ...current, priority, watchedAt })
+    return HttpResponse.json({ success: true, data: { wishlistItemId: id, priority, watchedAt } })
   }),
 
   // 찜 해제: 비로그인이면 401. 이미 없는 항목도 오류 없이 성공으로 답한다(삭제는 여러 번 해도 결과가 같다)
@@ -280,5 +259,6 @@ const publicScreenHandlers: RequestHandler[] = [
 export const handlers: RequestHandler[] = [
   ...scenarioHandlers,
   ...publicScreenHandlers,
+  ...memberHandlers,
   ...getProductMock(),
 ]

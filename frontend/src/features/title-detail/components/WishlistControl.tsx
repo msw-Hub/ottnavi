@@ -7,6 +7,8 @@ interface WishlistControlProps {
   tmdbId: number // 찜할 작품의 TMDB ID
   seasonNumber: number | null // 시즌 단위 찜이면 시즌 번호, 영화는 null
   panelAlign?: 'start' | 'end' // 설정 상자를 맞출 쪽(오른쪽 끝에 놓인 시즌 줄은 end)
+  popupName?: string // 찜 추가 팝업 문장에 쓸 이름. 생략하면 targetName(시즌 줄은 "작품 제목 시즌 2"처럼 작품 제목을 붙여 넘긴다)
+  posterUrl?: string | null // 찜 추가 팝업 썸네일 포스터 주소
   targetName: string // 무엇을 찜하는지 이름(예: "기생충", "시즌 2"). 화면 낭독기가 여러 찜 버튼을 구분하는 데 쓴다
 }
 
@@ -22,9 +24,14 @@ export function WishlistControl({
   tmdbId,
   seasonNumber,
   targetName,
+  popupName,
+  posterUrl = null,
   panelAlign,
 }: WishlistControlProps) {
-  const wishlist = useWishlistItem({ mediaType, tmdbId, seasonNumber }, targetName)
+  const wishlist = useWishlistItem({ mediaType, tmdbId, seasonNumber }, targetName, {
+    name: popupName ?? targetName,
+    posterUrl,
+  })
 
   return <WishlistButton targetName={targetName} panelAlign={panelAlign} {...wishlist} />
 }

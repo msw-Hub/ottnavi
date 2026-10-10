@@ -22,14 +22,29 @@
   --status-unavailable-bg: transparent;
   --status-unavailable-border: oklch(0.62 0.025 258);
 
-  /* 제공 상태: 모름(UNKNOWN). 바탕 없이 점선 테두리(점선 모양은 컴포넌트의 border-dashed가 정한다) */
-  --status-unknown: oklch(0.88 0.1 85);
-  --status-unknown-bg: transparent;
-  --status-unknown-border: oklch(0.74 0.11 80);
+  /*
+   * 제공 상태: 모름(UNKNOWN). 차분한 중립(슬레이트) 톤 + 옅게 채운 바탕 + 점선 테두리
+   * (점선 모양은 컴포넌트의 border-dashed가 정한다).
+   * 바꾼 이유(Task 028 피드백): 이전 값은 채도 높은 노랑(글자 oklch 0.88 0.1 85)이라 어두운 바탕에서 번져 보이고,
+   * 2px 점선 노랑 테두리와 겹쳐 눈이 피로하고 글자가 잘 읽히지 않았다. 색조(노랑)를 빼고 foreground에 가까운 글자색으로 바꿨다.
+   * - 글자: 밝기 0.92 → 카드 바탕(0.175)과 칩 바탕(0.27) 위에서 대비 약 10:1 이상(본문 기준 4.5:1 이상)
+   * - 바탕: 옅게 채움(0.27). "없음"(바탕 없음 + 실선)과 모양이 달라지게 하는 보조 수단이다
+   * - 테두리: 없음과 같은 슬레이트(0.62). 카드 위 3:1 이상이라 점선 모양이 보이되 노랑처럼 튀지 않는다
+   * 색은 보조 수단이다. 모름은 물음표 아이콘 + "모름" 글자 + 점선 테두리 + 옅은 바탕으로도 구분된다.
+   * 이 토큰은 ProviderStatusBadge(작품 상세 등)와 찜 목록 칩(ServiceStatusChips)이 함께 쓴다.
+   */
+  --status-unknown: oklch(0.92 0.01 258);
+  --status-unknown-bg: oklch(0.27 0.03 262);
+  --status-unknown-border: oklch(0.62 0.025 258);
 
-  /* 데이터 부족(쿠팡플레이처럼 data_quality = INSUFFICIENT인 서비스) 표시 */
-  --quality-insufficient: oklch(0.88 0.09 80); /* 글자·아이콘 */
-  --quality-insufficient-bg: oklch(0.3 0.05 75); /* 바탕 */
+  /*
+   * 데이터 부족(쿠팡플레이처럼 data_quality = INSUFFICIENT인 서비스) 표시.
+   * 모름 칩 안에 들어가므로 같은 중립 톤으로 맞췄다(이전: 노랑 글자 + 갈색 바탕이라 모름 칩 안에서 읽기 어려웠다).
+   * 바탕(0.34)이 모름 칩 바탕(0.27)보다 한 단계 밝아 칩 안에서도 구분되고, 글자(0.92)와의 대비는 약 8:1이다.
+   * 의미는 색이 아니라 데이터베이스 아이콘 + "데이터 부족" 글자가 전달한다.
+   */
+  --quality-insufficient: oklch(0.92 0.01 258); /* 글자·아이콘 */
+  --quality-insufficient-bg: oklch(0.36 0.03 262); /* 바탕 */
 
   /* "추정" 태그(러닝타임 등 추정값) */
   --estimated: oklch(0.85 0.07 290); /* 글자·점선 테두리 */
@@ -43,6 +58,33 @@
    * 하나로 쓰면 밝은 빨강 위 흰 글자는 대비가 모자라고, 짙은 빨강 글자는 어두운 바탕에서 읽기 어렵다.
    */
   --destructive-solid: oklch(0.577 0.245 27.325);
+
+  /*
+   * 안내(info) 띠·"이어 보기" 배지·"이미 시청 가능" 배지용 색(Task 028, 임시. 확정은 Task 037).
+   * 안내 문구가 오류(빨강)·경고(노랑)처럼 보이지 않게 강조색(--primary)과 같은 하늘색 계열로 맞췄다.
+   * 바탕(--info-bg, 밝기 0.27)과 글자(--info, 밝기 0.88)의 대비는 약 9:1로 본문 기준 4.5:1을 넉넉히 넘는다.
+   */
+  --info: oklch(0.88 0.07 230); /* 글자·아이콘·점선 테두리 */
+  --info-bg: oklch(0.27 0.05 235); /* 바탕 */
+
+  /*
+   * 플랜 유형 카드에서 "선택된 카드"의 테두리 색(Task 028, 임시. 확정은 Task 037).
+   * 기본은 강조색(--primary)을 그대로 쓴다. 선택 표시는 색만이 아니라 테두리 굵기(2px)와 "선택됨" 글자+체크 아이콘을 함께 쓰므로
+   * 이 색은 보조 수단이다. 디자인 방향이 바뀌면 이 한 줄만 바꾼다.
+   */
+  --plan-selected-border: var(--primary);
+
+  /*
+   * 서비스 이용 상태 선택 칸(SCR-07)의 "선택됨" 바탕색. 네 선택지가 서로 다른 색으로 보이게 한다(Task 028, 임시. 확정은 Task 037).
+   * 모두 밝은 바탕(밝기 0.8~0.86) 위에 짙은 남색 글자(--choice-fg, 밝기 0.15)를 올려 대비가 약 9:1 이상이다(본문 기준 4.5:1 이상).
+   * 색은 보조 수단이다. 선택됨은 체크 아이콘·굵은 글자·두꺼운 테두리로도 알리고, 상태 이름은 항상 글자로 적혀 있다.
+   * 구독 중=하늘, 무료 이용=초록(제공 "있음"과 같은 계열), 잘 모르겠음=노랑(미구독 회색과 구분하려고 따로 둔 값. 제공 "모름" 토큰(--status-unknown-*)은 중립 톤으로 바뀌어 더 이상 공유하지 않는다), 미구독=회색.
+   */
+  --choice-fg: oklch(0.15 0.035 264); /* 선택된 칸 글자·아이콘 */
+  --choice-subscribed-bg: oklch(0.8 0.1 235); /* 구독 중 */
+  --choice-free-bg: oklch(0.8 0.12 160); /* 무료 이용 */
+  --choice-unknown-bg: oklch(0.86 0.12 85); /* 잘 모르겠음 */
+  --choice-none-bg: oklch(0.82 0.02 258); /* 미구독 */
 }
 
 /*
@@ -65,4 +107,12 @@
   --color-estimated: var(--estimated);
   --color-estimated-bg: var(--estimated-bg);
   --color-destructive-solid: var(--destructive-solid);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-plan-selected-border: var(--plan-selected-border);
+  --color-choice-fg: var(--choice-fg);
+  --color-choice-subscribed-bg: var(--choice-subscribed-bg);
+  --color-choice-free-bg: var(--choice-free-bg);
+  --color-choice-unknown-bg: var(--choice-unknown-bg);
+  --color-choice-none-bg: var(--choice-none-bg);
 }

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { customInstance, type ApiError } from '@/api/http'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
+import { useWishlistAddedDialog } from '@/hooks/useWishlistAddedDialog'
 import type {
   AddWishlistItemRequest,
   CommonResponseAddWishlistItem,
@@ -38,6 +39,12 @@ function toEntryKey({ mediaType, tmdbId, seasonNumber }: WishlistTarget): string
   return `${mediaType}:${tmdbId}:${seasonNumber ?? 'all'}`
 }
 
+// 찜 추가 팝업에 쓸 표시 정보. 생략하면 이름은 targetName, 포스터는 없음으로 보인다
+interface WishlistAddedPopupInfo {
+  name: string // 팝업 문장의 이름(드라마 시즌이면 "제목 시즌 2")
+  posterUrl: string | null // 팝업 썸네일 포스터 주소
+}
+
 // 요청 제한(429)은 인터셉터가 이미 토스트로 알렸으므로 같은 안내를 또 띄우지 않는다
 function notifyError(error: ApiError) {
   if (!error.hasNotifiedUser) toast.error(error.userMessage)
@@ -61,13 +68,19 @@ const UNAUTHORIZED_STATUS = 401
  * mutation은 TanStack Query 기본값이 재시도 0번이라 같은 요청이 두 번 저장되지 않는다.
  * features/title-detail에도 같은 훅이 있는 이유: 기능 폴더끼리는 서로 import하지 않기 때문이다.
  */
-export function useWishlistItem(target: WishlistTarget, targetName: string) {
+export function useWishlistItem(
+  target: WishlistTarget,
+  targetName: string,
+  popup?: WishlistAddedPopupInfo,
+) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
   const entryKey = toEntryKey(target)
 
   const isLoggedIn = useIsLoggedIn()
+  // 찜을 추가했을 때의 선택지 팝업(더 둘러보기 / 찜 목록 보고 계산하기). 해제할 때는 쓰지 않는다
+  const showWishlistAddedDialog = useWishlistAddedDialog()
 
   // 로그인 화면으로 보낸다. 지금 화면을 from으로 넘겨 로그인 뒤 돌아오게 한다(로그인 화면이 내부 경로만 허용하도록 다시 검사한다)
   function redirectToLogin() {
@@ -117,7 +130,11 @@ export function useWishlistItem(target: WishlistTarget, targetName: string) {
     },
     onSuccess: (res) => {
       writeEntry({ wishlistItemId: res.data.wishlistItemId, priority: DEFAULT_WISHLIST_PRIORITY })
-      toast.success(`${targetName}을(를) 찜했습니다.`)
+      showWishlistAddedDialog({
+        entryKey,
+        name: popup?.name ?? targetName,
+        posterUrl: popup?.posterUrl ?? null,
+      })
     },
     onError: handleError,
   })
