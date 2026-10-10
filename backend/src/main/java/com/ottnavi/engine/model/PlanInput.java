@@ -131,6 +131,8 @@ public record PlanInput(
 	 * ① FREE·SUBSCRIBED 상품이 시청 가능 상품에 없고 월 예산 이하 가격의 시청 가능 상품도 없다(시청 가능 상품이 아예 없는 경우 포함, 후보 상품 정의 S6과 같은 기준)
 	 * ② 필요 시간이 월 시청 시간의 3배를 넘는다 ③ 긴 시즌(필요 시간 &gt; 월 시청 시간)인데 월 시청 시간이 최소 조각 120분 미만이다.
 	 * 끌어올림 판정과 평가기의 시즌 순서 판정이 같은 기준을 쓰도록 공개한다(productsById는 상품 ID → 상품).
+	 * 알려진 모서리: 예산 밖 조합을 평가기에 직접 넣으면 이 정적 판정에 기댄 사슬 판정이 조합과 무관해 어긋날 수 있다.
+	 * Solver는 달마다 예산 이하 조합만 넘기므로 운영 경로에는 영향이 없다(KnownCornerOffBudgetTest로 고정).
 	 */
 	public static boolean isStaticallyImpossible(WatchUnit unit, int monthlyBudget, int monthlyWatchMinutes, Map<Long, OttProduct> productsById) {
 		boolean hasUsableProduct = false;

@@ -63,7 +63,7 @@ class EngineBenchmarkMeasureTest {
 
 	@Test
 	@Order(1)
-	@DisplayName("정답 세트 13건: 완전탐색 대 그리디의 점수·비용 차이와 시간")
+	@DisplayName("정답 세트 전체: 완전탐색 대 그리디의 점수·비용 차이와 시간")
 	void 정답_세트_비교() {
 		List<List<String>> recommendedRows = new ArrayList<>();
 		List<List<String>> otherRows = new ArrayList<>();

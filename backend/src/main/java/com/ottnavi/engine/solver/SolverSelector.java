@@ -10,13 +10,13 @@ import com.ottnavi.engine.rule.PlanObjective;
  */
 public final class SolverSelector implements PlanSolver {
 
-	public static final long DEFAULT_MAX_CANDIDATE_COMBINATIONS = 2_097_152L; // 128의 3제곱: MVP는 항상 완전탐색. R11-30 측정 전 잠정값
+	public static final long DEFAULT_MAX_CANDIDATE_COMBINATIONS = 2_097_152L; // 128의 3제곱: MVP는 항상 완전탐색. Task 040 측정 반영(후보 7개일 때 절약형·간편형 조합 수, 단위 30개 기준 이 PC에서 절약형 약 1.6초·간편형 약 1.8초, Cloudtype 실측은 Task 100에서 재확인)
 
 	private final ExactSolver exactSolver;         // 기본 Solver
 	private final GreedySolver greedySolver;       // 후보 조합 수가 상한을 넘을 때 쓰는 Solver
 	private final long maxCandidateCombinations;   // 완전탐색으로 풀 수 있는 후보 조합 수 상한(이 값까지는 완전탐색)
 
-	/** 완전탐색·그리디와 전환 상한(후보 조합 수)을 받아 선택기를 만든다. 상한은 설정 값이며 R11-30 전까지 잠정값이다. */
+	/** 완전탐색·그리디와 전환 상한(후보 조합 수)을 받아 선택기를 만든다. 상한은 설정 값이며 기본값의 근거는 DEFAULT_MAX_CANDIDATE_COMBINATIONS 주석(Task 040 측정)이다. */
 	public SolverSelector(ExactSolver exactSolver, GreedySolver greedySolver, long maxCandidateCombinations) {
 		if (exactSolver == null || greedySolver == null) {
 			throw new IllegalArgumentException("완전탐색·그리디 Solver는 null일 수 없다");
