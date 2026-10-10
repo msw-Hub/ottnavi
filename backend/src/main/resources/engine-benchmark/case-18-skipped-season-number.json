@@ -1,0 +1,63 @@
+{
+  "name" : "case-18-skipped-season-number",
+  "note" : "시즌 순서 ④ 번호를 건너뛴 시즌(시즌 1·3만 찜, 소규모, 상품 2개). 월 예산 10,000원, 월 시청 200분. 서비스1은 9,000원, 서비스2는 4,000원이라 합치면 예산을 넘어 한 달에 하나만 구독한다. 작품F 1시즌(WANT 100분, 서비스2)과 3시즌(MUST 80분, 서비스1)만 찜했고 2시즌은 찜에 없다. 직전 시즌은 찜 목록에 있는 가장 큰 앞 번호라 3시즌의 앞 시즌은 1시즌이다. 기본 정렬은 MUST인 3시즌이 먼저지만 1시즌이 끌어올려져 1시즌→3시즌 순으로 배정된다. 손계산: 3시즌은 1시즌의 시청 완료 달 이후에 끝나야 한다. 서비스2(1시즌)와 서비스1(3시즌)은 예산 때문에 서로 다른 달에 구독해야 하므로 서비스2를 먼저 구독하고 그 뒤 달에 서비스1을 구독하는 [[2],[1],[]]·[[2],[],[1]]·[[],[2],[1]]만 꼭 1개·점수 2를 얻고, 비용은 모두 13,000원이다. 제약이 없다면 3시즌(MUST)을 0번째 달에 끝내는 [[1],[2],[]]가 조기 시청에서 이기겠지만, 그 조합은 3시즌이 1시즌보다 먼저 끝나 3시즌을 못 본다(꼭 0). 세 후보 중 0번째 달에 1시즌(점수 2), 1번째 달에 3시즌(꼭 1)이 끝나는 [[2],[1],[]]가 조기 시청에서 이긴다. 꼭 1개, 점수 2, 13,000원이고 세 유형이 같다. 미배정 작품이 없다. 기대값은 OracleAssigner 기반 전수 탐색으로 생성했다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 200,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 4000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품F 1시즌",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false,
+    "titleId" : 5,
+    "seasonNumber" : 1
+  }, {
+    "id" : 2,
+    "name" : "작품F 3시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 80,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 5,
+    "seasonNumber" : 3
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 2 ], [ 1 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 13000
+    },
+    "SAVER" : {
+      "months" : [ [ 2 ], [ 1 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 13000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 2 ], [ 1 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 2,
+      "totalCost" : 13000
+    }
+  },
+  "expectedUnitReasons" : {
+    "RECOMMENDED" : { },
+    "SAVER" : { },
+    "SIMPLE" : { }
+  }
+}

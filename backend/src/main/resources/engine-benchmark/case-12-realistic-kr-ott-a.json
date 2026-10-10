@@ -1,0 +1,176 @@
+{
+  "name" : "case-12-realistic-kr-ott-a",
+  "note" : "현실 모양 케이스 A: 국내 OTT 7곳 규모, 월 요금 0~17,000원, 작품 15개(MUST 3·WANT 6·MAYBE 6 가운데 시청 가능 상품이 없는 작품 2개 포함), 월 예산 20,000원, 월 시청 20시간(1,200분). 서비스4는 이미 구독 중, 서비스7은 무료 혜택, 여러 서비스에 동시 제공되는 작품과 긴 시즌(작품D 1,500분)이 섞여 있다. 손계산이 아니라 ExactSolver(SolverSelector)의 결과를 고정한 회귀 기준이다. 2026-10-10 조기 시청 규칙 반영으로 재생성했고, 전수 탐색(동치 제거 없는 무차별 대입) 결과와 세 유형 모두 같음을 확인했다.",
+  "expectationBasis" : "REGRESSION",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 20000,
+  "monthlyWatchMinutes" : 1200,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 17000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 13900,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 13900,
+    "condition" : "NONE"
+  }, {
+    "id" : 4,
+    "name" : "서비스4",
+    "monthlyPrice" : 9900,
+    "condition" : "SUBSCRIBED"
+  }, {
+    "id" : 5,
+    "name" : "서비스5",
+    "monthlyPrice" : 7900,
+    "condition" : "NONE"
+  }, {
+    "id" : 6,
+    "name" : "서비스6",
+    "monthlyPrice" : 5500,
+    "condition" : "NONE"
+  }, {
+    "id" : 7,
+    "name" : "서비스7",
+    "monthlyPrice" : 0,
+    "condition" : "FREE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 480,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "MUST",
+    "requiredMinutes" : 640,
+    "watchableProductIds" : [ 2, 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "WANT",
+    "requiredMinutes" : 1500,
+    "watchableProductIds" : [ 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 5,
+    "name" : "작품E",
+    "priority" : "WANT",
+    "requiredMinutes" : 110,
+    "watchableProductIds" : [ 4, 5 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 6,
+    "name" : "작품F",
+    "priority" : "WANT",
+    "requiredMinutes" : 560,
+    "watchableProductIds" : [ 4 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 7,
+    "name" : "작품G",
+    "priority" : "WANT",
+    "requiredMinutes" : 130,
+    "watchableProductIds" : [ 5, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 8,
+    "name" : "작품H",
+    "priority" : "WANT",
+    "requiredMinutes" : 900,
+    "watchableProductIds" : [ 1, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 9,
+    "name" : "작품I",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 10,
+    "name" : "작품J",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 150,
+    "watchableProductIds" : [ 2, 5, 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 11,
+    "name" : "작품K",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 420,
+    "watchableProductIds" : [ 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 12,
+    "name" : "작품L",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 960,
+    "watchableProductIds" : [ 4, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 13,
+    "name" : "작품M",
+    "priority" : "WANT",
+    "requiredMinutes" : 105,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : false
+  }, {
+    "id" : 14,
+    "name" : "작품N",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 95,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : true
+  }, {
+    "id" : 15,
+    "name" : "작품O",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 700,
+    "watchableProductIds" : [ 3, 4 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ 6 ] ],
+      "mustCompleted" : 3,
+      "score" : 9,
+      "totalCost" : 36400
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ 6 ] ],
+      "mustCompleted" : 3,
+      "score" : 9,
+      "totalCost" : 36400
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 2 ], [ 6 ] ],
+      "mustCompleted" : 3,
+      "score" : 9,
+      "totalCost" : 36400
+    }
+  },
+  "greedyExpected" : {
+    "months" : [ [ 2, 6 ], [ 1 ], [ 6 ] ],
+    "mustCompleted" : 3,
+    "score" : 9,
+    "totalCost" : 41900
+  }
+}

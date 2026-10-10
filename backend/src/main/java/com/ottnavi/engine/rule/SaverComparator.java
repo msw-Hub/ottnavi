@@ -1,28 +1,27 @@
 package com.ottnavi.engine.rule;
 
 import com.ottnavi.engine.model.Evaluation;
-import com.ottnavi.engine.model.OttProduct;
+import com.ottnavi.engine.model.PlanInput;
 import java.util.Comparator;
-import java.util.List;
 
 /**
  * 절약형 목적함수 비교기(PRD 5.4 절약형, 11절 35번, Task 039 안내서 3절).
  *
  * <p>반환 규칙은 EvaluationComparator와 같다: 양수 = 첫 번째가 더 좋다.
  * 사전식 순서: ① mustCompleted 큰 쪽 → ② 점수 하한(minScore) 이상인 쪽 → ③ totalCost 작은 쪽 → ④ score 큰 쪽
- * → ⑤ 결제 미루기 → ⑥ 달별 상품 ID 사전순.
- * ⑤·⑥은 추천형 비교기(EvaluationComparator)에 맡긴다. ①~④가 같으면 must·score·cost가 모두 같으므로
- * 추천형 비교기의 ①②③은 0이 되고 결과가 정확히 그 ④ 결제 미루기 → ⑤ ID 순이 된다(규칙을 한 곳에만 둔다).
+ * → ⑤ 조기 시청 → ⑥ 결제 미루기 → ⑦ 달별 상품 ID 사전순.
+ * ⑤~⑦은 추천형 비교기(EvaluationComparator)에 맡긴다. ①~④가 같으면 must·score·cost가 모두 같으므로
+ * 추천형 비교기의 ①②③은 0이 되고 결과가 정확히 그 ④ 조기 시청 → ⑤ 결제 미루기 → ⑥ ID 순이 된다(규칙을 한 곳에만 둔다).
  */
 final class SaverComparator implements Comparator<Evaluation> {
 
 	private final int minScore;                       // 점수 하한: 추천형 점수의 70% 올림
-	private final EvaluationComparator recommended;   // 마지막 동점(결제 미루기·ID 순)을 가르는 추천형 비교기
+	private final EvaluationComparator recommended;   // 마지막 동점(조기 시청·결제 미루기·ID 순)을 가르는 추천형 비교기
 
-	/** 상품 목록과 점수 하한으로 비교기를 만든다. */
-	SaverComparator(List<OttProduct> products, int minScore) {
+	/** 입력과 점수 하한으로 비교기를 만든다. */
+	SaverComparator(PlanInput input, int minScore) {
 		this.minScore = minScore;
-		this.recommended = new EvaluationComparator(products);
+		this.recommended = new EvaluationComparator(input);
 	}
 
 	/** 양수면 first가, 음수면 second가 더 좋은 결과다. */
@@ -48,7 +47,7 @@ final class SaverComparator implements Comparator<Evaluation> {
 		if (scoreOrder != 0) {
 			return scoreOrder;
 		}
-		// ⑤ 결제 미루기 → ⑥ 달별 상품 ID 사전순: 추천형 비교기의 ④·⑤와 같은 정의라 위임한다(클래스 설명 참고)
+		// ⑤ 조기 시청 → ⑥ 결제 미루기 → ⑦ 달별 상품 ID 사전순: 추천형 비교기의 ④·⑤·⑥과 같은 정의라 위임한다(클래스 설명 참고)
 		return recommended.compare(first, second);
 	}
 }

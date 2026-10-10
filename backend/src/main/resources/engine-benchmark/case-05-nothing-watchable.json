@@ -1,0 +1,54 @@
+{
+  "name" : "case-05-nothing-watchable",
+  "note" : "볼 수 있는 작품이 하나도 없는 소규모(상품 2개). 손계산: 두 작품 모두 시청 가능 상품이 없어(NO_PROVIDER, UNKNOWN) 서비스를 구독해도 얻는 것이 없다. 세 유형 모두 아무것도 구독하지 않는 [[],[],[]], 점수 0, 비용 0원이다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 5000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 7000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : true
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 0,
+      "totalCost" : 0
+    },
+    "SAVER" : {
+      "months" : [ [ ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 0,
+      "totalCost" : 0
+    },
+    "SIMPLE" : {
+      "months" : [ [ ], [ ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 0,
+      "totalCost" : 0
+    }
+  }
+}

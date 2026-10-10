@@ -34,7 +34,7 @@ class SolverSelectorTest {
 	@DisplayName("상한이 후보 조합 수와 같으면 완전탐색(경계값)")
 	void 경계값은_완전탐색() {
 		PlanInput input = sixtyFourCandidates();
-		PlanObjective saver = PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input));
+		PlanObjective saver = PlanObjective.saver(input, BruteForceOracle.bestRecommended(input));
 
 		SolveResult result = new SolverSelector(exact, greedy, 64).solve(input, saver);
 
@@ -46,7 +46,7 @@ class SolverSelectorTest {
 	@DisplayName("상한이 후보 조합 수보다 1 작으면 그리디")
 	void 상한_초과는_그리디() {
 		PlanInput input = sixtyFourCandidates();
-		PlanObjective saver = PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input));
+		PlanObjective saver = PlanObjective.saver(input, BruteForceOracle.bestRecommended(input));
 
 		SolveResult result = new SolverSelector(exact, greedy, 63).solve(input, saver);
 
@@ -58,7 +58,7 @@ class SolverSelectorTest {
 	@DisplayName("상한이 후보 조합 수보다 크면 완전탐색, 상한이 1이어도 후보가 1개면 완전탐색")
 	void 상한이_넉넉하면_완전탐색() {
 		PlanInput input = sixtyFourCandidates();
-		PlanObjective saver = PlanObjective.saver(input.products(), BruteForceOracle.bestRecommended(input));
+		PlanObjective saver = PlanObjective.saver(input, BruteForceOracle.bestRecommended(input));
 
 		assertThat(new SolverSelector(exact, greedy, 65).solve(input, saver).solverType()).isEqualTo(SolverType.EXACT);
 		assertThat(new SolverSelector(exact, greedy, Long.MAX_VALUE).solve(input, saver).solverType()).isEqualTo(SolverType.EXACT);
@@ -71,7 +71,7 @@ class SolverSelectorTest {
 	@DisplayName("후보 수는 실제 완전탐색이 세는 값과 같은 기준이다: 그 값이 상한이면 완전탐색, 하나 작으면 그리디")
 	void 완전탐색이_세는_값이_기준이다() {
 		PlanInput input = SolverCases.greedyWorse();
-		PlanObjective objective = PlanObjective.recommended(input.products());
+		PlanObjective objective = PlanObjective.recommended(input);
 		long count = exact.countCandidateCombinations(input, objective);
 		assertThat(count).isGreaterThan(1);
 
@@ -90,11 +90,11 @@ class SolverSelectorTest {
 		Evaluation recommended = BruteForceOracle.bestRecommended(input);
 		SolverSelector selector = new SolverSelector(exact, greedy, 8);
 
-		assertThat(selector.solve(input, PlanObjective.recommended(input.products())).solverType()).isEqualTo(SolverType.EXACT);
-		SolveResult saver = selector.solve(input, PlanObjective.saver(input.products(), recommended));
+		assertThat(selector.solve(input, PlanObjective.recommended(input)).solverType()).isEqualTo(SolverType.EXACT);
+		SolveResult saver = selector.solve(input, PlanObjective.saver(input, recommended));
 		assertThat(saver.solverType()).isEqualTo(SolverType.GREEDY);
 		assertThat(saver.planType()).isEqualTo(PlanType.SAVER);
-		assertThat(selector.solve(input, PlanObjective.simple(input.products(), recommended)).solverType()).isEqualTo(SolverType.GREEDY);
+		assertThat(selector.solve(input, PlanObjective.simple(input, recommended)).solverType()).isEqualTo(SolverType.GREEDY);
 	}
 
 	@Test
@@ -140,7 +140,7 @@ class SolverSelectorTest {
 		PlanInput input = SolverCases.singleProduct();
 
 		assertThatThrownBy(() -> selector.solve(null)).isInstanceOf(IllegalArgumentException.class);
-		assertThatThrownBy(() -> selector.solve(null, PlanObjective.recommended(input.products()))).isInstanceOf(IllegalArgumentException.class);
+		assertThatThrownBy(() -> selector.solve(null, PlanObjective.recommended(input))).isInstanceOf(IllegalArgumentException.class);
 		assertThatThrownBy(() -> selector.solve(input, null)).isInstanceOf(IllegalArgumentException.class);
 	}
 }

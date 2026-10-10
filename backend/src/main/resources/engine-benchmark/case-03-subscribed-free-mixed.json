@@ -1,0 +1,85 @@
+{
+  "name" : "case-03-subscribed-free-mixed",
+  "note" : "NONE·SUBSCRIBED·FREE가 섞인 소규모(상품 4개). 손계산: 월 예산 10,000원이라 서비스1(13,900원)은 후보에서 빠져 작품C는 못 본다. 이미 구독 중인 서비스2는 0번째 달에 선택 없이 0원으로 작품A(MUST)·E를 보고, 무료 서비스3은 선택 없이 작품B를 본다. 추천형은 작품D를 위해 서비스4(5,500원)만 더 구독해 점수 2+1+1=4, 5,500원이고, 같은 비용이면 첫 달부터 보는 조기 시청으로 [[4],[],[]]이다. 절약형·간편형은 점수 하한이 ceil(4*0.7)=3인데 선택 없이 이미 3(B 2점+E 1점)이라 아무것도 구독하지 않는다(0원).",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 13900,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 9500,
+    "condition" : "SUBSCRIBED"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 0,
+    "condition" : "FREE"
+  }, {
+    "id" : 4,
+    "name" : "서비스4",
+    "monthlyPrice" : 5500,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 4 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 5,
+    "name" : "작품E",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2, 4 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 4 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 4,
+      "totalCost" : 5500
+    },
+    "SAVER" : {
+      "months" : [ [ ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 0
+    },
+    "SIMPLE" : {
+      "months" : [ [ ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 0
+    }
+  }
+}

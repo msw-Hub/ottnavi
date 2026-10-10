@@ -1,8 +1,10 @@
 package com.ottnavi.engine.rule;
 
+import static com.ottnavi.engine.EngineFixtures.input;
 import static com.ottnavi.engine.EngineFixtures.product;
 import static com.ottnavi.engine.EngineFixtures.selection;
 import static com.ottnavi.engine.EngineFixtures.subscribed;
+import static com.ottnavi.engine.EngineFixtures.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -10,6 +12,7 @@ import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.PlanInput;
 import com.ottnavi.engine.model.PlanType;
+import com.ottnavi.engine.model.Priority;
 import com.ottnavi.engine.model.Selection;
 import com.ottnavi.engine.solver.BruteForceOracle;
 import com.ottnavi.engine.solver.SolverCases;
@@ -27,6 +30,7 @@ import org.junit.jupiter.api.Test;
 class PlanObjectiveTest {
 
 	private static final List<OttProduct> PRODUCTS = List.of(product(1, 9_000), product(2, 1_000), product(3, 1_000), subscribed(4, 1_000));
+	private static final PlanInput INPUT = input(600, PRODUCTS); // 시청 단위가 없는 입력: 합성 Evaluation(units 빈 목록)과 짝이 맞는다
 	private static final Selection EMPTY = selection(Set.of(), Set.of(), Set.of());
 
 	private static Evaluation evaluation(Selection selection, int mustCompleted, int score, int totalCost) {
@@ -39,11 +43,11 @@ class PlanObjectiveTest {
 	}
 
 	private static Comparator<Evaluation> saver(int recommendedScore) {
-		return PlanObjective.saver(PRODUCTS, recommended(recommendedScore)).comparator();
+		return PlanObjective.saver(INPUT, recommended(recommendedScore)).comparator();
 	}
 
 	private static Comparator<Evaluation> simple(int recommendedScore) {
-		return PlanObjective.simple(PRODUCTS, recommended(recommendedScore)).comparator();
+		return PlanObjective.simple(INPUT, recommended(recommendedScore)).comparator();
 	}
 
 	@Test
@@ -78,9 +82,9 @@ class PlanObjectiveTest {
 		Selection recommendedSelection = selection(Set.of(), Set.of(2L), Set.of(2L));
 		Evaluation recommendedEvaluation = evaluation(recommendedSelection, 1, 5, 2_000);
 
-		PlanObjective recommended = PlanObjective.recommended(PRODUCTS);
-		PlanObjective saver = PlanObjective.saver(PRODUCTS, recommendedEvaluation);
-		PlanObjective simple = PlanObjective.simple(PRODUCTS, recommendedEvaluation);
+		PlanObjective recommended = PlanObjective.recommended(INPUT);
+		PlanObjective saver = PlanObjective.saver(INPUT, recommendedEvaluation);
+		PlanObjective simple = PlanObjective.simple(INPUT, recommendedEvaluation);
 
 		assertThat(recommended.planType()).isEqualTo(PlanType.RECOMMENDED);
 		assertThat(recommended.baseline()).isNull();
@@ -214,7 +218,7 @@ class PlanObjectiveTest {
 	}
 
 	@Test
-	@DisplayName("절약형·간편형 마지막 기준: 결제 미루기, 그다음 달별 상품 ID 사전순")
+	@DisplayName("절약형·간편형 마지막 기준: 결제 미루기, 그다음 달별 상품 ID 사전순(시청 단위가 없어 조기 시청은 늘 동점)")
 	void 결제_미루기와_상품_ID() {
 		Evaluation late = evaluation(selection(Set.of(), Set.of(), Set.of(2L)), 0, 10, 1_000);
 		Evaluation early = evaluation(selection(Set.of(2L), Set.of(), Set.of()), 0, 10, 1_000);
@@ -227,6 +231,25 @@ class PlanObjectiveTest {
 		assertThat(simple(10).compare(smallerId, largerId)).isPositive();
 		assertThat(saver(10).compare(smallerId, smallerId)).isZero();
 		assertThat(simple(10).compare(smallerId, smallerId)).isZero();
+	}
+
+	@Test
+	@DisplayName("절약형 ⑤·간편형 ⑥ 조기 시청이 결제 미루기보다 먼저다: 점수·비용·가입 횟수가 같으면 첫 달에 더 많이 시청 완료한 쪽")
+	void 조기_시청이_결제_미루기보다_먼저() {
+		// A(WANT 200분)는 상품 1로만, B(WANT 200분)는 상품 2로만 볼 수 있다(각 10,000원, 월 600분)
+		PlanInput input = input(600, List.of(product(1, 10_000), product(2, 10_000)),
+				unit(10, Priority.WANT, 200, 1L), unit(11, Priority.WANT, 200, 2L));
+		Evaluator evaluator = new Evaluator(input);
+		Evaluation together = evaluator.evaluate(selection(Set.of(1L, 2L), Set.of(), Set.of())); // 0번째 달까지 점수 4, 새 결제 수 2,0,0
+		Evaluation split = evaluator.evaluate(selection(Set.of(1L), Set.of(2L), Set.of()));      // 0번째 달까지 점수 2, 새 결제 수 1,1,0
+
+		// 둘 다 점수 4·비용 20,000·가입 2회. 결제 미루기만 보면 split이 낫지만 조기 시청이 먼저라 together가 이긴다
+		Comparator<Evaluation> saver = PlanObjective.saver(input, together).comparator();
+		Comparator<Evaluation> simple = PlanObjective.simple(input, together).comparator();
+		assertThat(saver.compare(together, split)).isPositive();
+		assertThat(saver.compare(split, together)).isNegative();
+		assertThat(simple.compare(together, split)).isPositive();
+		assertThat(simple.compare(split, together)).isNegative();
 	}
 
 	@Test
@@ -276,11 +299,11 @@ class PlanObjectiveTest {
 			List<Evaluation> all = BruteForceOracle.allEvaluations(input);
 			for (PlanType type : PlanType.values()) {
 				Comparator<Evaluation> actual = switch (type) {
-					case RECOMMENDED -> PlanObjective.recommended(input.products()).comparator();
-					case SAVER -> PlanObjective.saver(input.products(), recommended).comparator();
-					case SIMPLE -> PlanObjective.simple(input.products(), recommended).comparator();
+					case RECOMMENDED -> PlanObjective.recommended(input).comparator();
+					case SAVER -> PlanObjective.saver(input, recommended).comparator();
+					case SIMPLE -> PlanObjective.simple(input, recommended).comparator();
 				};
-				Comparator<Evaluation> expected = BruteForceOracle.comparator(type, input.products(), recommended.score());
+				Comparator<Evaluation> expected = BruteForceOracle.comparator(type, input, recommended.score());
 				for (int i = 0; i < 3_000; i++) {
 					Evaluation a = all.get(random.nextInt(all.size()));
 					Evaluation b = all.get(random.nextInt(all.size()));

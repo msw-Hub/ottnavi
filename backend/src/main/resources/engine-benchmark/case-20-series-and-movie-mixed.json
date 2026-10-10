@@ -1,0 +1,88 @@
+{
+  "name" : "case-20-series-and-movie-mixed",
+  "note" : "시즌 순서 ⑥ 서로 다른 시리즈 두 개와 영화가 섞인 소규모(상품 2개, 작품 5개). 월 예산 10,000원, 월 시청 200분. 서비스1은 9,000원, 서비스2는 4,000원이라 합치면 예산을 넘어 한 달에 하나만 구독한다. 시리즈A(서비스1): 1시즌 WANT 100분, 2시즌 MUST 100분. 시리즈B(서비스2): 1시즌 MAYBE 80분, 2시즌 MUST 120분. 영화F(MUST 60분, 서비스1). 기본 정렬은 MUST 중 짧은 순이라 영화F(60)→A2(100)→B2(120)→A1(WANT)→B1(MAYBE)이고, 끌어올림으로 영화F→A1→A2→B1→B2가 된다(시리즈 사이에는 순서 제약이 없다). 손계산: 꼭 3개(영화F·A2·B2)를 모두 보려면 시리즈A 쪽 260분(영화F 60+A1 100+A2 100)이 서비스1 두 달(각 200분)을 요구한다(한 달에 A2까지 못 담음). 시리즈B 쪽 200분(B1 80+B2 120)은 서비스2 한 달에 정확히 들어간다. 최저 비용은 9,000x2+4,000=22,000원이고 꼭 3개, 점수 3(A1 2+B1 1)이다. 서비스1 두 달·서비스2 한 달의 배치 [[1],[1],[2]]·[[1],[2],[1]]·[[2],[1],[1]]를 각각 손으로 배정하면 0번째 달까지 (꼭, 점수)는 (1,2)·(1,2)·(1,1)이고, 1번째 달까지는 [[1],[1],[2]]가 (2,2), [[1],[2],[1]]이 (2,3)이라 추천형·절약형은 [[1],[2],[1]]이다. 간편형은 가입 횟수가 같은 2회인 [[1],[1],[2]]·[[2],[1],[1]]가 22,000원으로 같아 조기 시청에서 이기는 [[1],[1],[2]]이다([[1],[2],[1]]은 서비스1을 다시 가입해 3회). 세 유형 모두 미배정 작품이 없다. 기대값은 OracleAssigner 기반 전수 탐색으로 생성했다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 200,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 4000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "시리즈A 1시즌",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 1
+  }, {
+    "id" : 2,
+    "name" : "시리즈A 2시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 2
+  }, {
+    "id" : 3,
+    "name" : "시리즈B 1시즌",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 80,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false,
+    "titleId" : 2,
+    "seasonNumber" : 1
+  }, {
+    "id" : 4,
+    "name" : "시리즈B 2시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false,
+    "titleId" : 2,
+    "seasonNumber" : 2
+  }, {
+    "id" : 5,
+    "name" : "영화F",
+    "priority" : "MUST",
+    "requiredMinutes" : 60,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ 1 ] ],
+      "mustCompleted" : 3,
+      "score" : 3,
+      "totalCost" : 22000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ 1 ] ],
+      "mustCompleted" : 3,
+      "score" : 3,
+      "totalCost" : 22000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 1 ], [ 2 ] ],
+      "mustCompleted" : 3,
+      "score" : 3,
+      "totalCost" : 22000
+    }
+  },
+  "expectedUnitReasons" : {
+    "RECOMMENDED" : { },
+    "SAVER" : { },
+    "SIMPLE" : { }
+  }
+}
