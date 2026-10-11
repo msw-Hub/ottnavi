@@ -26,8 +26,8 @@ paths:
 - 회원 API: `/api/**` — Access Token 필요
 - 관리자 API: `/api/admin/**` — ADMIN 역할 필요
 - 인증 API: `/api/auth/**`, `/api/oauth2/**`, `/api/login/**` — 위 3분류의 예외. 보안 설정에서 따로 허용한다
-- 경로는 소문자 kebab-case 복수형 명사를 쓴다 (`/api/wishlist-items`, `/api/admin/products`).
-- 동작이 CRUD로 표현되지 않으면 하위 경로에 동사를 둔다 (`POST /api/plans/calculate`, `POST /api/admin/collect/run`).
+- 경로는 소문자 kebab-case 복수형 명사를 쓴다 (`/api/me/wishlist-items`, `/api/admin/products`). 행위는 주소가 아니라 HTTP 메서드가 나타낸다: 조회 `GET`, 생성 `POST`(성공 `201`, 비동기 접수 `202`), 통째 교체 `PUT`, 일부 수정 `PATCH`, 삭제 `DELETE`(`204`). 계산·실행처럼 결과가 새 자원이면 그 자원의 컬렉션에 `POST`한다 (`POST /api/me/plan-drafts`, `POST /api/admin/collect/executions`).
+- 동작이 CRUD로 표현되지 않으면 하위 경로에 동사를 둔다 (`POST /api/admin/products/{productId}/prices/{priceId}/verify`, `POST /api/admin/collect/executions/{executionId}/recover`).
 - 작품은 외부에 TMDB 기준으로 노출한다: `/api/public/titles/{mediaType}/{tmdbId}`. 내부 `id`는 경로에 쓰지 않는다.
 - 로그인한 사용자 본인의 데이터는 경로에 userId를 넣지 않고 `/api/me/**`로 표현한다 (예: `/api/me/settings`, `/api/me/subscriptions`).
 - **`openapi.yaml`의 path 키는 `servers`(`/api`)를 뺀 상대 경로로 쓴다** (예: 실제 `/api/public/ott-services` → 계약 `/public/ott-services`). 프론트 axios·MSW가 `/api`를 베이스로 붙이기 때문이다. 백엔드 컨트롤러는 `/api/...` 전체 경로로 매핑하고, 계약 대조 테스트가 생성 명세의 `/api` 접두사를 떼고 비교한다.
@@ -35,7 +35,7 @@ paths:
 ## operationId (프론트 훅 이름)
 
 - 모든 operation에 `operationId`를 붙인다. orval이 이 값으로 함수와 훅 이름을 만든다 (`searchTitles` → `useSearchTitles`).
-- 형식은 camelCase `동사 + 대상`이다: `searchTitles`, `getTitleDetail`, `getMySettings`, `updateMySettings`, `calculatePlan`, `getCurrentPlan`.
+- 형식은 camelCase `동사 + 대상`이다: `searchTitles`, `getTitleDetail`, `getMySettings`, `updateMySettings`, `createPlanDrafts`, `listPlanDrafts`.
 - 한 번 정한 `operationId`는 함부로 바꾸지 않는다. 바꾸면 프론트의 훅 이름이 모두 바뀐다.
 - `tags`는 도메인 단위로 붙인다: `catalog`, `user`, `wishlist`, `product`, `plan`, `auth`(`/api/auth/**` 로그인·재발급·로그아웃), `notification`(2단계), `admin`. orval이 태그별로 파일을 나눈다.
 
@@ -50,7 +50,7 @@ paths:
 | 월 | `YYYY-MM` 문자열 | `"2026-11"` |
 | 금액 | 원 단위 정수. 소수·통화 기호 없음 | `"monthlyPrice": 13500` |
 | 시간 | 분 단위 정수, 필드명 끝에 `Min` | `"monthlyWatchMinutes": 900` |
-| enum | UPPER_SNAKE_CASE 문자열, 스키마에 `enum` 목록 명시 | `"status": "AVAILABLE"` |
+| enum | UPPER_SNAKE_CASE 문자열, 스키마에 `enum` 목록 명시. 예외 2건(경로 값·ISO 관례와 같게 둠): `MediaType`(`movie`/`tv`, 경로 `/public/titles/{mediaType}/{tmdbId}`와 같은 값), `OverviewLanguage`(`ko`/`en`) | `"status": "AVAILABLE"` |
 | boolean | `is`/`has` 접두사 | `"isRuntimeEstimated": true` |
 | 이미지 | TMDB 상대 경로 그대로 전달, URL 조립은 프론트 | `"posterPath": "/abc.jpg"` |
 
@@ -83,7 +83,7 @@ paths:
 
 - `errorCode`는 SCREAMING_SNAKE_CASE이며, 각 operation의 오류 응답에 발생 가능한 `errorCode`를 설명으로 적는다.
 - 전체 오류 코드 목록은 `docs/api/error-codes.md`에 HTTP 상태, 의미, 화면 메시지와 함께 관리한다. 프론트의 `lib/errorMessages.ts`는 이 목록과 일치해야 한다.
-- 공통 오류: `400 VALIDATION_FAILED`(필드 오류 목록 포함), `400 INVALID_REQUEST`(깨진 본문 등 필드를 특정할 수 없는 요청 오류. 406·415 같은 기타 4xx는 원래 상태 유지), `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 RESOURCE_NOT_FOUND`(없는 경로), `405 METHOD_NOT_ALLOWED`, `429 RATE_LIMIT_EXCEEDED`, `500 INTERNAL_ERROR`, `502 EXTERNAL_API_ERROR`. 데이터가 없을 때는 `TITLE_NOT_FOUND`처럼 도메인 코드를 쓴다.
+- 공통 오류: `400 VALIDATION_FAILED`(필드 오류 목록 포함), `400 INVALID_REQUEST`(깨진 본문 등 필드를 특정할 수 없는 요청 오류. 406·415 같은 기타 4xx는 원래 상태 유지), `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 RESOURCE_NOT_FOUND`(없는 경로), `405 METHOD_NOT_ALLOWED`, `429 RATE_LIMIT_EXCEEDED`, `500 INTERNAL_ERROR`, `502 EXTERNAL_API_ERROR`. 데이터가 없을 때는 `TITLE_NOT_FOUND`·`WISHLIST_ITEM_NOT_FOUND`처럼 도메인 코드를 쓴다. 예외: 관리자 API(`/api/admin/**`)의 없는 데이터는 `RESOURCE_NOT_FOUND`를 쓴다(운영자 한 명이 쓰는 화면이라 데이터 종류마다 코드를 나눌 이득이 작다, `error-codes.md`).
 - Spring 7은 `type`이 `about:blank`이면 응답 JSON에서 `type`을 생략한다. 계약에서 `type`은 필수가 아니다.
 
 ## 계약 대조 (CI)
@@ -101,6 +101,8 @@ paths:
 ```json
 { "content": [ ], "page": 0, "size": 20, "totalElements": 135, "totalPages": 7 }
 ```
+
+- 고정 5개 필드(`content`, `page`, `size`, `totalElements`, `totalPages`)에 더해 화면 전용 부가 필드를 둘 수 있다(예: 검색의 `isExternalCollectFailed`, `dataAsOf`). 고정 필드의 이름·뜻은 바꾸지 않는다.
 
 ## 인증
 

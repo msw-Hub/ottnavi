@@ -36,9 +36,9 @@ const ERROR_CODES_DOCUMENT_PATH = resolve(import.meta.dirname, '../../../docs/ap
 const documentedMessages = parseDocumentedMessages(readFileSync(ERROR_CODES_DOCUMENT_PATH, 'utf-8'))
 
 describe('errorMessages와 docs/api/error-codes.md 일치', () => {
-  it('문서에서 오류 코드를 읽어 온다(공통 10개 + TECH 신규 4개 이상)', () => {
+  it('문서에서 오류 코드를 읽어 온다(공통 10개 + TECH 신규 15개 이상)', () => {
     // 파싱이 조용히 0건이 되면 아래 비교가 의미 없이 통과하므로 먼저 막는다
-    expect(documentedMessages.size).toBeGreaterThanOrEqual(14)
+    expect(documentedMessages.size).toBeGreaterThanOrEqual(25)
   })
 
   it('문서의 모든 오류 코드가 표에 있고, 표에 문서에 없는 코드가 없다', () => {
@@ -65,12 +65,15 @@ describe('getErrorMessage', () => {
     },
   )
 
-  it('문서에 아직 없는 월 구독요금 규칙 코드(제안)도 메시지를 돌려준다', () => {
+  it('제안 단계의 월 구독요금 규칙·수집·찜 코드도 문서 표대로 메시지를 돌려준다', () => {
     expect(isKnownErrorCode('PRICE_START_DATE_DUPLICATE')).toBe(true)
     expect(getErrorMessage('PRICE_START_DATE_DUPLICATE')).toBe(
       '같은 적용 시작일의 월 구독요금이 이미 있습니다.',
     )
     expect(getErrorMessage('BATCH_ALREADY_RUNNING')).toBe('같은 날짜의 수집이 이미 실행 중입니다.')
+    expect(getErrorMessage('WISHLIST_LIMIT_EXCEEDED')).toBe(
+      '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.',
+    )
   })
 
   it('객체가 물려받은 속성 이름은 아는 코드로 보지 않는다', () => {

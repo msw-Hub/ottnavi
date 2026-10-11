@@ -729,7 +729,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 - 진행 방식(2026-10-12 결정): 계약 설계 전에 읽기 전용 검사 에이전트 `contract-checker`(`.claude/agents/contract-checker.md`, 도구 Read·Glob·Grep, 모델 sonnet)를 문서 PR로 신설한다(에이전트 파일은 체크아웃한 브랜치의 `.claude/agents/`에서 로드되므로 병합 후 `develop`에서 쓴다. 병합 전에는 같은 검사를 `Explore`로 대신할 수 있다). 계약 설계는 `frontend-dev`와 `backend-dev`를 함께 불러 진행하고, 이 설계 단계에서만 호출 시 `model: opus`를 지정한다(에이전트 파일의 기본값 sonnet은 바꾸지 않는다). 설계가 끝나면 지정을 빼서 sonnet으로 돌아간다. 두 에이전트는 직접 대화하지 못하므로 `openapi.yaml` 초안과 보고서로만 주고받는다. 초안이 끝나면 `contract-checker`로 규칙·목업·오류 코드·결정을 대조한 뒤 사용자(백엔드 담당)의 승인을 받는다.
 - 계약에 반영할 확정 사항(Task 029·030 결정): `WISHLIST_LIMIT_EXCEEDED`는 409(PRD 11절 36번, 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열), 찜 목록 응답에 현재 개수("다 봤음" 제외)와 상한, 요금 응답에 마지막 확인일(PRD 11절 41번), 플랜 응답은 유형(`planType`: RECOMMENDED·SAVER·SIMPLE)별(PRD 11절 35번), 설정 저장 요청에 환산 입력(주 N회·회당 M시간)은 없음(PRD 11절 18번 A안), 관리자 화면의 제안 API와 오류 코드 8종(`PRICE_START_DATE_NOT_AFTER_LAST`, `PRICE_START_DATE_DUPLICATE`, `PRICE_FIRST_START_DATE_IN_FUTURE`, `PRICE_NOT_LATEST`, `PRICE_LAST_ROW_CANNOT_DELETE`, `PRICE_NOT_CURRENT`, `BATCH_RECOVERY_REQUIRED`, `BATCH_NOT_STOPPED`), 한 달 요금은 사용자 결제일 기준(PRD 11절 40번, 계약보다는 계산 입력 쪽 규칙).
-- 계약 설계 때 정할 것(문서끼리 어긋남, `contract-checker` 설계 중 발견): 찜 경로는 `api-contract.md` 예시가 `/api/wishlist-items`인데 목업은 `/api/me/wishlist-items`다. 플랜 계산 경로는 PRD 9절 후보가 `/api/plans/calculate`인데 목업은 `/api/me/plans/calculate`다. 본인 데이터는 `/api/me/**`라는 같은 문서의 규칙을 따르면 목업 쪽이 맞아 보이지만 사용자 판단으로 정한다.
+- 경로 설계(2026-10-12 사용자 확정, RESTful 원칙: 자원은 복수 명사, 행위는 HTTP 메서드, 동작만 하위 동사): 본인 데이터는 `/api/me/**`로 통일한다(찜 `/me/wishlist-items`, 설정 `/me/settings`, 요금 `/me/service-prices`(`PUT` 설정·`DELETE` 기본 요금 복귀), 플랜 계산은 초안 자원 `POST·GET /me/plan-drafts`, 저장은 `POST /me/plans`(본문 `planId`)). 수집은 배치 토큰 범위 `/admin/collect/**`를 유지해 `/admin/collect/executions`(`GET` 이력·`POST` 실행 202)와 그 하위 `/{executionId}/changes`·`recover`·`restart`로 둔다. 구현된 것은 `listOttServices` 하나이고 나머지 30개는 `x-planned: true`다. 이에 따라 Task 045·046·050대와 규칙 문서(`api-contract.md`)·PRD 7절의 옛 경로 표기를 같이 고쳤다.
+- 진행(2026-10-12): 계약 초안 31개 operation(구현됨 1 + `x-planned` 30)을 프론트·백엔드 에이전트 설계 2회(`opus`)와 `contract-checker` 검사(심각 0건)를 거쳐 **사용자(백엔드 담당)가 승인**했다. 결정: 내 요금은 `PUT·DELETE /me/service-prices/{productId}`(2단계 광고형·번들에도 주소가 안 바뀌게 서비스 ID 대신 상품 ID), "잘 모르겠음"(UNKNOWN)은 저장(ERD 상태 값 추가, Task 032), 요금제 이름(`planName`)은 표시용으로 유지(ERD `plan_name` 추가, Task 032), `lastVerifiedAt`은 일시로 저장·전송하고 화면은 한국 날짜만 표기(ERD `last_verified_at`은 TIMESTAMPTZ, Task 032), 검색 응답의 화면 전용 부가 필드는 허용, 수집 `targetDate`는 선택값, 새 오류 코드 11개는 `error-codes.md`에 "(제안)"으로 등록. ERD 영향은 12항목(Task 032 입력)이다.
+- PR 분할(2026-10-12 결정): 백엔드 Task 032~가 031 완료에 막혀 있어 **PR 1**(계약·오류표·규칙 문서·PRD/ROADMAP 정리 + 프론트 `errorMessages.ts`/테스트 최소 수정)을 먼저 병합하고, **PR 2**(`npm run api:generate`와 `mockTypes.ts` 교체·삭제, 목업 정리, 030 확정 화면 문구 반영)는 이후에 한다. `api-contract.md`의 "계약과 코드는 같은 PR" 원칙에서 한 번 벗어나는 것이며, PR 1은 프론트의 손으로 쓴 목업 타입이 계약 파일과 무관해 CI가 통과한다. Task 031은 PR 2까지 끝나야 ✅다.
 
 #### Task 032: ERD 보정 반영으로 스키마 확정 근거 마련 ⬜
 - 태그: [H] · PRD: F1(ERD 보정) · 선행: 030, 031
@@ -904,7 +906,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 ⬜
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항
-  - [ ] `POST /api/admin/collect/run`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
+  - [ ] `POST /api/admin/collect/executions`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
   - [ ] 관리자 수집 API의 `tier` 파라미터 enum은 `DAILY`·`WEEKLY`·`ALL`이다(R-16 확정). MVP 일괄 수집은 `ALL`을 쓴다. 계약(`openapi.yaml`)과 코드의 enum을 같게 둔다
   - [ ] `targetDate` 직접 지정은 `local` 프로필에서만 허용한다(설정 키 제안: `app.collect.allow-target-date-override`, local만 `true`). 운영(`prod`)에서 지정하면 거부(제안: 400 `VALIDATION_FAILED`)하고 서버 날짜를 쓴다. 같은 날 409를 피해 재수집을 재현하는 용도다(Task 067, 069)
   - [ ] 복구 `POST /api/admin/collect/{executionId}/recover`(제안): `recover` 후 `restart`
@@ -997,7 +999,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `RefreshTokenStore` 인터페이스와 **Redis TTL 구현**(R11-21 확정: RT는 해시로 저장, 재발급 때 회전, 이미 쓴 RT가 다시 쓰이면 해당 계열 무효화). 서명 검증만 하는 구현은 만들지 않는다. 알려진 한계(Redis가 비워지면 모든 사용자가 다시 로그인)는 TECH 4절
   - [ ] `/api/admin/**`는 ADMIN 역할 필요, 배치 토큰 경로는 토큰 또는 ADMIN. 로컬·테스트에서는 DB에서 `users.role`을 직접 바꿔 ADMIN을 만든다. 운영 지정 방법은 R-5(2026-10-09 **DB 직접 수정으로 확정**, 이 Task에 구현이 늘지 않는다. 절차는 Task 095 ②)
 - 완료 기준
-  - V-B: RT 회전(이전 RT 거부, 이미 쓴 RT 재사용 시 계열 무효화), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/run` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
+  - V-B: RT 회전(이전 RT 거부, 이미 쓴 RT 재사용 시 계열 무효화), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/executions` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
   - V-API: refresh·logout 호출을 확인했다.
 
 #### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ⬜
@@ -1089,7 +1091,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B7, FR-12, SCR-09·10 · 선행: 063, 040, 031 · 브랜치: `feature/b7-plan-calculate`
 - 관련: TECH 1·2절, T-4
 - 구현 사항
-  - [ ] `POST /api/plans/calculate`(`calculatePlan`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
+  - [ ] `POST /api/me/plan-drafts`(`createPlanDrafts`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
   - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
   - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
   - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
@@ -1110,7 +1112,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 066: 플랜 저장·현재 플랜 조회 API 구현으로 ACTIVE 플랜 관리 ⬜
 - 태그: [B] · PRD: B7, FR-14(MVP 저장) · 선행: 064, 045 · 기한 전제: R-6(2026-10-29) · 브랜치: `feature/b7-plan-activate`
 - 구현 사항
-  - [ ] `POST /api/plans/{id}/activate`: 고른 유형의 DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
+  - [ ] `POST /api/me/plans`(`createPlan`, 본문 `planId`): 고른 유형의 DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
   - [ ] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`. 저장 후 같은 사용자의 나머지 DRAFT는 벌크 삭제한다(PRD 11절 35번)
   - [ ] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6
 - 완료 기준
