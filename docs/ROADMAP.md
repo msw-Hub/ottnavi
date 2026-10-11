@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 7/14 | 🔄 진행 중 |
-| 3 | 핵심 기능 개발 | 3/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 32/105 | |
+| 합계 | | 33/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -720,12 +720,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 아직 구현되지 않은 operation마다 `x-planned: true`를 달고 description에 "제안"을 표시한다. 이미 구현된 API(Task 019 서비스 목록 등)에는 달지 않는다. 이 표시는 각 구현 Task가 지운다(4.2)
   - [ ] `npm run api:generate`(입력은 `openapi.yaml` 하나, Task 017 설정 그대로)로 생성 훅·MSW로 바꾸고, 화면 전용 데이터만 `src/mocks/fixtures/`에 남긴다. `features/*/hooks`에서 `select: (res) => res.data`
   - [ ] 플랜 계산 응답은 플랜 유형(`planType`: RECOMMENDED / SAVER / SIMPLE)별 플랜 목록이고, 저장 요청은 고른 유형의 DRAFT id를 가리킨다(PRD 11절 35번). 세 유형의 선택이 같을 때의 표시는 응답이 아니라 프론트가 합친다
-  - [ ] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, 422 또는 409는 R-9 절차에서 정함)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 둘지 정한다. 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
+  - [ ] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, **409 확정**(2026-10-12), 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 넣는다(2026-10-12 확정). 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
   - [ ] 사용자(백엔드 담당)가 계약 초안을 승인
 - 완료 기준
   - `npm run build` 성공, V-F: Task 027~029 흐름이 생성된 목업으로 그대로 동작한다.
   - V-B: `x-planned` operation을 제외한 계약 대조 테스트(Task 023)가 통과한다.
   - 임시 타입 제거(2026-10-08 결정): Task 027~029에서 만든 `features/*/mockTypes.ts`를 모두 생성 타입으로 바꾸고 지운다. `Get-ChildItem -Recurse -Filter mockTypes.ts frontend/src`의 결과가 비어 있다(`frontend.md` "목업 단계의 임시 타입 예외").
+
+- 진행 방식(2026-10-12 결정): 계약 설계 전에 읽기 전용 검사 에이전트 `contract-checker`(`.claude/agents/contract-checker.md`, 도구 Read·Glob·Grep, 모델 sonnet)를 문서 PR로 신설한다(에이전트 파일은 체크아웃한 브랜치의 `.claude/agents/`에서 로드되므로 병합 후 `develop`에서 쓴다. 병합 전에는 같은 검사를 `Explore`로 대신할 수 있다). 계약 설계는 `frontend-dev`와 `backend-dev`를 함께 불러 진행하고, 이 설계 단계에서만 호출 시 `model: opus`를 지정한다(에이전트 파일의 기본값 sonnet은 바꾸지 않는다). 설계가 끝나면 지정을 빼서 sonnet으로 돌아간다. 두 에이전트는 직접 대화하지 못하므로 `openapi.yaml` 초안과 보고서로만 주고받는다. 초안이 끝나면 `contract-checker`로 규칙·목업·오류 코드·결정을 대조한 뒤 사용자(백엔드 담당)의 승인을 받는다.
+- 계약에 반영할 확정 사항(Task 029·030 결정): `WISHLIST_LIMIT_EXCEEDED`는 409(PRD 11절 36번, 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열), 찜 목록 응답에 현재 개수("다 봤음" 제외)와 상한, 요금 응답에 마지막 확인일(PRD 11절 41번), 플랜 응답은 유형(`planType`: RECOMMENDED·SAVER·SIMPLE)별(PRD 11절 35번), 설정 저장 요청에 환산 입력(주 N회·회당 M시간)은 없음(PRD 11절 18번 A안), 관리자 화면의 제안 API와 오류 코드 8종(`PRICE_START_DATE_NOT_AFTER_LAST`, `PRICE_START_DATE_DUPLICATE`, `PRICE_FIRST_START_DATE_IN_FUTURE`, `PRICE_NOT_LATEST`, `PRICE_LAST_ROW_CANNOT_DELETE`, `PRICE_NOT_CURRENT`, `BATCH_RECOVERY_REQUIRED`, `BATCH_NOT_STOPPED`), 한 달 요금은 사용자 결제일 기준(PRD 11절 40번, 계약보다는 계산 입력 쪽 규칙).
+- 계약 설계 때 정할 것(문서끼리 어긋남, `contract-checker` 설계 중 발견): 찜 경로는 `api-contract.md` 예시가 `/api/wishlist-items`인데 목업은 `/api/me/wishlist-items`다. 플랜 계산 경로는 PRD 9절 후보가 `/api/plans/calculate`인데 목업은 `/api/me/plans/calculate`다. 본인 데이터는 `/api/me/**`라는 같은 문서의 규칙을 따르면 목업 쪽이 맞아 보이지만 사용자 판단으로 정한다.
 
 #### Task 032: ERD 보정 반영으로 스키마 확정 근거 마련 ⬜
 - 태그: [H] · PRD: F1(ERD 보정) · 선행: 030, 031
@@ -786,7 +790,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 3/30
+## 7. Phase 3 — 핵심 기능 개발 · 4/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -853,14 +857,20 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 완료 기준: V-B: 위 정답 테스트와 `clean build` 통과. 문서(PRD 5.4, TECH 1절, TASK038_GUIDE)와 코드가 일치한다.
   - 기록: 2026-10-10 구현·테스트·정답 세트 완료(Task 040과 같은 브랜치 `feature/b2-engine-benchmark`). 모델(`WatchUnit.titleId`·`seasonNumber`, `PlanInput`의 끌어올림과 `isStaticallyImpossible`), 평가기(`Evaluator`의 `prereqIndexes`·`blockedAlways`, `assign`의 시즌 순서 판정), 독립 `OracleAssigner`, S7 동치 제거 재검증(`ExactSolverOracleExactnessTest`, 전수 탐색 대조 반례 0), 시즌 정답 케이스 7건(15~21)을 마쳤다. 정확성 근거와 동작은 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md) 3.6절·5.3절·11절. 정적 불가능 ① SUBSCRIBED 해석은 확정했다(예산보다 비싼 구독 중 상품을 0번째 달에만 볼 수 있어도 "가능"으로 본다. 2026-10-10 사용자 결정 A안, 코드 유지, ENGINE_ALGORITHM 13.6절과 PRD 5.4에 명시했다. 남은 것 없음). 코드 주석 정리와 TASK038_GUIDE·PRD·TECH 현행화는 2026-10-10에 완료했다.
 
-#### Task 041: TMDB Feign 클라이언트 구현으로 외부 데이터 호출 기반 마련 ⬜
+#### Task 041: TMDB Feign 클라이언트 구현으로 외부 데이터 호출 기반 마련 ✅
 - 태그: [B] · PRD: B3, 5.5 · 선행: 024 · 브랜치: `feature/b3-tmdb-client`
 - 구현 사항
-  - [ ] `infra/tmdb/TmdbClient`: discover, 작품·시즌 상세, 작품·시즌별 제공처, 검색. DTO는 `infra/tmdb` 안에만
-  - [ ] Bucket4j 로컬 버킷(`app.tmdb.rate-limit.*`), `ErrorDecoder`(429·5xx 재시도 가능), `Retryer` 지수 백오프·`Retry-After` 우선, `tmdb.call` 카운터
-  - [ ] WireMock 테스트, 샘플 JSON `src/test/resources/tmdb/`
+  - [x] `infra/tmdb/TmdbClient`: discover, 작품·시즌 상세, 작품·시즌별 제공처, 검색, **제공처 전체 목록(`listProviders`)**. DTO는 `infra/tmdb` 안에만
+  - [x] Bucket4j 로컬 버킷(`app.tmdb.rate-limit.*`), `ErrorDecoder`(429·5xx 재시도 가능), `Retryer` 지수 백오프·`Retry-After` 우선, `tmdb.call` 카운터
+  - [x] WireMock 테스트, 샘플 JSON `src/test/resources/tmdb/`
 - 완료 기준
   - V-B: 정상, 429 후 재시도, 타임아웃 테스트가 통과한다(실제 TMDB 호출 없음).
+- 기록: 2026-10-12 완료(브랜치 `feature/b3-tmdb-client`, PR #41 develop 병합 9ae78c7). 상세는 [`docs/TASK041_GUIDE.md`](./TASK041_GUIDE.md)(구현 안내서)와 [`docs/OPENFEIGN_GUIDE.md`](./OPENFEIGN_GUIDE.md)(OpenFeign 개념과 TMDB 코드 설명).
+  - 구현: `TmdbApi`(Feign 인터페이스, 호출 10개), 응답 DTO 16개, `TmdbClient`(고정 쿼리 값 채움·오류 번역·`tmdb.call{endpoint,result}` 카운터), `TmdbFeignConfig`(Bearer 인증·속도 제한 인터셉터, `ErrorDecoder`, `Retryer`, `@Configuration` 미부착), `TmdbConfig`(버킷). 버킷은 capacity 10·초당 25·최대 대기 2초(결정 D1), 재시도는 429·5xx 총 3회·타임아웃 총 2회·대기 0.5초부터 두 배씩(상한 4초, ±20%)·`Retry-After` 우선(5초 초과 시 포기, D2). 404는 `TmdbNotFoundException`(D3), 모든 `TmdbException`은 `EXTERNAL_API_ERROR`(502)로 응답하며 TMDB 429를 재시도 후에도 못 풀면 502다(`RATE_LIMIT_EXCEEDED`와 별개). 토큰은 `TMDB_API_KEY`(읽기 액세스 토큰), 기본값을 비워 토큰 없이도 기동한다.
+  - 검증: `clean build` 통과(전체 430건 시점), TMDB 관련 테스트 12개 클래스 59건 통과(WireMock 중심, Testcontainers 통합 `TmdbClientIntegrationTest` 1건). 모든 테스트가 `TMDB_API_KEY` 없이 실행돼 실제 TMDB 호출이 없음을 확인했다. CodeRabbit 지적 0건(Docstring coverage 56% 경고는 프로젝트 주석 규칙과 기준이 달라 무시). WireMock 기동은 `wiremock-standalone` 3.13.2가 Boot 4.1.1에서 Jetty 충돌 없이 동작함을 확인해 TECH 6절에 반영했다(PR #39).
+  - 구현 중 확인된 것: Bucket4j `asBlocking().tryConsume(1, Duration.ZERO)`는 `IllegalArgumentException`이라 대기 시간 0이면 `tryConsume(1)`로 분기한다(T16-a가 발견). Feign 기본 디코더가 Jackson 3으로 매핑됨, `@Bean Retryer`가 `NEVER_RETRY`를 대체함, `Retryer.clone` 동작, 토큰이 DEBUG 로그에 안 찍힘. `@ConfigurationProperties`의 prefix에 `.*`를 붙이지 않는다(잘못 입력해도 테스트가 통과한 이유는 확인하지 못함).
+  - 아직 확인 못 함(5.8 실제 응답 확인은 선택이라 건너뜀, 소비 Task 시작 전 로컬 1회 호출로): TMDB가 429에 `Retry-After`를 보내는지, 오류 본문 구조, discover 페이지 상한, 파이프(`|`) OR 쿼리, 한국어 줄거리가 `""`인지 `null`인지, 시즌 응답의 정수 `id`, TV `credits`와 `aggregate_credits`.
+  - 넘길 내용: Task 042·044는 `TmdbNotFoundException`을 받으면 그 작품만 건너뛰고 계속한다. Task 043은 `listProviders`로 받은 전체 제공처 목록 중 우리 7곳이 아닌 제공처를 `tmdb_provider`에 "미매핑"으로 저장하고(저장은 043, 041은 목록을 받아 오는 호출까지) 관리자가 나중에 "관련 없음"으로 정리한다. DTO의 날짜는 `String`이고 `""`일 수 있어 변환은 소비 쪽(042)이 한다.
 
 #### Task 042: 제공 상태 판정과 러닝타임 계산 도메인 로직 구현으로 3상태 판정 확정 ⬜
 - 태그: [B] · PRD: B3, FR-02, 03, 8.2 · 선행: 035, 041 · 브랜치: `feature/b3-availability-rules`
@@ -876,7 +886,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B3, FR-18(MVP 일괄), 5.5 · 선행: 033, 042 · 브랜치: `feature/b3-collect-candidates`
 - 관련: TECH 3절, T-2
 - 구현 사항
-  - [ ] `collect/` Job 골격과 첫 Step: 서비스별 discover(KR 구독)로 후보 `title` 저장. 처음 본 제공처는 `tmdb_provider`에 `first_seen_at`과 함께 미매핑 저장
+  - [ ] `collect/` Job 골격과 첫 Step: 서비스별 discover(KR 구독)로 후보 `title` 저장. 제공처 전체 목록(`TmdbClient.listProviders`, Task 041)을 받아 우리 7곳이 아닌 제공처를 **버리지 않고** `tmdb_provider`에 `first_seen_at`과 함께 "미매핑"으로 저장한다(관리자가 나중에 "관련 없음"으로 정리, Task 041 안내서 8절 1번)
   - [ ] Job 파라미터 `targetDate`(LocalDate) + `tier`. MVP 일괄 수집은 **`tier=ALL`**(R-16 확정, `tier`의 뜻은 TECH 3절 설명 참고). 작품의 `title.refresh_tier`(DAILY/WEEKLY)와 Job 파라미터 `tier`가 같은 enum을 공유하는지는 이 Task에서 정한다(공유하지 않으면 `ALL`은 Job 파라미터에만 둔다)
   - [ ] 작은 chunk, 짧은 Feign 타임아웃, 연결 풀 사용량 지표(T-2)
 - 완료 기준
