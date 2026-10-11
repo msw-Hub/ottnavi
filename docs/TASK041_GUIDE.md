@@ -1,7 +1,8 @@
 # Task 041 작업 안내서 (TMDB Feign 클라이언트)
 
+> **상태: 구현 완료(2026-10-12, 커밋 8ec7143).** 아래 본문은 구현 전에 쓴 안내서이고, 구현 중 실제 결과와 어긋난 곳(5.3 `acquire()`, 5.1 `application.yml` 지시, 6절 함정 17·18, 10절)은 2026-10-12에 고쳤다. 구현 결과 요약은 5절 맨 앞에 있다.
 > 2026-10-11 작성. 기준 문서는 `docs/ROADMAP.md` Task 041(소비자: 042·043·044·050), TECH 3절(TMDB 호출 제한)·6절(호환성 함정)·T-2·T-3, PRD 5.5·FR-01~03·FR-18·6절 라이선스 행, ERD(`title`·`watch_unit`·`availability`·`tmdb_provider`), Task 004 기록(KR 제공처 ID), TASK003(TMDB 약관), `.claude/rules/backend.md`, `docs/TASK024_GUIDE.md`(Feign 공통 설정)이다.
-> 이 Task는 사용자가 직접 작성한다. Claude(또는 `backend-dev` 에이전트)는 검수를 돕는다. 1~4절의 코드 조각은 구조를 설명하는 스케치지만, **5절(구현 순서)의 코드는 파일 단위 전체 코드**라 그대로 옮겨 쓰도록 썼다(2026-10-11 개정). 다만 저장소에 만들어 컴파일·실행해 본 것은 아니다. 라이브러리 시그니처는 소스 jar와 대조했고, 대조하지 못한 곳은 코드 옆에 `확인 필요(컴파일 시 확인)`·`확인 필요(실행 시 확인)`로 표시했다.
+> 이 Task는 사용자가 직접 작성했고 Claude(또는 `backend-dev` 에이전트)가 검수를 도왔다. 1~4절의 코드 조각은 구조를 설명하는 스케치지만, **5절(구현 순서)의 코드는 파일 단위 전체 코드**로 썼다(2026-10-11 개정). 안내서 작성 시점에는 컴파일·실행해 보지 않았고, 구현 뒤 실제 실행 결과는 5절 맨 앞 요약과 10절에 반영했다. 코드 옆의 `확인 필요(컴파일 시 확인)`·`확인 필요(실행 시 확인)` 표시는 작성 당시 기준이며, 10절이 최종 결과다.
 > 근거 수준 표시 (이 문서 전체에서 같은 뜻으로 쓴다).
 >
 > | 표시 | 뜻 |
@@ -33,10 +34,10 @@
 | **실제 TMDB 호출이 없다** | 5.9절: `TMDB_API_KEY`를 비운 셸에서 테스트가 통과한다 |
 | (공통) `develop` 대상 PR에서 `backend-ci`·`frontend-ci` 통과 | PR 화면 |
 
-확인 명령 (PowerShell, 워크트리 기준):
+확인 명령 (PowerShell). 이 문서의 `cd backend`와 `backend\...` 상대 경로는 모두 **저장소 루트(ottnavi-backend 워크트리)에서 시작한다고 가정**한다:
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.*"   # 이 Task의 테스트만 (통합 테스트 1건 때문에 Docker Desktop을 켠다. 나머지는 Docker 없이 돈다, 5.7절·7절 D4)
 .\gradlew.bat clean build                               # 마지막에 전체 (다른 테스트가 Testcontainers를 쓰므로 Docker Desktop을 켠다)
 ```
@@ -174,6 +175,19 @@ public record TmdbMovieSummary(
 
 ## 5. 구현 순서 (단계마다 멈춰서 확인한다)
 
+**구현 결과 요약 (2026-10-12)**
+
+| 항목 | 결과 |
+|---|---|
+| 완료일 | 2026-10-12 (커밋 8ec7143, 브랜치 `feature/b3-tmdb-client`) |
+| 단계 | 0~⑦ 전부 통과 |
+| TMDB 테스트 | `infra/tmdb` 테스트 클래스 12개(보조 클래스 `TmdbTestFixtures`·`TmdbTestSupport` 별도), `@Test` 59건. `WireMockSmokeTest`는 삭제됨 |
+| 전체 빌드 | `clean build` 통과. 430건 시점에는 `WireMockSmokeTest` 1건이 포함돼 있었다 |
+| 5.8 (샘플 JSON을 실제 응답으로 확인) | 선택 절차라 **건너뜀**. 샘플 7개는 5.2절에서 가짜 값으로 이미 제공했다 |
+| 5.9 (`TMDB_API_KEY`를 비운 셸 확인) | 사용자가 토큰을 설정한 적이 없어 모든 테스트가 토큰 없이 실행됐으므로 충족한 것으로 본다 |
+
+구현 중 안내서와 달라진 곳: ① 5.3절 `acquire()`에 대기 시간 0 분기가 추가됐다. ② 5.1절 `application.yml`에는 지울 옛 주석이 없었다. ③ 6절에 함정 17·18을 추가했다.
+
 **이 절은 파일 단위 전체 코드다.** 단계마다 (1) 건드리는 파일 표 (2) 파일별 전체 코드 (3) 앞 단계와의 연결 (4) 테스트 (5) 멈추고 확인할 것과 흔한 오류 순서로 쓴다. 패키지는 `com.ottnavi.infra.tmdb`(하위 `dto`, `exception`)이고 들여쓰기는 4칸 공백이다(기존 `infra/tmdb` 파일과 같다. `global/` 쪽 일부 파일은 탭이지만 이 Task의 파일은 모두 공백으로 통일한다).
 
 **코드의 근거 수준**: 코드를 저장소에 만들지 않았고 컴파일·실행도 하지 않았다. 대신 import·시그니처를 로컬 Gradle 캐시의 소스 jar(feign-core 13.6.1, spring-cloud-openfeign-core 5.0.3, bucket4j 8.21.0, wiremock-standalone 3.13.2)와 Boot 4.1.1 jar 목록으로 대조했다. 소스 jar로 존재를 확인하지 못한 곳, 동작을 실행해 봐야 아는 곳은 코드 옆에 **`확인 필요(컴파일 시 확인)`** 또는 **`확인 필요(실행 시 확인)`** 로 적었다.
@@ -189,7 +203,7 @@ public record TmdbMovieSummary(
 | Feign 활성화 | `FeignConfig`(`global/config`)가 `@EnableFeignClients(basePackages = "com.ottnavi.infra")`다 |
 | 프로퍼티 클래스 | 이 저장소에 `@ConfigurationProperties`를 쓰는 곳이 없다(`OriginSecretFilter`는 `@Value`). `@ConfigurationPropertiesScan`도 없다 → **`TmdbConfig`에 `@EnableConfigurationProperties(TmdbProperties.class)`** 로 등록한다(스캔보다 범위가 좁다) |
 | 테스트 | `IntegrationTestSupport`는 `@SpringBootTest` + `@Import(TestcontainersConfig.class)`(PostgreSQL 17.6·Redis 8.6 컨테이너)다. `backend/src/test/resources/`는 **아직 없다**(이 Task가 `tmdb/` 폴더를 처음 만든다) |
-| 설정 | `application.yml`에 `spring.cloud.openfeign.client.config.tmdb`(connectTimeout 3000, readTimeout 5000, loggerLevel basic)와 `app.tmdb.*`(base-url, api-token, rate-limit, retry)가 **이미 작업 트리에 들어 있다**. `.env.example`에는 `TMDB_API_KEY=`가 이미 있다 |
+| 설정 | `application.yml`에 `spring.cloud.openfeign.client.config.tmdb`(connectTimeout 3000, readTimeout 5000, loggerLevel basic)와 `app.tmdb.*`(base-url, api-token, rate-limit, retry)가 안내서 작성 시점에 **이미 작업 트리에 들어 있었다**. `.env.example`에는 `TMDB_API_KEY=`가 이미 있다 |
 | 작업 트리 | `git status` 기준 `infra/tmdb`의 뼈대 파일 13개가 스테이징돼 있다. 아래 5.0.1에 어떤 파일이 컴파일되지 않는지 적었다 |
 
 ### 5.0.1 단계 순서 (재배치 결과)와 작업 트리 정리
@@ -262,7 +276,7 @@ backend/src/test/resources/tmdb/                 샘플 JSON 7개 (②에서 만
 | `src/main/java/com/ottnavi/infra/tmdb/exception/TmdbUnavailableException.java` | 수정(교체) | 일시 장애 (429·5xx·타임아웃·로컬 한도 초과·응답 해석 실패) |
 | `src/main/java/com/ottnavi/infra/tmdb/exception/TmdbRequestException.java` | 수정(교체) | 요청·설정 문제 (401·400·422 등) |
 | `src/main/java/com/ottnavi/infra/tmdb/exception/TmdbNotFoundException.java` | 수정(교체) | TMDB에 없는 리소스 (404, D3) |
-| `src/main/resources/application.yml` | 수정(2줄) | 주석 정정 1곳 + 옛 안내 주석 1줄 삭제 |
+| `src/main/resources/application.yml` | 수정 | 주석 정정 1곳(27행 Task 042 → 041)과 `app.tmdb` 설정 블록 추가. `origin-secret.enabled` 줄의 주석은 건드리지 않는다 |
 | `src/main/java/com/ottnavi/global/config/FeignConfig.java` | 수정(1줄) | 주석 정정 |
 | `src/test/java/com/ottnavi/infra/tmdb/TmdbTestFixtures.java` | 신규 | 테스트용 `TmdbProperties` 생성 보조 |
 | `src/test/java/com/ottnavi/infra/tmdb/TmdbFeignConfigTest.java` | 신규 | T18 |
@@ -445,7 +459,7 @@ public class TmdbNotFoundException extends TmdbException {
 
 **ErrorCode 매핑 결정 (기존 `ErrorCode`를 읽고 정했다)**: 세 예외 모두 `EXTERNAL_API_ERROR`(502)다. `TmdbNotFoundException`을 `TITLE_NOT_FOUND`(404)로 보내자는 안도 있지만 채택하지 않았다. `TITLE_NOT_FOUND`는 "우리 DB의 작품 ID를 못 찾았다"는 뜻이고, TMDB 404는 "우리가 TMDB에서 가져온 ID가 TMDB에서 사라졌다"는 외부 데이터 불일치라 호출한 사용자의 잘못이 아니다. 정상 흐름에서는 호출한 배치·서비스가 이 예외를 **잡아서 처리**하므로(7.1절) HTTP 응답까지 올라가는 경우는 처리 누락이다. 그때 404가 아니라 502로 드러나는 편이 누락을 알아채기 쉽다. 다른 매핑을 원하면 `TmdbNotFoundException`에서 `getErrorCode()`만 오버라이드하면 된다(`ErrorCode` 추가 없이 `TITLE_NOT_FOUND`를 쓰는 안).
 
-**`application.yml` 수정 (2줄)** — 나머지 `app.tmdb.*` 블록은 이미 작업 트리에 있는 내용 그대로 둔다.
+**`application.yml` 수정** — 주석 정정 1곳(수정 1)과 `app.tmdb` 설정 블록 추가(아래 최종 모습)가 전부다.
 
 수정 1: 27행 부근 주석 정정 (ROADMAP 번호는 041이다, 8절 2번). 앞뒤 줄을 같이 보인다.
 
@@ -461,25 +475,14 @@ public class TmdbNotFoundException extends TmdbException {
             connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
 ```
 
-수정 2: `app.tmdb` 아래의 옛 안내 주석 한 줄 삭제 (43행 부근, rate-limit·retry를 이미 넣었으므로 거짓 설명이 됐다).
+**수정 2는 없다.** 이전 판은 `app.tmdb` 아래의 옛 안내 주석 한 줄을 지우라고 했지만, 실제 저장소에는 그런 주석이 없었다. 이 잘못된 지시 때문에 `origin-secret.enabled` 줄의 주석이 지워지는 일이 있었다(복원됨). **`origin-secret.enabled` 줄의 주석(`# Vercel 경유 요청만 받는다(TECH T-8 ①)...`)은 건드리지 않는다.**
 
-```yaml
-# 수정 전
-    api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
-    # rate-limit.*, retry.* 는 ③·⑤단계에서 추가한다
-    rate-limit:
-
-# 수정 후 (가운데 주석 줄만 지운다)
-    api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
-    rate-limit:
-```
-
-참고로 `app.tmdb` 블록의 최종 모습(이미 작업 트리와 같다. 값이 다르면 이 값으로 맞춘다):
+`app.tmdb` 블록의 최종 모습(`origin-secret` 줄은 비교를 위해 앞뒤만 보인 것이다. 값이 다르면 `tmdb` 아래를 이 값으로 맞춘다):
 
 ```yaml
 app:
   origin-secret:
-    enabled: true
+    enabled: true   # (기존 줄. 주석은 그대로 둔다)
   tmdb:
     base-url: https://api.themoviedb.org/3
     api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
@@ -603,7 +606,7 @@ class TmdbPropertiesTest {
 ```
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.TmdbFeignConfigTest" --tests "com.ottnavi.infra.tmdb.TmdbPropertiesTest"
 ```
 
@@ -1189,7 +1192,7 @@ public record TmdbProviderListResponse(List<TmdbProviderInfo> results) {
 
 #### 샘플 JSON 7개 (`backend/src/test/resources/tmdb/`, BOM 없는 UTF-8, D6: 구조는 실제와 같고 값은 가짜)
 
-폴더가 없으면 만든다: `New-Item -ItemType Directory -Force C:\Users\swmoo\workspace\ottnavi-backend\backend\src\test\resources\tmdb`. 필드 구조는 4절의 `c7` 확인분을 따랐고, **쓰지 않는 필드(`adult`, `video`, `vote_count` 등)와 `""`·`null` 값을 일부러 섞었다**(T3이 이것으로 매핑 실패가 없는지 본다). 제공처 ID는 Task 004 매핑표의 숫자(8, 337 등)를 쓰되 이름은 가짜다. 실제 응답으로 모양을 검증하는 절차는 5.8절.
+폴더가 없으면 만든다: `New-Item -ItemType Directory -Force backend\src\test\resources\tmdb`. 필드 구조는 4절의 `c7` 확인분을 따랐고, **쓰지 않는 필드(`adult`, `video`, `vote_count` 등)와 `""`·`null` 값을 일부러 섞었다**(T3이 이것으로 매핑 실패가 없는지 본다). 제공처 ID는 Task 004 매핑표의 숫자(8, 337 등)를 쓰되 이름은 가짜다. 실제 응답으로 모양을 검증하는 절차는 5.8절.
 
 `discover-movie.json` — 영화 discover(검색 호출 `searchMovies`도 같은 모양이라 이 파일을 재사용한다). 두 번째 항목은 빈 날짜·null 포스터·빈 줄거리.
 
@@ -1833,7 +1836,7 @@ class TmdbClientTest extends TmdbTestSupport {
 #### 테스트 실행
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.TmdbClientTest"
 ```
 
@@ -1893,7 +1896,11 @@ public class TmdbRateLimiter {
     /** 토큰 1개를 얻을 때까지 최대 maxWait 기다린다. 못 얻으면 TmdbUnavailableException으로 포기한다 */
     public void acquire() {
         try {
-            if (!bucket.asBlocking().tryConsume(1, maxWait)) {
+            // Bucket4j는 기다리는 tryConsume에 0을 허용하지 않아서, 0 이하면 기다리지 않는 tryConsume(1)을 쓴다
+            boolean acquired = (maxWait.isZero() || maxWait.isNegative())
+                    ? bucket.tryConsume(1)
+                    : bucket.asBlocking().tryConsume(1, maxWait);
+            if (!acquired) {
                 throw new TmdbUnavailableException("TMDB 호출 한도 대기 시간을 넘겼다");   // 로컬 한도 포기
             }
         } catch (InterruptedException e) {
@@ -1959,6 +1966,8 @@ public class TmdbConfig {
     }
 }                                                              // ← 클래스 끝
 ```
+
+**`max-wait`가 0이면 왜 분기가 필요한가**: Bucket4j의 `BlockingBucket.tryConsume(long, Duration)`은 대기 시간 0을 허용하지 않고 `IllegalArgumentException`("Waiting value should be positive, 0 is wrong waiting period")을 던진다. 그래서 "기다리지 않고 즉시 포기" 설정(`max-wait: 0`)을 지원하려면 0 이하일 때 기다리지 않는 `bucket.tryConsume(1)`로 갈라야 한다. 안내서 초판은 이 분기 없이 `asBlocking().tryConsume(1, maxWait)`만 썼고, 테스트 T16-a(`max-wait` 0)가 이 예외를 잡아냈다(6절 함정 17).
 
 #### 앞 단계와의 연결
 
@@ -2054,7 +2063,7 @@ class TmdbRateLimiterTest {
 ```
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.TmdbRateLimiterTest" --tests "com.ottnavi.infra.tmdb.TmdbClientTest"
 ```
 
@@ -2063,6 +2072,7 @@ cd C:\Users\swmoo\workspace\ottnavi-backend\backend
 1. `TmdbRateLimiterTest` 4건 통과, `TmdbClientTest`는 ②의 15건 + 1건이 **그대로 통과**한다(버킷이 끼어들어도 정상 케이스가 안 깨진다).
 2. **한도 값 직접 확인**: `capacity + refill-tokens × 1초`가 40 미만이다(10 + 25 = 35). 이 값이 바뀌면 T16-e가 실패해 알려 준다.
 3. 5절 맨 앞의 결정(D1): 상한 있는 기다림(최대 2초) 후 포기 — 실패 시 `TmdbUnavailableException`.
+4. **`max-wait`가 0일 때 `IllegalArgumentException`이 아니라 `TmdbUnavailableException`이 나는지**(T16-a). 위 `acquire()`의 0 이하 분기가 이것을 지킨다.
 
 | 흔한 오류 | 해결 |
 |---|---|
@@ -2271,7 +2281,7 @@ class TmdbErrorDecoderTest {
 - `Map.<String, Collection<String>>of(...)`로 타입을 명시한 이유: `Map.of("..", List.of(..))`는 `Map<String, List<String>>`로 추론돼 `Map<String, Collection<String>>`에 대입되지 않는다.
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.TmdbErrorDecoderTest" --tests "com.ottnavi.infra.tmdb.TmdbClientTest"
 ```
 
@@ -2625,7 +2635,7 @@ class TmdbRetryTest extends TmdbTestSupport {
 ```
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.TmdbRetryerTest" --tests "com.ottnavi.infra.tmdb.TmdbRetryTest" --tests "com.ottnavi.infra.tmdb.TmdbClientTest"
 ```
 
@@ -3197,7 +3207,7 @@ class TmdbTokenLogTest extends TmdbTestSupport {
 - 검색어 같은 쿼리 문자열은 이 로그에 나오므로 운영에서 DEBUG를 켜지 않는다(6절 함정 16).
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.*"
 ```
 
@@ -3357,7 +3367,7 @@ class TmdbClientIntegrationTest extends IntegrationTestSupport {
 
 ```powershell
 Remove-Item Env:TMDB_API_KEY -ErrorAction SilentlyContinue    # 이 셸에서만 지운다. 토큰이 없어도 통과해야 한다(5.9)
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.*"          # Docker Desktop을 켠다 (T20 때문)
 .\gradlew.bat clean build                                       # 마지막에 전체
 ```
@@ -3421,7 +3431,7 @@ Remove-Variable token, headers
 5. **토큰·민감 값이 없는지 검사한다** (아무것도 안 나와야 정상):
 
 ```powershell
-Select-String -Path C:\Users\swmoo\workspace\ottnavi-backend\backend\src\test\resources\tmdb\*.json -Pattern "eyJ|Bearer|api_key|Authorization"
+Select-String -Path backend\src\test\resources\tmdb\*.json -Pattern "eyJ|Bearer|api_key|Authorization"
 ```
 
    TMDB 읽기 토큰은 JWT 형식이라 `eyJ`로 시작한다. 응답 본문에는 토큰이 들어 있지 않지만, 실수로 요청 정보를 파일에 붙여 넣는 일을 막는 검사다.
@@ -3436,14 +3446,14 @@ Select-String -Path C:\Users\swmoo\workspace\ottnavi-backend\backend\src\test\re
 
 ```powershell
 Remove-Item Env:TMDB_API_KEY -ErrorAction SilentlyContinue    # 이 셸에서만 지운다
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.*"
 ```
 
 2. 테스트 소스에 실제 주소가 없는지 확인한다(아무것도 안 나와야 정상. `src/main/resources/application.yml`의 기본 base-url은 대상이 아니다).
 
 ```powershell
-Get-ChildItem -Recurse -File C:\Users\swmoo\workspace\ottnavi-backend\backend\src\test | Select-String -Pattern "api.themoviedb.org"
+Get-ChildItem -Recurse -File backend\src\test | Select-String -Pattern "api.themoviedb.org"
 ```
 
 3. 테스트 프로퍼티가 `app.tmdb.base-url`을 WireMock 주소로 바꾸는 것을 `TmdbClientTest`의 `base_url이_WireMock_주소로_바뀌어_있다`가 한 번 단언한다(`baseUrl`이 `http://localhost`로 시작). 통합 테스트(T20)도 같은 방식으로 base-url만 돌린다.
@@ -3468,6 +3478,8 @@ Get-ChildItem -Recurse -File C:\Users\swmoo\workspace\ottnavi-backend\backend\sr
 | 14 | **페이지 상한**(discover는 정해진 쪽수까지만, 500쪽으로 알려져 있음)을 `c7`로 확인하지 못했다 | 이 Task의 범위가 아니다. 043이 `total_pages` 외에 상한도 보고 멈추게 하고, 필요하면 필터를 쪼갠다. 공식 문서 확인 필요 |
 | 15 | 가벼운 컨텍스트 구성이 실제로 뜨는지 확인하지 못했다 | 5.2절 `TmdbTestSupport`. 안 되면 `IntegrationTestSupport` 상속으로 바꿔도 된다(사용자 허용, Docker를 켠다). 그때는 `TmdbTestSupport`의 `@SpringBootTest(classes = ...)` 대신 `IntegrationTestSupport`를 상속하고 `TestApp`을 지운다 |
 | 16 | 검색 호출의 `query`는 사용자 입력이다 | 로그(DEBUG)에 나오므로 운영 DEBUG 금지. 지표 태그에 넣지 않는다. 길이·내용 검증은 050(API 계층)이 한다 |
+| 17 | **Bucket4j는 대기 시간 0을 허용하지 않는다.** `bucket.asBlocking().tryConsume(1, Duration.ZERO)`는 `IllegalArgumentException`("Waiting value should be positive, 0 is wrong waiting period")을 던진다. 테스트 T16-a가 잡았다 | `TmdbRateLimiter.acquire()`에서 대기 시간이 0 이하면 기다리지 않는 `bucket.tryConsume(1)`을 쓴다(5.3절) |
+| 18 | **`@ConfigurationProperties(prefix = "app.tmdb")`에 `.*`를 붙이지 않는다.** 구현 중 `"app.tmdb.*"`로 잘못 입력했는데도 테스트가 통과했고 그 이유는 확인하지 못했다 | `"app.tmdb"`로 고친 뒤 TMDB 테스트가 통과함을 2026-10-12 사용자가 확인했다. 원인은 모르므로 접두사에 와일드카드를 쓰지 않는다 |
 
 ## 7. 확정된 결정
 
@@ -3533,22 +3545,22 @@ try {
 ### 9.1 단계별 체크리스트
 
 - [x] 단계 0: `git branch --show-current`가 `feature/b3-tmdb-client`, WireMock 기동 확인 완료(2026-10-11, `WireMockSmokeTest` tests=1 failures=0)
-- [ ] 작업 트리 정리(5.0.1): 컴파일되지 않는 `TmdbApi`·`TmdbClient`·`TmdbRateLimiter` 뼈대를 `package` 줄만 남기고 비운 뒤 ①을 시작
-- [ ] ①: `TmdbProperties`(토큰 가리는 `toString()`)·`TmdbConfig`·`TmdbFeignConfig`(인증 인터셉터)·**예외 4종(`TmdbException`이 `BusinessException` 상속, `EXTERNAL_API_ERROR` 매핑; 404는 `TmdbNotFoundException`)**, 토큰 비어도 기동, 코드 주석 2곳 정정, T18·T21 통과
-- [ ] ②: `TmdbApi` 10개 호출(전체 제공처 목록 `listProviders` 포함, 7곳 외도 거르지 않고 반환), `TmdbMediaType`, 얇은 `TmdbClient`, DTO 16개(`@JsonIgnoreProperties`, 날짜는 `String`), 샘플 JSON 7개, `TmdbTestSupport`, T1·T2·T3·T10·T19 통과
-- [ ] ③: `TmdbRateLimiter`(싱글톤 빈 `tmdbBucket`), 재시도도 토큰 사용, `capacity + refill < 40` 계산 확인, T16 통과
-- [ ] ④: `TmdbErrorDecoder` 등록, T22 통과
-- [ ] ⑤: `TmdbRetryer` 등록(`clone()` 포함), T23·T4·T5·T14 통과, 최악 소요 시간 표와 설정값 일치
-- [ ] ⑥: `TmdbClient` 완성판(`call()`, 예외 변환, `tmdb.call` 카운터 태그 닫힌 집합 10×8), TMDB 429 포기 → `EXTERNAL_API_ERROR`(502) 매핑, T6·T7·T8·T9·T11·T12·T13·T15·T17·T24 통과
-- [ ] ⑦: T1~T19·T21~T24 가벼운 테스트 전부 통과(Docker 없이), T20 통합 테스트 1건 통과(Docker Desktop 켠 상태), `WireMockSmokeTest` 삭제
-- [ ] 코드 주석 2곳 정정: `application.yml` 27행 부근과 `FeignConfig.java`의 "Task 042"를 041로(`TASK024_GUIDE`·ROADMAP 024 기록은 고치지 않는다)
-- [ ] 샘플 JSON 확인: `Select-String` 검사에서 토큰 패턴 없음, BOM 없음
-- [ ] `docs/TECH.md` 6절의 WireMock Jetty 행을 실측 결과로 갱신(무엇을 왜 바꿨는지 PR 설명에 적음)
+- [x] 작업 트리 정리(5.0.1): 컴파일되지 않는 `TmdbApi`·`TmdbClient`·`TmdbRateLimiter` 뼈대를 `package` 줄만 남기고 비운 뒤 ①을 시작
+- [x] ①: `TmdbProperties`(토큰 가리는 `toString()`)·`TmdbConfig`·`TmdbFeignConfig`(인증 인터셉터)·**예외 4종(`TmdbException`이 `BusinessException` 상속, `EXTERNAL_API_ERROR` 매핑; 404는 `TmdbNotFoundException`)**, 토큰 비어도 기동, 코드 주석 2곳 정정, T18·T21 통과
+- [x] ②: `TmdbApi` 10개 호출(전체 제공처 목록 `listProviders` 포함, 7곳 외도 거르지 않고 반환), `TmdbMediaType`, 얇은 `TmdbClient`, DTO 16개(`@JsonIgnoreProperties`, 날짜는 `String`), 샘플 JSON 7개, `TmdbTestSupport`, T1·T2·T3·T10·T19 통과
+- [x] ③: `TmdbRateLimiter`(싱글톤 빈 `tmdbBucket`), 재시도도 토큰 사용, `capacity + refill < 40` 계산 확인, T16 통과
+- [x] ④: `TmdbErrorDecoder` 등록, T22 통과
+- [x] ⑤: `TmdbRetryer` 등록(`clone()` 포함), T23·T4·T5·T14 통과, 최악 소요 시간 표와 설정값 일치
+- [x] ⑥: `TmdbClient` 완성판(`call()`, 예외 변환, `tmdb.call` 카운터 태그 닫힌 집합 10×8), TMDB 429 포기 → `EXTERNAL_API_ERROR`(502) 매핑, T6·T7·T8·T9·T11·T12·T13·T15·T17·T24 통과
+- [x] ⑦: T1~T19·T21~T24 가벼운 테스트 전부 통과(Docker 없이), T20 통합 테스트 1건 통과(Docker Desktop 켠 상태), `WireMockSmokeTest` 삭제
+- [x] 코드 주석 2곳 정정: `application.yml` 27행 부근과 `FeignConfig.java`의 "Task 042"를 041로(`TASK024_GUIDE`·ROADMAP 024 기록은 고치지 않는다)
+- [x] 샘플 JSON 확인: `Select-String` 검사에서 토큰 패턴 없음, BOM 없음
+- [x] `docs/TECH.md` 6절의 WireMock Jetty 행을 실측 결과로 갱신(무엇을 왜 바꿨는지 PR 설명에 적음)
 
 ### 9.2 PR 전 확인
 
 ```powershell
-cd C:\Users\swmoo\workspace\ottnavi-backend\backend
+cd backend
 Remove-Item Env:TMDB_API_KEY -ErrorAction SilentlyContinue
 .\gradlew.bat test --tests "com.ottnavi.infra.tmdb.*"   # 이 Task의 테스트 (토큰 없이 통과 = 실제 호출 없음)
 # 통합 테스트 1건(T20)도 위 명령에 포함되므로 처음부터 Docker Desktop을 켜 둔다
@@ -3576,13 +3588,27 @@ Get-ChildItem -Recurse -File backend\src | Select-String -Pattern "TMDB_API_KEY\
 
 ## 10. 확인하지 못한 것
 
-- Feign 기본 디코더가 Jackson 3으로 실제 매핑하는지, 5.2절 가벼운 컨텍스트 구성(`TmdbTestSupport.TestApp`)이 실제로 뜨는지(실행 안 함 → ②의 T1에서 확인). `wiremock-standalone` 3.13.2 기동은 2026-10-11 5.0단계에서 확인됐다.
-- **5절 코드 전체의 컴파일·실행**: 저장소에 만들지 않았다. 소스 jar로 시그니처를 대조했으나 아래는 컴파일 시/실행 시 확인이 필요하다.
-  - 컴파일 시: `ClassPathResource#getContentAsString(Charset)`(Spring 7), `Response.Builder#body(String, Charset)`, AssertJ `extracting("프로퍼티명")`이 record 접근자에 동작하는지, `TmdbRetryer#clone()` 선언의 경고, Lombok `@RequiredArgsConstructor`가 만든 `TmdbClient(TmdbApi, MeterRegistry)` 생성자 순서.
-  - 실행 시: Jackson 3의 `null → 원시형 필드` 기본 동작, 제네릭 record `TmdbPage<T>` 매핑, `@Bean Retryer`가 Feign 기본 `NEVER_RETRY`를 대체하는지, `ErrorDecoder.Default`가 `RetryableException`의 cause에 원래 `FeignException`을 넣는지(4xx + Retry-After 풀어 주기), `@DynamicPropertySource`와 공유 WireMock 서버의 조합, `OutputCaptureExtension`으로 Feign DEBUG 로그 캡처(T15), 파이프(`8|337`) 쿼리 값 처리, JDK `HttpURLConnection`의 자체 재시도 여부(T9), 앱 전체 컨텍스트의 `MeterRegistry` 빈 주입(T20), `getBeansOfType(RequestInterceptor.class)`가 앱 전체에서 비어 있는지(T20).
+### 확인함 (2026-10-12 구현·실행 결과)
+
+| 항목 | 근거 테스트 |
+|---|---|
+| Feign 기본 디코더가 Jackson 3으로 실제 매핑한다 | `TmdbClientTest` T1·T2 |
+| 가벼운 컨텍스트(`TmdbTestSupport.TestApp`)가 뜬다 | `TmdbTestSupport`를 쓰는 모든 가벼운 테스트 |
+| `@Bean Retryer`가 Feign 기본 `NEVER_RETRY`를 대체한다 | `TmdbRetryTest` T4 |
+| `Retryer`의 `clone()` 동작 | `TmdbRetryerTest` |
+| JDK `HttpURLConnection`의 자체 재시도로 요청 횟수가 어긋나지 않는다 | `TmdbTimeoutTest` T9 |
+| Feign DEBUG 로그를 캡처해도 토큰이 찍히지 않는다 | `TmdbTokenLogTest` T15 |
+| `wiremock-standalone` 3.13.2 기동 | 2026-10-11 5.0단계 (`WireMockSmokeTest`, 이후 삭제) |
+| Bucket4j 대기 시간 0의 동작(예외 발생, 분기로 해결) | `TmdbRateLimiterTest` T16-a (6절 함정 17) |
+
+### 아직 확인하지 못한 것
+
+- 5.8절(샘플 JSON을 실제 응답으로 확인)을 건너뛰었으므로, **실제 TMDB 호출로만 알 수 있는 항목은 모두 미확인**이다. 소비 Task 시작 전에 로컬에서 1회 호출로 확인한다(아래 목록 참고).
+- 5절 코드 중 위 표에 없는 항목(컴파일·실행 시 확인 표시가 있던 것 가운데 개별 근거 테스트를 대지 못한 것)은 전체 `clean build` 통과로 갈음했고, 개별로 확인했다고 주장하지 않는다. 예: Jackson 3의 `null → 원시형 필드` 기본 동작, `ErrorDecoder.Default`가 `RetryableException`의 cause에 원래 `FeignException`을 넣는지, 파이프(`8|337`) 쿼리 값 처리(WireMock으로는 TMDB 쪽 동작을 알 수 없음), 앱 전체 컨텍스트의 `MeterRegistry` 주입과 `getBeansOfType(RequestInterceptor.class)`(T20)는 통과 여부만 안다.
+- `@ConfigurationProperties(prefix = "app.tmdb.*")`로 잘못 적은 상태에서도 테스트가 통과한 이유(6절 함정 18).
   - `TmdbNotFoundException`의 `ErrorCode`를 `EXTERNAL_API_ERROR`(502)로 정한 것은 이 개정의 판단이다(5.1절 근거). 다르게 하려면 사용자 결정이 필요하다.
   - `tmdb.call`의 `result` 태그에 `decode_error`를 추가한 것(7→8개)도 이 개정의 판단이다.
-- TMDB가 429에 `Retry-After`를 보내는지, 오류 본문 구조, discover 페이지 상한, 파이프(`|`) OR 파라미터 동작, 응답에 `ads`·`free`가 오는지, 시즌 제공처에 `rent`·`buy`가 오는지, 시즌 상세 응답의 정수 `id` 존재, `append_to_response`로 시즌 상세를 붙일 수 있는지, TV `credits` vs `aggregate_credits` 선택, 한국어 줄거리가 `""`인지 `null`인지, 한국어 제목 대체 동작(공식 문서 `developer.themoviedb.org` 직접 확인 또는 사용자가 로컬에서 1회 호출).
+- **아직 확인 못 함 (5.8을 건너뜀, 소비 Task 시작 전 로컬 1회 호출로 확인)**: TMDB가 429에 `Retry-After`를 보내는지, 오류 본문 구조, discover 페이지 상한, 파이프(`|`) OR 파라미터 동작, 응답에 `ads`·`free`가 오는지, 시즌 제공처에 `rent`·`buy`가 오는지, 시즌 상세 응답의 정수 `id` 존재, `append_to_response`로 시즌 상세를 붙일 수 있는지, TV `credits` vs `aggregate_credits` 선택, 한국어 줄거리가 `""`인지 `null`인지, 한국어 제목 대체 동작(공식 문서 `developer.themoviedb.org` 직접 확인 또는 사용자가 로컬에서 1회 호출).
 - 샘플 JSON을 공개 저장소에 두는 것의 TMDB 약관상 허용 범위(약관 원문 미확인).
 - `@JsonNaming`의 Jackson 3 패키지 위치(권하지 않는 방식이라 확인하지 않음).
 - Feign 자체 관측값(`MicrometerObservationCapability`)의 이름·태그와 `tmdb.call`의 충돌 여부.
