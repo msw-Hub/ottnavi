@@ -87,3 +87,12 @@ cd frontend; npm run api:generate                                      # openapi
 - **버전 함정**: Spring Boot 4.1은 Jackson 3(`tools.jackson.*`), `@MockitoBean`, `spring-boot-starter-flyway`·`spring-boot-starter-batch-jdbc` 필요, orval은 `httpClient: 'axios'` 명시 필요, msw 3은 `onUnhandledRequest`가 아니라 `onUnhandledFrame`, TypeScript 6은 `baseUrl` 없이 `paths`만 쓴다. 전체 목록은 TECH 6절.
 - **설정 파일은 YAML로 통일**한다(`application.yml`, `-local.yml`, `-prod.yml`). `.properties`와 섞지 않는다.
 - **화면 표시**: 제공 상태는 있음/없음/모름 3가지를 색만으로 구분하지 않고, 제공처 화면엔 JustWatch 출처, About엔 TMDB 로고·고지문을 반드시 넣는다. 결과는 "확정"이 아닌 "확인된 범위"로 표현하고 데이터 기준일을 보여준다.
+
+## 협업 방식
+
+- **결정을 물을 때는 전후 사정을 모르는 사람 기준으로 쓴다.** 용어(목업, 계약, PR, 에이전트 등)를 풀고 "배경 → 선택지 표(무엇이 달라지는지·위험) → 추천 → 답변 방법" 순으로 쓴다. 한 줄 요약만 던지지 않는다. 더 설명해 달라고 하면 실제 예시(코드 한두 줄)로 다시 푼다.
+- **사용자의 검토 범위는 화면(UI/UX·문구·흐름)이다.** 프론트 코드 정확성은 공식 문서(context7)와 설치된 타입 정의로 Claude가 먼저 확인하고 근거를 보고한다. 인증·토큰 동작 코드는 사용자 검토 대상이다(Task 057에서 다시 확인).
+- **푸시·PR 뒤에는 CI·CodeRabbit을 기다리지 않는다.** `sleep`이나 `gh pr checks` 반복 조회로 대기하지 않고 상태를 한 번만 알린 뒤 다른 작업을 이어간다. 사용자가 "코드래빗 왔다"고 알려 주면 그때 `coderabbit-triage`로 정리한다.
+- **에이전트를 쓰면 능률이 오르거나 토큰이 절약되는 작업은 시작 전에 먼저 제안한다.** 계획 단계에서 이득과 비용(콜드 스타트)을 한 줄로 알리고, 이득이 불분명하면 쓰지 않는다고 말한다. 병렬 작업은 별도 워크트리가 필요하므로 허락을 먼저 구한다.
+- **모델 방침**: 구현·테스트·검수 에이전트는 sonnet, 어려운 알고리즘의 설계·계획만 opus를 명시한다(opus로 구현까지 맡기면 5시간 할당량이 한 작업에 거의 소진된 적이 있다). 파일을 많이 읽는 큰 에이전트 작업은 시작 전에 소모 규모를 한 줄로 알린다.
+- **MCP(playwright, shadcn, shrimp)가 자주 끊긴다.** 끊기면 사용자에게 `/mcp` 재연결을 요청한다.
