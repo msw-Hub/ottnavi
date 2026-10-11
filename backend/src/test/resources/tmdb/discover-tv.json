@@ -1,0 +1,37 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "backdrop_path": "/test-tv-backdrop-1.jpg",
+      "first_air_date": "2023-03-01",
+      "genre_ids": [18],
+      "id": 800001,
+      "name": "테스트 드라마 1",
+      "origin_country": ["KR"],
+      "original_language": "ko",
+      "original_name": "테스트 드라마 원제 1",
+      "overview": "가짜 줄거리 A",
+      "popularity": 120.4,
+      "poster_path": "/test-tv-poster-1.jpg",
+      "vote_average": 8.1,
+      "vote_count": 560
+    },
+    {
+      "backdrop_path": null,
+      "first_air_date": "",
+      "genre_ids": [10759, 18],
+      "id": 800002,
+      "name": "테스트 드라마 2",
+      "origin_country": ["US", "KR"],
+      "original_language": "en",
+      "original_name": "Test Drama Original 2",
+      "overview": "",
+      "popularity": 5.0,
+      "poster_path": null,
+      "vote_average": 0,
+      "vote_count": 0
+    }
+  ],
+  "total_pages": 2,
+  "total_results": 25
+}

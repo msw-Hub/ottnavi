@@ -1,0 +1,16 @@
+{
+  "_id": "000000000000000000000001",
+  "air_date": "2023-03-01",
+  "episodes": [
+    { "air_date": "2023-03-01", "episode_number": 1, "episode_type": "standard", "id": 820001, "name": "1화", "overview": "", "runtime": 62, "season_number": 1, "show_id": 800001 },
+    { "air_date": "2023-03-02", "episode_number": 2, "episode_type": "standard", "id": 820002, "name": "2화", "overview": "", "runtime": 58, "season_number": 1, "show_id": 800001 },
+    { "air_date": "2023-03-08", "episode_number": 3, "episode_type": "standard", "id": 820003, "name": "3화", "overview": "", "runtime": null, "season_number": 1, "show_id": 800001 },
+    { "air_date": "", "episode_number": 4, "episode_type": "standard", "id": 820004, "name": "4화", "overview": "", "runtime": null, "season_number": 1, "show_id": 800001 }
+  ],
+  "id": 810001,
+  "name": "시즌 1",
+  "overview": "",
+  "poster_path": "/test-season-1.jpg",
+  "season_number": 1,
+  "vote_average": 8.0
+}

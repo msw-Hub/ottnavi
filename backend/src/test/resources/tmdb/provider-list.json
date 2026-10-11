@@ -1,0 +1,7 @@
+{
+  "results": [
+    { "display_priorities": { "KR": 3, "US": 1 }, "display_priority": 3, "logo_path": "/test-logo-8.jpg", "provider_name": "테스트 제공처 8", "provider_id": 8 },
+    { "display_priorities": { "KR": 7 }, "display_priority": 7, "logo_path": "/test-logo-337.jpg", "provider_name": "테스트 제공처 337", "provider_id": 337 },
+    { "display_priorities": { "KR": 50 }, "display_priority": 50, "logo_path": "/test-logo-9999.jpg", "provider_name": "테스트 제공처 9999(7곳 밖)", "provider_id": 9999 }
+  ]
+}
