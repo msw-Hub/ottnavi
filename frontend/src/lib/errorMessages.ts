@@ -23,41 +23,33 @@ const COMMON_ERROR_MESSAGES = {
   EXTERNAL_API_ERROR: '외부 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
 } as const
 
-// TECH 신규 코드(error-codes.md "TECH 신규 코드" 표). 문서상 "(제안)" 상태이며 해당 기능 Task에서 확정된다
+// TECH 신규 코드(error-codes.md "TECH 신규 코드" 표). 문서상 "(제안)" 상태이며 해당 기능 구현 Task에서 확정된다.
+// Task 031에서 관리자 월 구독요금 규칙·수집 복구·찜 상한·요금 대상 코드를 문서에 올리면서 이 표로 옮겼다
 const TECH_ERROR_MESSAGES = {
   PLAN_DRAFT_STALE: '데이터가 갱신되어 플랜을 다시 계산하고 있습니다.',
   PLAN_DRAFT_NOT_FOUND: '계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요.',
   BATCH_ALREADY_RUNNING: '같은 날짜의 수집이 이미 실행 중입니다.',
   BATCH_ALREADY_COMPLETED: '해당 날짜의 수집은 이미 완료되었습니다.',
+  BATCH_RECOVERY_REQUIRED:
+    '중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요.',
+  BATCH_NOT_STOPPED: '중단된 실행만 복구할 수 있습니다.',
+  PRICE_START_DATE_NOT_AFTER_LAST: '적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다.',
+  PRICE_START_DATE_DUPLICATE: '같은 적용 시작일의 월 구독요금이 이미 있습니다.',
+  PRICE_FIRST_START_DATE_IN_FUTURE:
+    '첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다.',
+  PRICE_NOT_CURRENT: '지금 적용 중인 월 구독요금만 확인할 수 있습니다.',
+  PRICE_NOT_LATEST: '가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.',
+  PRICE_LAST_ROW_CANNOT_DELETE: '월 구독요금이 하나뿐이라 삭제할 수 없습니다.',
+  WISHLIST_LIMIT_EXCEEDED: '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.',
+  WISHLIST_ITEM_NOT_FOUND: '찜 항목을 찾을 수 없습니다.',
+  SERVICE_PRICE_NOT_FOUND: '이 서비스의 요금 정보를 찾을 수 없습니다.',
 } as const
 
 // 두 표를 합친 전체 매핑. 화면 코드는 이 값이 아니라 getErrorMessage를 쓴다
 export const ERROR_MESSAGES = { ...COMMON_ERROR_MESSAGES, ...TECH_ERROR_MESSAGES } as const
 
-/*
- * 관리자 월 구독요금 규칙 위반 코드(Task 029 목업). 코드 이름과 메시지 모두 "제안"이다.
- * docs/api/error-codes.md에 아직 없어서 ERROR_MESSAGES(문서와 글자까지 같아야 하는 표)에 넣지 않고 따로 둔다.
- * 계약 Task(031)에서 error-codes.md에 올리면 TECH_ERROR_MESSAGES로 옮기고 이 표는 지운다.
- * (규칙: 첫 줄 시작일은 오늘 이하 / 같은 시작일 금지 / 새 줄 시작일은 마지막 줄보다 늦게 / 가장 최근 줄만 수정·삭제 / 줄이 하나뿐이면 삭제 금지)
- */
-const PROPOSED_ERROR_MESSAGES = {
-  PRICE_START_DATE_NOT_AFTER_LAST: '적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다.', // 제안
-  PRICE_START_DATE_DUPLICATE: '같은 적용 시작일의 월 구독요금이 이미 있습니다.', // 제안
-  PRICE_FIRST_START_DATE_IN_FUTURE:
-    '첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다.', // 제안
-  PRICE_NOT_CURRENT: '지금 적용 중인 월 구독요금만 확인할 수 있습니다.', // 제안
-  PRICE_NOT_LATEST: '가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.', // 제안
-  BATCH_RECOVERY_REQUIRED:
-    '중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요.', // 제안
-  BATCH_NOT_STOPPED: '중단된 실행만 복구할 수 있습니다.', // 제안
-  PRICE_LAST_ROW_CANNOT_DELETE: '월 구독요금이 하나뿐이라 삭제할 수 없습니다.', // 제안
-} as const
-
-// 문서 표 + 제안 표. 모르는 코드 판정과 메시지 조회는 이 전체 표를 기준으로 한다
-const ALL_ERROR_MESSAGES = { ...ERROR_MESSAGES, ...PROPOSED_ERROR_MESSAGES } as const
-
 // 아는 오류 코드의 문자열 유니온 타입(예: 'TITLE_NOT_FOUND'). 특정 코드로 분기할 때 오타를 막는다
-export type ErrorCode = keyof typeof ALL_ERROR_MESSAGES
+export type ErrorCode = keyof typeof ERROR_MESSAGES
 
 // 표에 없는 코드(백엔드가 새 코드를 먼저 배포한 경우 등)이거나 errorCode가 없을 때 보이는 메시지
 export const DEFAULT_ERROR_MESSAGE = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -66,14 +58,14 @@ export const DEFAULT_ERROR_MESSAGE = '요청을 처리하지 못했습니다. �
 export const NETWORK_ERROR_MESSAGE =
   '서버에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'
 
-/** 문자열이 아는 오류 코드(문서 + 제안)인지 확인한다(타입 가드). */
+/** 문자열이 아는 오류 코드(문서 표에 있는 코드)인지 확인한다(타입 가드). */
 export function isKnownErrorCode(errorCode: string | null | undefined): errorCode is ErrorCode {
   // `errorCode in ERROR_MESSAGES`를 쓰지 않는 이유: 'toString'처럼 모든 객체가 물려받는 이름도 true가 된다.
   // Object.hasOwn은 표에 직접 적힌 키만 인정한다
-  return errorCode != null && Object.hasOwn(ALL_ERROR_MESSAGES, errorCode)
+  return errorCode != null && Object.hasOwn(ERROR_MESSAGES, errorCode)
 }
 
 /** errorCode에 맞는 화면 메시지를 돌려준다. 모르는 코드이거나 값이 없으면 기본 메시지를 돌려준다. */
 export function getErrorMessage(errorCode?: string | null): string {
-  return isKnownErrorCode(errorCode) ? ALL_ERROR_MESSAGES[errorCode] : DEFAULT_ERROR_MESSAGE
+  return isKnownErrorCode(errorCode) ? ERROR_MESSAGES[errorCode] : DEFAULT_ERROR_MESSAGE
 }
