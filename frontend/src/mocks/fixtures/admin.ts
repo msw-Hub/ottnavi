@@ -1,0 +1,276 @@
+/*
+ * 관리자 화면 목업 데이터다(Task 029, SCR-14 OTT 구독상품·월 구독요금 / SCR-15 제공처 매핑 / SCR-16 수집).
+ *
+ * 날짜를 하드코딩하지 않는 이유: "확인일 90일 초과", "예정된 월 구독요금", "방금 시작한 수집"은 오늘을 기준으로 의미가 정해진다.
+ * 2026-10-11에 고정한 날짜를 쓰면 시간이 지난 뒤 모든 요금이 "오래됨"으로 보이거나 예정 줄이 과거가 된다.
+ * 그래서 아래 build* 함수는 기준일(오늘)을 받아 그날에서 상대적으로 날짜를 만든다. 호출할 때마다 새 객체를 만들어,
+ * 핸들러가 값을 고쳐도 원본 fixture가 오염되지 않는다.
+ *
+ * 값의 출처:
+ * - 제공처 매핑 8행·관련 없음 2행: docs/ROADMAP.md Task 004 기록(TMDB KR 제공처 조사, 2026-10-05)의 실제 값이다.
+ * - 미매핑 3행: 화면의 "미매핑 강조"를 확인하려는 예시다. 이름과 ID는 Task 004가 기록한 "매핑되지 않은 KR 제공처" 목록의 실제 값을 썼지만,
+ *   "방금 새로 발견됐다"는 발견 시각은 예시다(실제 수집 결과가 아니다).
+ * - OTT 구독상품 7개: 이름과 현재 월 구독요금은 SCR-09용 mocks/fixtures/pricing.ts를 그대로 따른다(두 화면의 금액이 어긋나지 않게 가져다 쓴다).
+ *   pricing.ts는 Task 004 가격표에 맞춰져 있다(2026-10-11).
+ *   이력(과거 줄·예정 줄·확인일)은 화면 확인용 예시다.
+ * - 수집 실행 이력과 변경된 작품: 모두 예시다.
+ */
+import type { AvailabilityStatus } from '@/components/common/displayTypes'
+import type {
+  AdminProduct,
+  AdminProductPrice,
+  AdminProvider,
+  CollectChange,
+  CollectExecution,
+} from '@/features/admin/mockTypes'
+import { addDays } from '@/lib/dateUtils'
+import { MOCK_PRODUCTS } from '@/mocks/fixtures/pricing'
+
+// 한국 시간 기준 날짜 + 'HH:mm'을 ISO 일시 문자열로 만든다(+09:00 오프셋이 붙어 어느 시간대에서도 같은 시각을 가리킨다)
+function toSeoulIso(date: string, time: string): string {
+  return `${date}T${time}:00+09:00`
+}
+
+/* ===== OTT 구독상품·월 구독요금 (SCR-14) ===== */
+
+// 월 구독요금 줄 하나를 만든다. 줄 ID는 OTT 구독상품 ID * 10 + 순번이라 상품마다 겹치지 않는다
+function priceRow(
+  productId: number,
+  sequence: number,
+  monthlyPrice: number,
+  effectiveFrom: string,
+  lastVerifiedAt: string,
+): AdminProductPrice {
+  return { id: productId * 10 + sequence, monthlyPrice, effectiveFrom, lastVerifiedAt }
+}
+
+/**
+ * OTT 구독상품 7개(서비스마다 단품 하나)와 월 구독요금 이력을 만든다.
+ * - 넷플릭스: 줄 3개(과거 / 지금 적용 중 / 예정) — "다음 줄 시작일의 전날"까지가 적용 기간임을 보이는 예시
+ * - 애플 TV+: 마지막 확인일이 오늘로부터 120일 전 — 오래됨 태그(90일 초과) 확인용
+ * - 왓챠: 판매 종료(active=false) — 종료 상품 표시 확인용
+ * - 나머지: 줄 하나, 최근에 확인함
+ * 지금 적용 중인 줄의 금액은 pricing.ts(SCR-09)의 기본 월 요금과 같다.
+ */
+export function buildMockAdminProducts(today: string): AdminProduct[] {
+  return MOCK_PRODUCTS.map((product): AdminProduct => {
+    const { productId, productName, ottServiceId, adminPrice } = product
+    let prices: AdminProductPrice[]
+    let active = true
+
+    if (productId === 101) {
+      // 넷플릭스: 과거 줄 → 지금 적용 중 → 예정 줄(적용 시작일이 오늘보다 뒤)
+      prices = [
+        priceRow(productId, 1, 12000, addDays(today, -400), addDays(today, -200)),
+        priceRow(productId, 2, adminPrice, addDays(today, -10), addDays(today, -5)),
+        priceRow(productId, 3, 14500, addDays(today, 30), addDays(today, -2)),
+      ]
+    } else if (productId === 103) {
+      // 애플 TV+: 확인일이 90일을 넘었다
+      prices = [priceRow(productId, 1, adminPrice, addDays(today, -300), addDays(today, -120))]
+    } else {
+      prices = [priceRow(productId, 1, adminPrice, addDays(today, -180), addDays(today, -7))]
+    }
+    if (productId === 106) active = false // 왓챠: 판매 종료
+
+    return { id: productId, name: productName, productType: 'SINGLE', ottServiceId, active, prices }
+  })
+}
+
+/* ===== 제공처 매핑 (SCR-15) ===== */
+
+// 매핑된 제공처 한 행. 이미 정리된 제공처라 처음 발견된 시각은 오래전이다
+function mappedProvider(
+  today: string,
+  providerId: number,
+  tmdbName: string,
+  ottServiceId: number,
+  tier: AdminProvider['tier'] = 'STANDARD',
+): AdminProvider {
+  return {
+    providerId,
+    tmdbName,
+    ottServiceId,
+    tier,
+    firstSeenAt: toSeoulIso(addDays(today, -200), '03:10'),
+    mappingState: 'MAPPED',
+  }
+}
+
+/**
+ * TMDB 제공처 목록을 만든다. 순서는 매핑됨(Task 004 표 순서) → 관련 없음 → 미매핑이다.
+ * 화면이 미매핑을 맨 위로 올려 강조하는 정렬은 화면(핸들러·훅) 몫이다.
+ * 서비스 ID는 pricing.ts의 서비스 번호(1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이)와 같다.
+ */
+export function buildMockAdminProviders(today: string): AdminProvider[] {
+  return [
+    // --- 매핑됨: ROADMAP Task 004 매핑표 8행 ---
+    mappedProvider(today, 8, 'Netflix', 1),
+    mappedProvider(today, 1796, 'Netflix Standard with Ads', 1, 'AD'), // 광고형. MVP에서는 사용하지 않는다(O3)
+    mappedProvider(today, 337, 'Disney Plus', 2),
+    mappedProvider(today, 1883, 'TVING', 4),
+    mappedProvider(today, 97, 'Watcha', 6),
+    mappedProvider(today, 356, 'wavve', 5),
+    mappedProvider(today, 1881, 'Coupang Play', 7),
+    mappedProvider(today, 350, 'Apple TV', 3),
+    // --- 관련 없음: Task 004가 "국내 구독 후보로 볼 만하지만 범위 밖"으로 기록한 제공처. 운영자가 확인하고 쓰지 않기로 했다 ---
+    {
+      providerId: 119,
+      tmdbName: 'Amazon Prime Video',
+      ottServiceId: null,
+      tier: 'STANDARD',
+      firstSeenAt: toSeoulIso(addDays(today, -200), '03:10'),
+      mappingState: 'IGNORED',
+    },
+    {
+      providerId: 3,
+      tmdbName: 'Google Play Movies',
+      ottServiceId: null,
+      tier: 'STANDARD',
+      firstSeenAt: toSeoulIso(addDays(today, -200), '03:10'),
+      mappingState: 'IGNORED',
+    },
+    // --- 미매핑(예시): 아직 운영자가 확인하지 않은 제공처 ---
+    {
+      providerId: 283,
+      tmdbName: 'Crunchyroll',
+      ottServiceId: null,
+      tier: 'STANDARD',
+      firstSeenAt: toSeoulIso(addDays(today, -1), '03:12'),
+      mappingState: 'UNMAPPED',
+    },
+    {
+      providerId: 11,
+      tmdbName: 'MUBI',
+      ottServiceId: null,
+      tier: 'STANDARD',
+      firstSeenAt: toSeoulIso(addDays(today, -2), '03:12'),
+      mappingState: 'UNMAPPED',
+    },
+    {
+      providerId: 538,
+      tmdbName: 'Plex',
+      ottServiceId: null,
+      tier: 'STANDARD',
+      firstSeenAt: toSeoulIso(addDays(today, -5), '03:15'),
+      mappingState: 'UNMAPPED',
+    },
+  ]
+}
+
+/* ===== 수집 (SCR-16) ===== */
+
+/**
+ * 수집 실행 이력을 만든다(최근 시작한 순). 상태 4종이 모두 있다.
+ * - 5번 RUNNING: 오늘 날짜, 8분 전에 시작(끝난 시각 없음)
+ * - 4번 COMPLETED: 어제 기준, 24분 걸림, 변경 6건
+ * - 3번 STOPPED: 서버가 갑자기 멈춰 기록만 "실행 중"으로 남은 것을 서버가 중단됨으로 판정한 실행 → [복구] 대상
+ * - 2번 FAILED: 외부(TMDB) 응답 지연으로 실패 → [다시 실행] 대상
+ * - 1번 COMPLETED: 4일 전 기준, 1시간 5분 걸림, 변경 3건
+ * RUNNING의 시작 시각만 "지금"에서 빼서 만든다(그 외는 날짜 + 새벽 3시). 지금 시각을 쓰므로 호출 시점마다 조금씩 달라진다.
+ */
+export function buildMockCollectExecutions(
+  today: string,
+  now: Date = new Date(),
+): CollectExecution[] {
+  const d1 = addDays(today, -1)
+  const d2 = addDays(today, -2)
+  const d3 = addDays(today, -3)
+  const d4 = addDays(today, -4)
+  return [
+    {
+      executionId: 5,
+      targetDate: today,
+      tier: 'ALL',
+      status: 'RUNNING',
+      startedAt: new Date(now.getTime() - 8 * 60_000).toISOString(),
+      endedAt: null,
+      processedCount: 1240,
+      changedCount: 12,
+      failureReason: null,
+    },
+    {
+      executionId: 4,
+      targetDate: d1,
+      tier: 'ALL',
+      status: 'COMPLETED',
+      startedAt: toSeoulIso(d1, '03:00'),
+      endedAt: toSeoulIso(d1, '03:24'),
+      processedCount: 3180,
+      changedCount: MOCK_CHANGES_EXEC_4.length,
+      failureReason: null,
+    },
+    {
+      executionId: 3,
+      targetDate: d2,
+      tier: 'ALL',
+      status: 'STOPPED',
+      startedAt: toSeoulIso(d2, '03:00'),
+      endedAt: null,
+      processedCount: 740,
+      changedCount: 5,
+      failureReason: null,
+    },
+    {
+      executionId: 2,
+      targetDate: d3,
+      tier: 'ALL',
+      status: 'FAILED',
+      startedAt: toSeoulIso(d3, '03:00'),
+      endedAt: toSeoulIso(d3, '03:07'),
+      processedCount: 310,
+      changedCount: 2,
+      failureReason: 'TMDB 응답 지연(연속 3회 시간 초과)으로 중단했습니다.',
+    },
+    {
+      executionId: 1,
+      targetDate: d4,
+      tier: 'ALL',
+      status: 'COMPLETED',
+      startedAt: toSeoulIso(d4, '03:00'),
+      endedAt: toSeoulIso(d4, '04:05'),
+      processedCount: 3150,
+      changedCount: MOCK_CHANGES_EXEC_1.length,
+      failureReason: null,
+    },
+  ]
+}
+
+// 변경 한 건. 이전 상태가 null이면 이번에 처음 확인된 신규 작품이다
+function change(
+  mediaType: CollectChange['mediaType'],
+  tmdbId: number,
+  title: string,
+  ottServiceId: number,
+  previousStatus: AvailabilityStatus | null,
+  currentStatus: AvailabilityStatus,
+): CollectChange {
+  return { mediaType, tmdbId, title, ottServiceId, previousStatus, currentStatus }
+}
+
+// 4번 실행(어제 기준 성공)에서 바뀐 작품: 있음/없음/모름 전환 + 신규(이전 null)를 섞었다
+const MOCK_CHANGES_EXEC_4: CollectChange[] = [
+  change('movie', 496243, '기생충', 4, 'NOT_AVAILABLE', 'AVAILABLE'),
+  change('movie', 838209, '파묘', 1, 'UNKNOWN', 'AVAILABLE'),
+  change('tv', 136283, '더 글로리', 1, 'AVAILABLE', 'NOT_AVAILABLE'),
+  change('tv', 93405, '오징어 게임', 1, 'AVAILABLE', 'UNKNOWN'),
+  change('movie', 837799, '헌트', 6, null, 'AVAILABLE'),
+  change('movie', 491584, '버닝', 5, null, 'NOT_AVAILABLE'),
+]
+
+// 1번 실행(4일 전 기준 성공)에서 바뀐 작품
+const MOCK_CHANGES_EXEC_1: CollectChange[] = [
+  change('tv', 96578, '슬기로운 의사생활', 1, 'NOT_AVAILABLE', 'AVAILABLE'),
+  change('movie', 496243, '기생충', 5, 'AVAILABLE', 'NOT_AVAILABLE'),
+  change('movie', 838209, '파묘', 4, null, 'AVAILABLE'),
+]
+
+/**
+ * 실행별 변경된 작품 목록을 만든다. 성공한 두 실행(4번·1번)에만 목록이 있다.
+ * 실행 중·중단됨·실패 실행이나 없는 실행 ID는 빈 목록이다(중간까지의 변경은 이 목업에서 보여 주지 않는다).
+ */
+export function buildMockCollectChanges(executionId: number): CollectChange[] {
+  if (executionId === 4) return MOCK_CHANGES_EXEC_4.map((c) => ({ ...c }))
+  if (executionId === 1) return MOCK_CHANGES_EXEC_1.map((c) => ({ ...c }))
+  return []
+}

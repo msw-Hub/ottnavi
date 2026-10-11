@@ -85,6 +85,26 @@
   --choice-free-bg: oklch(0.8 0.12 160); /* 무료 이용 */
   --choice-unknown-bg: oklch(0.86 0.12 85); /* 잘 모르겠음 */
   --choice-none-bg: oklch(0.82 0.02 258); /* 미구독 */
+
+  /*
+   * 주의(attention) 표시: 관리자 화면의 "미매핑" 제공처, "요금 확인일 오래됨" 태그, 미매핑 행의 왼쪽 막대(Task 029, 임시. 확정은 Task 037).
+   * 값은 "잘 모르겠음" 선택 칸(--choice-unknown-bg)·선택 글자(--choice-fg)와 같다. 같은 값을 그대로 참조하지 않고
+   * 이름을 따로 둔 이유: 뜻이 다르다. 한쪽 색을 바꿀 때 다른 쪽이 따라 바뀌지 않게 하려는 것이다.
+   * 노랑을 "글자"가 아니라 "바탕"으로만 쓴다. 어두운 바탕 위 노랑 글자는 번져 보인다는 Task 028 피드백 때문이다.
+   * 밝은 노랑 바탕(0.86) 위 짙은 남색 글자(0.15)의 대비는 약 9:1로 본문 기준 4.5:1 이상이다.
+   * 색은 보조 수단이다. 주의 표시는 항상 경고 아이콘 + 글자(예: "미매핑")와 함께 쓴다.
+   */
+  --attention-bg: oklch(0.86 0.12 85); /* 배지 바탕·행 왼쪽 막대 */
+  --attention-fg: oklch(0.15 0.035 264); /* 배지 글자·아이콘 */
+  --attention-border: var(--attention-bg); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+
+  /*
+   * 성공(success) 표시: 관리자 수집 이력의 "성공" 배지(Task 029, 임시. 확정은 Task 037).
+   * 값은 제공 상태 "있음"(--status-available-*)과 같다. "제공 있음"과 "실행 성공"은 뜻이 달라 이름을 나눴다.
+   * 초록 바탕(0.8) 위 짙은 남색 글자(0.15)의 대비는 "있음" 배지와 같아 4.5:1 이상이다. 체크 아이콘 + "성공" 글자와 함께 쓴다.
+   */
+  --success: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --success-bg: oklch(0.8 0.12 160); /* 바탕(채움) */
 }
 
 /*
@@ -115,4 +135,9 @@
   --color-choice-free-bg: var(--choice-free-bg);
   --color-choice-unknown-bg: var(--choice-unknown-bg);
   --color-choice-none-bg: var(--choice-none-bg);
+  --color-attention-bg: var(--attention-bg);
+  --color-attention-fg: var(--attention-fg);
+  --color-attention-border: var(--attention-border);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
 }

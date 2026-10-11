@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_DISPLAY, formatDataAsOf, formatDate, formatMinutes, formatWon } from '@/lib/format'
+import {
+  EMPTY_DISPLAY,
+  formatDataAsOf,
+  formatDate,
+  formatDateTime,
+  formatElapsed,
+  formatIsoDate,
+  formatMinutes,
+  formatWon,
+} from '@/lib/format'
 
 describe('formatDate', () => {
   it('개봉일·방영일(YYYY-MM-DD)을 한국어 날짜로 바꾼다', () => {
@@ -88,5 +97,63 @@ describe('formatDataAsOf', () => {
 
   it('잘못된 Date 객체는 null', () => {
     expect(formatDataAsOf(new Date('invalid'))).toBeNull()
+  })
+})
+
+describe('formatDateTime', () => {
+  it('한국 시간 기준 "YYYY-MM-DD HH:mm"으로 바꾼다', () => {
+    expect(formatDateTime('2026-10-10T03:24:00+09:00')).toBe('2026-10-10 03:24')
+    // UTC 18:30은 한국 시간으로 다음 날 03:30
+    expect(formatDateTime('2026-10-09T18:30:00Z')).toBe('2026-10-10 03:30')
+  })
+
+  it('자정은 24시가 아니라 00시로 보인다', () => {
+    expect(formatDateTime('2026-10-10T00:05:00+09:00')).toBe('2026-10-10 00:05')
+  })
+
+  it('해석할 수 없거나 시각이 없는 값은 null', () => {
+    expect(formatDateTime(null)).toBeNull()
+    expect(formatDateTime('abc')).toBeNull()
+    expect(formatDateTime('2026-10-10')).toBeNull()
+  })
+})
+
+describe('formatIsoDate', () => {
+  it('날짜만 있는 값은 그대로 "YYYY-MM-DD"로 보인다', () => {
+    expect(formatIsoDate('2026-10-08')).toBe('2026-10-08')
+    expect(formatIsoDate('2026-01-05')).toBe('2026-01-05')
+  })
+
+  it('일시는 한국 시간 기준 날짜로 바꾼다', () => {
+    // UTC 16:00은 한국 시간으로 다음 날 01:00
+    expect(formatIsoDate('2026-10-08T16:00:00Z')).toBe('2026-10-09')
+    expect(formatIsoDate(new Date('2026-12-31T15:30:00Z'))).toBe('2027-01-01')
+  })
+
+  it('없는 날짜·해석할 수 없는 값은 null', () => {
+    expect(formatIsoDate(null)).toBeNull()
+    expect(formatIsoDate(undefined)).toBeNull()
+    expect(formatIsoDate('')).toBeNull()
+    expect(formatIsoDate('2026-02-30')).toBeNull()
+    expect(formatIsoDate('abc')).toBeNull()
+  })
+})
+
+describe('formatElapsed', () => {
+  const start = '2026-10-10T03:00:00+09:00'
+
+  it.each([
+    ['2026-10-10T03:24:00+09:00', '24분'],
+    ['2026-10-10T04:05:00+09:00', '1시간 5분'],
+    ['2026-10-10T04:00:00+09:00', '1시간'],
+    ['2026-10-10T03:00:30+09:00', '1분 미만'],
+  ])('%s까지 → %s', (end, expected) => {
+    expect(formatElapsed(start, end)).toBe(expected)
+  })
+
+  it('끝난 시각이 없거나 시작보다 빠르거나 잘못된 값이면 "-"', () => {
+    expect(formatElapsed(start, null)).toBe(EMPTY_DISPLAY)
+    expect(formatElapsed(start, '2026-10-10T02:00:00+09:00')).toBe(EMPTY_DISPLAY)
+    expect(formatElapsed(start, 'abc')).toBe(EMPTY_DISPLAY)
   })
 })

@@ -34,8 +34,30 @@ const TECH_ERROR_MESSAGES = {
 // 두 표를 합친 전체 매핑. 화면 코드는 이 값이 아니라 getErrorMessage를 쓴다
 export const ERROR_MESSAGES = { ...COMMON_ERROR_MESSAGES, ...TECH_ERROR_MESSAGES } as const
 
-// 문서에 있는 오류 코드의 문자열 유니온 타입(예: 'TITLE_NOT_FOUND'). 특정 코드로 분기할 때 오타를 막는다
-export type ErrorCode = keyof typeof ERROR_MESSAGES
+/*
+ * 관리자 월 구독요금 규칙 위반 코드(Task 029 목업). 코드 이름과 메시지 모두 "제안"이다.
+ * docs/api/error-codes.md에 아직 없어서 ERROR_MESSAGES(문서와 글자까지 같아야 하는 표)에 넣지 않고 따로 둔다.
+ * 계약 Task(031)에서 error-codes.md에 올리면 TECH_ERROR_MESSAGES로 옮기고 이 표는 지운다.
+ * (규칙: 첫 줄 시작일은 오늘 이하 / 같은 시작일 금지 / 새 줄 시작일은 마지막 줄보다 늦게 / 가장 최근 줄만 수정·삭제 / 줄이 하나뿐이면 삭제 금지)
+ */
+const PROPOSED_ERROR_MESSAGES = {
+  PRICE_START_DATE_NOT_AFTER_LAST: '적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다.', // 제안
+  PRICE_START_DATE_DUPLICATE: '같은 적용 시작일의 월 구독요금이 이미 있습니다.', // 제안
+  PRICE_FIRST_START_DATE_IN_FUTURE:
+    '첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다.', // 제안
+  PRICE_NOT_CURRENT: '지금 적용 중인 월 구독요금만 확인할 수 있습니다.', // 제안
+  PRICE_NOT_LATEST: '가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.', // 제안
+  BATCH_RECOVERY_REQUIRED:
+    '중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요.', // 제안
+  BATCH_NOT_STOPPED: '중단된 실행만 복구할 수 있습니다.', // 제안
+  PRICE_LAST_ROW_CANNOT_DELETE: '월 구독요금이 하나뿐이라 삭제할 수 없습니다.', // 제안
+} as const
+
+// 문서 표 + 제안 표. 모르는 코드 판정과 메시지 조회는 이 전체 표를 기준으로 한다
+const ALL_ERROR_MESSAGES = { ...ERROR_MESSAGES, ...PROPOSED_ERROR_MESSAGES } as const
+
+// 아는 오류 코드의 문자열 유니온 타입(예: 'TITLE_NOT_FOUND'). 특정 코드로 분기할 때 오타를 막는다
+export type ErrorCode = keyof typeof ALL_ERROR_MESSAGES
 
 // 표에 없는 코드(백엔드가 새 코드를 먼저 배포한 경우 등)이거나 errorCode가 없을 때 보이는 메시지
 export const DEFAULT_ERROR_MESSAGE = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
@@ -44,14 +66,14 @@ export const DEFAULT_ERROR_MESSAGE = '요청을 처리하지 못했습니다. �
 export const NETWORK_ERROR_MESSAGE =
   '서버에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'
 
-/** 문자열이 문서에 있는 오류 코드인지 확인한다(타입 가드). */
+/** 문자열이 아는 오류 코드(문서 + 제안)인지 확인한다(타입 가드). */
 export function isKnownErrorCode(errorCode: string | null | undefined): errorCode is ErrorCode {
   // `errorCode in ERROR_MESSAGES`를 쓰지 않는 이유: 'toString'처럼 모든 객체가 물려받는 이름도 true가 된다.
   // Object.hasOwn은 표에 직접 적힌 키만 인정한다
-  return errorCode != null && Object.hasOwn(ERROR_MESSAGES, errorCode)
+  return errorCode != null && Object.hasOwn(ALL_ERROR_MESSAGES, errorCode)
 }
 
 /** errorCode에 맞는 화면 메시지를 돌려준다. 모르는 코드이거나 값이 없으면 기본 메시지를 돌려준다. */
 export function getErrorMessage(errorCode?: string | null): string {
-  return isKnownErrorCode(errorCode) ? ERROR_MESSAGES[errorCode] : DEFAULT_ERROR_MESSAGE
+  return isKnownErrorCode(errorCode) ? ALL_ERROR_MESSAGES[errorCode] : DEFAULT_ERROR_MESSAGE
 }

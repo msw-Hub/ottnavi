@@ -7,6 +7,8 @@
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 /* 서비스 고유 디자인 토큰(제공 상태·데이터 부족·추정·토스트 빨강)과 그 Tailwind 연결(Task 026) */
 @import "./styles/tokens.css";
+/* 관리자 화면 전용 밝은 문서형 테마(html[data-theme="admin"]일 때만 적용) */
+@import "./styles/admin-theme.css";
 
 /*
  * shadcn의 다크 모드 방식(.dark 클래스) 설정이다. 앱은 이제 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않는다.

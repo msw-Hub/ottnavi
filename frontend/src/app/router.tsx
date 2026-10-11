@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router'
+import { AdminLayout } from '@/app/AdminLayout'
 import { RequireAdmin } from '@/app/guards/RequireAdmin'
 import { RequireAuth } from '@/app/guards/RequireAuth'
 import { RootLayout } from '@/app/RootLayout'
@@ -144,38 +145,46 @@ export const routes: RouteObject[] = [
             Component: RequireAdmin,
             children: [
               {
-                path: 'admin/products', // SCR-14 상품·가격
-                lazy: {
-                  Component: () =>
-                    import('@/pages/AdminProductsPage').then((m) => m.AdminProductsPage),
-                },
-              },
-              {
-                path: 'admin/providers', // SCR-15 제공처 매핑
-                lazy: {
-                  Component: () =>
-                    import('@/pages/AdminProvidersPage').then((m) => m.AdminProvidersPage),
-                },
-              },
-              {
-                path: 'admin/collect', // SCR-16 수집
-                lazy: {
-                  Component: () =>
-                    import('@/pages/AdminCollectPage').then((m) => m.AdminCollectPage),
-                },
-              },
-              {
-                path: 'admin/monitoring', // SCR-17 모니터링 (3단계, 준비 중)
-                lazy: {
-                  Component: () =>
-                    import('@/pages/AdminMonitoringPage').then((m) => m.AdminMonitoringPage),
-                },
-              },
-              {
-                path: 'admin/llm', // SCR-18 LLM 검토 (3단계, 준비 중)
-                lazy: {
-                  Component: () => import('@/pages/AdminLlmPage').then((m) => m.AdminLlmPage),
-                },
+                // 경로 없는 레이아웃 라우트(Task 029): 관리자 화면 위에 관리자 메뉴(AdminNav)를 공통으로 둔다.
+                // 가드 안쪽에 둔 이유: 관리자가 아니면 메뉴도 그려지지 않아야 하고, 화면을 옮겨 다녀도 메뉴는 다시 만들어지지 않는다.
+                // 자식마다 전체 경로('admin/...')를 유지하므로 `/admin` 단독 주소는 여전히 아래 '*'(404)로 간다.
+                Component: AdminLayout,
+                children: [
+                  {
+                    path: 'admin/products', // SCR-14 OTT 구독상품·월 구독요금
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminProductsPage').then((m) => m.AdminProductsPage),
+                    },
+                  },
+                  {
+                    path: 'admin/providers', // SCR-15 제공처 매핑
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminProvidersPage').then((m) => m.AdminProvidersPage),
+                    },
+                  },
+                  {
+                    path: 'admin/collect', // SCR-16 수집
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminCollectPage').then((m) => m.AdminCollectPage),
+                    },
+                  },
+                  {
+                    path: 'admin/monitoring', // SCR-17 모니터링 (3단계, 준비 중)
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminMonitoringPage').then((m) => m.AdminMonitoringPage),
+                    },
+                  },
+                  {
+                    path: 'admin/llm', // SCR-18 LLM 검토 (3단계, 준비 중)
+                    lazy: {
+                      Component: () => import('@/pages/AdminLlmPage').then((m) => m.AdminLlmPage),
+                    },
+                  },
+                ],
               },
             ],
           },

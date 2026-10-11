@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import { Providers } from '@/app/providers'
@@ -26,9 +26,9 @@ const ROUTE_TABLE = [
   { pattern: '/plan/history', url: '/plan/history', heading: '플랜 변경 내역' }, // SCR-11
   { pattern: '/settings/notifications', url: '/settings/notifications', heading: '알림 설정' }, // SCR-12
   { pattern: '/settings/withdraw', url: '/settings/withdraw', heading: '회원 탈퇴' }, // SCR-13
-  { pattern: '/admin/products', url: '/admin/products', heading: '상품·가격 관리' }, // SCR-14
+  { pattern: '/admin/products', url: '/admin/products', heading: 'OTT 구독상품 관리' }, // SCR-14
   { pattern: '/admin/providers', url: '/admin/providers', heading: '제공처 매핑' }, // SCR-15
-  { pattern: '/admin/collect', url: '/admin/collect', heading: '수집 관리' }, // SCR-16
+  { pattern: '/admin/collect', url: '/admin/collect', heading: '수집 실행·이력' }, // SCR-16
   { pattern: '/admin/monitoring', url: '/admin/monitoring', heading: '모니터링' }, // SCR-17
   { pattern: '/admin/llm', url: '/admin/llm', heading: 'LLM 검토' }, // SCR-18
   { pattern: '/*', url: '/no-such-page', heading: '페이지를 찾을 수 없음' }, // 404
@@ -84,6 +84,23 @@ describe('라우터 경로표', () => {
       renderAt(url)
       // 페이지는 lazy로 불러오므로 바로 나타나지 않는다. findBy는 나타날 때까지 기다린다
       expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
+
+      // 관리자 화면 공통 틀(AdminLayout, Task 029): 관리자 5개 화면에만 메뉴가 있고 현재 메뉴에 aria-current=page가 붙는다.
+      // 같은 주소를 여는 별도 테스트로 나누지 않은 이유: React Router는 lazy 라우트를 처음 열 때 라우트 객체를 직접 고쳐서,
+      // 같은 routes로 만든 두 번째 라우터에서 같은 주소를 열면 "No route matches" 404가 난다(관찰). 그래서 한 번 여는 이 테스트에서 함께 검사한다.
+      // 회원·비로그인 차단은 RequireAdmin이 아직 모든 요청을 통과시키는 자리표시라(Task 057) 여기서 검사하지 않는다.
+      const adminNav = screen.queryByRole('navigation', { name: '관리자 메뉴' })
+      if (url.startsWith('/admin/')) {
+        expect(adminNav).toBeInTheDocument()
+        expect(within(adminNav!).getAllByRole('link')).toHaveLength(5)
+        expect(within(adminNav!).getByRole('link', { current: 'page' })).toHaveAttribute(
+          'href',
+          url,
+        )
+      } else if (!url.startsWith('/__dev/')) {
+        // 개발 확인 화면(__dev)은 부품 보기용으로 AdminNav를 직접 그리므로 제외한다
+        expect(adminNav).not.toBeInTheDocument()
+      }
     },
   )
 })
