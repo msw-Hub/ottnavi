@@ -7,3 +7,13 @@ import { afterEach } from 'vitest'
 afterEach(() => {
   cleanup()
 })
+
+// jsdom에는 ResizeObserver가 없다. Radix 라디오 그룹처럼 크기 감시를 쓰는 부품(수집 범위 선택 등)을 그리는 화면이
+// 라우터 테스트 등에서 "ResizeObserver is not defined"로 죽지 않도록, 아무 일도 하지 않는 대역을 전역에 둔다.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+}

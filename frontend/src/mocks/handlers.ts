@@ -18,6 +18,7 @@ import {
   problemResponse,
   resetMockWishlist,
 } from '@/mocks/handlerUtils'
+import { adminHandlers } from '@/mocks/adminHandlers'
 import { memberHandlers } from '@/mocks/memberHandlers'
 import { getMockRole } from '@/mocks/mockSession'
 
@@ -260,5 +261,6 @@ export const handlers: RequestHandler[] = [
   ...scenarioHandlers,
   ...publicScreenHandlers,
   ...memberHandlers,
+  ...adminHandlers, // 관리자 화면(Task 029). 역할을 검사하지 않는다(adminHandlers 주석)
   ...getProductMock(),
 ]

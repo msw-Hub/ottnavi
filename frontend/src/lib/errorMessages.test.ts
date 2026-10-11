@@ -65,6 +65,14 @@ describe('getErrorMessage', () => {
     },
   )
 
+  it('문서에 아직 없는 월 구독요금 규칙 코드(제안)도 메시지를 돌려준다', () => {
+    expect(isKnownErrorCode('PRICE_START_DATE_DUPLICATE')).toBe(true)
+    expect(getErrorMessage('PRICE_START_DATE_DUPLICATE')).toBe(
+      '같은 적용 시작일의 월 구독요금이 이미 있습니다.',
+    )
+    expect(getErrorMessage('BATCH_ALREADY_RUNNING')).toBe('같은 날짜의 수집이 이미 실행 중입니다.')
+  })
+
   it('객체가 물려받은 속성 이름은 아는 코드로 보지 않는다', () => {
     expect(isKnownErrorCode('toString')).toBe(false)
     expect(isKnownErrorCode('VALIDATION_FAILED')).toBe(true)

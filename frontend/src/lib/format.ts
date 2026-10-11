@@ -126,3 +126,82 @@ export function formatDate(value: string | Date | null | undefined): string | nu
 export function formatDataAsOf(value: string | Date | null | undefined): string | null {
   return formatDate(value)
 }
+
+// 관리자 날짜 표시용: 'YYYY-MM-DD'. en-CA 로캘이 이 모양으로 읽힌다(dateUtils의 SEOUL_DATE_FORMATTER와 같은 방식)
+const ISO_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  timeZone: 'Asia/Seoul',
+})
+
+/**
+ * 날짜를 숫자 형식 "2026-10-08"로 바꾼다. 해석할 수 없으면 null을 돌려준다.
+ *
+ * 관리자 화면 전용이다. 서비스(회원·공개) 화면은 "2026년 10월 9일"을 보이는 formatDate를 그대로 쓴다.
+ * 관리자는 표·이력에서 날짜를 훑어 비교하는 일이 많아 자리 수가 고정된 숫자 형식으로 통일했다(결정: 2026-10-11).
+ * 받는 값과 검증 규칙(없는 날짜는 null, 일시는 한국 시간 기준)은 formatDate와 같다.
+ */
+export function formatIsoDate(value: string | Date | null | undefined): string | null {
+  if (value == null) return null
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : ISO_DATE_FORMATTER.format(value)
+  }
+  const trimmed = value.trim()
+  const dateOnlyMatch = DATE_ONLY_PATTERN.exec(trimmed)
+  if (dateOnlyMatch) {
+    // 없는 날짜(2월 30일)는 formatDate가 이미 걸러 낸다. 그 결과가 null이 아닐 때만 입력 숫자를 그대로 이어 붙인다
+    if (formatDate(trimmed) === null) return null
+    const [, yearText, monthText, dayText] = dateOnlyMatch
+    return `${yearText}-${monthText}-${dayText}`
+  }
+  if (trimmed === '') return null
+  const dateTime = new Date(trimmed)
+  return Number.isNaN(dateTime.getTime()) ? null : ISO_DATE_FORMATTER.format(dateTime)
+}
+
+// 일시 표시용: 한국 시간 기준 연·월·일·시·분을 각각 숫자로 뽑는다. hourCycle 'h23'은 자정을 "24"가 아닌 "00"으로 읽게 한다
+const DATE_TIME_PARTS_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'Asia/Seoul',
+})
+
+/**
+ * 일시(ISO-8601, 오프셋 포함)를 한국 시간 기준 "2026-10-10 03:24" 형식으로 바꾼다. 해석할 수 없으면 null을 돌려준다.
+ *
+ * 관리자 화면의 수집 시작·종료 시각처럼 "몇 시에 일어났는지"가 중요한 곳에 쓴다. formatDate는 날짜까지만 보여 시각을 잃기 때문에 따로 둔다.
+ * 사용자 컴퓨터 시간대가 달라도 같은 값이 보이도록 formatDate와 같이 Asia/Seoul로 고정한다.
+ * 날짜만 있는 값('YYYY-MM-DD')은 시각이 없어 null이다(그런 값은 formatDate를 쓴다).
+ */
+export function formatDateTime(value: string | Date | null | undefined): string | null {
+  if (value == null) return null
+  const date =
+    value instanceof Date ? value : DATE_ONLY_PATTERN.test(value.trim()) ? null : new Date(value)
+  if (date === null || Number.isNaN(date.getTime())) return null
+
+  const parts: Record<string, string> = {}
+  for (const part of DATE_TIME_PARTS_FORMATTER.formatToParts(date)) parts[part.type] = part.value
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
+}
+
+/**
+ * 시작·종료 시각 사이를 "24분", "1시간 5분" 형식으로 바꾼다(분 표기는 formatMinutes를 재사용한다).
+ *
+ * - 1분 미만이면 "1분 미만": "0분"은 실행이 안 된 것처럼 읽혀서다.
+ * - 종료가 시작보다 빠르거나 해석할 수 없는 값이면 EMPTY_DISPLAY("-"): 데이터 오류를 그럴듯하게 보이지 않기 위함이다.
+ */
+export function formatElapsed(
+  startedAt: string | null | undefined,
+  endedAt: string | null | undefined,
+): string {
+  if (startedAt == null || endedAt == null) return EMPTY_DISPLAY
+  const elapsedMs = new Date(endedAt).getTime() - new Date(startedAt).getTime()
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return EMPTY_DISPLAY
+  if (elapsedMs < 60_000) return '1분 미만'
+  return formatMinutes(Math.round(elapsedMs / 60_000))
+}

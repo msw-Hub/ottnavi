@@ -16,6 +16,12 @@ import { ServiceStatusRow, type ServiceStatusEntry } from '@/components/common/S
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import type { AvailabilityStatus, PriceSource } from '@/components/common/displayTypes'
 import { Button } from '@/components/ui/button'
+import { AdminNav } from '@/features/admin/components/AdminNav'
+import { MappingStateBadge } from '@/features/admin/components/MappingStateBadge'
+import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
+import { RunStatusBadge } from '@/features/admin/components/RunStatusBadge'
+import { StaleVerifiedTag } from '@/features/admin/components/StaleVerifiedTag'
+import type { MappingDisplayState, RunDisplayStatus } from '@/features/admin/types'
 import { getErrorMessage } from '@/lib/errorMessages'
 import { formatMinutes } from '@/lib/format'
 import { useMockRole } from '@/hooks/useMockRole'
@@ -114,6 +120,21 @@ const SAMPLE_PRICES: {
     priceSource: 'FREE',
     note: '가족 공유 등 무료로 이용 중',
   },
+]
+
+// 관리자 수집 실행 상태 4종과 각 상태의 뜻(Task 029)
+const RUN_STATUS_LEGEND: { status: RunDisplayStatus; description: string }[] = [
+  { status: 'RUNNING', description: '수집이 진행 중' },
+  { status: 'COMPLETED', description: '끝까지 성공' },
+  { status: 'FAILED', description: '오류로 멈춤(복구한 실행 포함). [다시 실행]으로 이어서 수집' },
+  { status: 'STOPPED', description: '서버가 멈춰 기록만 남은 실행(서버가 판정). [복구] 대상' },
+]
+
+// 관리자 제공처 매핑 상태 3종과 각 상태의 뜻(Task 029)
+const MAPPING_STATE_LEGEND: { state: MappingDisplayState; description: string }[] = [
+  { state: 'UNMAPPED', description: '아직 확인하지 않은 제공처. 목록 맨 위에 강조' },
+  { state: 'MAPPED', description: '7개 서비스 중 하나에 연결됨' },
+  { state: 'IGNORED', description: '확인했고 쓰지 않기로 함(예: 대여·구매 전용 스토어)' },
 ]
 
 // 오류 상태 예시에 넘길 오류. 공통 인터셉터가 만드는 것과 같은 ApiError 모양으로 외부 데이터 오류를 흉내 낸다
@@ -325,6 +346,69 @@ export function ComponentsPreviewPage() {
         <p className="mt-3 text-[0.8125rem] text-muted-foreground" aria-live="polite">
           현재 역할: {mockRole}
         </p>
+      </PreviewSection>
+
+      {/* 관리자 화면(SCR-14~16)의 표시 컴포넌트 모음(Task 029). 화면 조립 전에 모양과 흑백 구분을 먼저 확인하려고 둔다 */}
+      <PreviewSection id="preview-admin" title="8. 관리자 표시 컴포넌트 (Task 029)">
+        <div className="grid gap-5">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">관리자 메뉴</h3>
+            {/* 이 확인 화면 주소는 관리자 경로가 아니라 "현재 메뉴" 밑줄은 보이지 않는다. 숫자 2는 예시 값이다 */}
+            <AdminNav unmappedProviderCount={2} />
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">수집 실행 상태</h3>
+            <ul className="grid gap-2 text-[0.9375rem]">
+              {RUN_STATUS_LEGEND.map(({ status, description }) => (
+                <li key={status} className="flex items-start gap-3">
+                  <span className="min-w-22 flex-none">
+                    <RunStatusBadge status={status} />
+                  </span>
+                  <span className="pt-0.5 text-muted-foreground">{description}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">제공처 매핑 상태</h3>
+            <ul className="grid gap-2 text-[0.9375rem]">
+              {MAPPING_STATE_LEGEND.map(({ state, description }) => (
+                <li key={state} className="flex items-start gap-3">
+                  <span className="min-w-26 flex-none">
+                    <MappingStateBadge state={state} />
+                  </span>
+                  <span className="pt-0.5 text-muted-foreground">{description}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">미매핑 행 강조 예시</h3>
+            {/* 왼쪽 4px 막대(attention)는 보조 표시이고, 뜻은 배지의 아이콘·글자가 전한다 */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-l-4 border-border border-l-attention-border bg-background px-3.5 py-3 text-sm">
+              <MappingStateBadge state="UNMAPPED" />
+              <span className="tabular-nums">119</span>
+              <span>Amazon Prime Video (예시)</span>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">태그</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <PhaseLaterTag />
+              <PhaseLaterTag phase="3단계" />
+              <PhaseLaterTag label="2단계부터 제공" />
+              <StaleVerifiedTag lastVerifiedDate="2026-06-30" />
+              <StaleVerifiedTag lastVerifiedDate={null} />
+            </div>
+            <p className="mt-2 text-[0.8125rem] text-muted-foreground">
+              마지막 태그: 확인일 값이 없을 때
+            </p>
+          </div>
+        </div>
       </PreviewSection>
     </div>
   )
