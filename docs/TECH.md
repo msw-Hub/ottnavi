@@ -168,7 +168,7 @@ sequenceDiagram
 | Batch chunk 안 TMDB 호출이 DB 연결을 점유해 풀(약 5) 고갈 | T-2 확정: 배치 예외 인정, 작은 chunk | rules 충돌 |
 | `@MockBean` 제거 | `@MockitoBean` | web |
 | Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
-| WireMock 기본 아티팩트가 Jetty 11. Boot BOM은 Jetty를 12.1로 강제하고 `wiremock-jetty12` 3.13.2는 12.0 기준으로 빌드됨 | Task 016에서 셰이딩된 `wiremock-standalone` 3.13.2를 선택. `wiremock-jetty12`를 쓰면 기동 테스트로 확인. 실제로 WireMock을 띄워 본 적은 없어 TMDB 연동 테스트 Task에서 검증 | c7, BOM(미검증) |
+| WireMock 기본 아티팩트가 Jetty 11. Boot BOM은 Jetty를 12.1로 강제하고 `wiremock-jetty12` 3.13.2는 12.0 기준으로 빌드됨 | Task 016에서 셰이딩된 `wiremock-standalone` 3.13.2를 선택. `wiremock-jetty12`를 쓰면 기동 테스트로 확인. **2026-10-11 Task 041 단계 0에서 실측: `wiremock-standalone` 3.13.2가 Spring Boot 4.1.1·JDK 17에서 동적 포트로 기동하고 스텁에 응답하며 종료까지 정상(`WireMockSmokeTest` 1건 통과, Jetty 충돌 없음). 아티팩트를 바꿀 필요 없음** | c7, 실측(2026-10-11) |
 | springdoc 3.x는 기본으로 `openapi 3.1.0`을 출력해 계약(`openapi.yaml`, 3.0.3)과 `nullable` 표현 등이 달라질 수 있음 | `springdoc.api-docs.version: openapi_3_0`(Task 023). 이 설정은 `3.0.1`을 출력하므로 계약 대조는 버전 문자열을 비교하지 않고 `3.0` 접두사만 검사한다 | c7, 실측(Task 016·023, `/v3/api-docs.yaml`) |
 | springdoc은 produces를 지정하지 않은 operation의 응답 media type을 `*/*`로 낼 수 있고, `@RestControllerAdvice` 핸들러의 응답을 모든 operation의 오류 응답으로 자동으로 붙임 | `springdoc.default-produces-media-type: application/json`. Task 019에서 첫 operation의 200 응답이 `application/json`으로 나오는 것을 확인했다. 계약 대조는 2xx 응답만 비교한다 | c7, 실측(Task 023·019) |
 | springdoc이 record 응답 필드를 `required`로 표시하는지 | 필드마다 `@Schema(requiredMode = REQUIRED)`를 붙이면 `required`에 들어간다(primitive도 자동으로 들어가지 않으므로 명시). Java enum 필드는 인라인 `enum` 목록으로 나온다 | 실측(Task 019, `/v3/api-docs.yaml`) |
