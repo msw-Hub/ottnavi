@@ -237,6 +237,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
                     type="button"
                     variant="destructive"
                     size="sm"
+                    disabled={remove.isPending}
                     onClick={() => setDeleteTarget(row)}
                   >
                     <Trash2Icon aria-hidden="true" />

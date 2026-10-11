@@ -70,6 +70,7 @@ function runRow(table: HTMLElement, executionId: number) {
 
 // 대상 날짜를 바꿔 [수집 실행]을 누른다
 async function submitRun(user: ReturnType<typeof userEvent.setup>, date: string) {
+  // type="date"는 jsdom에서 user.type으로 값이 채워지지 않아 fireEvent.change로 값을 넣는다
   fireEvent.change(screen.getByLabelText('대상 날짜'), { target: { value: date } })
   await user.click(screen.getByRole('button', { name: '수집 실행' }))
 }
