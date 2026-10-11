@@ -1,0 +1,35 @@
+{
+  "adult": false,
+  "backdrop_path": "/test-backdrop-1.jpg",
+  "belongs_to_collection": null,
+  "budget": 0,
+  "genres": [
+    { "id": 18, "name": "드라마" },
+    { "id": 53, "name": "스릴러" }
+  ],
+  "homepage": "",
+  "id": 900001,
+  "imdb_id": "tt0000000",
+  "original_language": "ko",
+  "original_title": "테스트 원제 1",
+  "overview": "가짜 줄거리 1",
+  "popularity": 87.5,
+  "poster_path": "/test-poster-1.jpg",
+  "production_companies": [],
+  "release_date": "2024-05-01",
+  "revenue": 0,
+  "runtime": 118,
+  "status": "Released",
+  "tagline": "",
+  "title": "테스트 영화 1",
+  "video": false,
+  "vote_average": 7.8,
+  "vote_count": 1234,
+  "credits": {
+    "cast": [
+      { "adult": false, "id": 7001, "name": "테스트 배우 1", "character": "테스트 역할 1", "order": 0, "profile_path": "/test-profile-1.jpg" },
+      { "adult": false, "id": 7002, "name": "테스트 배우 2", "character": "테스트 역할 2", "order": 1, "profile_path": null }
+    ],
+    "crew": []
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": 900001,
+  "results": {
+    "KR": {
+      "link": "https://www.themoviedb.org/movie/900001/watch?locale=KR",
+      "flatrate": [
+        { "logo_path": "/test-logo-8.jpg", "provider_id": 8, "provider_name": "테스트 제공처 8", "display_priority": 3 },
+        { "logo_path": "/test-logo-337.jpg", "provider_id": 337, "provider_name": "테스트 제공처 337", "display_priority": 7 }
+      ],
+      "rent": [
+        { "logo_path": "/test-logo-2.jpg", "provider_id": 2, "provider_name": "테스트 제공처 2", "display_priority": 20 }
+      ]
+    },
+    "US": {
+      "link": "https://www.themoviedb.org/movie/900001/watch?locale=US",
+      "flatrate": [
+        { "logo_path": "/test-logo-8.jpg", "provider_id": 8, "provider_name": "테스트 제공처 8", "display_priority": 1 }
+      ]
+    }
+  }
+}

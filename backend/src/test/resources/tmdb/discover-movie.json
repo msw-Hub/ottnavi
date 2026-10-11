@@ -1,0 +1,39 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": "/test-backdrop-1.jpg",
+      "genre_ids": [18, 53],
+      "id": 900001,
+      "original_language": "ko",
+      "original_title": "테스트 원제 1",
+      "overview": "가짜 줄거리 1",
+      "popularity": 87.5,
+      "poster_path": "/test-poster-1.jpg",
+      "release_date": "2024-05-01",
+      "title": "테스트 영화 1",
+      "video": false,
+      "vote_average": 7.8,
+      "vote_count": 1234
+    },
+    {
+      "adult": false,
+      "backdrop_path": null,
+      "genre_ids": [],
+      "id": 900002,
+      "original_language": "en",
+      "original_title": "Test Original 2",
+      "overview": "",
+      "popularity": 3.2,
+      "poster_path": null,
+      "release_date": "",
+      "title": "테스트 영화 2",
+      "video": false,
+      "vote_average": 0,
+      "vote_count": 0
+    }
+  ],
+  "total_pages": 3,
+  "total_results": 41
+}
