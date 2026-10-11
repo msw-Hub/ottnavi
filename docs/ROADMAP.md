@@ -909,7 +909,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `POST /api/admin/collect/executions`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
   - [ ] 관리자 수집 API의 `tier` 파라미터 enum은 `DAILY`·`WEEKLY`·`ALL`이다(R-16 확정). MVP 일괄 수집은 `ALL`을 쓴다. 계약(`openapi.yaml`)과 코드의 enum을 같게 둔다
   - [ ] `targetDate` 직접 지정은 `local` 프로필에서만 허용한다(설정 키 제안: `app.collect.allow-target-date-override`, local만 `true`). 운영(`prod`)에서 지정하면 거부(제안: 400 `VALIDATION_FAILED`)하고 서버 날짜를 쓴다. 같은 날 409를 피해 재수집을 재현하는 용도다(Task 067, 069)
-  - [ ] 복구 `POST /api/admin/collect/{executionId}/recover`(제안): `recover` 후 `restart`
+  - [ ] 복구 `POST /api/admin/collect/executions/{executionId}/recover`: `recover` 후 `restart`
   - [ ] 이력 조회: `BATCH_*` 읽기 전용(시작·종료, 성공/실패, 처리 건수, 실패 사유)
   - [ ] FR-20 "변경된 작품": 실행별 `availability_change`(`job_execution_id`로 연결)의 작품·시즌·서비스·이전/이후 상태 조회(이력 상세 또는 별도 조회, 경로는 제안). 재계산 대상 플랜 수는 2단계 Task 069이 계약에 추가한다
   - [ ] `ADMIN_BATCH_TOKEN` 필터(상수 시간 비교, `/api/admin/collect/**`·`/api/admin/plans/monthly/**`만. 재계산 경로를 토큰 허용 범위에 둘지는 TECH 4절 갱신을 따른다, R-21). ADMIN 역할 검사는 Task 054에서 합친다. 그 전까지 이력·복구 API는 토큰 필터로만 보호된다
