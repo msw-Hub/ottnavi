@@ -720,7 +720,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 아직 구현되지 않은 operation마다 `x-planned: true`를 달고 description에 "제안"을 표시한다. 이미 구현된 API(Task 019 서비스 목록 등)에는 달지 않는다. 이 표시는 각 구현 Task가 지운다(4.2)
   - [ ] `npm run api:generate`(입력은 `openapi.yaml` 하나, Task 017 설정 그대로)로 생성 훅·MSW로 바꾸고, 화면 전용 데이터만 `src/mocks/fixtures/`에 남긴다. `features/*/hooks`에서 `select: (res) => res.data`
   - [ ] 플랜 계산 응답은 플랜 유형(`planType`: RECOMMENDED / SAVER / SIMPLE)별 플랜 목록이고, 저장 요청은 고른 유형의 DRAFT id를 가리킨다(PRD 11절 35번). 세 유형의 선택이 같을 때의 표시는 응답이 아니라 프론트가 합친다
-  - [ ] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, 422 또는 409는 R-9 절차에서 정함)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 둘지 정한다. 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
+  - [ ] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, **409 확정**(2026-10-12), 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 넣는다(2026-10-12 확정). 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
   - [ ] 사용자(백엔드 담당)가 계약 초안을 승인
 - 완료 기준
   - `npm run build` 성공, V-F: Task 027~029 흐름이 생성된 목업으로 그대로 동작한다.

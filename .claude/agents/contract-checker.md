@@ -88,4 +88,4 @@ model: sonnet
 ## 6. 이 에이전트가 하지 않는 일
 
 - 계약 작성·수정, 프론트·백엔드 코드 구현, `npm run api:generate`, 빌드, 백엔드 테스트 실행. 도구가 읽기 전용이라 실행할 수도 없다.
-- CI와의 분담: `OpenApiContractTest`는 springdoc 생성 명세와 계약의 **구조**(operation 존재·operationId·tags·파라미터·요청 본문·2xx 스키마)를 비교하고, `x-planned`·4xx/5xx·description·example은 보지 않는다. 이 에이전트는 그 빈자리인 **규칙 준수, 목업 일치, 오류 코드 대조, 결정 반영, 호환성**을 본다. 구현된 operation의 springdoc 일치 여부는 CI 결과를 기준으로 하고 여기서 판정하지 않는다.
+- CI와의 분담: `OpenApiContractTest`는 springdoc 생성 명세와 계약의 **구조**(operation 존재·operationId·tags·파라미터·요청 본문·2xx 스키마)를 비교한다. `x-planned: true` operation은 일반 비교에서 제외하고 구현된 뒤 표시가 남아 있으면 "표시를 지우라"며 실패시키는 것만 본다. 4xx/5xx·description·example은 보지 않는다. 이 에이전트는 그 빈자리인 **규칙 준수, 목업 일치, 오류 코드 대조, 결정 반영, 호환성**을 본다. 구현된 operation의 springdoc 일치 여부는 CI 결과를 기준으로 하고 여기서 판정하지 않는다.
