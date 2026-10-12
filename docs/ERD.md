@@ -6,7 +6,7 @@
 
 - 공통 감사 컬럼 `created_at`, `updated_at`(TIMESTAMPTZ)은 표에서 생략한다.
 - 키 표기: **PK** 기본키, **FK** 외래키, **UK** 유니크 제약
-- NULL이 될 수 있는 컬럼은 반드시 표시한다(A 영역은 설명 칸에 `NULL 허용`, B~E 영역은 컬럼 이름 뒤에 `NULL`). 표시가 없는 컬럼은 `NOT NULL`이다. `CHECK`는 NULL이면 통과하므로, 열끼리의 규칙 `CHECK`(예: `(status = 'UNKNOWN') = (unknown_reason IS NOT NULL)`)는 이 `NOT NULL` 전제 위에서 성립한다. 마이그레이션에서 `NOT NULL`을 빠뜨리지 않는다.
+- NULL이 될 수 있는 컬럼은 반드시 표시한다(A 영역은 설명 칸에 `NULL 허용`, B~E 영역은 컬럼 이름 뒤에 `NULL`). 표시가 없는 컬럼은 `NOT NULL`이다. `CHECK`는 NULL이면 통과하므로, 열끼리의 규칙 `CHECK`(예: `(status = 'UNKNOWN') = (unknown_reason IS NOT NULL)`)는 이 `NOT NULL` 전제 위에서 성립한다. 마이그레이션에서 `NOT NULL`을 빠뜨리지 않는다. 연결도(mermaid)는 요약이라 NULL 표기를 빠뜨렸을 수 있으니, 어긋나면 각 영역의 상세 표를 정본으로 본다.
 
 ---
 
@@ -58,7 +58,7 @@ erDiagram
     int provider_id PK "TMDB 값"
     varchar tmdb_name "원본 라벨"
     varchar mapping_state "UNMAPPED / MAPPED / IGNORED"
-    bigint ott_service_id FK "MAPPED일 때만"
+    bigint ott_service_id FK "MAPPED일 때만, 아니면 NULL"
     varchar tier "STANDARD / AD"
   }
   title {
@@ -90,7 +90,7 @@ erDiagram
     bigint id PK
     bigint watch_unit_id FK
     bigint ott_service_id FK
-    varchar before_status
+    varchar before_status "NULL 허용"
     varchar after_status
     bigint job_execution_id "NULL 허용"
     timestamptz changed_at

@@ -17,7 +17,7 @@
 
 ## 2. 동작 흐름
 
-앱이 뜨면 Flyway가 `V1 → V2 → V3 → V4` 순서로 아직 안 적용된 파일만 실행한다. `application.yml`에 이미 `ddl-auto: validate`(엔티티와 DB 구조가 다르면 기동 실패)와 `batch.jdbc.initialize-schema: never`(Spring Batch가 테이블을 자동으로 만들지 않음)가 들어 있어서, `BATCH_*`는 V4가 만든다. 이 Task에서는 엔티티가 아직 없어 `validate`가 검사할 대상이 없다.
+앱이 뜨면 Flyway가 `V1 → V2 → V3 → V4` 순서로 아직 안 적용된 파일만 실행한다. `application.yml`에 이미 `ddl-auto: validate`(엔티티와 DB 구조가 다르면 기동 실패)와 `batch.jdbc.initialize-schema: never`(Spring Batch가 테이블을 자동으로 만들지 않음)가 들어 있어서, `BATCH_*`는 V4가 만든다. V2~V4가 만드는 테이블에는 대응하는 엔티티가 아직 없어 `validate`가 검사하지 않는다. 기존 `OttService` 엔티티가 V1의 `ott_service`만 검증한다.
 
 시드는 `INSERT ... SELECT ... JOIN ott_service`로 넣는다. 서비스 번호(id)를 직접 쓰지 않고 `code`(`NETFLIX` 등)로 찾기 때문에 V1이 어떤 번호를 줬든 안전하다. 반대로 V1의 코드가 바뀌면 **오류 없이 0행이 들어가므로** 테스트가 8행인지 확인한다.
 
