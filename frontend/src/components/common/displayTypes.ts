@@ -8,7 +8,7 @@
  * - 문구 표(Record)를 컴포넌트 파일에서 export하면 개발 서버의 빠른 새로고침(react-refresh) 규칙에 걸려,
  *   컴포넌트 파일과 분리했다.
  */
-import type { ServiceSubscriptionStatus } from '@/api/generated/model'
+import type { PriceSource, ServiceSubscriptionStatus } from '@/api/generated/model'
 
 // 임시: 계약 반영 후 생성 타입으로 교체 (ERD availability.status 값: AVAILABLE / NOT_AVAILABLE / UNKNOWN)
 // 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태
@@ -21,13 +21,12 @@ export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
   UNKNOWN: '모름',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD plan_month_product.price_source 값)
-// 플랜 계산에 쓴 금액이 어디서 왔는지
+// 플랜 계산에 쓴 금액이 어디서 왔는지(확정 계약의 생성 타입 PriceSource를 그대로 쓴다, Task 031 6-5)
 // - ADMIN: 관리자가 등록한 요금표의 기본 금액
 // - USER_OVERRIDE: 사용자가 직접 고친 금액
 // - ALREADY_PAID: 이미 구독 중이라 이번 달 비용에 넣지 않음
 // - FREE: 가족 공유 등으로 무료로 이용 중
-export type PriceSource = 'ADMIN' | 'USER_OVERRIDE' | 'ALREADY_PAID' | 'FREE'
+export type { PriceSource }
 
 // 가격 출처별 화면 글자(사용자 확정 문구, 2026-10-09)
 export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {

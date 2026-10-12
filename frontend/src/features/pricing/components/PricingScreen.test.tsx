@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -75,6 +75,21 @@ describe('요금 확인 화면', () => {
     await user.click(screen.getByRole('button', { name: '3개월 플랜 계산하기' }))
     expect(await screen.findByRole('heading', { name: '플랜 결과 화면' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/plan')
+  })
+
+  it('요금 기준일은 관리자 확인 일시의 한국 날짜로 보이고, 내 금액은 기본 요금으로 되돌릴 수 있다', async () => {
+    const user = userEvent.setup()
+    renderPricing()
+
+    // 목업의 확인 일시는 2026-10-08T18:30+09:00이다
+    expect(await screen.findByText('2026년 10월 8일')).toBeInTheDocument()
+
+    const input = await screen.findByLabelText('내 금액 (넷플릭스)')
+    const row = input.closest('li')!
+    await user.type(input, '9900')
+    await user.click(within(row).getByRole('button', { name: '적용' }))
+    await user.click(await within(row).findByRole('button', { name: '기본 요금으로 되돌리기' }))
+    await waitFor(() => expect(within(row).queryByText('사용자 수정')).not.toBeInTheDocument())
   })
 
   it('찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다', async () => {

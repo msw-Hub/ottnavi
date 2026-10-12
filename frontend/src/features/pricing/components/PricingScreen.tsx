@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { CalculatorIcon, CalendarIcon, LoaderCircleIcon, PencilIcon } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import type { OttService } from '@/api/generated/model'
+import type { OttService, ServicePrice, UserSettings } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -10,9 +10,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { PricingRow } from '@/features/pricing/components/PricingRow'
 import { usePricing } from '@/features/pricing/hooks/usePricing'
-import type { PricingOverview } from '@/features/pricing/mockTypes'
 import { useOttServices } from '@/hooks/useOttServices'
 import { useCalculatePlan } from '@/hooks/usePlanDrafts'
+import { useUserSettings } from '@/hooks/useUserSettings'
 import { formatDataAsOf, formatMinutes, formatWon } from '@/lib/format'
 
 // 화면 안에서 "계산하기" 버튼에 넘기는 계산 진행 상태와 시작 함수
@@ -35,6 +35,8 @@ interface PricingCalculation {
 export function PricingScreen() {
   const pricing = usePricing()
   const services = useOttServices()
+  // 예산·시청 시간 요약은 요금 응답에 없어 내 설정에서 읽는다(계약 listMyServicePrices는 요금 목록만 준다)
+  const settings = useUserSettings()
   const navigate = useNavigate()
   const location = useLocation()
   const calculate = useCalculatePlan()
@@ -48,13 +50,15 @@ export function PricingScreen() {
   }
 
   let content: ReactNode
-  if (pricing.isPending || services.isPending) {
+  if (pricing.isPending || services.isPending || settings.isPending) {
     content = <LoadingState message="요금 정보를 불러오고 있어요" />
   } else if (pricing.isError) {
     content = <ErrorState error={pricing.error} onRetry={() => pricing.refetch()} />
   } else if (services.isError) {
     content = <ErrorState error={services.error} onRetry={() => services.refetch()} />
-  } else if (pricing.data.services.length === 0) {
+  } else if (settings.isError) {
+    content = <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
+  } else if (pricing.data.length === 0) {
     content = (
       <EmptyState
         title="요금 정보가 아직 없어요"
@@ -63,7 +67,12 @@ export function PricingScreen() {
     )
   } else {
     content = (
-      <PricingContent overview={pricing.data} services={services.data} calculation={calculation} />
+      <PricingContent
+        prices={pricing.data}
+        settings={settings.data}
+        services={services.data}
+        calculation={calculation}
+      />
     )
   }
 
@@ -76,19 +85,29 @@ export function PricingScreen() {
 }
 
 interface PricingContentProps {
-  overview: PricingOverview // 서비스별 요금과 요약
+  prices: ServicePrice[] // 서비스별 요금(상품 단위 줄)
+  settings: UserSettings // 내 설정(예산·시청 시간 요약에 쓴다)
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름·데이터 충분도)
   calculation: PricingCalculation
 }
 
 // 데이터를 불러온 뒤의 화면
-function PricingContent({ overview, services, calculation }: PricingContentProps) {
+function PricingContent({ prices, settings, services, calculation }: PricingContentProps) {
   const location = useLocation()
   const serviceById = new Map(services.map((service) => [service.ottServiceId, service]))
   // 예산·시청 시간이 비어 있으면 계산을 시작할 수 없다(서버도 400). 먼저 설정하도록 안내하고 버튼을 막는다
   const isReadyToCalculate =
-    overview.monthlyBudget !== null && overview.monthlyWatchMinutes !== null
-  const priceDate = formatDataAsOf(overview.priceEffectiveFrom)
+    settings.monthlyBudget !== null && settings.monthlyWatchMinutes !== null
+  // 요금 기준일: 관리자가 요금을 마지막으로 확인한 일시(lastVerifiedAt) 중 가장 늦은 것의 한국 날짜.
+  // ISO-8601(오프셋 포함) 문자열은 같은 형식끼리 사전순 비교가 시간순이 아닐 수 있어 Date로 바꿔 비교한다
+  const latestVerifiedAt = prices.reduce<string | null>(
+    (latest, price) =>
+      latest === null || new Date(price.lastVerifiedAt) > new Date(latest)
+        ? price.lastVerifiedAt
+        : latest,
+    null,
+  )
+  const priceDate = formatDataAsOf(latestVerifiedAt)
 
   return (
     <div className="flex flex-col gap-5">
@@ -99,12 +118,12 @@ function PricingContent({ overview, services, calculation }: PricingContentProps
       >
         <div>
           <p className="text-sm text-muted-foreground">월 예산</p>
-          <p className="text-xl font-extrabold tabular-nums">{formatWon(overview.monthlyBudget)}</p>
+          <p className="text-xl font-extrabold tabular-nums">{formatWon(settings.monthlyBudget)}</p>
         </div>
         <div>
           <p className="text-sm text-muted-foreground">월 시청 시간</p>
           <p className="text-xl font-extrabold tabular-nums">
-            {formatMinutes(overview.monthlyWatchMinutes)}
+            {formatMinutes(settings.monthlyWatchMinutes)}
           </p>
         </div>
         <Button asChild variant="outline" className="h-11 justify-self-start sm:justify-self-end">
@@ -125,7 +144,7 @@ function PricingContent({ overview, services, calculation }: PricingContentProps
       )}
 
       <div className="grid gap-1">
-        {/* 요금 기준일: 요금표가 적용되기 시작한 날. 요금은 바뀔 수 있어 어느 날짜 기준인지 보여 준다 */}
+        {/* 요금 기준일: 관리자가 요금을 마지막으로 확인한 날. 요금은 바뀔 수 있어 어느 날짜 기준인지 보여 준다 */}
         <p className="flex items-start gap-1.75 text-sm text-muted-foreground tabular-nums">
           <CalendarIcon aria-hidden="true" className="mt-0.75 size-4 shrink-0" />
           {priceDate ? (
@@ -154,7 +173,7 @@ function PricingContent({ overview, services, calculation }: PricingContentProps
           <span>계산에 쓰는 금액</span>
         </div>
         <ul className="grid gap-3">
-          {overview.services.map((service) => {
+          {prices.map((service) => {
             const info = serviceById.get(service.ottServiceId)
             return (
               <PricingRow

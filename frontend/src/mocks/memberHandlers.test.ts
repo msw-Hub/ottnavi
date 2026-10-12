@@ -1,7 +1,12 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { customInstance, isApiError } from '@/api/http'
-import type { CommonResponseUserSettings, UpdateMySettingsRequest } from '@/api/generated/model'
+import type {
+  CommonResponseServicePrice,
+  CommonResponseServicePriceList,
+  CommonResponseUserSettings,
+  UpdateMySettingsRequest,
+} from '@/api/generated/model'
 import type {
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
@@ -252,28 +257,71 @@ describe('플랜 계산과 저장', () => {
 })
 
 describe('요금', () => {
-  it('사용자 금액을 고치면 적용 금액이 바뀌고 null로 되돌린다', async () => {
-    const changed = await request<{ data: { appliedPrice: number; priceSource: string } }>({
-      url: '/me/pricing/1',
-      method: 'PATCH',
+  // 넷플릭스 스탠다드의 상품 ID(101). 요금 API의 키는 서비스 ID가 아니라 상품 ID다
+  const NETFLIX_PRODUCT_ID = 101
+
+  it('요금 목록은 상품 단위 줄이고 요금 기준 일시(lastVerifiedAt)를 date-time으로 준다', async () => {
+    const res = await request<CommonResponseServicePriceList>({
+      url: '/me/service-prices',
+      method: 'GET',
+    })
+    expect(res.data.services).toHaveLength(7)
+    expect(res.data.services[0]).toMatchObject({
+      ottServiceId: 1,
+      productId: NETFLIX_PRODUCT_ID,
+      adminPrice: 13500,
+      userPrice: null,
+      priceSource: 'ADMIN',
+    })
+    expect(res.data.services[0].lastVerifiedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(res.data.services[0].effectiveFrom).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('PUT으로 고치면 적용 금액이 바뀌고 DELETE(204)로 기본 요금으로 되돌린다', async () => {
+    const changed = await request<CommonResponseServicePrice>({
+      url: `/me/service-prices/${NETFLIX_PRODUCT_ID}`,
+      method: 'PUT',
       data: { monthlyPrice: 11000 },
     })
     expect(changed.data).toMatchObject({ appliedPrice: 11000, priceSource: 'USER_OVERRIDE' })
 
-    const reverted = await request<{ data: { appliedPrice: number; priceSource: string } }>({
-      url: '/me/pricing/1',
-      method: 'PATCH',
-      data: { monthlyPrice: null },
+    await request({ url: `/me/service-prices/${NETFLIX_PRODUCT_ID}`, method: 'DELETE' })
+    const list = await request<CommonResponseServicePriceList>({
+      url: '/me/service-prices',
+      method: 'GET',
     })
-    expect(reverted.data).toMatchObject({ appliedPrice: 13500, priceSource: 'ADMIN' })
+    expect(list.data.services[0]).toMatchObject({ appliedPrice: 13500, priceSource: 'ADMIN' })
   })
 
-  it('음수 금액은 400이다', async () => {
-    const error = await request({
-      url: '/me/pricing/1',
-      method: 'PATCH',
-      data: { monthlyPrice: -1 },
+  it('범위를 벗어난 금액(음수·100만 원 초과·소수)은 400이다', async () => {
+    for (const monthlyPrice of [-1, 1_000_001, 100.5]) {
+      const error = await request({
+        url: `/me/service-prices/${NETFLIX_PRODUCT_ID}`,
+        method: 'PUT',
+        data: { monthlyPrice },
+      }).catch((e: unknown) => e)
+      expect(isApiError(error) && error.status).toBe(400)
+    }
+  })
+
+  it('없는 상품은 PUT·DELETE 모두 404 SERVICE_PRICE_NOT_FOUND다', async () => {
+    const putError = await request({
+      url: '/me/service-prices/999',
+      method: 'PUT',
+      data: { monthlyPrice: 1000 },
     }).catch((e: unknown) => e)
-    expect(isApiError(error) && error.status).toBe(400)
+    expect(putError).toMatchObject({ status: 404, errorCode: 'SERVICE_PRICE_NOT_FOUND' })
+
+    const deleteError = await request({ url: '/me/service-prices/999', method: 'DELETE' }).catch(
+      (e: unknown) => e,
+    )
+    expect(deleteError).toMatchObject({ status: 404, errorCode: 'SERVICE_PRICE_NOT_FOUND' })
+  })
+
+  it('비로그인이면 401이다', async () => {
+    setMockRole('GUEST')
+    await expect(request({ url: '/me/service-prices', method: 'GET' })).rejects.toMatchObject({
+      status: 401,
+    })
   })
 })

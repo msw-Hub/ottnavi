@@ -71,10 +71,13 @@ describe('목업 찜 목록 유지', () => {
 
 describe('목업 설정·요금 수정값 유지', () => {
   it('요금 수정값이 새로고침 뒤에도 남고 reset이 저장값을 지운다', async () => {
-    window.sessionStorage.setItem('ottnavi:mock-price-overrides', JSON.stringify([[1, 9900]]))
+    window.sessionStorage.setItem(
+      'ottnavi:mock-price-overrides-by-product',
+      JSON.stringify([[101, 9900]]),
+    )
     const { member } = await loadFresh()
     member.resetMockPricing()
-    expect(window.sessionStorage.getItem('ottnavi:mock-price-overrides')).toBeNull()
+    expect(window.sessionStorage.getItem('ottnavi:mock-price-overrides-by-product')).toBeNull()
   })
 
   it('resetMockSettings가 저장된 설정을 지운다', async () => {

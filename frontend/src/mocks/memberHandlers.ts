@@ -10,12 +10,13 @@ import type {
   PlanType,
 } from '@/features/plan/mockTypes'
 import type {
-  CommonResponsePricingOverview,
-  CommonResponsePricingService,
-  PricingService,
-  UpdatePricingRequest,
-} from '@/features/pricing/mockTypes'
-import type { CommonResponseWishlistItemList, WishlistItem } from '@/api/generated/model'
+  CommonResponseServicePrice,
+  CommonResponseServicePriceList,
+  CommonResponseWishlistItemList,
+  ServicePrice,
+  SetMyServicePriceRequest,
+  WishlistItem,
+} from '@/api/generated/model'
 import {
   denyGuest,
   hasMockScenario,
@@ -31,7 +32,12 @@ import {
   type PlanPriceInfo,
   type PlanScenario,
 } from '@/mocks/fixtures/plan'
-import { findMockProduct, MOCK_PRICE_EFFECTIVE_FROM, MOCK_PRODUCTS } from '@/mocks/fixtures/pricing'
+import {
+  findMockProduct,
+  MOCK_PRICE_EFFECTIVE_FROM,
+  MOCK_PRICE_VERIFIED_AT,
+  MOCK_PRODUCTS,
+} from '@/mocks/fixtures/pricing'
 import { DEFAULT_USER_SETTINGS, EMPTY_USER_SETTINGS } from '@/mocks/fixtures/settings'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { isMockOnboardingDone, setMockOnboardingDone } from '@/mocks/mockSession'
@@ -50,7 +56,9 @@ import {
  * - 내 설정:   GET  /api/me/settings                 (온보딩 전에는 isOnboardingDone=false인 빈 설정)
  *              PUT  /api/me/settings                 (저장하면 온보딩 완료. 입력 규칙 위반은 400 VALIDATION_FAILED)
  * - 찜 목록:   GET  /api/me/wishlist-items           (추가·우선순위·다 봤음 PATCH·삭제는 handlers.ts의 Task 027 핸들러를 쓴다)
- * - 요금:      GET  /api/me/pricing
+ * - 요금:      GET    /api/me/service-prices                (상품별 요금 줄)
+ *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없는 상품은 404 SERVICE_PRICE_NOT_FOUND)
+ *              DELETE /api/me/service-prices/{productId}    (고친 금액을 지우고 기본 요금으로 되돌림, 204)
  *              PATCH /api/me/pricing/{ottServiceId}  ({ monthlyPrice: 정수 | null }. null이면 기본 요금으로 되돌림)
  * - 플랜:      POST /api/me/plans/calculate          (유형 3종 초안을 새로 계산)
  *              GET  /api/me/plans/drafts             (계산 전이거나 저장한 뒤에는 빈 목록)
@@ -80,7 +88,7 @@ const CALCULATE_DELAY_MS = 1500
  * 플랜 계산 상태(calculationSeq 등)는 저장하지 않는다. 새로고침하면 다시 계산하는 편이 오히려 화면 흐름을 확인하기 쉽다.
  */
 const SETTINGS_STORAGE_KEY = 'ottnavi:mock-settings'
-const PRICE_OVERRIDES_STORAGE_KEY = 'ottnavi:mock-price-overrides'
+const PRICE_OVERRIDES_STORAGE_KEY = 'ottnavi:mock-price-overrides-by-product'
 
 // 저장된 설정을 읽는다. 모양이 다르면(손으로 바뀐 값 등) 없는 것으로 본다
 function readStoredSettings(): UserSettings | null {
@@ -91,7 +99,7 @@ function readStoredSettings(): UserSettings | null {
   return null
 }
 
-// 저장된 요금 수정값을 읽는다([서비스 ID, 월 요금] 쌍 목록)
+// 저장된 요금 수정값을 읽는다([상품 ID, 월 요금] 쌍 목록)
 function readStoredPriceOverrides(): [number, number][] {
   const stored = readMockJson(PRICE_OVERRIDES_STORAGE_KEY)
   if (!Array.isArray(stored)) return []
@@ -104,7 +112,7 @@ function readStoredPriceOverrides(): [number, number][] {
 // 사용자가 저장한 내 설정. null이면 아직 저장하지 않았다
 let savedSettings: UserSettings | null = readStoredSettings()
 
-// 요금 화면에서 사용자가 고친 금액(서비스 ID → 월 요금)
+// 요금 화면에서 사용자가 고친 금액(상품 ID → 월 요금). 계약이 상품 단위로 저장한다
 const priceOverrides = new Map<number, number>(readStoredPriceOverrides())
 
 // 요금 수정값을 저장소에 적는다. 하나도 없으면 키를 지운다
@@ -155,7 +163,7 @@ function getEffectiveSettings(): UserSettings | null {
 function getPriceInfo(ottServiceId: number): PlanPriceInfo {
   const product = findMockProduct(ottServiceId)
   if (!product) throw new Error(`목업 상품이 없는 서비스입니다: ${ottServiceId}`)
-  const override = priceOverrides.get(ottServiceId)
+  const override = priceOverrides.get(product.productId)
   return {
     productId: product.productId,
     productName: product.productName,
@@ -165,8 +173,8 @@ function getPriceInfo(ottServiceId: number): PlanPriceInfo {
   }
 }
 
-// 요금 화면의 한 줄을 만든다
-function toPricingService(ottServiceId: number, settings: UserSettings | null): PricingService {
+// 요금 화면의 한 줄(계약 ServicePrice)을 만든다
+function toServicePrice(ottServiceId: number, settings: UserSettings | null): ServicePrice {
   const info = getPriceInfo(ottServiceId)
   return {
     ottServiceId,
@@ -179,6 +187,8 @@ function toPricingService(ottServiceId: number, settings: UserSettings | null): 
     subscriptionStatus:
       settings?.subscriptions.find((s) => s.ottServiceId === ottServiceId)?.status ??
       'NOT_SUBSCRIBED',
+    effectiveFrom: MOCK_PRICE_EFFECTIVE_FROM,
+    lastVerifiedAt: MOCK_PRICE_VERIFIED_AT,
   }
 }
 
@@ -191,6 +201,17 @@ function getPlanScenario(request: Request): PlanScenario {
 // 지금 계산 순번 기준의 초안 목록을 만든다
 function buildCurrentDrafts(request: Request, settings: UserSettings) {
   return buildPlanDrafts(getPlanScenario(request), { settings, calculationSeq, getPriceInfo })
+}
+
+// 요금을 고칠 수 없는 상품(없는 상품·판매 종료)이면 돌려주는 404
+function servicePriceNotFound(request: Request) {
+  return problemResponse(
+    request,
+    404,
+    'Not Found',
+    'SERVICE_PRICE_NOT_FOUND',
+    '이 서비스의 요금 정보를 찾을 수 없습니다.',
+  )
 }
 
 function validationError(request: Request, detail: string) {
@@ -355,58 +376,57 @@ export const memberHandlers: RequestHandler[] = [
     return HttpResponse.json(body)
   }),
 
-  // 요금 확인
-  http.get('/api/me/pricing', async ({ request }) => {
+  // 요금 확인: 상품별 요금 줄
+  http.get('/api/me/service-prices', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
     const settings = getEffectiveSettings()
-    const body: CommonResponsePricingOverview = {
+    const body: CommonResponseServicePriceList = {
       success: true,
       data: {
-        services: MOCK_PRODUCTS.map((product) => toPricingService(product.ottServiceId, settings)),
-        priceEffectiveFrom: MOCK_PRICE_EFFECTIVE_FROM,
-        monthlyBudget: settings?.monthlyBudget ?? null,
-        monthlyWatchMinutes: settings?.monthlyWatchMinutes ?? null,
+        services: MOCK_PRODUCTS.map((product) => toServicePrice(product.ottServiceId, settings)),
       },
     }
     return HttpResponse.json(body)
   }),
 
-  // 사용자 금액 수정. monthlyPrice가 null이면 고친 금액을 지우고 기본 요금으로 되돌린다
-  http.patch('/api/me/pricing/:ottServiceId', async ({ request, params }) => {
+  // 내 월 요금 설정(PUT). 0원 이상 100만 원 이하 정수만 받는다. 요금을 고칠 수 없는 상품이면 404 SERVICE_PRICE_NOT_FOUND
+  http.put('/api/me/service-prices/:productId', async ({ request, params }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
-    const ottServiceId = Number(params.ottServiceId)
-    if (!findMockProduct(ottServiceId)) {
-      return problemResponse(
-        request,
-        404,
-        'Not Found',
-        'RESOURCE_NOT_FOUND',
-        '서비스를 찾을 수 없습니다.',
-      )
-    }
+    const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
+    if (!product) return servicePriceNotFound(request)
 
-    const { monthlyPrice } = (await request.json()) as UpdatePricingRequest
-    if (monthlyPrice === null) {
-      priceOverrides.delete(ottServiceId)
-      persistPriceOverrides()
-    } else if (!Number.isInteger(monthlyPrice) || monthlyPrice < 0 || monthlyPrice > 1_000_000) {
+    const { monthlyPrice } = (await request.json()) as SetMyServicePriceRequest
+    if (!Number.isInteger(monthlyPrice) || monthlyPrice < 0 || monthlyPrice > 1_000_000) {
       return validationError(request, '월 요금은 0원 이상 100만 원 이하의 정수여야 합니다.')
-    } else {
-      priceOverrides.set(ottServiceId, monthlyPrice)
-      persistPriceOverrides()
     }
+    priceOverrides.set(product.productId, monthlyPrice)
+    persistPriceOverrides()
 
-    const body: CommonResponsePricingService = {
+    const body: CommonResponseServicePrice = {
       success: true,
-      data: toPricingService(ottServiceId, getEffectiveSettings()),
+      data: toServicePrice(product.ottServiceId, getEffectiveSettings()),
     }
     return HttpResponse.json(body)
+  }),
+
+  // 내 월 요금 되돌리기(DELETE): 고친 금액을 지우고 기본 요금을 쓴다. 고친 적이 없어도 204다(여러 번 해도 결과가 같다)
+  http.delete('/api/me/service-prices/:productId', async ({ request, params }) => {
+    await wait()
+    const denied = denyGuest(request)
+    if (denied) return denied
+
+    const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
+    if (!product) return servicePriceNotFound(request)
+
+    priceOverrides.delete(product.productId)
+    persistPriceOverrides()
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // 플랜 계산: 유형 3종 초안을 새로 만든다(기존 초안은 덮어쓴다)

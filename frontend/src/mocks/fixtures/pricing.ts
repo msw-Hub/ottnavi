@@ -1,5 +1,6 @@
 /*
- * 서비스별 상품·기본 요금 목업 데이터다(Task 028, SCR-09 요금 확인).
+ * 서비스별 상품·기본 요금 목업 데이터다(Task 028, SCR-09 요금 확인). 관리자 목업(fixtures/admin.ts, adminHandlers.ts)도 이 상품 목록을
+ * 쓰므로 관리자 화면을 계약으로 바꾸는 6-7에서 함께 정리한다(그때 파일 위치·이름을 정한다).
  *
  * 금액은 ROADMAP Task 004 가격표(조사일 2026-10-05, 표시 가격 그대로)에 맞췄다(2026-10-11 사용자 결정). 실제 요금은 바뀔 수 있고
  * 운영에서는 관리자가 등록한 월 구독요금(SCR-14)을 따른다. 요금제 기준: 넷플릭스·디즈니+·티빙·웨이브 스탠다드, 왓챠 베이직(STANDARD로 사용),
@@ -14,8 +15,11 @@ export interface MockProduct {
   adminPrice: number // 관리자 기본 월 요금(원)
 }
 
-// 요금 기준일(관리자 요금표의 적용 시작일)
+// 요금표 적용 시작일(계약 ServicePrice.effectiveFrom)
 export const MOCK_PRICE_EFFECTIVE_FROM = '2026-10-01'
+
+// 관리자가 요금을 마지막으로 확인한 일시(계약 ServicePrice.lastVerifiedAt, date-time). 화면은 한국 날짜만 보인다
+export const MOCK_PRICE_VERIFIED_AT = '2026-10-08T18:30:00+09:00'
 
 export const MOCK_PRODUCTS: MockProduct[] = [
   { ottServiceId: 1, productId: 101, productName: '넷플릭스 스탠다드', adminPrice: 13500 },
