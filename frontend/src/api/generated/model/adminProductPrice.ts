@@ -20,6 +20,6 @@ export interface AdminProductPrice {
   monthlyPrice: number;
   /** 적용 시작일. 같은 상품 안에서 겹치지 않는다 */
   effectiveFrom: string;
-  /** 마지막 확인 일시. [요금 확인함]과 줄 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ여야 한다, Task 032). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
+  /** 마지막 확인 일시. [요금 확인함]과 줄 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
   lastVerifiedAt: string;
 }

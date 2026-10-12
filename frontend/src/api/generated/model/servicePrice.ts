@@ -36,6 +36,6 @@ export interface ServicePrice {
   subscriptionStatus: ServiceSubscriptionStatus;
   /** adminPrice의 적용 시작일(관리자 월 구독요금 줄) */
   effectiveFrom: string;
-  /** adminPrice 줄을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ여야 한다, Task 032). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
+  /** adminPrice 줄을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
   lastVerifiedAt: string;
 }

@@ -16,8 +16,9 @@ import type { ProductType } from './productType';
  */
 export interface CreateAdminProductRequest {
   /**
-     * 이름(앞뒤 공백 제외 1자 이상)
+     * 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
      * @minLength 1
+     * @maxLength 100
      */
   name: string;
   productType: ProductType;

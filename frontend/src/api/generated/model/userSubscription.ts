@@ -19,7 +19,7 @@ export interface UserSubscription {
   ottServiceId: number;
   status: ServiceSubscriptionStatus;
   /**
-     * 요금제 이름(예 "스탠다드"). SUBSCRIBED일 때만 필수이고 그 밖에는 null. 계산에 쓰이지 않는 표시용 입력이다. ERD에 `plan_name`(30자) 칸을 추가해야 한다(Task 032). 2단계에서 상품 선택으로 대체될 수 있다
+     * 요금제 이름(예 "스탠다드"). SUBSCRIBED일 때만 필수이고 그 밖에는 null. 계산에 쓰이지 않는 표시용 입력이다. ERD `user_subscription`에 `plan_name`(30자) 칸이 있다(ERD v0.4에 반영됨). 2단계에서 상품 선택으로 대체될 수 있다
      * @maxLength 30
      * @nullable
      */
