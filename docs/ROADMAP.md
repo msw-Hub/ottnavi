@@ -912,6 +912,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
+  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개, 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
   - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
   - [ ] TV 시즌 호출량 지표(R11-26 측정용)
