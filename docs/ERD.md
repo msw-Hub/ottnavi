@@ -6,6 +6,7 @@
 
 - 공통 감사 컬럼 `created_at`, `updated_at`(TIMESTAMPTZ)은 표에서 생략한다.
 - 키 표기: **PK** 기본키, **FK** 외래키, **UK** 유니크 제약
+- NULL 표기(`NULL`, `NULL 허용`)가 없는 컬럼은 `NOT NULL`이다. `CHECK`는 NULL이면 통과하므로, 열끼리의 규칙 `CHECK`(예: `(status = 'UNKNOWN') = (unknown_reason IS NOT NULL)`)는 이 `NOT NULL` 전제 위에서 성립한다. 마이그레이션에서 `NOT NULL`을 빠뜨리지 않는다.
 
 ---
 

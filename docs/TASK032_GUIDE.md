@@ -904,7 +904,7 @@ CONSTRAINT ck_plan_month_product_price CHECK (applied_price >= 0)
 
 | 순서 | 할 일 | 확인할 것 | 막히면 |
 |---|---|---|---|
-| ① | 문서 워크트리에서 변경을 읽는다: `git diff docs/ERD.md` (또는 VS Code의 변경 보기) | 8절 표(①~⑬)와 같은 곳이 바뀌었는지. 특히 **④ tmdb_provider 표, ⑦ product_price 표, ⑧ user_subscription 표, ⑨ plan 표** | 이해 안 되는 줄은 8절의 해당 블록과 4.x절(이유)을 본다 |
+| ① | 문서 워크트리에서 변경을 읽는다: `git diff docs/ERD.md` (또는 VS Code의 변경 보기). 함께 바뀐 문서는 `git diff docs/PRD.md docs/TECH.md docs/ROADMAP.md docs/api/openapi.yaml`로 ERD와 상태·필드가 맞는지 본다(계약 파일의 구문 오류는 CI의 계약 대조 테스트가 잡는다) | 8절 표(①~⑬)와 같은 곳이 바뀌었는지. 특히 **④ tmdb_provider 표, ⑦ product_price 표, ⑧ user_subscription 표, ⑨ plan 표** | 이해 안 되는 줄은 8절의 해당 블록과 4.x절(이유)을 본다 |
 | ② | 연결도(mermaid)가 오류 없이 그려지는지 눈으로 본다 (VS Code 마크다운 미리보기 또는 GitHub) | 연결도 A~D의 표시가 깨지지 않는다 | 깨진 연결도 번호를 알려 준다 |
 | ③ | (선택) 9.2절 SQL이 정말 도는지 확인하고 싶으면 11.1절을 따른다 | 기대한 곳에서만 실패한다 | 건너뛰어도 된다. 안내서 작성 때 이미 실행했다 |
 | ④ | 바꾸고 싶은 문구·결정이 있으면 알려 준다 | 6절 D1~D9는 추천대로 확정이다 | — |
