@@ -537,6 +537,7 @@ class UserPlanMigrationTest extends IntegrationTestSupport {
 **이 안내서가 정한 것(ERD가 "034에서 확정"으로 남긴 것):**
 - `users`는 `email`·`name`·`oauth_provider`·`oauth_subject` 모두 `NOT NULL`. 구글 이름이 비어 오면 서비스가 이메일 앞부분으로 채운다. 틀렸으면 새 마이그레이션이 아니라 이 안내서를 고쳐 병합 전에 반영한다(`oauth_provider`는 `GOOGLE`만 허용하는 CHECK).
 - `plan_item.completed_month_index`는 NULL 허용이고 SCHEDULED일 때만 값이 있을 수 있다(UNSCHEDULED면 NULL, `>= 0`). SCHEDULED에 반드시 값이 있어야 하는지는 Task 063·064에서 정한 뒤 필요하면 CHECK를 더한다.
+- `plan_month.month_index`는 하한(`>= 0`)만 DB가 검사하고 상한(0~2)은 두지 않았다. ERD D3 방침(상·하한은 앱·계약 검증)에 따른 것이며 CodeRabbit #50 지적을 검토한 결과다. 3개월을 넘는 값은 만들지 않도록 Task 063·064가 지킨다.
 - `plan.change_summary`는 `TEXT`다. 형식(문장인지 JSON인지)은 Task 069에서 정하고, 바꾸려면 새 마이그레이션을 추가한다.
 - `calc_run.input_hash`는 `CHAR(64)`(SHA-256 16진수 문자열).
 - ROADMAP Task 034 구현 사항의 추가 인덱스 목록에 `plan_month_product(plan_month_id)`가 있지만 ERD 규칙(유니크 인덱스 선두 컬럼이 덮는 FK는 따로 만들지 않는다)에 따라 **만들지 않았다**. `UNIQUE(plan_month_id, product_id)`가 그 역할을 한다. 같은 PR에서 ROADMAP 문구도 고친다.
