@@ -11,14 +11,14 @@
 @import "./styles/admin-theme.css";
 
 /*
- * shadcn 원본 컴포넌트(components/ui)가 쓰는 `dark:` 클래스의 기준을 ".dark 클래스 아래"로 정하는 설정이다.
- * 앱은 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않으므로 `dark:` 클래스는 지금 모두 꺼져 있다(Task 037 정리).
+ * shadcn 원본 컴포넌트(components/ui)가 쓰는 `dark:` 클래스를 항상 켜는 설정이다(Task 037 결정).
+ * 앱은 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않는다. 그래서 "항상 참" 조건으로 두어 `dark:` 클래스가 늘 적용되게 한다.
  * 이 줄을 지우지 않는 이유: Tailwind 4는 이 설정이 없으면 `dark:`를 OS의 어두운 모드(prefers-color-scheme)에 따라 켠다.
- * 그러면 OS 설정에 따라 outline 버튼 바탕이 `bg-input/30`으로 바뀌는 등 화면이 달라진다.
- * `dark:`를 늘 켤지는 ROADMAP Task 037 ⑩(결정 대기)이다. 켜기로 하면 이 줄을 `@custom-variant dark (&:is(*));` 같은 항상 참 조건으로 바꾼다.
+ * 그러면 OS 설정에 따라 outline 버튼 바탕 등이 달라진다. 항상 켜 두면 OS 설정과 무관하게 같은 화면이 나온다.
+ * 영향: outline 버튼 바탕이 `bg-input/30`으로 옅게 채워져 보인다.
  * (shadcn 기본 .dark 색 블록은 쓰는 곳이 없어 지웠다. 필요하면 shadcn 문서의 기본 dark 값을 다시 가져온다)
  */
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(*));
 
 /*
  * Task 018에서 Vite 템플릿 CSS를 걷어냈다.

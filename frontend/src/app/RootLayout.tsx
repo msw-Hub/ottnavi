@@ -59,7 +59,7 @@ export function RootLayout() {
 
       {/* 푸터 링크는 inline-flex min-h-10으로 누르는 영역을 세로 40px로 넓혔다(Task 037 ⑫) */}
       <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-sm text-muted-foreground">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-4 text-center text-sm text-muted-foreground">
           <Link
             to="/about"
             className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
