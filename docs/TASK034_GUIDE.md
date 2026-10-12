@@ -299,6 +299,22 @@ CREATE TABLE shedlock (
 
 기존 `IntegrationTestSupport`를 상속하므로 Testcontainers가 PostgreSQL 17.6을 띄우고 V1~V7을 적용한 DB로 검사한다. `@Transactional`이라 테스트마다 롤백된다. 작품·상품 FK가 필요한 테스트는 헬퍼가 `title`·`watch_unit`·`subscription_product`를 직접 넣는다(V2·V3 컬럼 기준).
 
+**이 테스트가 확인하는 것** — 거부 5건, 정상 통과 1건, 삭제 동작 3건, 구조 2건.
+
+| # | 테스트 | 확인하는 것 | 막으려는 사고 |
+|---|---|---|---|
+| 1 | DRAFT를_지우면_하위_4개_테이블_행도_사라진다 | 플랜 하나를 지우면 `plan_month`·`plan_month_product`·`plan_item`·`plan_assignment`가 모두 0행 | 재계산 때 이전 DRAFT의 하위 행이 남아 쌓이는 것 |
+| 2 | 사용자를_지우면_소유한_행이_모두_사라지고_계산_기록은_플랜_연결만_끊긴다 | 탈퇴(`users` 삭제) 후 설정·구독·금액 수정·찜·플랜·알림이 0행, `calc_run`은 남고 `plan_id`만 NULL | 탈퇴 후 개인 데이터가 남는 것, 통계 기록이 같이 지워지는 것 |
+| 3 | 이전_플랜을_지워도_다음_플랜은_남고_연결만_끊긴다 | `previous_plan_id`가 SET NULL이라 다음 플랜이 남는다 | 이전 플랜 삭제가 다음 플랜 삭제나 오류로 번지는 것 |
+| 4 | 한_사용자의_ACTIVE_플랜이_둘이면_거부한다 | 부분 유니크 `uk_plan_active` | 현재 플랜이 둘이라 알림·재계산 대상이 모호해지는 것 |
+| 5 | 같은_유형_DRAFT가_둘이면_거부한다 | 부분 유니크 `uk_plan_draft_type` | 같은 유형 계산 결과가 겹쳐 쌓이는 것 |
+| 6 | 서로_다른_유형_DRAFT_3개는_허용한다 | 추천형·절약형·간편형 DRAFT 3개가 한꺼번에 저장된다 | 5번 제약이 정상 입력까지 막는 것(반대쪽 검증) |
+| 7 | 구독_중이_아닌데_결제일이_있으면_거부한다 | `ck_user_subscription_paid_only` | 무료·잘 모르겠음 상태에 결제일이 남는 것 |
+| 8 | 확정_여부가_달_번호와_다르면_거부한다 | `confirmed`는 `month_index = 0`일 때만 true | 이번 달이 아닌데 확정으로 표시되는 것 |
+| 9 | 같은_dedupe_key_알림은_거부한다 | `notification_outbox.dedupe_key` 유니크 | 같은 달 알림 메일이 두 번 생기는 것 |
+| 10 | ShedLock_표가_있고_이름이_기본키다 | `shedlock`이 만들어져 있고 같은 이름은 중복 불가 | ShedLock이 표를 못 찾아 스케줄 작업이 실패하는 것 |
+| 11 | 참조_컬럼_인덱스가_모두_있다 | ERD가 정한 인덱스 6개 존재 | 인덱스를 빼먹어 삭제·조회가 느려지는 것 |
+
 ```java
 package com.ottnavi.migration;
 
