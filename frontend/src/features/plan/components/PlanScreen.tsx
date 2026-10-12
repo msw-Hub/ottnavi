@@ -25,7 +25,7 @@ import { UnscheduledList } from '@/features/plan/components/UnscheduledList'
 import { useCalculatePlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
 import type { PlanDraft, PlanType } from '@/api/generated/model'
-import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
+import { hasSeveralSeasonsOfOneSeries, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
@@ -278,6 +278,12 @@ function PlanResult({
         <div className="grid gap-1.5 border-t border-border pt-4">
           <SourceAttribution />
           <DataAsOf value={draft.dataAsOf} />
+          {/* 계산 기준 안내: 같은 드라마의 시즌이 둘 이상 들어 있으면 순서 규칙을 한 줄로 알린다(확정 문구, PRD SCR-08·11절 37번) */}
+          {hasSeveralSeasonsOfOneSeries(draft) && (
+            <p className="text-sm text-muted-foreground">
+              같은 드라마는 앞 시즌부터 보는 순서로 계산해요.
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             제공 여부와 요금은 확인된 범위이며, 실제와 다를 수 있습니다. 새로 가입한 서비스는 가입
             직후 해지 예약을 해 두면 다음 달 자동 결제를 피할 수 있는지 서비스에서 확인해 보세요.

@@ -10,6 +10,7 @@ import type { MediaType, WishlistPriority } from '@/api/generated/model'
 import type { ApiError } from '@/api/http'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { useWishlistAddedDialog } from '@/hooks/useWishlistAddedDialog'
+import { getMockRequestParams } from '@/lib/mockScenario'
 
 // 우선순위를 묻지 않고 찜할 때 쓰는 기본값(보고 싶음)
 const DEFAULT_WISHLIST_PRIORITY: WishlistPriority = 'WANT'
@@ -49,6 +50,9 @@ function notifyError(error: ApiError) {
 // 비로그인 요청에 서버가 돌려주는 상태 코드
 const UNAUTHORIZED_STATUS = 401
 
+// 활성 찜이 20개일 때 새 찜을 추가하면 서버가 409로 알리는 오류 코드(docs/api/error-codes.md)
+const WISHLIST_LIMIT_EXCEEDED_ERROR_CODE = 'WISHLIST_LIMIT_EXCEEDED'
+
 /**
  * 작품(영화) 또는 시즌(드라마) 하나의 찜 상태와 찜 추가·우선순위 변경·해제를 돌려준다.
  *
@@ -87,10 +91,25 @@ export function useWishlistItem(
     navigate('/login', { state: { from: `${location.pathname}${location.search}` } })
   }
 
-  // 요청이 실패했을 때: 401이면 로그인 화면으로 보내고, 그 밖의 오류는 토스트로 알린다
+  // 요청이 실패했을 때: 401이면 로그인 화면으로 보내고, 찜이 20개를 넘으면 [찜 목록 가기]가 있는 토스트를, 그 밖의 오류는 토스트로 알린다
   function handleError(error: ApiError) {
     if (error.status === UNAUTHORIZED_STATUS) {
       redirectToLogin()
+      return
+    }
+    if (error.errorCode === WISHLIST_LIMIT_EXCEEDED_ERROR_CODE) {
+      // 본문은 errorMessages의 WISHLIST_LIMIT_EXCEEDED 문구(error.userMessage)다. 버튼은 찜 목록으로 보내 자리를 만들게 한다(확정, PRD SCR-08).
+      // 목업 확인용 주소 파라미터(?mockScenario=)는 이어 붙여 같은 시나리오로 이어 본다(운영에서는 빈 문자열이다)
+      toast.error(error.userMessage, {
+        action: {
+          label: '찜 목록 가기',
+          onClick: () =>
+            navigate({
+              pathname: '/wishlist',
+              search: new URLSearchParams(getMockRequestParams()).toString(),
+            }),
+        },
+      })
       return
     }
     notifyError(error)

@@ -7,6 +7,8 @@ import { customInstance } from '@/api/http'
 import { Providers } from '@/app/providers'
 import { WishlistScreen } from '@/features/wishlist/components/WishlistScreen'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
+import { mockWishlist } from '@/mocks/handlerUtils'
+import { TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { resetMockMemberState } from '@/mocks/memberHandlers'
 import { resetMockSession, setMockRole } from '@/mocks/mockSession'
 
@@ -108,5 +110,69 @@ describe('찜 목록 펼침 패널', () => {
 
     await vi.waitFor(() => expect(screen.queryByRole('region', PANEL)).not.toBeInTheDocument())
     expect(screen.getAllByRole('button', { name: /자세히 보기/ })).toHaveLength(3)
+  })
+})
+
+// 목업 작품의 찜 단위(영화 1편, 드라마 시즌 1개)를 n개 목업 저장소에 직접 넣는다(다 봤음 아님). 화면은 서버(목업)의 개수를 그대로 보인다
+function fillActiveWishlist(count: number) {
+  let id = 1000
+  for (const title of TITLE_FIXTURES) {
+    const seasonNumbers =
+      title.mediaType === 'tv' ? title.seasons.map((s) => s.seasonNumber) : [null]
+    for (const seasonNumber of seasonNumbers) {
+      if (mockWishlist.size >= count) return
+      mockWishlist.set(id++, {
+        mediaType: title.mediaType,
+        tmdbId: title.tmdbId,
+        seasonNumber,
+        priority: 'WANT',
+        watchedAt: null,
+      })
+    }
+  }
+}
+
+describe('찜 개수와 안내(Task 030 확정 문구)', () => {
+  it('개수 줄은 "찜 N/20"이고 20개 전에는 안내 띠가 없다', async () => {
+    await addFourMovies()
+    renderWishlist()
+
+    expect(await screen.findByText(/찜 4\/20/)).toBeInTheDocument()
+    expect(screen.queryByText(/자리가 생겨요/)).not.toBeInTheDocument()
+  })
+
+  it('20개에 닿으면 목록 상단에 안내 띠가 보이고, 다 본 작품은 개수에 넣지 않는다', async () => {
+    fillActiveWishlist(20)
+    renderWishlist()
+
+    expect(await screen.findByText(/찜 20\/20/)).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "찜은 20개까지 담을 수 있어요. 다 본 작품을 '다 봤음'으로 옮기면 자리가 생겨요.",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('같은 드라마의 시즌을 둘 이상 찜하면 계산 순서 안내가 한 줄 보인다', async () => {
+    for (const seasonNumber of [1, 2]) {
+      await customInstance({
+        url: '/me/wishlist-items',
+        method: 'POST',
+        data: { mediaType: 'tv', tmdbId: 93405, seasonNumber, priority: 'WANT' },
+      })
+    }
+    renderWishlist()
+
+    expect(
+      await screen.findByText('같은 드라마는 앞 시즌부터 보는 순서로 계산해요.'),
+    ).toBeInTheDocument()
+  })
+
+  it('시즌이 하나뿐이면 순서 안내가 없다', async () => {
+    await addFourMovies()
+    renderWishlist()
+
+    await screen.findByText(/찜 4\/20/)
+    expect(screen.queryByText(/앞 시즌부터 보는 순서/)).not.toBeInTheDocument()
   })
 })

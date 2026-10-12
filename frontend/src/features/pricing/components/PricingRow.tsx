@@ -1,4 +1,4 @@
-import { CircleCheckIcon, GiftIcon, RotateCcwIcon } from 'lucide-react'
+import { CircleCheckIcon, GiftIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import type { ServicePrice } from '@/api/generated/model'
@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useUpdatePricing } from '@/features/pricing/hooks/usePricing'
-import { formatWon } from '@/lib/format'
+import { getTodayDateString } from '@/lib/dateUtils'
+import { formatDataAsOf, formatWon } from '@/lib/format'
+import { isVerifiedStale } from '@/lib/priceFreshness'
 
 // 이 화면의 입력 폼 값. 입력 칸은 항상 문자열이라 문자열로 두고 제출할 때 숫자로 바꾼다
 interface PriceFormValues {
@@ -51,6 +53,10 @@ export function PricingRow({
     reset,
     formState: { errors, isDirty },
   } = useForm<PriceFormValues>({ defaultValues: { price: toInputText(service.userPrice) } })
+
+  // 확인일은 한국 날짜로 보인다. 날짜를 해석할 수 없으면 확인일 줄은 빼고, 오래된 요금으로 보아 안내만 띄운다(isVerifiedStale)
+  const lastVerifiedDate = formatDataAsOf(service.lastVerifiedAt)
+  const isPriceStale = isVerifiedStale(service.lastVerifiedAt, getTodayDateString())
 
   const inputId = `price-${service.ottServiceId}`
   const errorId = `${inputId}-error`
@@ -98,6 +104,19 @@ export function PricingRow({
           {isInsufficientData && <DataInsufficientTag />}
         </p>
         <p className="text-sm text-muted-foreground">{service.productName}</p>
+        {/* 요금 확인일(관리자가 이 요금을 마지막으로 확인한 날, PRD 11절 41번). 90일을 넘으면 안내를 덧붙인다. 계산은 막지 않는다.
+            주의는 색만으로 알리지 않고 아이콘과 글자를 함께 쓴다 */}
+        {lastVerifiedDate && (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            요금 확인일 {lastVerifiedDate}
+          </p>
+        )}
+        {isPriceStale && (
+          <p className="flex items-start gap-1 text-sm font-semibold text-foreground">
+            <TriangleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            요금이 달라졌을 수 있어요. 실제 금액이 다르면 직접 수정해 주세요.
+          </p>
+        )}
         {/* 이용 상태: 구독 중·무료 이용이면 이번 달 비용이 달라질 수 있어 알린다. 아이콘 + 글자 */}
         {isFreeOrSubscribed && (
           <p className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-info">

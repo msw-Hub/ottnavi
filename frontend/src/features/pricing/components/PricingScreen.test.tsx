@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -90,6 +91,60 @@ describe('요금 확인 화면', () => {
     await user.click(within(row).getByRole('button', { name: '적용' }))
     await user.click(await within(row).findByRole('button', { name: '기본 요금으로 되돌리기' }))
     await waitFor(() => expect(within(row).queryByText('사용자 수정')).not.toBeInTheDocument())
+  })
+
+  it('요금 확인일을 줄마다 보이고, 90일 넘게 확인하지 않은 요금에만 안내를 덧붙인다(계산은 막지 않는다)', async () => {
+    // 목업 기본값(확인일 2026-10-08)을 넷플릭스는 오래된 일시로, 디즈니+는 어제로 바꿔 내려준다
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    server.use(
+      http.get('/api/me/service-prices', () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            services: [
+              {
+                ottServiceId: 1,
+                productId: 101,
+                productName: '넷플릭스 스탠다드',
+                adminPrice: 13500,
+                userPrice: null,
+                appliedPrice: 13500,
+                priceSource: 'ADMIN',
+                subscriptionStatus: 'NOT_SUBSCRIBED',
+                effectiveFrom: '2026-01-01',
+                lastVerifiedAt: '2026-06-14T09:00:00+09:00',
+              },
+              {
+                ottServiceId: 2,
+                productId: 102,
+                productName: '디즈니+ 스탠다드',
+                adminPrice: 9900,
+                userPrice: null,
+                appliedPrice: 9900,
+                priceSource: 'ADMIN',
+                subscriptionStatus: 'NOT_SUBSCRIBED',
+                effectiveFrom: '2026-01-01',
+                lastVerifiedAt: yesterday,
+              },
+            ],
+          },
+        }),
+      ),
+    )
+    renderPricing()
+
+    const netflixRow = (await screen.findByLabelText('내 금액 (넷플릭스)')).closest('li')!
+    const disneyRow = screen.getByLabelText('내 금액 (디즈니+)').closest('li')!
+    expect(within(netflixRow).getByText('요금 확인일 2026년 6월 14일')).toBeInTheDocument()
+    expect(
+      within(netflixRow).getByText(
+        '요금이 달라졌을 수 있어요. 실제 금액이 다르면 직접 수정해 주세요.',
+      ),
+    ).toBeInTheDocument()
+    expect(within(disneyRow).getByText(/요금 확인일/)).toBeInTheDocument()
+    expect(within(disneyRow).queryByText(/요금이 달라졌을 수 있어요/)).not.toBeInTheDocument()
+    // 계산은 막지 않는다
+    expect(screen.getByRole('button', { name: '3개월 플랜 계산하기' })).toBeEnabled()
   })
 
   it('찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다', async () => {
