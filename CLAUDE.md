@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 저장소 현황
 
 - **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)도 있다. 백엔드는 Task 016에서 의존성 전체·프로필(`local`·`prod`)·임시 `SecurityConfig`(전 경로 `permitAll`)·Testcontainers 테스트 베이스를, Task 023에서 `CommonResponse`·`ProblemDetail` 예외 처리·계약 대조 테스트(`OpenApiContractTest`)를 구성했다. Task 019에서 첫 도메인(`provider`: `ott_service` Flyway V1, 서비스 목록 API `GET /api/public/ott-services`)과 오리진 비밀 헤더 필터(`app.origin-secret.enabled`, local만 꺼짐)·진입 IP 로그가 생겼다. 다른 도메인 패키지는 아직 없다. 백엔드는 Task 020에서 Cloudtype 서비스 `ottnavi`(프리티어 1GB)에 올라가 있다(Task 021에서 `develop` → `main` 병합으로 첫 배포를 마쳤고 배포 브랜치는 `main`이다. 운영 프론트는 `ottnavi.vercel.app`. 배포는 콘솔 `배포하기`로 수동이며 GitHub Actions 배포 파일은 없다. 방문자 IP는 `remoteAddr`로 본다(`x-real-ip`는 Vercel IP). 런타임 환경 변수는 `Environment variables`, 프로필은 Start Command의 `-D`로 지정, TECH 6절).
-- 진행 상황과 다음 Task는 `docs/ROADMAP.md`(5단계 Phase, 105개 Task)가 기준이다. 새 작업 전에 해당 Task의 선행·완료 기준을 확인한다. 사용자가 직접 하는 `[H]` Task는 `docs/PHASE1_HUMAN_TASKS.md`에 체크리스트로 따로 있다.
+- 진행 상황과 다음 Task는 `docs/ROADMAP.md`(5단계 Phase, 105개 Task)가 기준이다. 새 작업 전에 해당 Task의 선행·완료 기준을 확인한다. 사용자가 직접 하는 `[H]` Task는 ROADMAP의 태그로 구분하고, 비밀 값 보관 규칙은 `docs/TECH.md` 8절에 있다.
 - Task 진행은 쉬림프 태스크 매니저(MCP)로 추적한다. 데이터는 `shrimp_data/`(git 제외)에 있고, 경로는 `.claude/settings.local.json`의 `SHRIMP_DATA_DIR`이 정한다(`.mcp.json`이 `${SHRIMP_DATA_DIR}`로 참조). 로드맵이 기준이고 쉬림프는 보조다.
 - 사용자 전역 규칙(`~/.claude/CLAUDE.md`)이 적용된다: 주석·로그·에러 메시지·UI 문자열은 한국어, 식별자는 영어, 커밋은 한국어 Conventional Commits, 터미널 명령은 PowerShell 기준(Windows 11), 탐색 → 계획 제시 → 승인 → 구현 순서.
 
@@ -28,13 +28,12 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
 | `docs/PROJECT_STORY.md` | 프로젝트를 만든 이유(포트폴리오·README·자기소개서·면접용 문구). 사용자가 직접 겪은 경험만 담고 용도별(문단·두 문장·구두)로 다듬어 둠. 근거 문서가 아니다 |
 | `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation은 서비스 목록(`listOttServices`, Task 019) 하나이고 나머지는 Task 031부터 추가된다 |
-| `docs/PHASE1_HUMAN_TASKS.md` | Phase 1의 사람 작업 `[H]` 체크리스트와 완료 기록 |
 | `.claude/rules/backend.md` | `backend/**` 작업 시 자동 로드. Java/Spring 스타일·스택·패키지 구조 |
 | `.claude/rules/frontend.md` | `frontend/**` 작업 시 자동 로드. React/TS 스타일·상태 관리·인증 규칙 |
 | `.claude/rules/api-contract.md` | OpenAPI 계약 변경 절차, 응답·오류·페이지네이션 형식 |
 | `.claude/rules/git.md` | 브랜치·커밋·병합 규칙 |
 
-`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage), API 계약 검사용 읽기 전용 에이전트(contract-checker: `docs/api/openapi.yaml`을 규칙·목업·오류 코드·확정 결정과 대조해 표로 보고, 파일을 수정하지 않음), DB 설계 검토용 읽기 전용 에이전트(db-reviewer: `docs/ERD.md`와 마이그레이션 SQL을 계약·PRD·TECH와 대조해 결함 표와 "사용자에게 시킬 일"로 보고, 모델 opus, 파일을 수정하지 않음), 개발 에이전트 3종(backend-dev: 백엔드 검수·맡긴 구현 / frontend-dev: 프론트 구현 전반 / ui-designer: UI/UX 시각 설계·수정)이, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. 개발 에이전트끼리는 직접 대화하지 못하고 `docs/api/openapi.yaml` 계약과 보고서의 "넘길 내용"으로 협업한다. 작업 공간의 기준은 각 에이전트 md이고 `.claude/hooks/`의 hook은 보조 안전장치다(backend-dev는 `frontend/`, frontend-dev는 `backend/`와 `frontend/src/api/generated/` 수정을 막는다). 프론트는 대부분 frontend-dev가 맡고 UI/UX 수정 요청은 ui-designer가 맡는다. 구성은 `docs/TASK018_031_PLAN.md` 7절. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
+`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage), API 계약 검사용 읽기 전용 에이전트(contract-checker: `docs/api/openapi.yaml`을 규칙·목업·오류 코드·확정 결정과 대조해 표로 보고, 파일을 수정하지 않음), DB 설계 검토용 읽기 전용 에이전트(db-reviewer: `docs/ERD.md`와 마이그레이션 SQL을 계약·PRD·TECH와 대조해 결함 표와 "사용자에게 시킬 일"로 보고, 모델 opus, 파일을 수정하지 않음), 개발 에이전트 3종(backend-dev: 백엔드 검수·맡긴 구현 / frontend-dev: 프론트 구현 전반 / ui-designer: UI/UX 시각 설계·수정)이, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. 개발 에이전트끼리는 직접 대화하지 못하고 `docs/api/openapi.yaml` 계약과 보고서의 "넘길 내용"으로 협업한다. 작업 공간의 기준은 각 에이전트 md이고 `.claude/hooks/`의 hook은 보조 안전장치다(backend-dev는 `frontend/`, frontend-dev는 `backend/`와 `frontend/src/api/generated/` 수정을 막는다). 프론트는 대부분 frontend-dev가 맡고 UI/UX 수정 요청은 ui-designer가 맡는다. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
 
 ## 목표 아키텍처 (big picture)
 

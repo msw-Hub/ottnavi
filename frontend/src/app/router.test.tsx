@@ -5,7 +5,7 @@ import { Providers } from '@/app/providers'
 import { routes } from '@/app/router'
 
 /*
- * 화면 주소표(TASK018_031_PLAN 5절)를 테스트 쪽에 따로 적어 두고 실제 라우터 설정과 맞춰 본다.
+ * 화면 주소표를 테스트 쪽에 따로 적어 두고 실제 라우터 설정과 맞춰 본다.
  * - pattern: 라우터에 등록돼 있어야 하는 경로 패턴
  * - url: 실제로 열어 볼 주소(동적 경로는 예시 값을 채운다)
  * - heading: 그 화면이 그려졌다는 증거로 찾을 제목(h1)
