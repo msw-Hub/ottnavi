@@ -11,10 +11,10 @@
  */
 import type {
   AdminProvider,
-  AdminProviderMappingState,
-  AdminProviderTier,
-  SaveProviderMappingRequest,
-} from '@/features/admin/mockTypes'
+  ProviderMappingState,
+  ProviderTier,
+  UpdateAdminProviderRequest,
+} from '@/api/generated/model'
 
 export const CHOICE_UNMAPPED = ''
 export const CHOICE_IGNORED = 'IGNORED'
@@ -44,16 +44,13 @@ export function isServiceChoice(choice: string): boolean {
 }
 
 /** 선택값 → 저장 후 매핑 상태. 서비스 선택은 MAPPED, 관련 없음은 IGNORED, 선택 안 함은 UNMAPPED다. */
-export function toMappingState(choice: string): AdminProviderMappingState {
+export function toMappingState(choice: string): ProviderMappingState {
   if (choice === CHOICE_IGNORED) return 'IGNORED'
   return choice === CHOICE_UNMAPPED ? 'UNMAPPED' : 'MAPPED'
 }
 
 /** 화면 입력(선택값, 등급)을 저장 요청으로 바꾼다. 서비스에 연결하지 않으면 등급은 STANDARD로 고정한다. */
-export function buildSaveRequest(
-  choice: string,
-  tier: AdminProviderTier,
-): SaveProviderMappingRequest {
+export function buildSaveRequest(choice: string, tier: ProviderTier): UpdateAdminProviderRequest {
   const mappingState = toMappingState(choice)
   return {
     mappingState,
@@ -69,7 +66,7 @@ export function buildSaveRequest(
 export function isMappingChanged(
   provider: AdminProvider,
   choice: string,
-  tier: AdminProviderTier,
+  tier: ProviderTier,
 ): boolean {
   const request = buildSaveRequest(choice, tier)
   return (
@@ -81,7 +78,7 @@ export function isMappingChanged(
 
 /** 요청이 규칙에 맞는지 검사한다(서버 쪽 검사). 올바르면 null, 아니면 안내 문장을 돌려준다. */
 export function validateSaveRequest(
-  request: SaveProviderMappingRequest,
+  request: UpdateAdminProviderRequest,
   knownServiceIds: number[],
 ): string | null {
   if (request.mappingState === 'MAPPED') {

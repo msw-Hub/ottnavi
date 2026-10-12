@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAddProductPrice, useUpdateProductPrice } from '@/features/admin/hooks/useAdminProducts'
-import type { AdminProductPrice } from '@/features/admin/mockTypes'
+import type { AdminProductPrice } from '@/api/generated/model'
 import {
   checkAddPriceStartDate,
   checkEditLastPriceStartDate,
@@ -105,11 +105,12 @@ export function PriceForm({ productId, sortedPrices, today, editingRow, onClose 
         }
       },
     }
-    if (editingRow) updatePrice.mutate({ productId, priceId: editingRow.id, ...body }, callbacks)
+    if (editingRow)
+      updatePrice.mutate({ productId, priceId: editingRow.priceId, ...body }, callbacks)
     else addPrice.mutate({ productId, ...body }, callbacks)
   })
 
-  const idPrefix = editingRow ? `price-edit-${editingRow.id}` : 'price-add'
+  const idPrefix = editingRow ? `price-edit-${editingRow.priceId}` : 'price-add'
   const priceInputId = `${idPrefix}-price`
   const startInputId = `${idPrefix}-start`
   const priceErrorId = `${priceInputId}-error`

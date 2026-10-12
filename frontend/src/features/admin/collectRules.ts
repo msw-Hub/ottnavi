@@ -6,11 +6,7 @@
  * 실패한 실행은 같은 값으로 restart, 서버가 멈춰 "실행 중"으로 남은 실행은 복구(recover)한 뒤 restart 한다.
  * "중단됨" 판정은 서버가 내려준다(사용자 결정 2026-10-11). 화면은 시간으로 추측하지 않고 status === 'STOPPED'만 본다.
  */
-import type {
-  CollectExecution,
-  CollectExecutionStatus,
-  CollectTier,
-} from '@/features/admin/mockTypes'
+import type { CollectExecution, CollectExecutionStatus, CollectTier } from '@/api/generated/model'
 
 // 범위(tier) 화면 글자
 export const COLLECT_TIER_LABELS: Record<CollectTier, string> = {

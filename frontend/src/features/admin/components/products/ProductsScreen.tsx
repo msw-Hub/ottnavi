@@ -50,7 +50,7 @@ export function ProductsScreen() {
   const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
 
   const selectedId = Number(searchParams.get(SELECTED_PRODUCT_PARAM))
-  const selectedProduct = products.data?.products.find((p) => p.id === selectedId) ?? null
+  const selectedProduct = products.data?.products.find((p) => p.productId === selectedId) ?? null
 
   function selectProduct(productId: number) {
     setSearchParams(
@@ -87,14 +87,14 @@ export function ProductsScreen() {
         <ProductTable
           products={products.data.products}
           serviceNames={serviceNames}
-          selectedProductId={selectedProduct?.id ?? null}
+          selectedProductId={selectedProduct?.productId ?? null}
           today={today}
           onSelect={selectProduct}
           onEdit={(product) => openDialog({ mode: 'edit', product })}
         />
         {selectedProduct ? (
           <PriceHistoryPanel
-            key={selectedProduct.id}
+            key={selectedProduct.productId}
             product={selectedProduct}
             serviceName={
               serviceNames.get(selectedProduct.ottServiceId) ??

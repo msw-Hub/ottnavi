@@ -6,7 +6,7 @@
  */
 import { isApiError } from '@/api/http'
 import { findRunning } from '@/features/admin/collectRules'
-import type { CollectExecution, CollectTier } from '@/features/admin/mockTypes'
+import type { CollectExecution, CollectTier } from '@/api/generated/model'
 import { getErrorMessage } from '@/lib/errorMessages'
 
 export type RunNotice =

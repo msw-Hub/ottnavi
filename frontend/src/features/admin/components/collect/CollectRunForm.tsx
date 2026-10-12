@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { RunNotice } from '@/features/admin/components/collect/runNotice'
 import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
 import { COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
-import type { CollectTier } from '@/features/admin/mockTypes'
+import type { CollectTier } from '@/api/generated/model'
 import { formatIsoDate } from '@/lib/format'
 
 interface CollectRunFormProps {

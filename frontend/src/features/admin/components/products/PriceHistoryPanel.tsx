@@ -27,7 +27,7 @@ import {
   useDeleteProductPrice,
   useVerifyProductPrice,
 } from '@/features/admin/hooks/useAdminProducts'
-import type { AdminProduct, AdminProductPrice } from '@/features/admin/mockTypes'
+import type { AdminProduct, AdminProductPrice } from '@/api/generated/model'
 import {
   getPriceEndDate,
   getPriceRowKind,
@@ -92,7 +92,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
   }, [isAdding, editingPriceId])
 
   const sortedAsc = sortPricesAscending(product.prices)
-  const latestId = sortedAsc[sortedAsc.length - 1]?.id
+  const latestId = sortedAsc[sortedAsc.length - 1]?.priceId
   const hasOnlyOneRow = sortedAsc.length === 1
   const rowsNewestFirst = [...sortedAsc].reverse()
 
@@ -128,7 +128,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
 
       {isAdding && (
         <PriceForm
-          productId={product.id}
+          productId={product.productId}
           sortedPrices={sortedAsc}
           today={today}
           onClose={closeAddForm}
@@ -148,20 +148,20 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
 
       <ul className="grid gap-3">
         {rowsNewestFirst.map((row) => {
-          const index = sortedAsc.findIndex((r) => r.id === row.id)
+          const index = sortedAsc.findIndex((r) => r.priceId === row.priceId)
           const kind = getPriceRowKind(sortedAsc, index, today)
           const endDate = getPriceEndDate(sortedAsc, index)
-          const isLatest = row.id === latestId
+          const isLatest = row.priceId === latestId
 
-          if (editingPriceId === row.id) {
+          if (editingPriceId === row.priceId) {
             return (
-              <li key={row.id}>
+              <li key={row.priceId}>
                 <PriceForm
-                  productId={product.id}
+                  productId={product.productId}
                   sortedPrices={sortedAsc}
                   today={today}
                   editingRow={row}
-                  onClose={() => closeEditForm(row.id)}
+                  onClose={() => closeEditForm(row.priceId)}
                 />
               </li>
             )
@@ -169,7 +169,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
 
           return (
             <li
-              key={row.id}
+              key={row.priceId}
               className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[1.4fr_1.6fr_1.4fr_1.6fr] md:items-start md:gap-4"
             >
               <div className="grid gap-1">
@@ -205,7 +205,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
                     disabled={verify.isPending}
                     onClick={() =>
                       verify.mutate(
-                        { productId: product.id, priceId: row.id },
+                        { productId: product.productId, priceId: row.priceId },
                         {
                           onSuccess: () => toast.success('요금 확인일을 오늘로 갱신했어요'),
                           onError: toastError,
@@ -220,12 +220,12 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
                 )}
                 {isLatest && (
                   <Button
-                    id={`edit-price-${row.id}`}
+                    id={`edit-price-${row.priceId}`}
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={isAdding || editingPriceId !== null}
-                    onClick={() => setEditingPriceId(row.id)}
+                    onClick={() => setEditingPriceId(row.priceId)}
                   >
                     <PencilIcon aria-hidden="true" />
                     수정
@@ -277,7 +277,7 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
               onClick={() => {
                 if (!deleteTarget) return
                 remove.mutate(
-                  { productId: product.id, priceId: deleteTarget.id },
+                  { productId: product.productId, priceId: deleteTarget.priceId },
                   {
                     onSuccess: () => toast.success('월 구독요금을 삭제했어요'),
                     onError: toastError,

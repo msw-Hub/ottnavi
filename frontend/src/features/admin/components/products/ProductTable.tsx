@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table'
 import { AdminStatusPill } from '@/features/admin/components/AdminStatusPill'
 import { StaleVerifiedTag } from '@/features/admin/components/StaleVerifiedTag'
-import type { AdminProduct } from '@/features/admin/mockTypes'
+import type { AdminProduct } from '@/api/generated/model'
 import { getCurrentPrice, isVerifiedStale, sortPricesAscending } from '@/features/admin/priceRules'
 import { formatWon } from '@/lib/format'
 
@@ -85,11 +85,11 @@ export function ProductTable({
   const nameButton = (product: AdminProduct) => (
     <button
       type="button"
-      onClick={() => onSelect(product.id)}
+      onClick={() => onSelect(product.productId)}
       className="rounded-sm text-left font-semibold underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       {product.name}
-      {product.id === selectedProductId && <span className="sr-only"> (선택됨)</span>}
+      {product.productId === selectedProductId && <span className="sr-only"> (선택됨)</span>}
     </button>
   )
 
@@ -125,19 +125,19 @@ export function ProductTable({
           </TableHeader>
           <TableBody>
             {products.map((product) => {
-              const isSelected = product.id === selectedProductId
+              const isSelected = product.productId === selectedProductId
               return (
                 <TableRow
-                  key={product.id}
+                  key={product.productId}
                   data-selected={isSelected}
                   aria-current={isSelected ? 'true' : undefined}
-                  onClick={handleRowClick(product.id)}
+                  onClick={handleRowClick(product.productId)}
                   className={cn('cursor-pointer', selectedBar, isSelected && 'bg-muted/50')}
                 >
                   <TableCell>{nameButton(product)}</TableCell>
                   <TableCell>{serviceName(product.ottServiceId)}</TableCell>
                   <TableCell>
-                    <SalesStatusPill isActive={product.active} />
+                    <SalesStatusPill isActive={product.isActive} />
                   </TableCell>
                   <TableCell>
                     <CurrentPriceCell product={product} today={today} />
@@ -153,13 +153,13 @@ export function ProductTable({
       {/* 좁은 화면: 카드 목록 */}
       <ul aria-label="OTT 구독상품 목록" className="grid gap-3 md:hidden">
         {products.map((product) => {
-          const isSelected = product.id === selectedProductId
+          const isSelected = product.productId === selectedProductId
           return (
             <li
-              key={product.id}
+              key={product.productId}
               data-selected={isSelected}
               aria-current={isSelected ? 'true' : undefined}
-              onClick={handleRowClick(product.id)}
+              onClick={handleRowClick(product.productId)}
               className={cn(
                 'grid cursor-pointer gap-2 rounded-xl border border-border bg-card p-4 hover:bg-muted/50',
                 selectedBar,
@@ -167,7 +167,7 @@ export function ProductTable({
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 {nameButton(product)}
-                <SalesStatusPill isActive={product.active} />
+                <SalesStatusPill isActive={product.isActive} />
               </div>
               <p className="text-sm text-muted-foreground">{serviceName(product.ottServiceId)}</p>
               <div className="flex flex-wrap items-center justify-between gap-2">

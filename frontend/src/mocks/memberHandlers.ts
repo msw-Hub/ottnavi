@@ -32,7 +32,7 @@ import {
   MOCK_PRICE_EFFECTIVE_FROM,
   MOCK_PRICE_VERIFIED_AT,
   MOCK_PRODUCTS,
-} from '@/mocks/fixtures/pricing'
+} from '@/mocks/fixtures/admin'
 import { DEFAULT_USER_SETTINGS, EMPTY_USER_SETTINGS } from '@/mocks/fixtures/settings'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { isMockOnboardingDone, setMockOnboardingDone } from '@/mocks/mockSession'
@@ -362,8 +362,12 @@ export const memberHandlers: RequestHandler[] = [
       success: true,
       data: {
         items,
-        // 상한(20)에 세는 개수는 "다 봤음"이 아닌 찜이다(PRD 11절 36번)
-        activeItemCount: items.filter((item) => item.watchedAt === null).length,
+        // 상한(20)에 세는 개수는 "다 봤음"이 아닌 찜이다(PRD 11절 36번).
+        // 화면 확인용: X-Mock-Scenario: wishlist-full이면 20개가 찬 것으로 알린다(찜 추가의 409 시나리오와 같은 이름). 20개를 직접 채우지 않고도
+        // "찜 20/20"과 안내 띠를 볼 수 있다
+        activeItemCount: hasMockScenario(request, 'wishlist-full')
+          ? 20
+          : items.filter((item) => item.watchedAt === null).length,
         maxActiveItemCount: 20,
         dataAsOf: MOCK_DATA_AS_OF,
       },

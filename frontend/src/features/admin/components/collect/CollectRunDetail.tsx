@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
 import { useCollectChanges } from '@/features/admin/hooks/useAdminCollect'
-import type { CollectExecution } from '@/features/admin/mockTypes'
+import type { CollectExecution } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
 import { getErrorMessage } from '@/lib/errorMessages'
 
@@ -76,17 +76,20 @@ export function CollectRunDetail({ id, execution, serviceNames }: CollectRunDeta
         </Button>
       </div>
     )
-  } else if (changes.data.changes.length === 0) {
+  } else if (changes.data.content.length === 0) {
     body = <p className="text-sm text-muted-foreground">이 실행에서 바뀐 작품이 없습니다.</p>
   } else {
     body = (
       <ul className="grid gap-2">
-        {changes.data.changes.map((change) => (
+        {changes.data.content.map((change) => (
           <li
-            key={`${change.mediaType}-${change.tmdbId}-${change.ottServiceId}`}
+            key={`${change.mediaType}-${change.tmdbId}-${change.seasonNumber ?? 0}-${change.ottServiceId}`}
             className="flex flex-wrap items-center gap-x-3 gap-y-1.5"
           >
-            <span className="font-medium">{change.title}</span>
+            <span className="font-medium">
+              {change.title}
+              {change.seasonNumber !== null && ` 시즌 ${change.seasonNumber}`}
+            </span>
             <span className="text-sm text-muted-foreground">
               {serviceNames.get(change.ottServiceId) ?? `서비스 ${change.ottServiceId}`}
             </span>
