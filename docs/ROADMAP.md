@@ -254,7 +254,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
 - 완료 기준
   - V-H: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록했고, 저장소·채팅에 키가 없음을 확인했다.
-- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/TECH.md` 8절 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
+- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 꺼 둔 상태(2026-10-13 사용자 확인. 백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/TECH.md` 8절 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
 
 #### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ✅
 - 태그: [H] · PRD: H2, R11-27 · 선행: 없음
@@ -764,7 +764,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
   - [ ] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
-  - [ ] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_month_product(plan_month_id)`, `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
+  - [ ] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
   - [ ] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
   - [ ] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
 - 완료 기준
@@ -912,6 +912,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
+  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
   - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
   - [ ] TV 시즌 호출량 지표(R11-26 측정용)
@@ -1095,6 +1096,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 063: 계산 입력 수집과 엔진 입출력 변환 구현으로 엔진 연결 ⬜
 - 태그: [B] · PRD: B7, FR-12 · 선행: 062, 039, 056, 060 · 기한 전제: R11-13(2026-10-29) · 브랜치: `feature/b7-plan-input`
 - 구현 사항
+  - [ ] 월 번호 범위: `plan_month.month_index`는 DB가 `>= 0`만 검사하므로(Task 034 결정, ERD D3) 변환 단계가 0~2만 만든다
   - [ ] 입력 수집(readOnly): 다 봤음 제외 찜, 제공 상태, 적용 가격, 구독 상태, 설정, `data_as_of`(수집 Job 마지막 COMPLETED 종료 시각)
   - [ ] 쿠팡플레이 포함 여부 필터(R11-13, 입력 단계). 상품을 걸러낼 때 시청 단위의 시청 가능 상품 ID 집합에서도 같은 상품을 함께 거른다(`PlanInput` 생성자가 `products`에 없는 시청 가능 상품 ID를 예외로 막는다). 제외로 시청 가능 상품이 비게 된 단위를 어떤 이유 코드(`NO_PROVIDER` 등)로 보일지는 R11-13 결정(2026-10-29)에 따라 정한다. 원천 상태(모름·없음)를 구분해 넘기지 않으면 `NO_PROVIDER`로 오분류될 수 있어서다(PR #24 CodeRabbit 지적)
   - [ ] 엔티티 ↔ 엔진 record 변환(`plan` 서비스만 `engine` 호출). **시리즈 식별자·시즌 번호 반영(2026-10-10 결정, 시즌 순서 규칙 PRD 5.4·11절 37번)**: 시청 단위를 만들 때 `watch_unit.title_id`를 시리즈 식별자로, `season_number`를 시즌 번호로 채운다(영화는 시즌 번호 없음). 앞 시즌이 찜 목록에 없거나 "다 봤음"이면 입력에 넣지 않는 것으로 충분하다(제약 없음). 후속 항목 S(Task 040 뒤)의 모델 변경이 끝난 뒤에 구현한다
