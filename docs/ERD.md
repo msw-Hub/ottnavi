@@ -6,7 +6,7 @@
 
 - 공통 감사 컬럼 `created_at`, `updated_at`(TIMESTAMPTZ)은 표에서 생략한다.
 - 키 표기: **PK** 기본키, **FK** 외래키, **UK** 유니크 제약
-- NULL 표기(`NULL`, `NULL 허용`)가 없는 컬럼은 `NOT NULL`이다. `CHECK`는 NULL이면 통과하므로, 열끼리의 규칙 `CHECK`(예: `(status = 'UNKNOWN') = (unknown_reason IS NOT NULL)`)는 이 `NOT NULL` 전제 위에서 성립한다. 마이그레이션에서 `NOT NULL`을 빠뜨리지 않는다.
+- NULL이 될 수 있는 컬럼은 반드시 표시한다(A 영역은 설명 칸에 `NULL 허용`, B~E 영역은 컬럼 이름 뒤에 `NULL`). 표시가 없는 컬럼은 `NOT NULL`이다. `CHECK`는 NULL이면 통과하므로, 열끼리의 규칙 `CHECK`(예: `(status = 'UNKNOWN') = (unknown_reason IS NOT NULL)`)는 이 `NOT NULL` 전제 위에서 성립한다. 마이그레이션에서 `NOT NULL`을 빠뜨리지 않는다. 연결도(mermaid)는 요약이라 NULL 표기를 빠뜨렸을 수 있으니, 어긋나면 각 영역의 상세 표를 정본으로 본다.
 
 ---
 
@@ -58,7 +58,7 @@ erDiagram
     int provider_id PK "TMDB 값"
     varchar tmdb_name "원본 라벨"
     varchar mapping_state "UNMAPPED / MAPPED / IGNORED"
-    bigint ott_service_id FK "MAPPED일 때만"
+    bigint ott_service_id FK "MAPPED일 때만, 아니면 NULL"
     varchar tier "STANDARD / AD"
   }
   title {
@@ -90,7 +90,7 @@ erDiagram
     bigint id PK
     bigint watch_unit_id FK
     bigint ott_service_id FK
-    varchar before_status
+    varchar before_status "NULL 허용"
     varchar after_status
     bigint job_execution_id "NULL 허용"
     timestamptz changed_at
@@ -127,7 +127,7 @@ erDiagram
 |---|---|---|---|
 | provider_id | INT | PK | TMDB 값 그대로 (8, 1796 등). 외부 값이 안정적인 식별자라 대리키를 두지 않는다 |
 | tmdb_name | VARCHAR(100) | | TMDB 원본 라벨. 관리자 확인용이며 판정에 쓰지 않는다 |
-| logo_path | VARCHAR(200) | | |
+| logo_path | VARCHAR(200) | | NULL 허용 |
 | mapping_state | VARCHAR(20) | | UNMAPPED(미매핑, 처음 발견된 상태) / MAPPED(서비스에 연결됨) / IGNORED(관련 없음). 기본값 UNMAPPED. 판정에는 MAPPED만 쓴다. 수집은 이미 있는 제공처의 상태를 덮어쓰지 않는다 |
 | ott_service_id | BIGINT | FK | 우리 판정. MAPPED일 때만 값이 있고 UNMAPPED·IGNORED는 NULL. `CHECK ((mapping_state = 'MAPPED') = (ott_service_id IS NOT NULL))` |
 | tier | VARCHAR(20) | | STANDARD / AD. 우리 판정. UNMAPPED·IGNORED는 STANDARD로 저장 |
@@ -141,14 +141,14 @@ erDiagram
 | media_type | VARCHAR(10) | UK | MOVIE / TV (`CHECK`). DB는 대문자로 저장하고 API는 소문자 `movie`/`tv`다. 변환은 도메인 enum(`MediaType`)이 맡는다 |
 | tmdb_id | INT | UK | `UNIQUE(media_type, tmdb_id)`로 영화·드라마 ID 충돌 해결 |
 | title | VARCHAR(300) | | 한국어 제목 (없으면 원제) |
-| original_title | VARCHAR(300) | | 영화 original_title / 드라마 original_name |
-| overview | TEXT | | 줄거리 |
-| overview_lang | VARCHAR(5) | | ko / en. 영어로 대체했는지 표시 |
-| release_date | DATE | | 영화 개봉일 / 드라마 첫 방영일 |
-| poster_path, backdrop_path | VARCHAR(200) | | 이미지 상대 경로 |
-| original_language | VARCHAR(10) | | |
-| tv_status | VARCHAR(30) | | 드라마만. Returning Series, Ended 등 |
-| popularity, vote_average | NUMERIC | | 정렬과 수집 우선순위 |
+| original_title | VARCHAR(300) | | NULL 허용. 영화 original_title / 드라마 original_name |
+| overview | TEXT | | NULL 허용. 줄거리 |
+| overview_lang | VARCHAR(5) | | NULL 허용. ko / en. 영어로 대체했는지 표시 |
+| release_date | DATE | | NULL 허용. 영화 개봉일 / 드라마 첫 방영일 |
+| poster_path, backdrop_path | VARCHAR(200) | | NULL 허용. 이미지 상대 경로 |
+| original_language | VARCHAR(10) | | NULL 허용 |
+| tv_status | VARCHAR(30) | | NULL 허용. 드라마만. Returning Series, Ended 등 |
+| popularity, vote_average | NUMERIC | | NULL 허용. 정렬과 수집 우선순위 |
 | refresh_tier | VARCHAR(10) | | DAILY(찜에 있음) / WEEKLY(나머지 후보) |
 | fetched_at | TIMESTAMPTZ | | 마지막 수집 시각. 6개월 갱신 규칙 점검에 사용 |
 
@@ -159,9 +159,9 @@ erDiagram
 | id | BIGINT | PK | |
 | title_id | BIGINT | FK, UK | → title |
 | unit_type | VARCHAR(10) | | MOVIE / SEASON. `CHECK ((unit_type = 'SEASON') = (season_number IS NOT NULL))` |
-| season_number | INT | UK | 영화는 NULL. `UNIQUE(title_id, season_number) NULLS NOT DISTINCT`. 시즌 0(스페셜)은 수집하지 않음 |
-| tmdb_season_id | INT | | 시즌만 |
-| name, poster_path, air_date | — | | 시즌 표시용 (영화는 title 값 사용) |
+| season_number | INT | UK | NULL 허용(영화는 NULL). `UNIQUE(title_id, season_number) NULLS NOT DISTINCT`. 시즌 0(스페셜)은 수집하지 않음 |
+| tmdb_season_id | INT | | NULL 허용. 시즌만 |
+| name, poster_path, air_date | — | | NULL 허용. 시즌 표시용 (영화는 title 값 사용) |
 | episode_count | INT | | 전체 회차 수 (영화는 1) |
 | aired_episode_count | INT | | 방영된 회차 수 |
 | total_runtime_min | INT | | 방영된 회차 runtime 합 / 영화 runtime |
@@ -188,7 +188,7 @@ erDiagram
 |---|---|---|---|
 | id | BIGINT | PK | |
 | watch_unit_id, ott_service_id | BIGINT | FK | |
-| before_status, after_status | VARCHAR(20) | | 신규는 before가 NULL |
+| before_status, after_status | VARCHAR(20) | | before_status는 NULL 허용(신규는 NULL), after_status는 필수 |
 | job_execution_id | BIGINT | | Spring Batch 실행 ID (FK 없이 참조값만). 배치 밖(단건 수집)에서 생긴 변경이면 NULL. **인덱스 있음**: 실행별 "바뀐 작품" 조회와 실행 이력의 변경 건수 집계가 이 값으로 거른다 |
 | changed_at | TIMESTAMPTZ | | 재계산·변경 알림의 입력 |
 
@@ -198,7 +198,7 @@ erDiagram
 |---|---|---|
 | genre | id INT PK, name | TMDB 장르 ID를 그대로 PK로 사용. 애니메이션(16) 판별 |
 | title_genre | PK(title_id, genre_id) | N:M 연결 테이블 |
-| title_cast | id PK, title_id FK, cast_order, person_tmdb_id, name, character_name, profile_path | 상위 10명만 저장. `UNIQUE(title_id, cast_order)`. 인물 테이블은 두지 않음 |
+| title_cast | id PK, title_id FK, cast_order, person_tmdb_id, name, character_name NULL, profile_path NULL | 상위 10명만 저장. `UNIQUE(title_id, cast_order)`. 인물 테이블은 두지 않음 |
 
 ---
 
@@ -296,7 +296,7 @@ erDiagram
 |---|---|---|
 | users | id, email UK, name, role, oauth_provider, oauth_subject | `UNIQUE(oauth_provider, oauth_subject)`. 테이블명은 예약어(user)를 피하려고 복수형 |
 | user_setting | user_id PK·FK, monthly_budget, monthly_watch_minutes, watch_preset, notification_enabled | 1:1. 예산·시청 시간 필수(FR-10). watch_preset = LIGHT / NORMAL / HEAVY / CUSTOM. **행이 있으면 온보딩(첫 설정 저장)을 마친 사용자**이고 행은 `PUT /me/settings`가 처음 만든다(가입 때 만들지 않는다). 구독 행 수로는 온보딩 여부를 알 수 없다(모두 미구독이면 0행). 환산 입력(주 N회·회당 M시간)은 저장하지 않는다(R11-18 A안) |
-| user_subscription | id, user_id FK, ott_service_id FK, status, product_id FK NULL, plan_name, billing_day | `UNIQUE(user_id, ott_service_id)`. status = SUBSCRIBED(구독 중) / FREE(무료 이용) / UNKNOWN(잘 모르겠음, 저장하며 계산에서는 미구독과 같이 취급). **미구독(NOT_SUBSCRIBED)은 행을 두지 않는다**(API가 행이 없는 서비스를 NOT_SUBSCRIBED로 채워 준다). plan_name(VARCHAR(30))은 표시용 요금제 이름, billing_day(1~31)는 결제일이며 둘 다 SUBSCRIBED일 때만 값이 있고 나머지 상태에서는 NULL(`CHECK`). 결제일이 비어 들어오면 서비스가 1을 채운다(DB 기본값이 아니다). MVP는 product_id를 NULL로 두고 계산 입력 단계가 서비스의 판매 중 단품을 찾는다. 번들 이용 시 구성 서비스 행들이 같은 product_id를 가리킨다(2단계) |
+| user_subscription | id, user_id FK, ott_service_id FK, status, product_id FK NULL, plan_name NULL, billing_day NULL | `UNIQUE(user_id, ott_service_id)`. status = SUBSCRIBED(구독 중) / FREE(무료 이용) / UNKNOWN(잘 모르겠음, 저장하며 계산에서는 미구독과 같이 취급). **미구독(NOT_SUBSCRIBED)은 행을 두지 않는다**(API가 행이 없는 서비스를 NOT_SUBSCRIBED로 채워 준다). plan_name(VARCHAR(30))은 표시용 요금제 이름, billing_day(1~31)는 결제일이며 둘 다 SUBSCRIBED일 때만 값이 있고 나머지 상태에서는 NULL(`CHECK`). 결제일이 비어 들어오면 서비스가 1을 채운다(DB 기본값이 아니다). MVP는 product_id를 NULL로 두고 계산 입력 단계가 서비스의 판매 중 단품을 찾는다. 번들 이용 시 구성 서비스 행들이 같은 product_id를 가리킨다(2단계) |
 | user_price_override | id, user_id FK, product_id FK, monthly_price | `UNIQUE(user_id, product_id)`. 관리자 가격을 바꾸지 않는 사용자별 덮어쓰기(FR-11) |
 | wishlist_item | id, user_id FK, watch_unit_id FK, priority, watched_at(TIMESTAMPTZ) NULL | `UNIQUE(user_id, watch_unit_id)`. 드라마 찜은 시즌별 행으로 저장. watched_at이 있으면 계산에서 제외. **사용자당 찜은 최대 20개**(`watched_at`이 없는 행만 센다, PRD 11절 36번, 2026-10-10)이며 **애플리케이션 규칙이라 DB 제약(CHECK·트리거)을 두지 않는다**(같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화, 예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다)으로 검사·저장하며 방식은 Task 056 구현에서 정한다). 개수는 `SELECT count(*) FROM wishlist_item WHERE user_id = ? AND watched_at IS NULL`로 센다(`UNIQUE(user_id, watch_unit_id)`의 선두가 user_id라 별도 인덱스가 없다). 검사·저장이 한 단위로 묶여야 하는 동작은 새 찜 추가와 '다 봤음' 되돌리기 둘이다. 초과하면 서비스 계층이 `WISHLIST_LIMIT_EXCEEDED`(제안)로 막는다. 같은 시리즈의 시즌 순서(PRD 11절 37번)는 `watch_unit.title_id`·`season_number`로 판단하므로 스키마 변경은 없다 |
 
@@ -370,10 +370,10 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| plan | id, user_id FK, previous_plan_id FK NULL, status, plan_type, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, activated_at, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). plan_type = RECOMMENDED(추천형) / SAVER(절약형) / SIMPLE(간편형, PRD 5.4, 11절 35번). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT는 유형마다 하나: `UNIQUE(user_id, plan_type) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. data_as_of(TIMESTAMPTZ)는 계산에 쓴 수집 Job의 마지막 완료 시각이고 API 응답은 한국 날짜로 바꿔 준다. activated_at(TIMESTAMPTZ, NULL 허용)은 ACTIVE로 저장된 시각이며 DRAFT만 NULL이고 ACTIVE·ARCHIVED는 반드시 값이 있다(`CHECK ((status = 'DRAFT') = (activated_at IS NULL))`). 상태와 activated_at은 같은 갱신에서 바꾼다. 매월 재계산이 DRAFT 없이 만드는 ACTIVE도 값을 채운다. start_month는 첫 달의 1일(DATE)이며 API에서는 YYYY-MM이다. scheduledCount·totalCount·savedAmount는 저장하지 않고 plan_item과 두 비용 열에서 계산한다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost. **all_subscribe_cost**(PRD 11절 38번, 2026-10-10) = 찜한(안 다 본) 작품을 볼 수 있는 서비스를 전부 3개월 내내 기본 요금(사용자 수정 금액이 있으면 그 금액)으로 구독했을 때의 비용이며 세 플랜 유형이 같은 값이다. 총비용과 같은 규칙으로 FREE는 0원, 0번째 달의 SUBSCRIBED는 0원이다 |
+| plan | id, user_id FK, previous_plan_id FK NULL, status, plan_type, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, activated_at NULL, change_summary NULL | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). plan_type = RECOMMENDED(추천형) / SAVER(절약형) / SIMPLE(간편형, PRD 5.4, 11절 35번). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT는 유형마다 하나: `UNIQUE(user_id, plan_type) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. data_as_of(TIMESTAMPTZ)는 계산에 쓴 수집 Job의 마지막 완료 시각이고 API 응답은 한국 날짜로 바꿔 준다. activated_at(TIMESTAMPTZ, NULL 허용)은 ACTIVE로 저장된 시각이며 DRAFT만 NULL이고 ACTIVE·ARCHIVED는 반드시 값이 있다(`CHECK ((status = 'DRAFT') = (activated_at IS NULL))`). 상태와 activated_at은 같은 갱신에서 바꾼다. 매월 재계산이 DRAFT 없이 만드는 ACTIVE도 값을 채운다. start_month는 첫 달의 1일(DATE)이며 API에서는 YYYY-MM이다. scheduledCount·totalCount·savedAmount는 저장하지 않고 plan_item과 두 비용 열에서 계산한다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost. **all_subscribe_cost**(PRD 11절 38번, 2026-10-10) = 찜한(안 다 본) 작품을 볼 수 있는 서비스를 전부 3개월 내내 기본 요금(사용자 수정 금액이 있으면 그 금액)으로 구독했을 때의 비용이며 세 플랜 유형이 같은 값이다. 총비용과 같은 규칙으로 FREE는 0원, 0번째 달의 SUBSCRIBED는 0원이다 |
 | plan_month | id, plan_id FK, month_index, month, confirmed, cost | `UNIQUE(plan_id, month_index)`. month_index 0은 확정(이번 달), 1·2는 예상. month는 그 달의 1일(DATE)이며 API에서는 YYYY-MM. confirmed는 API의 isConfirmed이고 month_index 0이면 true인 파생 값이라 `CHECK (confirmed = (month_index = 0))`로 묶는다 |
 | plan_month_product | id, plan_month_id FK, product_id FK, applied_price, price_source | 그 달에 구독할 상품. price_source = ADMIN / USER_OVERRIDE / ALREADY_PAID / FREE. 가격 스냅샷이라 이후 가격 변경에 영향받지 않음. 가입·해지 안내는 인접 월을 비교해 도출. `UNIQUE(plan_month_id, product_id)`로 같은 달에 같은 상품이 두 행 저장되는 것을 막는다 |
-| plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason은 NULL 허용이며 UNSCHEDULED일 때만 값이 있다. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천. `CHECK ((outcome = 'UNSCHEDULED') = (reason IS NOT NULL))` |
+| plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason NULL, completed_month_index NULL | `UNIQUE(plan_id, watch_unit_id)`. reason은 NULL 허용이며 UNSCHEDULED일 때만 값이 있다. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천. `CHECK ((outcome = 'UNSCHEDULED') = (reason IS NOT NULL))` |
 | plan_assignment | id, plan_item_id FK, plan_month_id FK, ott_service_id FK, minutes | `UNIQUE(plan_item_id, plan_month_id)`, `CHECK (minutes > 0)`. 긴 시즌은 연속된 달에 걸쳐 여러 행으로 나뉘고 한 달 = 한 조각이다. API의 watchMin이 minutes이고, segmentIndex·segmentCount·isContinuation은 저장하지 않고 `ROW_NUMBER`·`COUNT` 윈도우로 계산한다. ott_service_id는 엔진이 상품만 주므로 plan 서비스가 변환해 채운다 |
 | calc_run | id, plan_id FK NULL, input_hash, plan_type, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 완전탐색과 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
 
@@ -383,7 +383,7 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| notification_outbox | id, user_id FK, type, dedupe_key UK, payload JSONB, status, attempt_count, next_attempt_at, sent_at, last_error | type = SUBSCRIBE_GUIDE / MONTHLY / PLAN_CHANGE. status = PENDING / SENT / FAILED. 인덱스 (status, next_attempt_at), user_id(탈퇴 삭제용). 발송 이력 조회(FR-16)도 이 테이블. dedupe_key 예: `MONTHLY:{userId}:2026-11` |
+| notification_outbox | id, user_id FK, type, dedupe_key UK, payload JSONB, status, attempt_count, next_attempt_at, sent_at NULL, last_error NULL | type = SUBSCRIBE_GUIDE / MONTHLY / PLAN_CHANGE. status = PENDING / SENT / FAILED. 인덱스 (status, next_attempt_at), user_id(탈퇴 삭제용). 발송 이력 조회(FR-16)도 이 테이블. dedupe_key 예: `MONTHLY:{userId}:2026-11` |
 | BATCH_* (Spring Batch) | 라이브러리 관리 | 수집 실행 이력. 생성 스크립트만 Flyway에 추가. 관리자 화면(FR-20)이 읽기 전용으로 조회. 수집 실행의 `STOPPED`(중단됨)는 이 테이블에 저장하지 않는 파생 상태다. `STARTED`인데 지금 이 서버가 돌리고 있지 않은 실행을 서버가 판정한다(API `CollectExecutionStatus`) |
 | shedlock | 라이브러리 관리 | @Scheduled 작업 락. 생성 스크립트만 Flyway에 추가 |
 
