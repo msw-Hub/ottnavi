@@ -20,11 +20,15 @@ const server = setupServer(...handlers)
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 beforeEach(() => {
+  // 요금 확인일의 "90일 넘음" 판정이 실제 날짜에 흔들리지 않도록 Date만 고정한다(MSW·user-event의 타이머는 그대로 둔다)
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-13T12:00:00+09:00'))
   vi.stubEnv('VITE_USE_MOCK', 'true')
   setMockRole('USER')
   setMockOnboardingDone(true) // 설정(예산·시청 시간)이 있는 회원이어야 계산할 수 있다
 })
 afterEach(() => {
+  vi.useRealTimers()
   server.resetHandlers()
   vi.unstubAllEnvs()
   resetMockSession()
@@ -95,7 +99,7 @@ describe('요금 확인 화면', () => {
 
   it('요금 확인일을 줄마다 보이고, 90일 넘게 확인하지 않은 요금에만 안내를 덧붙인다(계산은 막지 않는다)', async () => {
     // 목업 기본값(확인일 2026-10-08)을 넷플릭스는 오래된 일시로, 디즈니+는 어제로 바꿔 내려준다
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 고정한 시각(2026-10-13)의 어제
     server.use(
       http.get('/api/me/service-prices', () =>
         HttpResponse.json({
@@ -145,6 +149,41 @@ describe('요금 확인 화면', () => {
     expect(within(disneyRow).queryByText(/요금이 달라졌을 수 있어요/)).not.toBeInTheDocument()
     // 계산은 막지 않는다
     expect(screen.getByRole('button', { name: '3개월 플랜 계산하기' })).toBeEnabled()
+  })
+
+  it('요금 확인 일시를 해석할 수 없으면 확인일 줄은 빼고 오래된 요금으로 보아 안내만 보인다', async () => {
+    server.use(
+      http.get('/api/me/service-prices', () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            services: [
+              {
+                ottServiceId: 1,
+                productId: 101,
+                productName: '넷플릭스 스탠다드',
+                adminPrice: 13500,
+                userPrice: null,
+                appliedPrice: 13500,
+                priceSource: 'ADMIN',
+                subscriptionStatus: 'NOT_SUBSCRIBED',
+                effectiveFrom: '2026-01-01',
+                lastVerifiedAt: 'invalid',
+              },
+            ],
+          },
+        }),
+      ),
+    )
+    renderPricing()
+
+    const netflixRow = (await screen.findByLabelText('내 금액 (넷플릭스)')).closest('li')!
+    expect(within(netflixRow).queryByText(/요금 확인일/)).not.toBeInTheDocument()
+    expect(
+      within(netflixRow).getByText(
+        '요금이 달라졌을 수 있어요. 실제 금액이 다르면 직접 수정해 주세요.',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다', async () => {

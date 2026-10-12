@@ -1,4 +1,4 @@
-import { useGetTitleDetail } from '@/api/generated/catalog/catalog'
+import { getGetTitleDetailQueryKey, useGetTitleDetail } from '@/api/generated/catalog/catalog'
 import type { MediaType } from '@/api/generated/model'
 import { getMockRequestHeaders } from '@/lib/mockScenario'
 
@@ -23,7 +23,10 @@ export function useTitleDetail(params: TitleDetailParams | null) {
 
   return useGetTitleDetail(params?.mediaType ?? 'movie', params?.tmdbId ?? 0, {
     query: {
-      queryKey: [`/public/titles/${params?.mediaType}/${params?.tmdbId}`, mockHeaders],
+      queryKey: [
+        ...getGetTitleDetailQueryKey(params?.mediaType ?? 'movie', params?.tmdbId ?? 0),
+        mockHeaders,
+      ],
       select: (res) => res.data,
       enabled: params !== null,
     },

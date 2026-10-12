@@ -773,7 +773,10 @@ export const adminHandlers: RequestHandler[] = [
     if (hasMockScenario(request, 'run-error')) return internalError(request)
 
     const body = (await request.json()) as CreateCollectExecutionRequest
-    // 계약: targetDate는 선택이다. 비우거나 null이면 오늘(KST)로 본다
+    // 계약: targetDate는 선택이다. 비우거나 null이면 오늘(KST)로 본다. 문자열이 아닌 값은 형식 오류다
+    if (body.targetDate != null && typeof body.targetDate !== 'string') {
+      return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
+    }
     const targetDate = body.targetDate ? body.targetDate : getTodayDateString()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
       return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
