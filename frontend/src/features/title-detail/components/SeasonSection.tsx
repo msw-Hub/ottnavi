@@ -110,7 +110,7 @@ export function SeasonSection({
             <Button
               type="button"
               variant="outline"
-              className="h-10 w-fit"
+              className="h-11 w-fit"
               onClick={() => setIsShowingAll(true)}
             >
               시즌 더 보기 (남은 {hiddenCount}개)

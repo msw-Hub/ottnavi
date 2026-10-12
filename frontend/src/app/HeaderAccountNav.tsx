@@ -29,15 +29,18 @@ export function HeaderAccountNav() {
     navigate('/')
   }
 
+  // 링크·버튼은 min-h-10(40px)·좌우 px-1로 누르는 영역을 넓혔다(Task 037 ⑫). -my-2(위아래 -8px)는 넓힌 높이가 레이아웃 높이에는 안 잡히게 하는 장치다:
+  // 그냥 40px로 두면 모바일 머리글 윗줄(로고 26px)이 40px로 커져 머리글이 103px → 117px이 되고 토스트 위치(--header-height)와 어긋난다.
+  // gap-1 + px-1 x 2 = 12px로 항목 사이 간격은 이전(gap-3)과 같아, 좁은 폭에서 줄바꿈이 새로 생기지 않는다
   return (
-    <nav aria-label="계정" className="ml-auto flex items-center gap-3">
+    <nav aria-label="계정" className="ml-auto flex items-center gap-1">
       <MockRoleSwitcher />
       {effectiveRole === 'GUEST' ? (
         // 지금 보던 화면을 from으로 넘겨, 로그인이 끝나면 이 화면으로 돌아오게 한다(getSafeRedirectPath가 내부 경로만 통과시킨다)
         <Link
           to="/login"
           state={{ from: `${location.pathname}${location.search}` }}
-          className="text-sm underline-offset-4 hover:underline"
+          className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
         >
           로그인
         </Link>
@@ -50,7 +53,7 @@ export function HeaderAccountNav() {
           */}
           <Link
             to={{ pathname: '/wishlist', search: wishlistSearch }}
-            className="text-sm underline-offset-4 hover:underline"
+            className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
           >
             찜 목록
           </Link>
@@ -60,7 +63,7 @@ export function HeaderAccountNav() {
           <button
             type="button"
             onClick={handleLogout}
-            className="text-sm underline-offset-4 hover:underline"
+            className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
           >
             로그아웃
           </button>

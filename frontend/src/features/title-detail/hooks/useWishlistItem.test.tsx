@@ -16,7 +16,7 @@ import { setMockRole } from '@/mocks/mockSession'
 
 vi.mock('@/api/http', () => ({ customInstance: vi.fn() }))
 // 토스트가 실제로 그려지는지가 아니라 "어떤 문구와 버튼으로 요청했는지"를 본다
-vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 const WISHLIST_STATE_KEY = ['mock-wishlist-state']
 const TARGET = { mediaType: 'movie', tmdbId: 496243, seasonNumber: null } as const
@@ -95,9 +95,12 @@ describe('useWishlistItem 로그인 가드', () => {
 })
 
 describe('useWishlistItem 찜 20개 제한(409)', () => {
-  beforeEach(() => vi.mocked(toast.error).mockClear())
+  beforeEach(() => {
+    vi.mocked(toast.error).mockClear()
+    vi.mocked(toast.warning).mockClear()
+  })
 
-  it('찜 추가가 409 WISHLIST_LIMIT_EXCEEDED면 서버 문구 토스트와 [찜 목록 가기] 버튼을 띄운다', async () => {
+  it('찜 추가가 409 WISHLIST_LIMIT_EXCEEDED면 오류가 아닌 경고 토스트로 문구와 [찜 목록 가기] 버튼을 띄운다', async () => {
     setMockRole('USER')
     const userMessage = '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.'
     vi.mocked(customInstance).mockRejectedValue({
@@ -109,8 +112,9 @@ describe('useWishlistItem 찜 20개 제한(409)', () => {
 
     act(() => result.current.onAdd())
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalled())
-    const [message, options] = vi.mocked(toast.error).mock.calls[0]
+    await waitFor(() => expect(toast.warning).toHaveBeenCalled())
+    expect(toast.error).not.toHaveBeenCalled()
+    const [message, options] = vi.mocked(toast.warning).mock.calls[0]
     expect(message).toBe(userMessage)
     expect(options).toMatchObject({ action: { label: '찜 목록 가기' } })
 
@@ -132,5 +136,6 @@ describe('useWishlistItem 찜 20개 제한(409)', () => {
     act(() => result.current.onAdd())
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('일시적인 오류가 발생했습니다.'))
+    expect(toast.warning).not.toHaveBeenCalled()
   })
 })

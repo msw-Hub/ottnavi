@@ -39,8 +39,8 @@ export function ErrorState({
       <p className="font-bold text-destructive">{title}</p>
       <p className="text-sm text-muted-foreground">{description}</p>
       {onRetry && (
-        // size="lg"(36px)에 h-10을 덧씌워 40px로 만든다: 손가락으로 누르기 쉽게(Task 026 검수). components/ui는 고치지 않는다
-        <Button type="button" size="lg" onClick={onRetry} className="mt-1 h-10">
+        // size="lg"(36px)에 h-11을 덧씌워 44px로 만든다: 손가락으로 누르기 쉽게(Task 026 검수, Task 037에서 사용자 화면 버튼 높이를 44px로 통일). components/ui는 고치지 않는다
+        <Button type="button" size="lg" onClick={onRetry} className="mt-1 h-11">
           <RefreshCwIcon aria-hidden="true" />
           다시 시도
         </Button>

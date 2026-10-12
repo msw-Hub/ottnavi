@@ -60,7 +60,7 @@ export function WishlistButton({
 
   const isIcon = variant === 'icon'
   // 아이콘 모양: 터치 영역 44x44px, 아이콘 20px. 배경 없는 ghost라 카드 위에서 하트만 보인다
-  const triggerClassName = isIcon ? 'size-11 rounded-full p-0' : 'h-10'
+  const triggerClassName = isIcon ? 'size-11 rounded-full p-0' : 'h-11'
 
   if (priority === null) {
     return (
@@ -123,7 +123,7 @@ export function WishlistButton({
             {WISHLIST_PRIORITY_OPTIONS.map((option) => (
               <label
                 key={option.value}
-                className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted has-focus-visible:outline-2 has-focus-visible:outline-ring"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted has-focus-visible:outline-2 has-focus-visible:outline-ring"
               >
                 <input
                   type="radio"
@@ -143,7 +143,7 @@ export function WishlistButton({
           <Button
             type="button"
             variant="ghost"
-            className="h-10 justify-start"
+            className="h-11 justify-start"
             onClick={() => {
               onRemove()
               setIsOpen(false)

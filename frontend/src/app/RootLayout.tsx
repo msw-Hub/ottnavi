@@ -17,7 +17,7 @@ import { isMockMode } from '@/lib/mockScenario'
  *
  * 라우터의 최상위 라우트가 이 컴포넌트를 그리고, 주소에 맞는 화면은 <Outlet /> 자리에 들어간다.
  * 그래서 화면을 옮겨 다녀도 헤더·푸터는 다시 만들어지지 않고 본문만 바뀐다.
- * 시각 디자인은 Task 037에서 확정하므로 지금은 shadcn 기본 토큰(bg-background, text-muted-foreground 등)만 쓴다.
+ * 색은 디자인 토큰(bg-background, text-muted-foreground 등)만 쓴다.
  */
 export function RootLayout() {
   // 개발용 이동 링크가 목업 확인용 주소 파라미터(?mockScenario=… 등)를 이어 붙이도록 현재 주소의 쿼리를 읽는다
@@ -32,8 +32,12 @@ export function RootLayout() {
         본문으로 건너뛰기
       </a>
 
-      {/* bg-card: 본문 바탕보다 한 단계 밝은 면으로 머리글을 구분한다(Task 026 검수) */}
-      <header className="border-b bg-card">
+      {/*
+        bg-card: 본문 바탕보다 한 단계 밝은 면으로 머리글을 구분한다(Task 026 검수).
+        min-h-(--header-height): 토스트 위치(app/providers.tsx)와 같은 CSS 변수(styles/tokens.css)를 최소 높이로 써서,
+        머리글 높이와 "토스트가 시작하는 높이"가 한 값으로 묶이게 한다(Task 037). 내용 높이(65px/103px)와 같은 값이라 겉모습은 그대로다.
+      */}
+      <header className="min-h-(--header-height) border-b bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
           <Link to="/" className="font-semibold">
             OTT내비
@@ -53,9 +57,13 @@ export function RootLayout() {
         <Outlet />
       </main>
 
+      {/* 푸터 링크는 inline-flex min-h-10으로 누르는 영역을 세로 40px로 넓혔다(Task 037 ⑫) */}
       <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-sm text-muted-foreground">
-          <Link to="/about" className="underline-offset-4 hover:underline">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-4 text-center text-sm text-muted-foreground">
+          <Link
+            to="/about"
+            className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
+          >
             서비스 소개(About)
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
@@ -70,25 +78,25 @@ export function RootLayout() {
               <span>개발용 이동</span>
               <Link
                 to={{ pathname: '/settings', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 내 설정
               </Link>
               <Link
                 to={{ pathname: '/wishlist', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 찜 목록
               </Link>
               <Link
                 to={{ pathname: '/pricing', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 요금 확인
               </Link>
               <Link
                 to={{ pathname: '/plan', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 플랜 결과
               </Link>
