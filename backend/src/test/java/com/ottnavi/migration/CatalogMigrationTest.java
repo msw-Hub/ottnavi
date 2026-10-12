@@ -120,6 +120,16 @@ class CatalogMigrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void 회차_수가_음수면_거부한다() {
+        long titleId = insertTitle("TV", 1007);
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO watch_unit (title_id, unit_type, season_number, episode_count, total_runtime_min, fetched_at) "
+                        + "VALUES (?, 'SEASON', 1, -1, 120, now())",
+                titleId)).isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void 시청단위가_참조하는_작품은_지울_수_없다() {
         long titleId = insertTitle("MOVIE", 1006);
         insertWatchUnit(titleId, "MOVIE", null);

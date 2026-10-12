@@ -66,7 +66,9 @@ CREATE TABLE watch_unit (
 	CONSTRAINT uk_watch_unit_title_season UNIQUE NULLS NOT DISTINCT (title_id, season_number),
 	CONSTRAINT ck_watch_unit_type CHECK (unit_type IN ('MOVIE', 'SEASON')),
 	CONSTRAINT ck_watch_unit_season CHECK ((unit_type = 'SEASON') = (season_number IS NOT NULL)),
-	CONSTRAINT ck_watch_unit_runtime CHECK (total_runtime_min >= 0)
+	CONSTRAINT ck_watch_unit_runtime CHECK (total_runtime_min >= 0),
+	-- 회차 수 음수 방지. 방영 회차 <= 전체 회차 같은 비교는 TMDB 값에 따라 수집이 막힐 수 있어 두지 않는다(ERD D3)
+	CONSTRAINT ck_watch_unit_episode_counts CHECK (episode_count >= 0 AND aired_episode_count >= 0 AND runtime_missing_count >= 0)
 );
 
 -- 시청 단위 × 서비스 제공 상태. 서비스 단위로 집계해 저장한다
