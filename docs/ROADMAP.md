@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 11/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 12/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 37/105 | |
+| 합계 | | 38/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -605,7 +605,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 11/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 12/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -747,17 +747,19 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - `db-reviewer` 검토 후 추가 확정(2026-10-13): 매월 재계산 순서(이전 ACTIVE를 ARCHIVED로 바꾸고 flush한 뒤 새 ACTIVE), 저장·재계산도 `user_setting` 잠금, delete 뒤 save 순서 주의(벌크 삭제 먼저), 열끼리의 CHECK(`watch_unit`·`availability`·`plan_item`·`plan_month.confirmed`), 금액·분 `>= 0`·`must_completed <= must_total`, `plan_month_product` UNIQUE, `SMALLINT`→`INT`, PK 예외 목록, 상품 이름 `maxLength: 100`, `tmdbId` 상한, `calc_run` 보존 기준(Task 080), NULL 표기 규약.
   - 넘길 내용: Task 033(V2·V3·V4 반영), 034(V5·V6 반영, `users` NULL 여부와 `plan_item.completed_month_index` 확정), 035(엔티티 타입: `NUMERIC`→`BigDecimal`, `SMALLINT` 없음), 045(recover 응답 `endedAt`은 null, `batch.recovered`로 판별), 055·056·061·063. 참고로 남긴 것(033~034 또는 다음 ERD 손질 때): "서비스당 판매 중 SINGLE 상품은 1개" 규칙을 앱 규칙으로 명시, `NUMERIC`↔`Double` validate 호환, 같은 새 작품의 동시 검색에서 `uk_title_media_tmdb` 위반 500, 연결도 정리, `mapping_state`/`tier` CHECK, 첫 설정 저장 경합, `completed_month_index` 설명.
 
-#### Task 033: 작품·상품 영역(A·B)과 배치 메타 Flyway 마이그레이션 작성으로 수집 스키마 확정 ⬜
+#### Task 033: 작품·상품 영역(A·B)과 배치 메타 Flyway 마이그레이션 작성으로 수집 스키마 확정 ✅
 - 태그: [B] · PRD: B0, 8.1 · 선행: 019, 030, 032, 004 · 브랜치: `feature/b0-schema-catalog`
 - 구현 사항
-  - [ ] Task 032에서 A·B 영역 변경이 나오면 아직 병합 전인 V2·V3에 넣고, 이미 `develop`에 병합된 파일(V1 `ott_service`)이 대상이면 그 파일을 고치지 않고 새 마이그레이션 버전으로 반영한다(4.2)
-  - [ ] V2 작품 영역: `tmdb_provider`, `title`(`UNIQUE(media_type, tmdb_id)`), `watch_unit`(`UNIQUE(title_id, season_number) NULLS NOT DISTINCT`), `availability`(`UNIQUE(watch_unit_id, ott_service_id)`), `availability_change`, `genre`, `title_genre`, `title_cast`(`UNIQUE(title_id, cast_order)`)
-  - [ ] V3 상품 영역: `subscription_product`, `product_component`, `product_price`(`UNIQUE(product_id, effective_from)`). 마스터 FK는 NO ACTION
-  - [ ] V4 Spring Batch PostgreSQL 메타데이터(`BATCH_*`). ERD E 영역이지만 수집 Job(Task 043)이 먼저 필요해 여기서 만든다
-  - [ ] Task 004 매핑표로 `tmdb_provider` 시드
+  - [x] Task 032에서 A·B 영역 변경이 나오면 아직 병합 전인 V2·V3에 넣고, 이미 `develop`에 병합된 파일(V1 `ott_service`)이 대상이면 그 파일을 고치지 않고 새 마이그레이션 버전으로 반영한다(4.2)
+  - [x] V2 작품 영역: `tmdb_provider`, `title`(`UNIQUE(media_type, tmdb_id)`), `watch_unit`(`UNIQUE(title_id, season_number) NULLS NOT DISTINCT`), `availability`(`UNIQUE(watch_unit_id, ott_service_id)`), `availability_change`, `genre`, `title_genre`, `title_cast`(`UNIQUE(title_id, cast_order)`)
+  - [x] V3 상품 영역: `subscription_product`, `product_component`, `product_price`(`UNIQUE(product_id, effective_from)`). 마스터 FK는 NO ACTION
+  - [x] V4 Spring Batch PostgreSQL 메타데이터(`BATCH_*`). ERD E 영역이지만 수집 Job(Task 043)이 먼저 필요해 여기서 만든다
+  - [x] Task 004 매핑표로 `tmdb_provider` 시드
 - 완료 기준
   - V-B: 마이그레이션 테스트 통과. 영화 행(시즌 NULL) 중복과 `title` (media_type, tmdb_id) 중복이 거부된다.
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b0-schema-catalog`, PR #51). 사용자가 직접 구현했다. V2(작품 영역 8개 테이블 + `tmdb_provider` 시드 8행, 전부 MAPPED이고 1796은 AD), V3(상품 영역 3개, 가격 시드는 넣지 않음), V4(Spring Batch 6.0.5 `BATCH_*` 6개 + 시퀀스 3개). 마이그레이션 테스트 `CatalogMigrationTest` 13건, 전체 442건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 안내서(`TASK033_GUIDE.md`)는 정리로 삭제했다(`git log -- docs/TASK033_GUIDE.md`).
+  - CodeRabbit 결정: ① `watch_unit` 회차 수 3개 컬럼에 `>= 0` CHECK(`ck_watch_unit_episode_counts`)를 추가했다. `aired <= episode` 같은 비교는 TMDB 값에 따라 수집이 막힐 수 있어 두지 않았다. ② `unit_type`과 `title.media_type`의 일치, 영화 단위의 `episode_count = 1`은 DB가 막지 않고 수집 Job이 지킨다(Task 044에 반영). ③ 새 테이블에 RLS 없음 우려는 Supabase Data API를 꺼 둔 상태(2026-10-13 확인)라 조치하지 않았다.
+  - 넘길 내용: Task 034(V5~V7, 안내서 `TASK034_GUIDE.md`), 035(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`), 043·044(수집이 `unknown_reason`을 UNKNOWN일 때만 채움, 작품 종류에 맞는 단위만 생성). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035).
 #### Task 034: 사용자·플랜·알림 영역(C·D·E) 마이그레이션과 FK 동작 테스트 작성으로 사용자 데이터 스키마 확정 ⬜
 - 태그: [B] · PRD: B0, FR-07, 12, 14 · 선행: 032, 033 · 브랜치: `feature/b0-schema-user-plan`
 - 관련: ERD C·D·E, "FK 삭제 동작"·"참조 컬럼 인덱스", TECH T-1
