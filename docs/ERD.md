@@ -177,7 +177,7 @@ erDiagram
 | watch_unit_id | BIGINT | FK, UK | `UNIQUE(watch_unit_id, ott_service_id)` |
 | ott_service_id | BIGINT | FK, UK | |
 | status | VARCHAR(20) | | AVAILABLE / NOT_AVAILABLE / UNKNOWN. 엔티티 메서드 하나에서만 변경. `CHECK ((status = 'UNKNOWN') = (unknown_reason IS NOT NULL))` |
-| unknown_reason | VARCHAR(30) | | NO_KR_DATA(응답에 KR 없음) / STRUCTURAL_GAP(쿠팡플레이 영화 등) |
+| unknown_reason | VARCHAR(30) | | NULL 허용. UNKNOWN일 때만 값이 있고 아니면 NULL. NO_KR_DATA(응답에 KR 없음) / STRUCTURAL_GAP(쿠팡플레이 영화 등) |
 | in_standard | BOOLEAN | | STANDARD tier 제공처가 있었는지 |
 | in_ad_tier | BOOLEAN | | AD tier 제공처가 있었는지 (광고형 요금제 판정) |
 | checked_at | TIMESTAMPTZ | | 마지막 확인 시각 |
@@ -350,7 +350,7 @@ erDiagram
     bigint plan_id FK
     bigint watch_unit_id FK
     varchar outcome "SCHEDULED / UNSCHEDULED"
-    varchar reason
+    varchar reason "UNSCHEDULED일 때만"
   }
   plan_assignment {
     bigint id PK
@@ -373,7 +373,7 @@ erDiagram
 | plan | id, user_id FK, previous_plan_id FK NULL, status, plan_type, start_month, monthly_budget, monthly_watch_minutes, algorithm, must_total, must_completed, score, total_cost, all_subscribe_cost, data_as_of, activated_at, change_summary | status = DRAFT(계산했지만 저장 안 함) / ACTIVE(저장한 현재 플랜, 알림·매월 재계산의 기준) / ARCHIVED(물러난 이전 플랜). plan_type = RECOMMENDED(추천형) / SAVER(절약형) / SIMPLE(간편형, PRD 5.4, 11절 35번). 사용자당 ACTIVE는 하나: `UNIQUE(user_id) WHERE status = 'ACTIVE'`, 사용자당 DRAFT는 유형마다 하나: `UNIQUE(user_id, plan_type) WHERE status = 'DRAFT'` 부분 인덱스. DRAFT를 덮어쓸 때 하위 plan_month·plan_item·plan_month_product·plan_assignment 행도 함께 삭제한다(FK `ON DELETE CASCADE`로 DB가 지운다. 아래 "삭제 정책" 참고). 저장 시 DRAFT의 data_as_of가 최신 수집보다 오래됐으면 서비스에서 막는다. data_as_of(TIMESTAMPTZ)는 계산에 쓴 수집 Job의 마지막 완료 시각이고 API 응답은 한국 날짜로 바꿔 준다. activated_at(TIMESTAMPTZ, NULL 허용)은 ACTIVE로 저장된 시각이며 DRAFT만 NULL이고 ACTIVE·ARCHIVED는 반드시 값이 있다(`CHECK ((status = 'DRAFT') = (activated_at IS NULL))`). 상태와 activated_at은 같은 갱신에서 바꾼다. 매월 재계산이 DRAFT 없이 만드는 ACTIVE도 값을 채운다. start_month는 첫 달의 1일(DATE)이며 API에서는 YYYY-MM이다. scheduledCount·totalCount·savedAmount는 저장하지 않고 plan_item과 두 비용 열에서 계산한다. 예산·시청 시간은 계산 당시 값의 스냅샷. 절감액 = all_subscribe_cost − total_cost. **all_subscribe_cost**(PRD 11절 38번, 2026-10-10) = 찜한(안 다 본) 작품을 볼 수 있는 서비스를 전부 3개월 내내 기본 요금(사용자 수정 금액이 있으면 그 금액)으로 구독했을 때의 비용이며 세 플랜 유형이 같은 값이다. 총비용과 같은 규칙으로 FREE는 0원, 0번째 달의 SUBSCRIBED는 0원이다 |
 | plan_month | id, plan_id FK, month_index, month, confirmed, cost | `UNIQUE(plan_id, month_index)`. month_index 0은 확정(이번 달), 1·2는 예상. month는 그 달의 1일(DATE)이며 API에서는 YYYY-MM. confirmed는 API의 isConfirmed이고 month_index 0이면 true인 파생 값이라 `CHECK (confirmed = (month_index = 0))`로 묶는다 |
 | plan_month_product | id, plan_month_id FK, product_id FK, applied_price, price_source | 그 달에 구독할 상품. price_source = ADMIN / USER_OVERRIDE / ALREADY_PAID / FREE. 가격 스냅샷이라 이후 가격 변경에 영향받지 않음. 가입·해지 안내는 인접 월을 비교해 도출. `UNIQUE(plan_month_id, product_id)`로 같은 달에 같은 상품이 두 행 저장되는 것을 막는다 |
-| plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천. `CHECK ((outcome = 'UNSCHEDULED') = (reason IS NOT NULL))` |
+| plan_item | id, plan_id FK, watch_unit_id FK, priority, outcome, reason, completed_month_index | `UNIQUE(plan_id, watch_unit_id)`. reason은 NULL 허용이며 UNSCHEDULED일 때만 값이 있다. reason = BUDGET(예산 부족) / TIME(시청 시간 초과) / UNKNOWN(제공처 정보 없음: 7개 중 "있음"은 없고 "모름"이 있음) / NO_PROVIDER(7개 서비스에 없음: 7개 모두 "없음"). 판정 순서는 NO_PROVIDER → UNKNOWN → BUDGET → TIME. "남은 작품과 이유"(FR-12)의 원천. `CHECK ((outcome = 'UNSCHEDULED') = (reason IS NOT NULL))` |
 | plan_assignment | id, plan_item_id FK, plan_month_id FK, ott_service_id FK, minutes | `UNIQUE(plan_item_id, plan_month_id)`, `CHECK (minutes > 0)`. 긴 시즌은 연속된 달에 걸쳐 여러 행으로 나뉘고 한 달 = 한 조각이다. API의 watchMin이 minutes이고, segmentIndex·segmentCount·isContinuation은 저장하지 않고 `ROW_NUMBER`·`COUNT` 윈도우로 계산한다. ott_service_id는 엔진이 상품만 주므로 plan 서비스가 변환해 채운다 |
 | calc_run | id, plan_id FK NULL, input_hash, plan_type, algorithm, must_completed, score, total_cost, candidate_count, elapsed_ms | 완전탐색과 그리디 비교 기록(FR-13). 같은 input_hash로 두 알고리즘 결과를 비교. 플랜이 삭제되면 plan_id만 NULL |
 
