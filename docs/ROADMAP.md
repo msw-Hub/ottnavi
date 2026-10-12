@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 8/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 9/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 34/105 | |
+| 합계 | | 35/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -111,7 +111,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 | 2단계(5~6주차) | 11-05 ~ 11-18 | 068~084, (091 결정 시) / 102 (`v0.2.0`) |
 | 3단계(7~8주차) | 11-19 ~ 12-02 | 085~090 / 096~101, 103, 104 / 105 (`v0.3.0`) |
 
-- **2026-10-08 갱신**: 030(기한 10-14)이 1주차 끝에 몰려 있어 **031은 10-15~16으로 밀릴 가능성이 높다**. 032~034(2주차)는 영향이 작다. 1주차의 프론트 작업(018·025~029)은 `frontend-dev`·`ui-designer` 에이전트가 맡고(`docs/TASK018_031_PLAN.md` 7절), 사용자 직접 작업은 022·024·030이다. 025·026은 PR 하나로 합친다.
+- **2026-10-08 갱신**: 030(기한 10-14)이 1주차 끝에 몰려 있어 **031은 10-15~16으로 밀릴 가능성이 높다**. 032~034(2주차)는 영향이 작다. 1주차의 프론트 작업(018·025~029)은 `frontend-dev`·`ui-designer` 에이전트가 맡고(구성은 `.claude/agents/`), 사용자 직접 작업은 022·024·030이다. 025·026은 PR 하나로 합친다.
 
 ### 3.3 MVP 완료 기준 충족 지점
 
@@ -254,7 +254,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
 - 완료 기준
   - V-H: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록했고, 저장소·채팅에 키가 없음을 확인했다.
-- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/PHASE1_HUMAN_TASKS.md`의 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
+- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/TECH.md` 8절 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
 
 #### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ✅
 - 태그: [H] · PRD: H2, R11-27 · 선행: 없음
@@ -319,6 +319,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] 포트폴리오용이라 **1년만 쓰는 것을 기준**으로 한다. 등록업체별 **첫해 가격**을 비교하고(갱신 가격은 기록만 한다), 도메인 월 환산 비용(첫해 가격 ÷ 12)을 Cloudtype 구독료(512MB당 월 6,600원)와 합쳐 저예산 범위인지 확인한다(고정 상한은 두지 않는다)
   - [ ] 구매. 1년 선결제만 지원하고 자동 갱신이 없다(이전 경험상 만료 전에 업체가 연장하라고 연락해 온다). 자동 갱신이 있다면 꺼 둔다. 소유자 이메일은 만료·연장 안내가 오는 주소라 평소 확인하는 메일을 쓴다. DNS 연결은 Task 092
+  - [ ] 구매할 때 **WHOIS 개인정보 보호**(프라이버시 서비스)가 켜져 있는지 확인하고, 등록업체 계정에 **2단계 인증**을 켠다(도메인 탈취는 서비스 전체 장애로 이어진다). 연장 안내를 받으면 메시지의 링크가 아니라 **업체 사이트에 직접 접속해서** 확인한다(도메인 만료를 노린 사칭이 있다). 카카오톡 알림을 켜 둔다
   - [ ] 만료 한 달 전 알림을 남기고, 만료되면 `*.vercel.app` 기본 주소로 돌아가도록 `APP_FRONTEND_ORIGIN`·`OAUTH2_REDIRECT_BASE_URL`·Google OAuth 운영 리디렉션 URI·`vercel.json`의 주소만 바꾸면 되는지(코드 변경 없음)를 포트폴리오 문서에 적어 둔다
 - 완료 기준
   - V-H: 업체·첫해 가격(·갱신 가격 참고)·구매일·만료일을 기록했다.
@@ -466,7 +467,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: Testcontainers로 컨텍스트 로드 테스트가 통과한다.
   - V-API: local 프로필 기동 시 Flyway·Batch·Security 관련 오류가 없고 기본 로그인 폼·생성 비밀번호가 나오지 않는다.
-- 기록: 2026-10-06 완료(브랜치 `feature/b0-backend-setup`). 상세 절차와 근거는 `docs/TASK016_GUIDE.md`.
+- 기록: 2026-10-06 완료(브랜치 `feature/b0-backend-setup`). 상세 절차 안내서는 정리로 삭제했다(`git log -- docs/TASK016_GUIDE.md`).
   - 의존성: Boot 4.1.1 BOM에 Spring Cloud 2025.1.3, springdoc 3.1.1, Bucket4j 8.21.0, ShedLock 7.10.1, jjwt 0.13.0, WireMock `wiremock-standalone` 3.13.2를 더했다. `spring-boot-starter-batch-jdbc` 아티팩트는 Maven Central에서 4.1.1 존재를 확인했고 `compileJava`가 통과했다(context7로는 이름을 확인하지 못했다, 1절 해소). 메일·Thymeleaf·GreenMail은 제외했다. Lombok을 추가했다(목록에는 없었으나 backend.md가 전제). `dependencyInsight` 결과 Jackson 2는 `jjwt-jackson`·springdoc(swagger-core)로만 들어오고 Boot는 Jackson 3다. bucket4j-lettuce와 Lettuce 7 호환은 미확인이라 요청 제한 구현 Task에서 검증한다.
   - 결정: OAuth2 Google 등록·`JWT_SECRET` 참조는 Task 053으로 미룬다(첫 배포 기동 실패 방지). `spring.profiles.default: local`, `spring.application.name: ottnavi`를 뒀다. Tomcat 스레드는 기본값이다. JVM 힙은 yml이 아니라 Cloudtype 환경 변수(`JAVA_TOOL_OPTIONS`)로 Task 020·021에서 첫 배포 실측 후 정한다(첫 배포는 프리티어 1GB 기준, 스왑은 플랫폼 허용 여부 미확인이라 계획에서 뺀다). Redis health 대응은 Task 020에서 Redis Cloud 생존을 확인한 뒤 판단한다. prod에서 springdoc을 끈다.
   - 검증: V-B는 로컬 compose를 끈 상태에서 `OttnaviApplicationTests`(`IntegrationTestSupport` 상속)가 통과했고 Testcontainers의 `postgres:17.6-alpine`·`redis:8.6-alpine` 기동을 로그로 확인했다. `.\gradlew.bat build`도 통과했다. V-API는 local 프로필 기동 5.6초, `/actuator/health` 200 UP, `/login` 404, `/v3/api-docs` 200이며 Flyway는 `No migrations found` WARN만 낸다(V1은 Task 019).
@@ -493,7 +494,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `RequireAuth`, `RequireAdmin` 자리(동작은 Task 057), 404, 전역 오류 경계
 - 완료 기준
   - V-F: 모든 경로가 로드되고 콘솔 에러가 0건이다.
-- 결정(2026-10-08): 경로표는 `docs/TASK018_031_PLAN.md` 5절의 표로 확정한다(P6). 이 경로는 브라우저 주소창에 보이는 프론트 화면 주소이며 `/api/...` 백엔드 주소와 다르다. 작품 상세는 `/titles/:mediaType/:tmdbId`. 구현은 `frontend-dev` 에이전트가 하고(에이전트 PR 병합 후 `develop`에서 브랜치), 사용자는 가드 코드를 검토한다.
+- 결정(2026-10-08): 경로표는 확정했다(P6, 지금 기준은 `frontend/src/app/router.tsx`). 이 경로는 브라우저 주소창에 보이는 프론트 화면 주소이며 `/api/...` 백엔드 주소와 다르다. 작품 상세는 `/titles/:mediaType/:tmdbId`. 구현은 `frontend-dev` 에이전트가 하고(에이전트 PR 병합 후 `develop`에서 브랜치), 사용자는 가드 코드를 검토한다.
 - 기록: 2026-10-09 완료(`feature/f0-routes-layout`). 경로 19개와 404를 `src/app/router.tsx`에 등록했고 페이지는 `lazy`(React Router 8 객체형)로 나눠 관리자 화면이 첫 번들에 섞이지 않는다. `RootLayout`(헤더 검색·로그인, 푸터 출처 자리), `Providers`(QueryClient), `RouteErrorBoundary`(두 겹), `RouteLoadingFallback`, `ComingSoon`, 빈 페이지 20개를 만들었다. `RequireAuth`·`RequireAdmin`은 지금 `<Outlet />`만 돌려주며 `TODO(Task 057)`에 들어올 동작을 적어 두었다. `/auth/callback`은 가드 밖(공개)이다. `App.tsx`·`App.css`·템플릿 에셋·`public/icons.svg`를 지우고 `index.css`의 템플릿 CSS를 정리했다(`favicon.svg`는 Task 036·037에서 교체). 화면 문구는 존댓말로 통일했다. `lint`·`format:check`·`test`(23건, 경로표 비교 포함)·`build` 통과, V-F 경로 19개·404 로드와 콘솔 에러 0건. 확인하지 못한 것: `RouteErrorBoundary`가 실제로 그려지는 모습과 뒤로 가기 때 검색창 동기화(Task 027에서 Playwright로 확인). `/admin`만 입력하면 404이며 자동 이동은 Task 029에서 정한다. 관리자 권한 없음 처리 방식은 Task 057로 이관했다. 사용자가 가드 설계를 검토·승인했다.
 
 #### Task 019: ott_service 마이그레이션과 서비스 목록 API 로컬 구현으로 얇은 배포 대상 마련 ✅
@@ -575,7 +576,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 시험 후 일회성 서비스와 시험 브랜치 삭제
 - 완료 기준
   - V-H: 성공·실패, 오류 메시지, 시험일, 일회성 서비스 삭제를 기록했고 사용자가 R11-11을 결정했다.
-- 안내서(2026-10-08): `docs/TASK022_GUIDE.md`에 이유·방법·순서·판정표·`기록:` 초안을 정리했다. 시험 코드는 기동 시 1회 발송하는 `ApplicationRunner`(공개 엔드포인트 없음)를 추천한다.
+- 안내서(2026-10-08): 안내서에 이유·방법·순서·판정표·`기록:` 초안을 정리했다(정리로 삭제, `git log -- docs/TASK022_GUIDE.md`). 시험 코드는 기동 시 1회 발송하는 `ApplicationRunner`(공개 엔드포인트 없음)를 추천한다.
 - 기록: 2026-10-09 사용자가 수행했다. **결과: Cloudtype에서 SMTP 587(Gmail, STARTTLS) 연결·인증과 시험 메일 발송이 성공했고 수신함에 도착했다.** 그래서 465 SSL 재시험과 HTTPS 메일 API 시험은 하지 않았다. 환경: 일회성 서비스 `ottnavi-smtp-trial`(프리티어 무료 리소스 0.5GB·최소 vCPU, prod 프로필, 브랜치 `feature/b1-smtp-trial`은 병합하지 않음). 로컬 사전 시험도 성공했다(연결·인증 1911ms, 발송 3311ms). Cloudtype에서의 소요 시간은 서비스를 먼저 삭제해 기록하지 못했다. 시험 서비스와 시험 브랜치(로컬·원격)는 삭제했다.
   - 시행착오: ① 1차 배포는 DB 비밀번호 인증 실패(`28P01`, 시험 서비스의 `DB_USERNAME`·`DB_PASSWORD` 값이 운영과 달랐다)로 기동하지 못했고 운영 값을 그대로 복사해 해결했다. ② 2차 배포에서 시험 로그가 나오지 않은 원인은 푸시된 커밋에 `SmtpTrialRunner` 빈 클래스만 있고 메일 의존성·`application.yml`이 미커밋 상태였기 때문이다(Cloudtype은 원격 브랜치를 빌드한다). 푸시 전 `git status`로 미커밋 파일이 없는지 확인한다.
   - 새로 알게 된 것: 프리티어 무료 1GB는 서비스를 만들 때 서비스별로 나눠 고른다(이번에 0.5GB). 0.5GB·최소 vCPU에서 앱이 OOM 없이 기동했으나 기동에 약 220초가 걸렸다(로컬 5.7초, Spring 컨텍스트 초기화만 약 65초). 메일 발송만 하는 상태의 값이라 운영 부하와는 다르며 Task 021·092의 메모리 측정 자료로 쓴다.
@@ -604,7 +605,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 8/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 9/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -617,7 +618,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] `global/config/FeignConfig`: `spring.cloud.openfeign.client.config.tmdb.*` 타임아웃. 앱 직렬화는 Jackson 3만
 - 완료 기준
   - V-B: Testcontainers Redis에 캐시를 저장·조회하고 값이 JSON인지 확인하는 테스트가 통과한다.
-- 안내서(2026-10-08): `docs/TASK024_GUIDE.md`. 주의: Jackson 3의 `GenericJacksonJsonRedisSerializer`는 기본으로 타입 정보를 넣지 않아 record가 Map으로 돌아올 수 있으므로, 추천안(미확정, 안내서 D1)은 캐시별 타입 지정(`JacksonJsonRedisSerializer<T>`)이고 record 왕복 테스트를 포함한다. 사용자가 직접 작성하고 `backend-dev`가 검수한다.
+- 안내서(2026-10-08, 정리로 삭제 `git log -- docs/TASK024_GUIDE.md`). 주의: Jackson 3의 `GenericJacksonJsonRedisSerializer`는 기본으로 타입 정보를 넣지 않아 record가 Map으로 돌아올 수 있으므로, 추천안(미확정, 안내서 D1)은 캐시별 타입 지정(`JacksonJsonRedisSerializer<T>`)이고 record 왕복 테스트를 포함한다. 사용자가 직접 작성하고 `backend-dev`가 검수한다.
 - 기록: 2026-10-09 완료(`feature/b0-redis-feign-config`, PR #17 develop 병합 9ba0ae5). 결정(안내서 5절): D1 값 직렬화 B 방침(기본 직렬화기는 타입 정보 없는 `GenericJacksonJsonRedisSerializer`로 구성했고, 캐시별 `JacksonJsonRedisSerializer<T>`는 DTO가 생기는 후속 Task에서 등록한다. 지금 `src/main`에는 등록된 것이 없고 테스트 fixture(`RedisCacheConfigTest`)에서만 B 방식으로 왕복을 확인했다), D2 `spring-boot-starter-cache` 추가(Boot 4는 캐시 자동 구성이 `spring-boot-cache` 모듈이고 `RedisCacheManagerBuilderCustomizer`가 `org.springframework.boot.cache.autoconfigure`에 있다), D3 Feign `tmdb` 연결 3초·읽기 5초(Task 048 첫 전체 수집에서 실측 후 조정), D4 TTL 기본 1시간·세 캐시 24시간(실측 86400초), D5 Redis 명령 2초·연결 5초, **D6 캐시 쓰기 즉시 반영(`immediateWrites`)**(구현 중 발견: Spring Data Redis 4에서 Lettuce면 기본 `RedisCacheWriter`의 `put`·`evict`·`clear`가 비동기라 수집 직후 clear해도 옛 값이 읽힐 수 있다. 블로킹 비용은 규모가 작아 수용, 운영 응답 시간은 첫 배포 뒤 로그로 확인). 테스트 `RedisCacheConfigTest` 8건(저장·조회, JSON, 키 접두사, TTL, 실제 캐시 TTL, 즉시 반영, null 미저장) 통과, 전체 `clean build` 8개 클래스 46건 통과, CI 4건과 CodeRabbit 통과(지적 0건). 로컬 기동에서 오류 없이 `/actuator/health` 200 `UP`, `@EnableFeignClients`는 클라이언트 없이도 뜬다. 첫 Redis 연결 때 Netty `TCP_KEEPCOUNT`·`TCP_KEEPIDLE`·`TCP_KEEPINTERVAL` WARN 3건이 나오나 영향이 없어 무시(Windows·Java 17 추정, 운영 로그에서 다시 나오면 판단). 확인하지 못한 것: Feign 기본 디코더의 Jackson 3 사용 여부(Task 042 WireMock 테스트), 운영(Redis Cloud) 블로킹 쓰기 응답 시간.
   - 이후 Task에 넘길 내용: ① 캐시에 DTO를 쓰는 Task(049·051·062 등)는 `RedisConfig`에 그 캐시의 `JacksonJsonRedisSerializer<DTO>`를 한 줄씩 등록한다(기본 직렬화기로는 꺼낸 값이 `LinkedHashMap`이 되어 `ClassCastException`). ② `cache.put(key, null)`은 `IllegalArgumentException`이므로 `@Cacheable`에 `unless = "#result == null"`을 붙인다. ③ CodeRabbit이 짚은 일반론: 운영 스키마 호환(DTO 변경 시 기존 캐시 값)과 동시 무효화는 TTL만으로 보장되지 않으니 해당 Task에서 다룬다.
 
@@ -709,7 +710,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 2026-10-10 결정(PRD 11절 36~38번)의 **화면 문구·위치**를 정한다(결정 자체는 이미 확정): ① 찜 20개 제한(찜 개수 표시, 21번째 추가 시 안내가 뜨는 곳과 문구, "다 봤음" 항목은 개수에서 빠짐을 알리는 방법) ② 시즌 순서 안내(찜 목록의 같은 시리즈 시즌, 결과 화면의 "앞 시즌을 먼저 봐야 해요" 같은 남은 작품 이유 문구) ③ 절감액 설명 문구("찜한 작품을 볼 수 있는 서비스를 3개월 내내 전부 구독했을 때와의 차이")
 - 완료 기준
   - V-H: 승인일과 네 항목 결정을 기록하고 10.2를 갱신했다.
-- 준비(2026-10-08): Claude가 목업 둘러보기 순서표(경로·확인할 점)와 네 항목의 선택지 비교표(ERD·계약에 주는 영향 포함)를 만들어 둔다. 목업 완성 뒤 사용자가 직접 눌러 보고 정한다. 근거: `docs/TASK018_031_PLAN.md` 5절.
+- 준비(2026-10-08): Claude가 목업 둘러보기 순서표(경로·확인할 점)와 네 항목의 선택지 비교표(ERD·계약에 주는 영향 포함)를 만들어 둔다. 목업 완성 뒤 사용자가 직접 눌러 보고 정한다. 근거: 위 구현 사항.
 - 결정(2026-10-12, 사용자): 네 항목을 확정했다(PRD 11절 14·18·19·20번, 10.1에서 해소 처리하고 10.2 표에서 뺌). R11-14 현재 구성 유지, R11-18 A안(환산한 분만 저장, ERD 변경 없음), R11-19 시즌 단위, R11-20 시즌 0 안내 없음. 화면 문구·위치 결정 3건도 확정했다(PRD SCR-08·FR-09). 찜 20개 제한은 개수 줄 "찜 N/20"(다 봤음은 별도 구역, 개수 제외), 20개 도달 시 상단 안내 띠, 21번째 추가 시 토스트와 [찜 목록 가기]이고, 시즌 순서 안내는 찜 목록 위와 결과 화면의 계산 기준에 한 줄씩(개별 문구 없음), 절감액 설명은 현재 문구 유지다. "다 봤음" 기능은 유지하고 역할(월초 재계산 입력, 취소 가능, 20개·시즌 순서·추천 집계 제외)을 PRD FR-09에 정리했다. 이 문구들의 화면 반영은 Task 031 계약 반영 때 함께 한다.
 - 기록: 2026-10-12 완료(문서 PR #40). **승인(V-H)**: 사용자가 목업 둘러보기 7단계(비로그인 검색 → 상세·시즌 찜 → 로그인·온보딩 → 찜 목록 → 요금 확인 → 플랜 결과 → 관리자 3화면)를 직접 눌러 보고 문제없다고 승인했다(2026-10-12). 확정한 결정은 PRD 11절 13·14·18·19·20번과 40·41번이다. 추가로 정한 두 가지: 한 달 플랜 계산의 요금 기준 날짜는 **사용자 결제일 기준**(B안, PRD 11절 40번), 90일 넘게 확인되지 않은 요금은 **요금 확인 화면(SCR-09)에 확인일과 "달라졌을 수 있어요" 안내를 표시**하고 계산은 막지 않는다(B안, 41번). 화면 문구(찜 20개 제한·시즌 순서 안내·절감액·"다 봤음" 역할)는 PRD SCR-08·FR-09에 정리했다. Task 031에서 정할 것: `WISHLIST_LIMIT_EXCEEDED`는 409(추천대로), 찜 목록 응답에 현재 개수("다 봤음" 제외)와 상한을 포함, 요금 응답에 마지막 확인일을 포함. 요금 빈 구간 처리(A/B/C)와 한 달 요금에 쓸 날짜 기준은 이 Task에서 함께 정한다.
 
@@ -734,14 +735,17 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - PR 분할(2026-10-12 결정): 백엔드 Task 032~가 031 완료에 막혀 있어 **PR 1**(계약·오류표·규칙 문서·PRD/ROADMAP 정리 + 프론트 `errorMessages.ts`/테스트 최소 수정)을 먼저 병합하고, **PR 2**(`npm run api:generate`와 `mockTypes.ts` 교체·삭제, 목업 정리, 030 확정 화면 문구 반영)는 이후에 한다. `api-contract.md`의 "계약과 코드는 같은 PR" 원칙에서 한 번 벗어나는 것이며, PR 1은 프론트의 손으로 쓴 목업 타입이 계약 파일과 무관해 CI가 통과한다. Task 031은 PR 2까지 끝나야 ✅다.
 - 기록(2026-10-13 완료, PR #43·#44 병합): PR 1은 #43으로 병합했다. PR 2(#44)는 같은 브랜치에서 `npm run api:generate`(31개 operation)로 생성 훅·타입으로 교체하고 `features/*/mockTypes.ts`를 모두 지웠다(`frontend/src` 전체에 없음). 검토용 값(mockScenario·mockPageSize)은 목업 모드에서만 `X-Mock-*` 요청 헤더로 보내도록 `api/http.ts`에 요청 인터셉터를 추가했다(인증 로직 변경 없음, 사용자 검토 대상). 찜 N/20·20개 안내 띠·21번째 토스트와 [찜 목록 가기]·시즌 순서 안내·요금 확인일(90일 초과 안내)을 반영했다. `contract-checker` 재검사는 심각 0건이고, 권장 지적은 판매 종료 상품 제외·절감액 기준(PRD 11절 38번)·상품 수정의 불필요한 409 제거로 반영했다. 프론트 검증 4종과 테스트 449건 통과. 남은 결정: 요금 확인일 표기(YYYY-MM-DD 대 년월일), 90일 초과 안내 문구, 시즌 순서 줄의 노출 조건(모두 추천안 적용 중). ✅ 처리와 쉬림프 verify는 PR 2 병합 직후 했다(쉬림프 Task 031 완료).
 
-#### Task 032: ERD 보정 반영으로 스키마 확정 근거 마련 ⬜
+#### Task 032: ERD 보정 반영으로 스키마 확정 근거 마련 ✅
 - 태그: [H] · PRD: F1(ERD 보정) · 선행: 030, 031
 - 구현 사항
-  - [ ] R11-18(환산 입력 저장)·R11-19(드라마 찜 단위) 결정과 계약 초안에서 나온 ERD 변경 필요 항목을 목록으로 정리
-  - [ ] 사용자가 `docs/ERD.md`를 고치고 버전을 올린다(이 로드맵 작업은 ERD를 수정하지 않음). 변경이 없으면 "변경 없음"을 기록
+  - [x] R11-18(환산 입력 저장)·R11-19(드라마 찜 단위) 결정과 계약 초안에서 나온 ERD 변경 필요 항목을 목록으로 정리
+  - [x] 사용자가 `docs/ERD.md`를 고치고 버전을 올린다(이 로드맵 작업은 ERD를 수정하지 않음). 변경이 없으면 "변경 없음"을 기록
 - 완료 기준
   - V-H: 반영 항목과 ERD 버전(또는 변경 없음)을 기록했다.
-- 진행(2026-10-13): 사용자 지시로 `docs/ERD.md` v0.4 수정은 Claude가 안내서(`docs/TASK032_GUIDE.md`) 8절대로 적용했고, 사용자는 안내서 10절의 순서로 검토·확정한다. 계약과 어긋나던 PRD·TECH·ROADMAP 경로 표기는 계약 기준으로 같이 고쳤다. 병합 뒤 `기록:`을 채우고 ✅ 처리한다.
+- 기록: 2026-10-13 완료(문서 PR #45, #47). ERD v0.3 → v0.4. 사용자 지시로 `docs/ERD.md` 수정은 Claude가 작업 안내서 8절대로 적용했고 사용자가 검토·병합했다. 반영: ① `product_price.effective_to` 제거(종료일은 다음 줄 시작일 전날로 계산) ② `product_price.last_verified_at`(TIMESTAMPTZ) ③ `tmdb_provider.mapping_state`(UNMAPPED/MAPPED/IGNORED)+CHECK ④ `user_subscription` 상태 `UNKNOWN`·`plan_name`(30)·구독 중 전용 열 CHECK ⑤ `plan.activated_at`·`data_as_of` TIMESTAMPTZ ⑥ `availability_change(job_execution_id)` 인덱스·NULL 허용 ⑦ `title.media_type` CHECK(변환은 도메인 enum) ⑧ `plan_assignment.minutes > 0` CHECK. 변경 없음: `active`↔`isActive`(이름 대응), `isOnboardingDone`(`user_setting` 행 존재), `watchMin`(조각은 계산), 찜 개수(`watched_at IS NULL` 집계), 수집 STOPPED(저장하지 않는 파생 상태), R11-18·R11-19.
+  - 결정(모두 추천대로 확정, 2026-10-12): D1 `activated_at` 추가, D2 `data_as_of` TIMESTAMPTZ, D3 CHECK는 열끼리의 규칙+모든 enum 값 목록+변하지 않는 하한, D4 `user_subscription.product_id`는 MVP에서 NULL, D5 `billing_day`·`plan_name`은 DB 기본값 없음(구독 중이 아니면 NULL), D6 `notification_enabled` 기본 꺼짐(최종값은 2단계), D7 `MediaType` enum은 `catalog.domain`, D8 `job_execution_id` NULL 허용, D9 `dataAsOf`는 마지막 COMPLETED 수집 Job의 종료 시각(한국 날짜로 변환).
+  - `db-reviewer` 검토 후 추가 확정(2026-10-13): 매월 재계산 순서(이전 ACTIVE를 ARCHIVED로 바꾸고 flush한 뒤 새 ACTIVE), 저장·재계산도 `user_setting` 잠금, delete 뒤 save 순서 주의(벌크 삭제 먼저), 열끼리의 CHECK(`watch_unit`·`availability`·`plan_item`·`plan_month.confirmed`), 금액·분 `>= 0`·`must_completed <= must_total`, `plan_month_product` UNIQUE, `SMALLINT`→`INT`, PK 예외 목록, 상품 이름 `maxLength: 100`, `tmdbId` 상한, `calc_run` 보존 기준(Task 080), NULL 표기 규약.
+  - 넘길 내용: Task 033(V2·V3·V4 반영), 034(V5·V6 반영, `users` NULL 여부와 `plan_item.completed_month_index` 확정), 035(엔티티 타입: `NUMERIC`→`BigDecimal`, `SMALLINT` 없음), 045(recover 응답 `endedAt`은 null, `batch.recovered`로 판별), 055·056·061·063. 참고로 남긴 것(033~034 또는 다음 ERD 손질 때): "서비스당 판매 중 SINGLE 상품은 1개" 규칙을 앱 규칙으로 명시, `NUMERIC`↔`Double` validate 호환, 같은 새 작품의 동시 검색에서 `uk_title_media_tmdb` 위반 500, 연결도 정리, `mapping_state`/`tier` CHECK, 첫 설정 저장 경합, `completed_month_index` 설명.
 
 #### Task 033: 작품·상품 영역(A·B)과 배치 메타 Flyway 마이그레이션 작성으로 수집 스키마 확정 ⬜
 - 태그: [B] · PRD: B0, 8.1 · 선행: 019, 030, 032, 004 · 브랜치: `feature/b0-schema-catalog`
@@ -813,13 +817,13 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 기록: 2026-10-09 완료(사용자 작성 1차 → `backend-dev` 검수 → 재작성, 브랜치 `feature/b2-engine-assignment`, PR #25 develop 병합 cab7a56). CodeRabbit 지적 1건(비용 `int` 합산 오버플로)은 타입을 `long`으로 바꾸지 않고 `OttProduct`에 월 가격 상한 100만 원 검증을 두어 처리했다(상품 32개 × 3개월 × 100만 원이 `int` 범위 안). 검증: 엔진 테스트 66건(`EngineModelTest` 17·`EvaluationComparatorTest` 10·`EvaluatorTest` 39), `clean build` 전체 112건 통과(Docker 포함, `backend-dev` 보고).
   - 검수에서 찾아 고친 것: 정렬 누락(`WatchUnitComparator`를 만들고 쓰지 않아 T8·T9 실패), 입력 검증 없음, 최적화(호출마다 집합·Map 재생성, 해시 조회 → 비트마스크·사전 계산). 속도(대략적, 노트북 1회 측정): 단위 30개 기준 옛 구현 대비 5~7배, 210만 번 환산 약 12초 → 약 2.3초(정식 측정은 Task 040).
   - 결정(사용자, 2026-10-09): 결정 1(긴 시즌은 실제 시청 달도 연속, 몰아보기 개념), 결정 2(SUBSCRIBED는 평가기가 0번째 달에 시청 가능으로 처리), 결정 3(시청 가능 상품 ID가 `products`에 없으면 `PlanInput` 생성자 예외), 결정 4(긴 시즌은 마지막 조각 제외 한 달 최소 120분). 정렬 기준 맨 앞 키로 "시청 가능 상품이 없는 단위는 맨 뒤"를 추가하고 기준은 `WatchUnit.ASSIGNMENT_ORDER`에 둔다. "덮는/커버" 용어를 "시청 가능 상품"으로 통일했고, `hasUnknownProvider` → `isProviderUnknown`으로 바꿨다. 월 시청 분 120 이상은 Task 055 설정 API 검증으로 보고(엔진은 그대로), 월 가격 상한은 100만 원으로 정했고, `build.gradle`의 `starter-cache` 위치를 정리했다.
-  - **Task 039로 넘길 내용**: Solver 호출 방식은 `new PlanInput(...)` → `new Evaluator(input)`(한 번) → `evaluate(selection)` 반복이고, `new EvaluationComparator(input.products())`로 `compare(e1,e2) > 0`이면 e1이 더 좋다(**2026-10-10 변경: 조기 시청 ④가 시청 단위의 우선순위를 쓰므로 현재는 `new EvaluationComparator(planInput)`이고, `PlanObjective.recommended/saver/simple`의 첫 인자도 `products`에서 `PlanInput`으로 바뀌었다. 이 줄의 `input.products()` 예시는 당시 기록이라 그대로 두었다**). 예산 필터는 Solver가 한다(D7). 0번째 달 후보에서 SUBSCRIBED·FREE를 빼면 평가가 같아서 탐색 낭비를 줄인다. 2단계 평가 확장(마스크 진입점, 점수만 계산하는 가벼운 함수, 비교기 ④·⑤ 마스크 계산)은 039에서 측정 후 결정한다. 완전탐색 지배 제거의 동점은 ⑤로 가른다(TECH 1절, 안내서 T20 정답 테스트 후보). 2026-10-10 규칙 변경으로 이 문장의 ④·⑤는 현재 ⑤ 결제 미루기·⑥ 상품 ID 순이고 ④는 조기 시청이다. 최선 조합 예시는 `docs/TASK038_GUIDE.md` 9절. 상품 수 한계는 32개(`int` 비트마스크, 2단계에서 64개가 필요하면 `long`)이고, 월 가격 상한 100만 원을 바꾸면 합산 타입을 다시 본다.
+  - **Task 039로 넘길 내용**: Solver 호출 방식은 `new PlanInput(...)` → `new Evaluator(input)`(한 번) → `evaluate(selection)` 반복이고, `new EvaluationComparator(input.products())`로 `compare(e1,e2) > 0`이면 e1이 더 좋다(**2026-10-10 변경: 조기 시청 ④가 시청 단위의 우선순위를 쓰므로 현재는 `new EvaluationComparator(planInput)`이고, `PlanObjective.recommended/saver/simple`의 첫 인자도 `products`에서 `PlanInput`으로 바뀌었다. 이 줄의 `input.products()` 예시는 당시 기록이라 그대로 두었다**). 예산 필터는 Solver가 한다(D7). 0번째 달 후보에서 SUBSCRIBED·FREE를 빼면 평가가 같아서 탐색 낭비를 줄인다. 2단계 평가 확장(마스크 진입점, 점수만 계산하는 가벼운 함수, 비교기 ④·⑤ 마스크 계산)은 039에서 측정 후 결정한다. 완전탐색 지배 제거의 동점은 ⑤로 가른다(TECH 1절, 안내서 T20 정답 테스트 후보). 2026-10-10 규칙 변경으로 이 문장의 ④·⑤는 현재 ⑤ 결제 미루기·⑥ 상품 ID 순이고 ④는 조기 시청이다. 상품 수 한계는 32개(`int` 비트마스크, 2단계에서 64개가 필요하면 `long`)이고, 월 가격 상한 100만 원을 바꾸면 합산 타입을 다시 본다.
   - 확인하지 못한 것: Javadoc 도구 실행, 정식 속도 측정(Task 040·100), Cloudtype 환경 속도, DB 가격이 상한을 넘을 때 서비스 계층 처리(Task 063에서 정함).
 
 #### Task 039: 완전탐색·그리디 Solver 구현으로 조합 탐색 완성 ✅
 - 태그: [B] · PRD: B2, FR-12, 13, TECH T-4 · 선행: 038 · 브랜치: `feature/b2-engine-solvers`
 - 구현 사항
-  - [x] `engine/solver/PlanSolver`(`solve(input, objective)`), `ExactSolver`(후보 상품에서 쓸모없는 상품 제외 후 3개월 중첩 순회, 동치 제거는 추천형만, 후보 상품 20개 초과 시 예외), `GreedySolver`(절약형·간편형은 추천형 결과에서 출발해 개선). 명세는 `docs/TASK039_GUIDE.md`
+  - [x] `engine/solver/PlanSolver`(`solve(input, objective)`), `ExactSolver`(후보 상품에서 쓸모없는 상품 제외 후 3개월 중첩 순회, 동치 제거는 추천형만, 후보 상품 20개 초과 시 예외), `GreedySolver`(절약형·간편형은 추천형 결과에서 출발해 개선). 명세는 `TASK039_GUIDE`(정리로 삭제, Git 이력)
   - [x] 후보 조합 수 상한 초과 시 그리디 전환(`SolverSelector`, 상한은 설정 값, R11-30 전까지 잠정값), 선택 알고리즘을 결과에 남김
   - [x] 플랜 유형 3종의 목적함수(`PlanObjective`: 추천형·절약형·간편형, 점수 하한 = 추천형 점수의 70% 올림, PRD 5.4·11절 35번)와 `PlanTypeSolver.solveAll`(추천형을 먼저 풀고 그 점수로 절약형·간편형 기준 생성)
 - 완료 기준
@@ -839,8 +843,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] Task 039 이월 성능 최적화 3건을 측정 결과로 판단한다: ① 간편형 `signUpCount`를 비교할 때마다 두 번 다시 계산함, ② 조합마다 `Selection`이 정렬 복사를 함(038 모델), ③ `SolverSelector`가 후보 수를 세려고 후보를 만들고 이어서 Solver가 다시 만듦(후보를 한 번만 만들어 넘기고, 그리디로 갈 때는 동치 제거 전에 `budgetSubsets` 곱을 먼저 확인). 후보 상품 20개 한도의 메모리 위험(수백 MB)도 함께 측정해 한도를 정한다
   - [x] 측정이 끝나면 **계산 엔진 알고리즘 상세 문서**(예: `docs/ENGINE_ALGORITHM.md`)를 작성한다: 038 평가기·배정 규칙, 039 완전탐색·그리디·플랜 유형 3종·동치 제거·후보 제외, 040 측정 결과. 쉬운 설명, 작은 숫자 예시, 실행 흐름 순서의 클래스·메서드 설명, 테스트 설명 포함(사용자 요청, 2026-10-10)
   - [x] 최악 입력과 후보 상한 근처에서 **힙 사용량**을 함께 기록한다(메모리 예산 측정 지점, 4.6)
-  - [x] 비교기 ④ 조기 시청 규칙 변경 반영(문서·`EvaluationComparator`·절약형·간편형 비교기·정답 세트 기대값 재생성·재측정). 사용자 결정 2026-10-10: 추천형 ①꼭 시청 완료 수 ②점수 ③총비용 ④조기 시청 ⑤결제 미루기 ⑥달별 상품 ID, 절약형 ①②점수 하한 ③총비용 ④점수 ⑤조기 시청 ⑥결제 미루기 ⑦ID, 간편형 ①②하한 ③새로 가입하는 횟수 ④총비용 ⑤점수 ⑥조기 시청 ⑦결제 미루기 ⑧ID. 조기 시청은 달 0→1→2 순서로 "그 달까지 시청 완료한 꼭 작품 수, 같으면 점수 합"이 먼저 다른 달에서 큰 쪽(문서는 이 변경 PR에서 먼저 고침). 기대값이 달라지는 기존 테스트: `SolverCases`의 T20·성질 3 케이스(`ExactSolverTest` T20 동치 제거 동점, 완전탐색 대 그리디 케이스), `EvaluationComparatorTest` 결제 미루기 케이스, `PlanObjectiveTest` 결제 미루기·ID 케이스, `BruteForceOracle` 비교 로직. **같은 변경으로 `PlanObjective.recommended/saver/simple`의 첫 인자가 `products`에서 `PlanInput`으로 바뀌었다**(`EvaluationComparator`도 `new EvaluationComparator(planInput)`. 이 시그니처를 쓰는 테스트·호출부를 함께 고친다, `docs/TASK039_GUIDE.md` 2절)
-  - [x] 정답 세트에 **케이스 14**를 넣는다: 꼭 시청 완료 3·점수 5·총비용 20,000원인 조합과 꼭 시청 완료 2·점수 6·총비용 15,000원인 조합에서 **앞쪽(꼭 시청 완료가 많은 쪽)이 이긴다**. 점수와 비용이 더 좋아도 ①이 먼저임을 세 유형 모두에서 고정한다(`docs/TASK039_GUIDE.md` 5절)
+  - [x] 비교기 ④ 조기 시청 규칙 변경 반영(문서·`EvaluationComparator`·절약형·간편형 비교기·정답 세트 기대값 재생성·재측정). 사용자 결정 2026-10-10: 추천형 ①꼭 시청 완료 수 ②점수 ③총비용 ④조기 시청 ⑤결제 미루기 ⑥달별 상품 ID, 절약형 ①②점수 하한 ③총비용 ④점수 ⑤조기 시청 ⑥결제 미루기 ⑦ID, 간편형 ①②하한 ③새로 가입하는 횟수 ④총비용 ⑤점수 ⑥조기 시청 ⑦결제 미루기 ⑧ID. 조기 시청은 달 0→1→2 순서로 "그 달까지 시청 완료한 꼭 작품 수, 같으면 점수 합"이 먼저 다른 달에서 큰 쪽(문서는 이 변경 PR에서 먼저 고침). 기대값이 달라지는 기존 테스트: `SolverCases`의 T20·성질 3 케이스(`ExactSolverTest` T20 동치 제거 동점, 완전탐색 대 그리디 케이스), `EvaluationComparatorTest` 결제 미루기 케이스, `PlanObjectiveTest` 결제 미루기·ID 케이스, `BruteForceOracle` 비교 로직. **같은 변경으로 `PlanObjective.recommended/saver/simple`의 첫 인자가 `products`에서 `PlanInput`으로 바뀌었다**(`EvaluationComparator`도 `new EvaluationComparator(planInput)`. 이 시그니처를 쓰는 테스트·호출부를 함께 고친다, `TASK039_GUIDE`(정리로 삭제, Git 이력) 2절)
+  - [x] 정답 세트에 **케이스 14**를 넣는다: 꼭 시청 완료 3·점수 5·총비용 20,000원인 조합과 꼭 시청 완료 2·점수 6·총비용 15,000원인 조합에서 **앞쪽(꼭 시청 완료가 많은 쪽)이 이긴다**. 점수와 비용이 더 좋아도 ①이 먼저임을 세 유형 모두에서 고정한다(`TASK039_GUIDE`(정리로 삭제, Git 이력) 5절)
 - 완료 기준
   - V-B: 정답 세트 전체 통과. 비교 결과표(점수 차, 비용 차, 시간)와 R11-30 잠정 상한 근거를 `기록:`에 남겼다. `calc_run` 기록은 Task 065.
 - 기록: 2026-10-10 완료(백엔드 브랜치 `feature/b2-engine-benchmark`, 문서 브랜치 `feature/docs-engine-algorithm`). 상세는 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md)(12절 측정 결과, 13절 한계). 아래 시간·힙 값은 모두 개발 PC(12코어, OpenJDK 17) 기준이며 Cloudtype과 다르다.
@@ -854,12 +858,12 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 확인하지 못한 것: Cloudtype(1GB) 환경 시간·힙, 전체 실행이 단독 실행보다 느린 이유(JIT 가설), 동점이 많은 입력에서 조기 시청 비교 비용. (정적 불가능 ①의 SUBSCRIBED 해석은 확정: ENGINE_ALGORITHM 13.6절, 2026-10-10 사용자 결정 A안.)
 - **후속 항목 S: 시즌 순서 규칙 엔진 반영** (번호 없음. Task 번호와 진행 개수 105에 넣지 않고 Task 040의 선행 작업으로 둔다. 2026-10-10 사용자 결정, PRD 5.4 "시즌 순서"·11절 37번)
   - 이유: 정답 세트의 기대값은 배정 규칙에 달려 있으므로 규칙을 먼저 바꾸고 나서 위 정답 세트·측정을 확정해야 한 번만 만든다. 번호를 새로 붙이면 105개 체계, Phase별 개수, 선행 참조(063 등)가 줄줄이 밀려서 후속 항목으로 둔다. Task 038 평가기를 고치는 일이라 브랜치는 따로 판다(제안: `feature/b2-engine-season-order`). 설계는 opus, 구현·테스트·검수는 sonnet 방침을 따른다.
-  - [x] 모델: `WatchUnit`(및 `PlanInput` 검증)에 시리즈 식별자(`title_id`)와 시즌 번호를 추가한다(영화는 시즌 번호 없음). 구현 방식은 이 항목에서 정한다(`docs/TASK038_GUIDE.md` 결정 5, TECH 1절)
+  - [x] 모델: `WatchUnit`(및 `PlanInput` 검증)에 시리즈 식별자(`title_id`)와 시즌 번호를 추가한다(영화는 시즌 번호 없음). 구현 방식은 이 항목에서 정한다(TECH 1절)
   - [x] 배정 규칙: 같은 시리즈의 뒤 시즌 시청 완료 달 ≥ 앞 시즌 시청 완료 달(같은 달이면 앞 시즌 먼저), 앞 시즌이 찜 목록에 없거나 "다 봤음"이면 제약 없음, 앞 시즌이 3개월 안에 시청 완료되지 못하면 뒤 시즌 미배정(이유 코드 TIME 확정, 단 뒤 시즌 자신의 서비스가 선택되지 않았으면 기존 판정 순서(NO_PROVIDER → UNKNOWN → BUDGET → TIME)대로). 우선순위 역전은 앞 시즌 끌어올리기로 확정(기존 정렬 뒤 한 번 훑으면서 어떤 시즌을 내보낼 때 같은 시리즈의 아직 나오지 않은 앞 시즌들을 시즌 번호 순으로 그 시즌 바로 앞에 끼워 넣음, 우선순위 무관. 점수·꼭 시청 완료 수·필요 시간·ID 순은 원래 값. 뒤 시즌이나 그 앞 시즌 중에 정적으로 시청 완료가 불가능한 시즌(후보 상품 없음 또는 항상 예산 초과, 필요 분 > 월 시청 시간 × 3, 긴 시즌인데 월 시청 시간 < 120분)이 있으면 끌어올리지 않음. 한계: 가능한 만큼 채우는 규칙이라 뒤 시즌이 TIME이 될 수 있어 테스트로 고정), 시작 달은 제약하지 않음(2026-10-10 사용자 결정). 위 끌어올림 방식을 정렬 단계에 넣는 구현과 검증 방법을 설계한다
   - [x] 정답 테스트: 038 T1~T20이 시즌 번호 없는 단위로 그대로 통과하는지 확인하고, 시즌 순서 케이스(같은 달, 앞 시즌 미완료, 앞 시즌이 찜 목록에 없음, 시즌 1·3만 찜, 서로 다른 시리즈)를 추가한다
   - [x] 039 S7 동치 제거 재검증: "그 달에 볼 수 있게 되는 시청 단위 집합이 같으면 배정·시청 완료 달이 같다"는 전제가 시즌 순서에서도 성립하는지 무차별 대입 오라클(`BruteForceOracleTest`)로 확인하고, 깨지면 동치 제거를 좁힌다
-  - 완료 기준: V-B: 위 정답 테스트와 `clean build` 통과. 문서(PRD 5.4, TECH 1절, TASK038_GUIDE)와 코드가 일치한다.
-  - 기록: 2026-10-10 구현·테스트·정답 세트 완료(Task 040과 같은 브랜치 `feature/b2-engine-benchmark`). 모델(`WatchUnit.titleId`·`seasonNumber`, `PlanInput`의 끌어올림과 `isStaticallyImpossible`), 평가기(`Evaluator`의 `prereqIndexes`·`blockedAlways`, `assign`의 시즌 순서 판정), 독립 `OracleAssigner`, S7 동치 제거 재검증(`ExactSolverOracleExactnessTest`, 전수 탐색 대조 반례 0), 시즌 정답 케이스 7건(15~21)을 마쳤다. 정확성 근거와 동작은 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md) 3.6절·5.3절·11절. 정적 불가능 ① SUBSCRIBED 해석은 확정했다(예산보다 비싼 구독 중 상품을 0번째 달에만 볼 수 있어도 "가능"으로 본다. 2026-10-10 사용자 결정 A안, 코드 유지, ENGINE_ALGORITHM 13.6절과 PRD 5.4에 명시했다. 남은 것 없음). 코드 주석 정리와 TASK038_GUIDE·PRD·TECH 현행화는 2026-10-10에 완료했다.
+  - 완료 기준: V-B: 위 정답 테스트와 `clean build` 통과. 문서(PRD 5.4, TECH 1절)와 코드가 일치한다.
+  - 기록: 2026-10-10 구현·테스트·정답 세트 완료(Task 040과 같은 브랜치 `feature/b2-engine-benchmark`). 모델(`WatchUnit.titleId`·`seasonNumber`, `PlanInput`의 끌어올림과 `isStaticallyImpossible`), 평가기(`Evaluator`의 `prereqIndexes`·`blockedAlways`, `assign`의 시즌 순서 판정), 독립 `OracleAssigner`, S7 동치 제거 재검증(`ExactSolverOracleExactnessTest`, 전수 탐색 대조 반례 0), 시즌 정답 케이스 7건(15~21)을 마쳤다. 정확성 근거와 동작은 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md) 3.6절·5.3절·11절. 정적 불가능 ① SUBSCRIBED 해석은 확정했다(예산보다 비싼 구독 중 상품을 0번째 달에만 볼 수 있어도 "가능"으로 본다. 2026-10-10 사용자 결정 A안, 코드 유지, ENGINE_ALGORITHM 13.6절과 PRD 5.4에 명시했다. 남은 것 없음). 코드 주석 정리와 PRD·TECH 현행화는 2026-10-10에 완료했다.
 
 #### Task 041: TMDB Feign 클라이언트 구현으로 외부 데이터 호출 기반 마련 ✅
 - 태그: [B] · PRD: B3, 5.5 · 선행: 024 · 브랜치: `feature/b3-tmdb-client`
@@ -869,7 +873,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] WireMock 테스트, 샘플 JSON `src/test/resources/tmdb/`
 - 완료 기준
   - V-B: 정상, 429 후 재시도, 타임아웃 테스트가 통과한다(실제 TMDB 호출 없음).
-- 기록: 2026-10-12 완료(브랜치 `feature/b3-tmdb-client`, PR #41 develop 병합 9ae78c7). 상세는 [`docs/TASK041_GUIDE.md`](./TASK041_GUIDE.md)(구현 안내서)와 [`docs/OPENFEIGN_GUIDE.md`](./OPENFEIGN_GUIDE.md)(OpenFeign 개념과 TMDB 코드 설명).
+- 기록: 2026-10-12 완료(브랜치 `feature/b3-tmdb-client`, PR #41 develop 병합 9ae78c7). 상세는 구현 안내서(정리로 삭제, `git log -- docs/TASK041_GUIDE.md`)와 [`docs/OPENFEIGN_GUIDE.md`](./OPENFEIGN_GUIDE.md)(OpenFeign 개념과 TMDB 코드 설명).
   - 구현: `TmdbApi`(Feign 인터페이스, 호출 10개), 응답 DTO 16개, `TmdbClient`(고정 쿼리 값 채움·오류 번역·`tmdb.call{endpoint,result}` 카운터), `TmdbFeignConfig`(Bearer 인증·속도 제한 인터셉터, `ErrorDecoder`, `Retryer`, `@Configuration` 미부착), `TmdbConfig`(버킷). 버킷은 capacity 10·초당 25·최대 대기 2초(결정 D1), 재시도는 429·5xx 총 3회·타임아웃 총 2회·대기 0.5초부터 두 배씩(상한 4초, ±20%)·`Retry-After` 우선(5초 초과 시 포기, D2). 404는 `TmdbNotFoundException`(D3), 모든 `TmdbException`은 `EXTERNAL_API_ERROR`(502)로 응답하며 TMDB 429를 재시도 후에도 못 풀면 502다(`RATE_LIMIT_EXCEEDED`와 별개). 토큰은 `TMDB_API_KEY`(읽기 액세스 토큰), 기본값을 비워 토큰 없이도 기동한다.
   - 검증: `clean build` 통과(전체 430건 시점), TMDB 관련 테스트 12개 클래스 59건 통과(WireMock 중심, Testcontainers 통합 `TmdbClientIntegrationTest` 1건). 모든 테스트가 `TMDB_API_KEY` 없이 실행돼 실제 TMDB 호출이 없음을 확인했다. CodeRabbit 지적 0건(Docstring coverage 56% 경고는 프로젝트 주석 규칙과 기준이 달라 무시). WireMock 기동은 `wiremock-standalone` 3.13.2가 Boot 4.1.1에서 Jetty 충돌 없이 동작함을 확인해 TECH 6절에 반영했다(PR #39).
   - 구현 중 확인된 것: Bucket4j `asBlocking().tryConsume(1, Duration.ZERO)`는 `IllegalArgumentException`이라 대기 시간 0이면 `tryConsume(1)`로 분기한다(T16-a가 발견). Feign 기본 디코더가 Jackson 3으로 매핑됨, `@Bean Retryer`가 `NEVER_RETRY`를 대체함, `Retryer.clone` 동작, 토큰이 DEBUG 로그에 안 찍힘. `@ConfigurationProperties`의 prefix에 `.*`를 붙이지 않는다(잘못 입력해도 테스트가 통과한 이유는 확인하지 못함).
@@ -1535,4 +1539,4 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | 2026-10-03 | 초판 작성. PRD v0.3·TECH(T-1~T-9)·ERD v0.3·rules 기준으로 5단계 Phase, 87개 Task, PRD 단계 매핑, MVP 완료 지점(Task 079), 리스크·확인 필요 사항 정리. Task 001(H1)만 완료 표시 |
 | 2026-10-03 | 2판. roadmap-reviewer 지적과 사용자 결정 반영으로 104개 Task로 재번호. 얇은 배포를 019(로컬 구현)·020(첫 배포)로 분리, 순환 의존 해소(cron·배포 확인을 병합 Task로 이관), 계산 API를 061~064로 분리(T-4: 비교 기록은 측정 경로 064에서만), 마이그레이션 A·B·C·D·E를 목업 승인(029) 뒤로 이동하고 ERD 보정 Task 031 신설, 2단계 이후 기능을 "목업 → 계약·구현 → 교체" 순서로 재배치, 탈퇴 결정 Task 079 분리, 4.1 개발 환경·4.3 플러그인 규칙(설치 완료, Task 013 ✅)·Flyway 번호 규칙 추가, R-1·R-2·R-3·R-4·R-7·R-8 해소, R-14~R-20 신규. MVP 완료 지점은 Task 094 |
 | 2026-10-03 | 3판. roadmap-reviewer 재평가와 사용자 결정 반영. Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 Task 020(신설, [H])으로 분리하면서 2판의 Task 020~104를 021~105로 한 칸씩 재번호(105개 Task). 이 행 아래의 번호는 3판 기준: R-20 해소(`openapi.yaml` 하나 + `x-planned: true`, 계약 대조 테스트 023 제외 규칙, 031·017·4.2), R-21 신규·해소(수집 Job 완료 리스너 → 재계산 069 → 월초 알림 073, Actions는 수집 시작만, 047·102), R-14 해소(로컬 첫 수집 048, 운영 적재 095), R-15 해소(일회성 Cloudtype 서비스, 003에서 서비스 추가 가능 여부 확인, 022 선행 003·006·016 추가), MVP 게이트 095 선행에 061·037 추가와 "ADMIN 지정 → 상품·가격 입력 → 첫 운영 수집 → 스모크" 순서, R-5 기한을 095 전으로, local 프로필 전용 `targetDate` 지정(045, 067 재현), R-17 실측을 014로 당김(거부 시 009 수정), 002↔022 순환 해소(HTTPS 메일 API 키는 022 실패 분기), FR-20 변경된 작품·재계산 대상 플랜 수를 045·061·069·070에 연결, 094 완료 기준 축소(화면 확인은 095), 010·012 frontend-ci `test` no-op 명시, [H] 기록·문서 수정의 `feature/` PR 규칙, 033 선행 032 추가와 V1 변경 시 새 버전 규칙, R-10 FK 서술 정정(`wishlist_item`·모든 상태의 `plan_item`), 087 R-18 ERD·마이그레이션, 105 선행 102 추가, 메일·Thymeleaf·GreenMail 의존성을 016에서 072로 이동, Task 013 기록의 존재하지 않는 커밋 해시 삭제 |
-| 2026-10-08 | 3판 이후 진행 메모. Task 018·022·024·025~031에 사용자 결정(경로표 확정, 025·026 PR 합침, sonner 토스트, 목업 로그인 전환 토글, 대체 이미지 기본, 임시 타입 예외와 `mockTypes.ts` 제거 조건)과 안내서·계획 문서(`TASK022_GUIDE.md`, `TASK024_GUIDE.md`, `TASK018_031_PLAN.md`) 링크를 반영하고 3.2에 일정 위험을 적었다. 에이전트 `frontend-dev`·`ui-designer` 추가. Task 번호·상태·선행은 바꾸지 않았다 |
+| 2026-10-08 | 3판 이후 진행 메모. Task 018·022·024·025~031에 사용자 결정(경로표 확정, 025·026 PR 합침, sonner 토스트, 목업 로그인 전환 토글, 대체 이미지 기본, 임시 타입 예외와 `mockTypes.ts` 제거 조건)과 안내서·계획 문서 링크를 반영하고(해당 문서는 이후 정리로 삭제) 3.2에 일정 위험을 적었다. 에이전트 `frontend-dev`·`ui-designer` 추가. Task 번호·상태·선행은 바꾸지 않았다 |

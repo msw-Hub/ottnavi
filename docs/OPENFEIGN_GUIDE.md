@@ -1,6 +1,6 @@
 # OpenFeign 사용법과 개념 (TMDB 클라이언트 코드로 배우기)
 
-> 2026-10-12 작성. Task 041(TMDB Feign 클라이언트)을 구현하며 오간 설명을 정리한 학습 문서다. 규칙의 근거 문서가 아니다(근거는 `docs/TECH.md` 3절·6절, `docs/TASK041_GUIDE.md`).
+> 2026-10-12 작성. Task 041(TMDB Feign 클라이언트)을 구현하며 오간 설명을 정리한 학습 문서다. 규칙의 근거 문서가 아니다(근거는 `docs/TECH.md` 3절·6절).
 > 코드 예시는 `backend/src/main/java/com/ottnavi/infra/tmdb/` 아래 실제 코드에서 가져왔다. 줄 수를 줄이려고 일부를 생략했으면 `// ...`로 표시했다.
 > 근거 수준: **코드 확인**(이 저장소 코드를 읽음), **테스트로 확인**(통과한 테스트가 있음), **문서 기반**(공식 문서·라이브러리 소스를 읽은 안내서의 내용. 실행으로는 확인하지 않음).
 
@@ -364,6 +364,6 @@ app:
 테스트는 진짜 TMDB가 아닌 WireMock(가짜 서버)을 부른다. 결과는 통과해도 Gradle이 개수를 출력하지 않으므로 `build/test-results/test/TEST-*.xml`의 `tests/failures/errors`로 확인한다.
 
 ## 11. 출처와 한계
-- **이 문서의 근거**: 이 저장소의 실제 코드(`infra/tmdb/`, `global/config/FeignConfig.java`, `application.yml`), 통과한 테스트, `docs/TASK041_GUIDE.md`.
+- **이 문서의 근거**: 이 저장소의 실제 코드(`infra/tmdb/`, `global/config/FeignConfig.java`, `application.yml`), 통과한 테스트.
 - **안내서의 근거**: 공식 문서(Spring Cloud OpenFeign, Bucket4j, WireMock, Micrometer, TMDB `developer.themoviedb.org`)와 라이브러리 소스(`feign-core 13.6.1`, `spring-cloud-openfeign-core 5.0.3`, `bucket4j 8.21.0`)를 `backend-dev` 에이전트가 읽은 내용이다. 실행으로 확인한 것은 테스트가 통과한 범위뿐이다.
 - **확인하지 못한 것**: TMDB가 429에 `Retry-After`를 실제로 보내는지, 실제 TMDB 응답의 한국어 줄거리가 `""`인지 `null`인지, discover의 페이지 상한 등은 실제 호출로만 알 수 있다(안내서 10절). `prefix`를 `"app.tmdb.*"`로 잘못 쓴 상태에서 테스트가 통과한 이유(8절 9번)도 확인하지 못했다(고친 뒤에는 통과를 확인했다).

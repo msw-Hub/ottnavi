@@ -234,3 +234,52 @@ T-1~T-8은 확정(2026-10-03), T-9는 결정 필요다. PRD 11절 항목은 PRD�
 
 - [x] 삭제 정책 문구 확정: "FK `ON DELETE CASCADE` 또는 서비스 로직" → FK `ON DELETE CASCADE`. 적용 범위는 T-1의 목록을 따른다(`calc_run.plan_id`·`plan.previous_plan_id`는 SET NULL, 마스터 FK는 NO ACTION).
 - [x] 참조 컬럼 인덱스 추가: `plan_month_product.plan_month_id`, `plan_assignment.plan_month_id`, `calc_run.plan_id`, `plan.previous_plan_id`, 탈퇴 대상 테이블(`user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `notification_outbox`) 중 유니크 선두가 아닌 `user_id`.
+
+## 8. 비밀 값 보관 규칙 (Task 002·015·020 공통)
+
+> Phase 1 사람 작업 체크리스트(`PHASE1_HUMAN_TASKS.md`, 정리로 삭제)에서 옮겼다. 변수 이름만 적고 값은 어디에도 적지 않는다.
+
+### 8.1 원칙
+1. **원본은 비밀번호 관리자에만 둔다.** 발급받은 키·토큰·비밀번호는 먼저 비밀번호 관리자(예: Bitwarden, 1Password)에 항목별로 저장한다. 서비스 화면에서 한 번만 보여 주는 값(Google OAuth 클라이언트 보안 비밀, 일부 토큰, Supabase 데이터베이스 비밀번호 등)은 화면을 닫기 전에 저장한다.
+2. **서비스가 값을 읽는 곳에만 복사해 넣는다.** 아래 "등록 위치"에 적힌 곳 외에는 값을 두지 않는다.
+3. **채팅(Claude 포함)·커밋·PR·이슈·스크린샷·문서에 값을 적지 않는다.** Claude에게 질문할 때도 **변수 이름만** 말한다. 값이 화면에 보이는 스크린샷은 가리고 올린다.
+4. **`VITE_` 변수에는 비밀 값을 넣지 않는다.** `VITE_`로 시작하는 변수는 빌드 결과(브라우저)에 그대로 들어간다.
+5. **로컬 `.env`는 커밋하지 않는다.** `.gitignore`가 `.env`·`.env.*`를 막고 `.env.example`만 예외로 둔다. 새로 만든 파일이 `git status`에 보이면 커밋 전에 멈춘다.
+6. **개발용과 운영용 값은 서로 다르게 만든다.** 특히 `JWT_SECRET`·`ADMIN_BATCH_TOKEN`은 로컬 `.env`(개발용)와 Cloudtype(운영용)에 같은 값을 쓰지 않는다. 운영 DB·Redis 접속 정보는 로컬 `.env`에 넣지 않는다(로컬은 docker compose 기본값을 쓴다).
+
+### 8.2 비밀 값별 발급처와 등록 위치
+
+| 이름 | 발급·생성 | 등록 위치 | 비고 |
+|---|---|---|---|
+| `TMDB_API_KEY` | TMDB 계정 설정 → API | 로컬 `.env`, Cloudtype 환경 변수(Task 020 또는 092) | v3 API 키와 읽기 액세스 토큰이 함께 발급된다. 어느 쪽을 쓸지는 수집 구현 때 정하므로 둘 다 비밀번호 관리자에 보관 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud 콘솔 → OAuth 클라이언트 | 로컬 `.env`, Cloudtype(Task 092 최종 점검 때) | 클라이언트 보안 비밀은 생성 직후에 저장 |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`(운영) | Supabase 프로젝트(Session Pooler 5432) | **Cloudtype 환경 변수만** | 로컬 `.env`에는 넣지 않는다 |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`(운영) | Redis Cloud 데이터베이스 | **Cloudtype 환경 변수만** | 로컬 `.env`에는 넣지 않는다 |
+| `JWT_SECRET` | 직접 생성(아래 명령) | 로컬 `.env`(개발용), Cloudtype(운영용) | 256비트 이상, 두 값은 서로 다르게 |
+| `ADMIN_BATCH_TOKEN` | 직접 생성 | **GitHub Actions secrets**, Cloudtype, 로컬 `.env`(개발용) | cron이 `Authorization: Bearer`로 보냄. GitHub·Cloudtype 값은 같아야 함 |
+| `ORIGIN_SECRET` | 직접 생성 | **GitHub Actions secrets**, **Vercel(Production·Preview 둘 다)**, Cloudtype | 세 곳의 값이 같아야 한다. 로컬에서는 오리진 검사를 끈다(`app.origin-secret.enabled=false`)라서 `.env`에 불필요 |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | Gmail 앱 비밀번호 | 로컬 `.env`, 일회성 Cloudtype 서비스(Task 022), 운영 Cloudtype(Task 092) | 일반 로그인 비밀번호가 아니라 앱 비밀번호 16자리 |
+| Cloudtype 배포 토큰, 백엔드 주소 | Cloudtype(Task 020) | GitHub Actions secrets | 이름은 R-12 결정으로 정한다 |
+| `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` | 비밀 아님(주소) | Cloudtype, 로컬 `.env` | |
+| `VITE_USE_MOCK` | 비밀 아님(`true`/`false`) | `frontend/.env.local` | 공개 값만 |
+
+### 8.3 난수 만드는 법 (PowerShell)
+화면에 출력하지 않고 클립보드로 복사한 뒤 비밀번호 관리자에 붙여 넣는다. 아래 명령은 Windows PowerShell 5.1과 PowerShell 7 모두에서 동작한다.
+```powershell
+# 32바이트(256비트) 난수를 Base64로 만들어 클립보드에 복사. 변수마다 한 번씩 실행해 값을 따로 만든다.
+$b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b) | Set-Clipboard
+```
+- `JWT_SECRET`: 위 명령으로 32바이트(Base64 44자). 길게 하려면 `byte[] 48`로 바꾼다.
+- `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`: 같은 명령으로 각각 따로 만든다. HTTP 헤더에 쓰이는 값이라 Base64의 `+`, `/`, `=`가 문제가 되면 `byte[] 32`를 16진수로 바꿔서 쓴다(`($b | ForEach-Object { $_.ToString('x2') }) -join ''`).
+- 클립보드 기록 관리 도구를 쓰고 있다면 붙여 넣은 뒤 해당 기록을 지운다.
+
+### 8.4 노출됐을 때 (한 줄 절차)
+| 값 | 재발급 |
+|---|---|
+| 아무 키나 커밋·채팅에 노출 | 즉시 해당 서비스에서 폐기·재발급 → 등록 위치 전부 교체. git 이력에서 지우는 것은 이미 늦다(공개 저장소). |
+| `ORIGIN_SECRET` | 새 값 생성 → Cloudtype → Vercel(Production·Preview) → GitHub secrets 순으로 교체 → 재배포. 교체하는 동안 Cloudtype과 Vercel 값이 어긋나는 구간에는 `/api` 요청이 403이 된다(재배포가 끝날 때까지 수 분). 노출 사고 대응이라 수용한다 |
+| `ADMIN_BATCH_TOKEN` | 새 값 생성 → Cloudtype → GitHub secrets 교체 |
+| `JWT_SECRET` | 새 값 생성 → Cloudtype 교체 → 재시작(모든 사용자 로그아웃됨) |
+| DB·Redis 비밀번호 | 각 서비스 콘솔에서 비밀번호 재설정 → Cloudtype 교체 |
+| TMDB·Google·Gmail 앱 비밀번호 | 각 콘솔에서 폐기 후 재발급 → 등록 위치 교체 |
+| Cloudtype 배포 토큰 | Cloudtype에서 폐기·재발급 → GitHub secrets 교체 |

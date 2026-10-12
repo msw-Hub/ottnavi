@@ -48,7 +48,7 @@ model: sonnet
 | 5 | 인증 | `bearerAuth`(HTTP bearer, JWT)가 정의돼 있고, 회원·관리자 API에만 `security`가 붙음. 공개·인증 API는 `security: []` 또는 없음(전역 security 설정 여부를 먼저 확인). Refresh Token 쿠키를 필드·파라미터로 노출하지 않고 `/auth/refresh` 설명에 "HttpOnly 쿠키 사용"만 적음 | "인증" |
 | 6 | `x-planned` | 미구현 operation에는 `x-planned: true`와 description의 "제안" 표시가 함께 있음. 이미 구현된 operation(백엔드 컨트롤러에 매핑이 있는 것. `Grep`으로 `backend/src/main/java/**/api/**`의 매핑 경로 확인)에는 없음 | "변경 절차" 5번, `openapi.yaml` 머리 description |
 | 7 | 오류 코드 대조 | 계약 description에 나온 errorCode ↔ `error-codes.md` ↔ `errorMessages.ts`(제안 표 포함) ↔ 백엔드 `ErrorCode` enum. 한쪽에만 있는 코드, HTTP 상태 불일치, `PROPOSED_ERROR_MESSAGES`에 남아 있는데 문서로 올라가야 할 코드. 백엔드 enum에 없는 것은 "(제안)"·미구현이면 정상이므로 참고로만 적는다 | "공통 응답" 오류 절, `error-codes.md` 머리말 |
-| 8 | 목업 일치 | 목업이 부르는 모든 경로·메서드(핸들러의 `http.get(...)` 등과 mockTypes의 제안 API 목록)가 계약에 있는지. 요청·응답 필드 이름·타입·nullable·enum 값, 성공 상태 코드(201·202·204 등), 핸들러가 `problemResponse`로 내는 상태 코드·errorCode가 계약과 같은지. 계약에는 있는데 목업에는 없는 operation도 적는다. Task 031 이후 mockTypes가 지워졌으면 수동 핸들러·fixtures만 대조하고 그 사실을 적는다 | `TASK018_031_PLAN.md` 5절, ROADMAP Task 027~031 기록 |
+| 8 | 목업 일치 | 목업이 부르는 모든 경로·메서드(핸들러의 `http.get(...)` 등과 mockTypes의 제안 API 목록)가 계약에 있는지. 요청·응답 필드 이름·타입·nullable·enum 값, 성공 상태 코드(201·202·204 등), 핸들러가 `problemResponse`로 내는 상태 코드·errorCode가 계약과 같은지. 계약에는 있는데 목업에는 없는 operation도 적는다. Task 031 이후 mockTypes가 지워졌으면 수동 핸들러·fixtures만 대조하고 그 사실을 적는다 | ROADMAP Task 027~031 기록 |
 | 9 | 결정 일치 | 입력받은 결정마다 계약 어디에 반영됐는지(또는 빠졌는지) | 입력 결정 목록 + PRD 11절 |
 | 10 | 호환성 | 이미 구현된 operation(`x-planned` 없음)의 필드 삭제·이름 변경·타입 변경·필수값 추가·경로 변경·operationId 변경. 응답 필드 추가는 호환 변경이라 지적하지 않는다. 호환을 깨는 변경이 의도라면 커밋·PR 설명에 적어야 한다고 알린다 | "변경 절차" 하단 |
 
