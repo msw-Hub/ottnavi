@@ -34,7 +34,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `.claude/rules/api-contract.md` | OpenAPI 계약 변경 절차, 응답·오류·페이지네이션 형식 |
 | `.claude/rules/git.md` | 브랜치·커밋·병합 규칙 |
 
-`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage), API 계약 검사용 읽기 전용 에이전트(contract-checker: `docs/api/openapi.yaml`을 규칙·목업·오류 코드·확정 결정과 대조해 표로 보고, 파일을 수정하지 않음), 개발 에이전트 3종(backend-dev: 백엔드 검수·맡긴 구현 / frontend-dev: 프론트 구현 전반 / ui-designer: UI/UX 시각 설계·수정)이, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. 개발 에이전트끼리는 직접 대화하지 못하고 `docs/api/openapi.yaml` 계약과 보고서의 "넘길 내용"으로 협업한다. 작업 공간의 기준은 각 에이전트 md이고 `.claude/hooks/`의 hook은 보조 안전장치다(backend-dev는 `frontend/`, frontend-dev는 `backend/`와 `frontend/src/api/generated/` 수정을 막는다). 프론트는 대부분 frontend-dev가 맡고 UI/UX 수정 요청은 ui-designer가 맡는다. 구성은 `docs/TASK018_031_PLAN.md` 7절. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
+`.claude/agents/`에는 문서 작성용 에이전트(prd-writer, tech-writer, roadmap-writer, roadmap-reviewer)와 PR 코드래빗 지적 정리용 읽기 전용 에이전트(coderabbit-triage), API 계약 검사용 읽기 전용 에이전트(contract-checker: `docs/api/openapi.yaml`을 규칙·목업·오류 코드·확정 결정과 대조해 표로 보고, 파일을 수정하지 않음), DB 설계 검토용 읽기 전용 에이전트(db-reviewer: `docs/ERD.md`와 마이그레이션 SQL을 계약·PRD·TECH와 대조해 결함 표와 "사용자에게 시킬 일"로 보고, 모델 opus, 파일을 수정하지 않음), 개발 에이전트 3종(backend-dev: 백엔드 검수·맡긴 구현 / frontend-dev: 프론트 구현 전반 / ui-designer: UI/UX 시각 설계·수정)이, `.claude/skills/`에는 git 작업 스킬(git-branch, git-commit, git-pr, git-merge, git-review)이 있다. 개발 에이전트끼리는 직접 대화하지 못하고 `docs/api/openapi.yaml` 계약과 보고서의 "넘길 내용"으로 협업한다. 작업 공간의 기준은 각 에이전트 md이고 `.claude/hooks/`의 hook은 보조 안전장치다(backend-dev는 `frontend/`, frontend-dev는 `backend/`와 `frontend/src/api/generated/` 수정을 막는다). 프론트는 대부분 frontend-dev가 맡고 UI/UX 수정 요청은 ui-designer가 맡는다. 구성은 `docs/TASK018_031_PLAN.md` 7절. MCP는 `.mcp.json`에 shadcn, shrimp-task-manager가 설정돼 있고, 로드맵은 쉬림프 태스크 매니저가 더 세분화할 것을 전제로 한다.
 
 ## 목표 아키텍처 (big picture)
 
@@ -94,5 +94,5 @@ cd frontend; npm run api:generate                                      # openapi
 - **사용자의 검토 범위는 화면(UI/UX·문구·흐름)이다.** 프론트 코드 정확성은 공식 문서(context7)와 설치된 타입 정의로 Claude가 먼저 확인하고 근거를 보고한다. 인증·토큰 동작 코드는 사용자 검토 대상이다(Task 057에서 다시 확인).
 - **푸시·PR 뒤에는 CI·CodeRabbit을 기다리지 않는다.** `sleep`이나 `gh pr checks` 반복 조회로 대기하지 않고 상태를 한 번만 알린 뒤 다른 작업을 이어간다. 사용자가 "코드래빗 왔다"고 알려 주면 그때 `coderabbit-triage`로 정리한다.
 - **에이전트를 쓰면 능률이 오르거나 토큰이 절약되는 작업은 시작 전에 먼저 제안한다.** 계획 단계에서 이득과 비용(콜드 스타트)을 한 줄로 알리고, 이득이 불분명하면 쓰지 않는다고 말한다. 병렬 작업은 별도 워크트리가 필요하므로 허락을 먼저 구한다.
-- **모델 방침**: 구현·테스트·검수 에이전트는 sonnet, 어려운 알고리즘의 설계·계획만 opus를 명시한다(opus로 구현까지 맡기면 5시간 할당량이 한 작업에 거의 소진된 적이 있다). 파일을 많이 읽는 큰 에이전트 작업은 시작 전에 소모 규모를 한 줄로 알린다.
+- **모델 방침**: 구현·테스트·검수 에이전트는 sonnet, 어려운 알고리즘의 설계·계획만 opus를 명시한다(opus로 구현까지 맡기면 5시간 할당량이 한 작업에 거의 소진된 적이 있다). 예외로 DB 설계 검토형 `db-reviewer`는 opus를 쓴다(스키마 결함은 ERD·계약·PRD·TECH를 가로지르는 추론이 필요하고 읽기 전용이다, 2026-10-13 사용자 결정). 파일을 많이 읽는 큰 에이전트 작업은 시작 전에 소모 규모를 한 줄로 알린다.
 - **MCP(playwright, shadcn, shrimp)가 자주 끊긴다.** 끊기면 사용자에게 `/mcp` 재연결을 요청한다.

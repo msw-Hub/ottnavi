@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 7/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 8/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 33/105 | |
+| 합계 | | 34/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -604,7 +604,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 7/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 8/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -713,15 +713,15 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 결정(2026-10-12, 사용자): 네 항목을 확정했다(PRD 11절 14·18·19·20번, 10.1에서 해소 처리하고 10.2 표에서 뺌). R11-14 현재 구성 유지, R11-18 A안(환산한 분만 저장, ERD 변경 없음), R11-19 시즌 단위, R11-20 시즌 0 안내 없음. 화면 문구·위치 결정 3건도 확정했다(PRD SCR-08·FR-09). 찜 20개 제한은 개수 줄 "찜 N/20"(다 봤음은 별도 구역, 개수 제외), 20개 도달 시 상단 안내 띠, 21번째 추가 시 토스트와 [찜 목록 가기]이고, 시즌 순서 안내는 찜 목록 위와 결과 화면의 계산 기준에 한 줄씩(개별 문구 없음), 절감액 설명은 현재 문구 유지다. "다 봤음" 기능은 유지하고 역할(월초 재계산 입력, 취소 가능, 20개·시즌 순서·추천 집계 제외)을 PRD FR-09에 정리했다. 이 문구들의 화면 반영은 Task 031 계약 반영 때 함께 한다.
 - 기록: 2026-10-12 완료(문서 PR #40). **승인(V-H)**: 사용자가 목업 둘러보기 7단계(비로그인 검색 → 상세·시즌 찜 → 로그인·온보딩 → 찜 목록 → 요금 확인 → 플랜 결과 → 관리자 3화면)를 직접 눌러 보고 문제없다고 승인했다(2026-10-12). 확정한 결정은 PRD 11절 13·14·18·19·20번과 40·41번이다. 추가로 정한 두 가지: 한 달 플랜 계산의 요금 기준 날짜는 **사용자 결제일 기준**(B안, PRD 11절 40번), 90일 넘게 확인되지 않은 요금은 **요금 확인 화면(SCR-09)에 확인일과 "달라졌을 수 있어요" 안내를 표시**하고 계산은 막지 않는다(B안, 41번). 화면 문구(찜 20개 제한·시즌 순서 안내·절감액·"다 봤음" 역할)는 PRD SCR-08·FR-09에 정리했다. Task 031에서 정할 것: `WISHLIST_LIMIT_EXCEEDED`는 409(추천대로), 찜 목록 응답에 현재 개수("다 봤음" 제외)와 상한을 포함, 요금 응답에 마지막 확인일을 포함. 요금 빈 구간 처리(A/B/C)와 한 달 요금에 쓸 날짜 기준은 이 Task에서 함께 정한다.
 
-#### Task 031: OpenAPI 초안 도출과 orval 생성물 연결로 MVP 계약 고정 ⬜
+#### Task 031: OpenAPI 초안 도출과 orval 생성물 연결로 MVP 계약 고정 ✅
 - 태그: [F][B] · PRD: F1 · 선행: 030, 023(`x-planned` 제외 동작) · 브랜치: `feature/f1-openapi-draft`
 - 구현 사항
-  - [ ] 승인된 목업에서 MVP API를 `docs/api/openapi.yaml`에 정의(경로 규칙, operationId, tags, `CommonResponseXxx`, example, nullable·required·enum). 별도 초안 파일은 두지 않는다(R-20 확정)
-  - [ ] 아직 구현되지 않은 operation마다 `x-planned: true`를 달고 description에 "제안"을 표시한다. 이미 구현된 API(Task 019 서비스 목록 등)에는 달지 않는다. 이 표시는 각 구현 Task가 지운다(4.2)
-  - [ ] `npm run api:generate`(입력은 `openapi.yaml` 하나, Task 017 설정 그대로)로 생성 훅·MSW로 바꾸고, 화면 전용 데이터만 `src/mocks/fixtures/`에 남긴다. `features/*/hooks`에서 `select: (res) => res.data`
-  - [ ] 플랜 계산 응답은 플랜 유형(`planType`: RECOMMENDED / SAVER / SIMPLE)별 플랜 목록이고, 저장 요청은 고른 유형의 DRAFT id를 가리킨다(PRD 11절 35번). 세 유형의 선택이 같을 때의 표시는 응답이 아니라 프론트가 합친다
-  - [ ] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, **409 확정**(2026-10-12), 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 넣는다(2026-10-12 확정). 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
-  - [ ] 사용자(백엔드 담당)가 계약 초안을 승인
+  - [x] 승인된 목업에서 MVP API를 `docs/api/openapi.yaml`에 정의(경로 규칙, operationId, tags, `CommonResponseXxx`, example, nullable·required·enum). 별도 초안 파일은 두지 않는다(R-20 확정)
+  - [x] 아직 구현되지 않은 operation마다 `x-planned: true`를 달고 description에 "제안"을 표시한다. 이미 구현된 API(Task 019 서비스 목록 등)에는 달지 않는다. 이 표시는 각 구현 Task가 지운다(4.2)
+  - [x] `npm run api:generate`(입력은 `openapi.yaml` 하나, Task 017 설정 그대로)로 생성 훅·MSW로 바꾸고, 화면 전용 데이터만 `src/mocks/fixtures/`에 남긴다. `features/*/hooks`에서 `select: (res) => res.data`
+  - [x] 플랜 계산 응답은 플랜 유형(`planType`: RECOMMENDED / SAVER / SIMPLE)별 플랜 목록이고, 저장 요청은 고른 유형의 DRAFT id를 가리킨다(PRD 11절 35번). 세 유형의 선택이 같을 때의 표시는 응답이 아니라 프론트가 합친다
+  - [x] 2026-10-10 결정 반영(PRD 11절 36·38번): 찜 추가 operation에 오류 `WISHLIST_LIMIT_EXCEEDED`(제안, 찜 20개 초과, **409 확정**(2026-10-12), 기존 오류 코드표에 422가 없고 상태 충돌은 409 계열)를 등록하고 `docs/api/error-codes.md`에도 제안으로 올린다. 찜 목록 응답에 개수 정보(현재 개수·상한)를 넣는다(2026-10-12 확정). 플랜 응답의 절감액·`allSubscribeCost`는 세 유형이 같은 값을 쓰는 정의(PRD 5.4)로 description에 적는다. 남은 작품 이유 코드는 기존 4종 그대로다(시즌 순서는 TIME으로 확정, PRD 5.4)
+  - [x] 사용자(백엔드 담당)가 계약 초안을 승인
 - 완료 기준
   - `npm run build` 성공, V-F: Task 027~029 흐름이 생성된 목업으로 그대로 동작한다.
   - V-B: `x-planned` operation을 제외한 계약 대조 테스트(Task 023)가 통과한다.
@@ -732,7 +732,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 경로 설계(2026-10-12 사용자 확정, RESTful 원칙: 자원은 복수 명사, 행위는 HTTP 메서드, 동작만 하위 동사): 본인 데이터는 `/api/me/**`로 통일한다(찜 `/me/wishlist-items`, 설정 `/me/settings`, 요금 `/me/service-prices`(`PUT` 설정·`DELETE` 기본 요금 복귀), 플랜 계산은 초안 자원 `POST·GET /me/plan-drafts`, 저장은 `POST /me/plans`(본문 `planId`)). 수집은 배치 토큰 범위 `/admin/collect/**`를 유지해 `/admin/collect/executions`(`GET` 이력·`POST` 실행 202)와 그 하위 `/{executionId}/changes`·`recover`·`restart`로 둔다. 구현된 것은 `listOttServices` 하나이고 나머지 30개는 `x-planned: true`다. 이에 따라 Task 045·046·050대와 규칙 문서(`api-contract.md`)·PRD 7절의 옛 경로 표기를 같이 고쳤다.
 - 진행(2026-10-12): 계약 초안 31개 operation(구현됨 1 + `x-planned` 30)을 프론트·백엔드 에이전트 설계 2회(`opus`)와 `contract-checker` 검사(심각 0건)를 거쳐 **사용자(백엔드 담당)가 승인**했다. 결정: 내 요금은 `PUT·DELETE /me/service-prices/{productId}`(2단계 광고형·번들에도 주소가 안 바뀌게 서비스 ID 대신 상품 ID), "잘 모르겠음"(UNKNOWN)은 저장(ERD 상태 값 추가, Task 032), 요금제 이름(`planName`)은 표시용으로 유지(ERD `plan_name` 추가, Task 032), `lastVerifiedAt`은 일시로 저장·전송하고 화면은 한국 날짜만 표기(ERD `last_verified_at`은 TIMESTAMPTZ, Task 032), 검색 응답의 화면 전용 부가 필드는 허용, 수집 `targetDate`는 선택값, 새 오류 코드 11개는 `error-codes.md`에 "(제안)"으로 등록. ERD 영향은 12항목(Task 032 입력)이다.
 - PR 분할(2026-10-12 결정): 백엔드 Task 032~가 031 완료에 막혀 있어 **PR 1**(계약·오류표·규칙 문서·PRD/ROADMAP 정리 + 프론트 `errorMessages.ts`/테스트 최소 수정)을 먼저 병합하고, **PR 2**(`npm run api:generate`와 `mockTypes.ts` 교체·삭제, 목업 정리, 030 확정 화면 문구 반영)는 이후에 한다. `api-contract.md`의 "계약과 코드는 같은 PR" 원칙에서 한 번 벗어나는 것이며, PR 1은 프론트의 손으로 쓴 목업 타입이 계약 파일과 무관해 CI가 통과한다. Task 031은 PR 2까지 끝나야 ✅다.
-- 기록(2026-10-13, PR 2 구현 완료·병합 대기): PR 1은 #43으로 병합했다. PR 2는 같은 브랜치에서 `npm run api:generate`(31개 operation)로 생성 훅·타입으로 교체하고 `features/*/mockTypes.ts`를 모두 지웠다(`frontend/src` 전체에 없음). 검토용 값(mockScenario·mockPageSize)은 목업 모드에서만 `X-Mock-*` 요청 헤더로 보내도록 `api/http.ts`에 요청 인터셉터를 추가했다(인증 로직 변경 없음, 사용자 검토 대상). 찜 N/20·20개 안내 띠·21번째 토스트와 [찜 목록 가기]·시즌 순서 안내·요금 확인일(90일 초과 안내)을 반영했다. `contract-checker` 재검사는 심각 0건이고, 권장 지적은 판매 종료 상품 제외·절감액 기준(PRD 11절 38번)·상품 수정의 불필요한 409 제거로 반영했다. 프론트 검증 4종과 테스트 449건 통과. 남은 결정: 요금 확인일 표기(YYYY-MM-DD 대 년월일), 90일 초과 안내 문구, 시즌 순서 줄의 노출 조건(모두 추천안 적용 중). ✅ 처리와 쉬림프 verify는 PR 2 병합 때 한다.
+- 기록(2026-10-13 완료, PR #43·#44 병합): PR 1은 #43으로 병합했다. PR 2(#44)는 같은 브랜치에서 `npm run api:generate`(31개 operation)로 생성 훅·타입으로 교체하고 `features/*/mockTypes.ts`를 모두 지웠다(`frontend/src` 전체에 없음). 검토용 값(mockScenario·mockPageSize)은 목업 모드에서만 `X-Mock-*` 요청 헤더로 보내도록 `api/http.ts`에 요청 인터셉터를 추가했다(인증 로직 변경 없음, 사용자 검토 대상). 찜 N/20·20개 안내 띠·21번째 토스트와 [찜 목록 가기]·시즌 순서 안내·요금 확인일(90일 초과 안내)을 반영했다. `contract-checker` 재검사는 심각 0건이고, 권장 지적은 판매 종료 상품 제외·절감액 기준(PRD 11절 38번)·상품 수정의 불필요한 409 제거로 반영했다. 프론트 검증 4종과 테스트 449건 통과. 남은 결정: 요금 확인일 표기(YYYY-MM-DD 대 년월일), 90일 초과 안내 문구, 시즌 순서 줄의 노출 조건(모두 추천안 적용 중). ✅ 처리와 쉬림프 verify는 PR 2 병합 직후 했다(쉬림프 Task 031 완료).
 
 #### Task 032: ERD 보정 반영으로 스키마 확정 근거 마련 ⬜
 - 태그: [H] · PRD: F1(ERD 보정) · 선행: 030, 031
@@ -741,6 +741,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 사용자가 `docs/ERD.md`를 고치고 버전을 올린다(이 로드맵 작업은 ERD를 수정하지 않음). 변경이 없으면 "변경 없음"을 기록
 - 완료 기준
   - V-H: 반영 항목과 ERD 버전(또는 변경 없음)을 기록했다.
+- 진행(2026-10-13): 사용자 지시로 `docs/ERD.md` v0.4 수정은 Claude가 안내서(`docs/TASK032_GUIDE.md`) 8절대로 적용했고, 사용자는 안내서 10절의 순서로 검토·확정한다. 계약과 어긋나던 PRD·TECH·ROADMAP 경로 표기는 계약 기준으로 같이 고쳤다. 병합 뒤 `기록:`을 채우고 ✅ 처리한다.
 
 #### Task 033: 작품·상품 영역(A·B)과 배치 메타 Flyway 마이그레이션 작성으로 수집 스키마 확정 ⬜
 - 태그: [B] · PRD: B0, 8.1 · 선행: 019, 030, 032, 004 · 브랜치: `feature/b0-schema-catalog`
@@ -910,7 +911,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] `POST /api/admin/collect/executions`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
   - [ ] 관리자 수집 API의 `tier` 파라미터 enum은 `DAILY`·`WEEKLY`·`ALL`이다(R-16 확정). MVP 일괄 수집은 `ALL`을 쓴다. 계약(`openapi.yaml`)과 코드의 enum을 같게 둔다
   - [ ] `targetDate` 직접 지정은 `local` 프로필에서만 허용한다(설정 키 제안: `app.collect.allow-target-date-override`, local만 `true`). 운영(`prod`)에서 지정하면 거부(제안: 400 `VALIDATION_FAILED`)하고 서버 날짜를 쓴다. 같은 날 409를 피해 재수집을 재현하는 용도다(Task 067, 069)
-  - [ ] 복구 `POST /api/admin/collect/executions/{executionId}/recover`: `recover` 후 `restart`
+  - [ ] 복구 `POST /api/admin/collect/executions/{executionId}/recover`(`recoverCollectExecution`): STOPPED로 판정된 실행만 `recover`로 FAILED로 바꾸고(아니면 `BATCH_NOT_STOPPED`), 응답 `endedAt`은 계약대로 null(`batch.recovered`로 판별, Task 032 안내서 4.11). 재시작은 `POST …/{executionId}/restart`(`restartCollectExecution`, 새 실행 202)
   - [ ] 이력 조회: `BATCH_*` 읽기 전용(시작·종료, 성공/실패, 처리 건수, 실패 사유)
   - [ ] FR-20 "변경된 작품": 실행별 `availability_change`(`job_execution_id`로 연결)의 작품·시즌·서비스·이전/이후 상태 조회(이력 상세 또는 별도 조회, 경로는 제안). 재계산 대상 플랜 수는 2단계 Task 069이 계약에 추가한다
   - [ ] `ADMIN_BATCH_TOKEN` 필터(상수 시간 비교, `/api/admin/collect/**`·`/api/admin/plans/monthly/**`만. 재계산 경로를 토큰 허용 범위에 둘지는 TECH 4절 갱신을 따른다, R-21). ADMIN 역할 검사는 Task 054에서 합친다. 그 전까지 이력·복구 API는 토큰 필터로만 보호된다
@@ -921,7 +922,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 046: 제공처 매핑 관리 API 구현으로 매핑 운영 수단 마련 ⬜
 - 태그: [B] · PRD: B3, FR-18(R11-23 흡수안), SCR-15 · 선행: 035, 031 · 브랜치: `feature/b3-provider-mapping-api`
 - 구현 사항
-  - [ ] `GET /api/admin/providers`(미매핑 여부, `first_seen_at`), `PUT /api/admin/providers/{providerId}`(서비스 또는 없음, tier)
+  - [ ] `GET /api/admin/providers`(`listAdminProviders`: `mappingState`, `first_seen_at`), `PATCH /api/admin/providers/{providerId}`(`updateAdminProvider`: `mappingState`·`ottServiceId`·`tier`)
   - [ ] 매핑 변경은 다음 수집부터 반영됨을 응답 설명에 적는다
 - 완료 기준
   - V-API: 미매핑 제공처 매핑 후 재조회에 반영된다. 이 API는 Task 054 전까지 보호되지 않는 상태(local 전용)이고, USER 403 확인은 Task 054 완료 기준이다.
@@ -1008,15 +1009,15 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `UserSetting`, `UserSubscription` 엔티티
   - [ ] `GET/PUT /api/me/settings`: 예산·시청 분 필수(없으면 400 `VALIDATION_FAILED`), `watchPreset`(프리셋 값은 설정 키), 환산 입력은 R11-18 결정대로. **월 시청 분은 120 이상**(미만이면 400 `VALIDATION_FAILED`, 2026-10-09 사용자 결정: 긴 시즌 한 달 최소 120분 규칙 때문에 120 미만이면 긴 시즌이 하나도 배정되지 않는다. PRD 11절 34번, Task 038 `MIN_LONG_SEASON_SEGMENT_MINUTES`와 같은 값을 쓴다)
-  - [ ] `GET/PUT /api/me/subscriptions`: SUBSCRIBED/FREE, `productId`, 결제일 기본 1, 미구독은 행 삭제
-  - [ ] 온보딩 완료 판정 기준을 계약에 명시
+  - [ ] 구독 상태는 `/api/me/settings`에 통합(별도 `/me/subscriptions` 없음): `subscriptions[]`의 `status`(SUBSCRIBED/FREE/NOT_SUBSCRIBED/UNKNOWN), `planName`(30자, 구독 중일 때만), `billingDay`(구독 중일 때만, 비면 1), `productId` 없음. NOT_SUBSCRIBED는 행을 저장하지 않고 조회 때 서버가 채운다(전체 교체 저장)
+  - [x] 온보딩 완료 판정 기준: `user_setting` 행이 있으면 `isOnboardingDone: true`(계약에 명시됨, Task 032 안내서 4.6)
 - 완료 기준
   - V-B: 사용자 격리, 필수값 400, 비로그인 401 테스트가 통과한다. V-API: 저장 후 조회가 일치한다.
 
 #### Task 056: 찜·우선순위·시청 체크 API 구현으로 계산 대상 관리 ⬜
 - 태그: [B] · PRD: B5, FR-09, R11-19 · 선행: 055, 051 · 찜 상한 20개 확정(2026-10-10, PRD 11절 36번. 2026-10-09의 잠정값 30을 대체) · 브랜치: `feature/b5-wishlist`
 - 구현 사항
-  - [ ] `/api/wishlist-items` 추가·삭제·목록, 우선순위 변경, "다 봤음"(`watched_at`) 토글. 중복 추가 무시, 드라마는 R11-19 결정 단위
+  - [ ] `/api/me/wishlist-items`(`listWishlistItems`·`addWishlistItem`)·`/api/me/wishlist-items/{wishlistItemId}`(`updateWishlistItem` PATCH·`removeWishlistItem`) 추가·삭제·목록, 우선순위 변경, "다 봤음"(`watched_at`) 토글. 중복 추가 무시, 드라마는 R11-19 결정 단위
   - [ ] 목록: 필요 시간·추정, 서비스별 상태, "이미 시청 가능"
   - [ ] 찜 상한(**20개 확정**, 2026-10-10 사용자 결정, PRD 11절 36번. 찜 항목 단위로 세어 영화 1편·드라마 시즌 1개가 각각 1개이고 "다 봤음"으로 옮긴 항목은 세지 않는다. 설정 키로 두되 DB 제약은 두지 않는 애플리케이션 규칙이다, ERD) 21번째 추가는 막고 `WISHLIST_LIMIT_EXCEEDED`(제안, 코드는 R-9 절차와 Task 031로 등록)로 응답한다. 이미 있는 항목의 중복 추가는 상한과 무관하게 기존대로 무시한다. 같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화(예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다))로 검사·저장하며 방식은 이 Task 구현에서 정한다. 엔진의 `MAX_PRODUCT_COUNT = 20`은 별개의 값(후보 상품 수)이라 바꾸지 않는다. `refresh_tier` 갱신은 Task 077에서 한다
 - 완료 기준
@@ -1047,7 +1048,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B6, FR-19(단품), SCR-14 · 선행: 035, 054 · 브랜치: `feature/b6-admin-products`
 - 구현 사항
   - [ ] `/api/admin/products` 목록·등록·수정·비활성(`active = false`), MVP는 STANDARD 단품
-  - [ ] `/api/admin/products/{productId}/prices` 가격 추가, 기간 겹침 거부(코드는 R-9)
+  - [ ] `/api/admin/products/{productId}/prices` 줄 추가·마지막 줄 수정·삭제와 `…/{priceId}/verify`([요금 확인함]). 종료일은 저장하지 않고 시작일이 마지막 줄보다 늦어야 한다(`PRICE_START_DATE_NOT_AFTER_LAST`·`PRICE_START_DATE_DUPLICATE`·`PRICE_NOT_LATEST` 등, error-codes.md)
   - [ ] 기준일 유효 가격 선택 서비스 메서드(계산·요금 확인 공용)
 - 완료 기준
   - V-B: 겹침 거부·기준일별 선택 테스트. V-API: ADMIN 성공, USER 403.
@@ -1055,7 +1056,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 060: 사용자 금액 수정과 적용 가격 결정 구현으로 실제 지불 금액 반영 ⬜
 - 태그: [B] · PRD: B6, FR-11, SCR-09 · 선행: 059, 055, 031 · 브랜치: `feature/b6-price-override`
 - 구현 사항
-  - [ ] `GET/PUT /api/me/price-overrides`(`UNIQUE(user_id, product_id)`), 요금 확인 조회 API(관리자 요금표, 사용자 금액, 요금 기준일)
+  - [ ] `GET /api/me/service-prices`(`listMyServicePrices`: 관리자 요금표, 사용자 금액, 적용 시작일·마지막 확인일), `PUT·DELETE /api/me/service-prices/{productId}`(`setMyServicePrice`·`resetMyServicePrice`, `UNIQUE(user_id, product_id)`)
   - [ ] 적용 가격: `USER_OVERRIDE` / `ADMIN` / `ALREADY_PAID`(SUBSCRIBED 이번 달) / `FREE`
 - 완료 기준
   - V-B: 가격 출처 4종 테스트. V-API: 수정 후 조회에 반영되고 관리자 가격은 그대로다.
@@ -1151,7 +1152,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 계약 추가(Task 068 변경안) + 재계산 Job
   - [ ] 연결(R-21 확정): 수집 Job의 `JobExecutionListener.afterJob`이 상태가 COMPLETED일 때만 재계산 Job을 비동기로 시작한다. 수집이 실패하면 재계산하지 않는다. GitHub Actions(`collect.yml`)는 수정하지 않는다(수집 시작만 호출)
   - [ ] 실패 복구용 관리자 수동 재실행 API(제안: `POST /api/admin/plans/monthly/run`, 202·중복 409). 배치 토큰 허용 여부는 TECH 4절 갱신을 따른다
-  - [ ] ACTIVE만 대상. 새 ACTIVE → 이전 ARCHIVED(명시 flush) → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
+  - [ ] ACTIVE만 대상. 이전 ACTIVE → ARCHIVED(명시 flush) → 새 ACTIVE 생성 → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
   - [ ] 영향 플랜 선정(제안, R-19): 이번 수집 실행의 `availability_change`(`job_execution_id`)에 걸린 `watch_unit`을 `plan_item`으로 가진 ACTIVE 플랜. 월초(제안: 그 달 첫 COMPLETED 수집)에는 전체 ACTIVE
   - [ ] 재계산 대상 플랜 수를 실행 기록으로 남기고(제안: 재계산 Job의 실행 컨텍스트 또는 읽기 건수) Task 045 수집 이력 응답에 필드로 추가한다(계약 변경, SCR-16 연결은 Task 070)
 - 완료 기준
@@ -1245,6 +1246,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] R-10: `watch_unit` 6개월 삭제가 NO ACTION FK에 막히는 문제의 처리 방식. 막는 참조는 `wishlist_item`과 모든 상태(ACTIVE·DRAFT·ARCHIVED) 플랜의 `plan_item`이다(ERD. `plan_assignment`는 `plan_item`·`plan_month`를 참조하고 `watch_unit`을 직접 참조하지 않는다). 같은 A 영역의 `availability`·`availability_change`도 `watch_unit`을 참조하므로 정리 작업이 먼저 지운다
   - [ ] `BATCH_*` 이력 보존 기준(Supabase 500MB)
+  - [ ] `calc_run` 보존 기준(계산마다 3행이 쌓이고 탈퇴 뒤에도 plan_id만 NULL로 남음, Task 032 db-reviewer 지적)
   - [ ] 6개월 갱신·삭제 정리 방식(점검 쿼리 주기, 삭제 대상, 실행 경로)
 - 완료 기준
   - V-H: 세 결정을 기록하고 10.3 R-10을 갱신했다.
