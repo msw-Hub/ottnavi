@@ -11,8 +11,12 @@
 @import "./styles/admin-theme.css";
 
 /*
- * shadcn의 다크 모드 방식(.dark 클래스) 설정이다. 앱은 이제 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않는다.
- * 아래 .dark 블록과 함께 Task 037에서 정리한다(지금 지우면 shadcn 원본 컴포넌트의 dark: 클래스 처리가 달라질 수 있어 그대로 둔다).
+ * shadcn 원본 컴포넌트(components/ui)가 쓰는 `dark:` 클래스의 기준을 ".dark 클래스 아래"로 정하는 설정이다.
+ * 앱은 :root 자체가 어두운 테마라 .dark 클래스를 붙이지 않으므로 `dark:` 클래스는 지금 모두 꺼져 있다(Task 037 정리).
+ * 이 줄을 지우지 않는 이유: Tailwind 4는 이 설정이 없으면 `dark:`를 OS의 어두운 모드(prefers-color-scheme)에 따라 켠다.
+ * 그러면 OS 설정에 따라 outline 버튼 바탕이 `bg-input/30`으로 바뀌는 등 화면이 달라진다.
+ * `dark:`를 늘 켤지는 ROADMAP Task 037 ⑩(결정 대기)이다. 켜기로 하면 이 줄을 `@custom-variant dark (&:is(*));` 같은 항상 참 조건으로 바꾼다.
+ * (shadcn 기본 .dark 색 블록은 쓰는 곳이 없어 지웠다. 필요하면 shadcn 문서의 기본 dark 값을 다시 가져온다)
  */
 @custom-variant dark (&:is(.dark *));
 
@@ -23,7 +27,7 @@
  *   prefers-color-scheme: dark 블록.
  * - 다크 모드를 지운 이유: 템플릿은 OS 다크 모드에서 --border·--accent를 템플릿 값으로 덮어써 shadcn 색과 섞였고,
  *   color-scheme: light dark 때문에 배경은 밝은데 스크롤바·입력창만 어두워지는 충돌이 있었다.
- *   다크 모드는 shadcn 방식(.dark 클래스)만 남기고, 켤지 여부는 디자인 토큰 정리(Task 037)에서 정한다.
+ *   다크 모드 클래스 방식(@custom-variant dark)만 남겼고, .dark 색 블록은 Task 037에서 지웠다.
  * - 남긴 것: 아래 shadcn 토큰 전부. --border·--accent는 템플릿 블록 안에 섞여 있던 shadcn 값 그대로 옮겼다.
  */
 /*
@@ -59,7 +63,7 @@
   --border: oklch(0.28 0.045 264); /* 장식용 구분선(카드 테두리 등) */
   --input: oklch(0.54 0.04 258); /* 입력창 테두리. "여기에 입력한다"는 정보라 카드 위 3:1 이상(약 3.76:1) */
   --ring: oklch(0.79 0.09 230); /* 키보드 포커스 표시(--primary와 같은 하늘색) */
-  /* 차트 색은 아직 쓰는 곳이 없어 shadcn 기본값 그대로 둔다(Task 037에서 정한다) */
+  /* 차트 색은 아직 쓰는 곳이 없어 shadcn 기본값 그대로 둔다(쓰는 곳이 생기면 정한다) */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -138,41 +142,6 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-}
-
-/* shadcn 기본 다크 값. 앱은 .dark 클래스를 붙이지 않아 적용되지 않는다. Task 037에서 정리한다 */
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @layer base {

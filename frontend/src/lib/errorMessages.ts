@@ -51,7 +51,8 @@ export const ERROR_MESSAGES = { ...COMMON_ERROR_MESSAGES, ...TECH_ERROR_MESSAGES
 // 아는 오류 코드의 문자열 유니온 타입(예: 'TITLE_NOT_FOUND'). 특정 코드로 분기할 때 오타를 막는다
 export type ErrorCode = keyof typeof ERROR_MESSAGES
 
-// 표에 없는 코드(백엔드가 새 코드를 먼저 배포한 경우 등)이거나 errorCode가 없을 때 보이는 메시지
+// 표에 없는 코드(백엔드가 새 코드를 먼저 배포한 경우 등)이거나 errorCode가 없을 때 보이는 메시지.
+// 이 문구와 아래 네트워크 오류 문구는 Task 037에서 현재 문구로 확정했다
 export const DEFAULT_ERROR_MESSAGE = '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'
 
 // 서버 응답을 아예 받지 못했을 때(인터넷 끊김, 서버 미기동 등)의 메시지. 서버가 준 errorCode가 아니므로 표와 따로 둔다

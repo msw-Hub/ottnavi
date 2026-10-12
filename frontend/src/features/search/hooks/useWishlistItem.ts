@@ -10,6 +10,7 @@ import type { MediaType, WishlistPriority } from '@/api/generated/model'
 import type { ApiError } from '@/api/http'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { useWishlistAddedDialog } from '@/hooks/useWishlistAddedDialog'
+import { toastApiError } from '@/lib/errorToast'
 import { getMockRequestParams } from '@/lib/mockScenario'
 
 // 현재 미사용: 검색 카드에서 찜 하트를 없앴다(찜은 상세에서만). 하트를 되살릴 때를 위해 파일은 남긴다.
@@ -47,7 +48,7 @@ interface WishlistAddedPopupInfo {
 
 // 요청 제한(429)은 인터셉터가 이미 토스트로 알렸으므로 같은 안내를 또 띄우지 않는다
 function notifyError(error: ApiError) {
-  if (!error.hasNotifiedUser) toast.error(error.userMessage)
+  if (!error.hasNotifiedUser) toastApiError(error.errorCode, error.userMessage)
 }
 
 // 비로그인 요청에 서버가 돌려주는 상태 코드
@@ -100,7 +101,8 @@ export function useWishlistItem(
     if (error.errorCode === WISHLIST_LIMIT_EXCEEDED_ERROR_CODE) {
       // 본문은 errorMessages의 WISHLIST_LIMIT_EXCEEDED 문구(error.userMessage)다. 버튼은 찜 목록으로 보내 자리를 만들게 한다(확정, PRD SCR-08).
       // 목업 확인용 주소 파라미터(?mockScenario=)는 이어 붙여 같은 시나리오로 이어 본다(운영에서는 빈 문자열이다)
-      toast.error(error.userMessage, {
+      // 오류가 아니라 경고 토스트로 뜬다(경고 대상 코드는 lib/errorToast.ts 한곳에서 정한다)
+      toastApiError(error.errorCode, error.userMessage, {
         action: {
           label: '찜 목록 가기',
           onClick: () =>
