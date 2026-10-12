@@ -279,23 +279,20 @@ describe('toSaveSettingsRequest', () => {
     })
   })
 
-  it('프리셋은 그 값과 분으로 저장하고 환산 입력값은 비운다', () => {
+  it('프리셋은 그 값과 분으로 저장한다', () => {
     const request = toSaveSettingsRequest(createValidValues())
     expect(request).toMatchObject({
       monthlyBudget: 20000,
       monthlyWatchMinutes: 900,
       watchPreset: 'NORMAL',
-      weeklyInput: null,
     })
   })
 
-  it('환산 방식은 CUSTOM과 환산한 분, 환산 입력값을 함께 담는다', () => {
+  it('환산 방식은 CUSTOM과 환산한 분만 담고 환산 입력값은 보내지 않는다(계약에 필드가 없다)', () => {
     const values = createValidValues()
     values.watchTime = { mode: 'weekly', timesPerWeek: 3, hoursPerTime: 2 }
-    expect(toSaveSettingsRequest(values)).toMatchObject({
-      monthlyWatchMinutes: 1559,
-      watchPreset: 'CUSTOM',
-      weeklyInput: { timesPerWeek: 3, hoursPerTime: 2 },
-    })
+    const request = toSaveSettingsRequest(values)
+    expect(request).toMatchObject({ monthlyWatchMinutes: 1559, watchPreset: 'CUSTOM' })
+    expect(request).not.toHaveProperty('weeklyInput')
   })
 })

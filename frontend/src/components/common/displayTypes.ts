@@ -8,6 +8,7 @@
  * - 문구 표(Record)를 컴포넌트 파일에서 export하면 개발 서버의 빠른 새로고침(react-refresh) 규칙에 걸려,
  *   컴포넌트 파일과 분리했다.
  */
+import type { ServiceSubscriptionStatus } from '@/api/generated/model'
 
 // 임시: 계약 반영 후 생성 타입으로 교체 (ERD availability.status 값: AVAILABLE / NOT_AVAILABLE / UNKNOWN)
 // 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태
@@ -54,10 +55,9 @@ export const WISHLIST_PRIORITY_LABELS: Record<WishlistPriority, string> = {
   MAYBE: '여유될 때',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD user_subscription.status는 SUBSCRIBED / FREE이고 미구독은 행이 없다)
-// 온보딩에서 사용자가 서비스마다 고르는 이용 상태. UNKNOWN은 "아직 모르겠음"을 담는 화면 전용 값이다(ERD에는 없어 계약에서 확정 필요)
-// - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독
-export type ServiceSubscriptionStatus = 'SUBSCRIBED' | 'FREE' | 'NOT_SUBSCRIBED' | 'UNKNOWN'
+// 온보딩에서 사용자가 서비스마다 고르는 이용 상태. 확정 계약의 생성 타입을 그대로 쓴다(Task 031 6-4).
+// - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독 / UNKNOWN: 아직 모르겠음
+export type { ServiceSubscriptionStatus }
 
 // 이용 상태별 화면 글자
 export const SUBSCRIPTION_STATUS_LABELS: Record<ServiceSubscriptionStatus, string> = {

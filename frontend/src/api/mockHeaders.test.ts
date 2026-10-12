@@ -36,15 +36,10 @@ async function captureMockHeaders(): Promise<Record<string, string>> {
 describe('목업 헤더 요청 인터셉터', () => {
   it('목업 모드에서 화면 주소의 전환 값을 X-Mock-* 헤더로 싣는다', async () => {
     vi.stubEnv('VITE_USE_MOCK', 'true')
-    window.history.pushState(
-      {},
-      '',
-      '/?mockScenario=collect-failed&mockVariantWatch=b&mockPageSize=5',
-    )
+    window.history.pushState({}, '', '/?mockScenario=collect-failed&mockPageSize=5')
 
     expect(await captureMockHeaders()).toEqual({
       'x-mock-scenario': 'collect-failed',
-      'x-mock-variant-watch': 'b',
       'x-mock-page-size': '5',
     })
   })

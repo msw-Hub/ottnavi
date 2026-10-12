@@ -10,11 +10,7 @@
  */
 import { z } from 'zod'
 import { SUBSCRIPTION_STATUS_LABELS } from '@/components/common/displayTypes'
-import type {
-  SaveUserSettingsRequest,
-  UserSubscription,
-  WatchPreset,
-} from '@/features/onboarding/mockTypes'
+import type { UpdateMySettingsRequest, UserSubscription, WatchPreset } from '@/api/generated/model'
 import {
   MAX_MONTHLY_WATCH_MINUTES,
   MIN_MONTHLY_WATCH_MINUTES,
@@ -187,10 +183,10 @@ export type OnboardingFormValues = z.infer<typeof onboardingFormSchema>
  * 폼 값을 저장 요청(PUT /me/settings)으로 바꾼다. 검증을 통과한 값만 넘긴다.
  *
  * - SUBSCRIBED가 아닌 서비스는 요금제·결제일을 null로 비운다(이전에 입력했다가 상태를 바꾼 값이 서버로 새지 않게 한다).
- * - 프리셋을 골랐으면 그 값, 환산·직접 입력이면 CUSTOM이다. 환산 입력값(weeklyInput)은 항상 함께 보내고,
- *   R11-18 안 a(분만 저장)에서는 서버가 버리고 안 b에서만 저장한다(목업 핸들러가 이 차이를 보여 준다).
+ * - 프리셋을 골랐으면 그 값, 환산·직접 입력이면 CUSTOM이다. 환산("주 N회 × 회당 M시간")은 화면에서 분으로 바꿔 monthlyWatchMinutes로만 보낸다.
+ *   환산 입력값 자체는 저장하지 않는다(계약에 필드가 없다. R11-18 안 a 확정).
  */
-export function toSaveSettingsRequest(values: OnboardingFormValues): SaveUserSettingsRequest {
+export function toSaveSettingsRequest(values: OnboardingFormValues): UpdateMySettingsRequest {
   const monthlyWatchMinutes = resolveMonthlyWatchMinutes(values.watchTime)
   if (monthlyWatchMinutes === null) {
     // 검증을 통과한 값이라면 일어나지 않는다. 호출 순서가 잘못됐을 때 조용히 잘못된 값을 보내지 않으려는 방어다
@@ -207,18 +203,12 @@ export function toSaveSettingsRequest(values: OnboardingFormValues): SaveUserSet
     }
   })
 
-  const { watchTime } = values
-  const { timesPerWeek, hoursPerTime } = watchTime
-  const watchPreset: WatchPreset = resolveWatchPreset(watchTime)
+  const watchPreset: WatchPreset = resolveWatchPreset(values.watchTime)
 
   return {
     subscriptions,
     monthlyBudget: values.monthlyBudget,
     monthlyWatchMinutes,
     watchPreset,
-    weeklyInput:
-      watchTime.mode === 'weekly' && timesPerWeek !== undefined && hoursPerTime !== undefined
-        ? { timesPerWeek, hoursPerTime }
-        : null,
   }
 }

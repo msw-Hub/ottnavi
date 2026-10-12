@@ -1,9 +1,9 @@
 import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import type {
   CommonResponseUserSettings,
-  SaveUserSettingsRequest,
+  UpdateMySettingsRequest,
   UserSettings,
-} from '@/features/onboarding/mockTypes'
+} from '@/api/generated/model'
 import type {
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
@@ -18,7 +18,6 @@ import type {
 import type { CommonResponseWishlistItemList, WishlistItem } from '@/api/generated/model'
 import {
   denyGuest,
-  getRequestMockWatchVariant,
   hasMockScenario,
   mockWishlist,
   type MockWishlistEntry,
@@ -199,7 +198,7 @@ function validationError(request: Request, detail: string) {
 }
 
 // 저장 요청의 값이 입력 규칙(schema.ts와 같은 규칙)을 지키는지 검사한다. 어긋나면 안내 문장을, 맞으면 null을 돌려준다
-function validateSettingsRequest(body: SaveUserSettingsRequest): string | null {
+function validateSettingsRequest(body: UpdateMySettingsRequest): string | null {
   if (!Number.isInteger(body.monthlyBudget) || body.monthlyBudget < 0) {
     return '월 예산은 0 이상의 정수여야 합니다.'
   }
@@ -210,14 +209,27 @@ function validateSettingsRequest(body: SaveUserSettingsRequest): string | null {
   ) {
     return `월 시청 시간은 ${MIN_MONTHLY_WATCH_MINUTES}분 이상이어야 합니다.`
   }
-  if (!Array.isArray(body.subscriptions) || body.subscriptions.length === 0) {
+  // 계약: 서비스 상태는 1~7개이고 같은 서비스를 두 번 보내면 400이다
+  if (
+    !Array.isArray(body.subscriptions) ||
+    body.subscriptions.length === 0 ||
+    body.subscriptions.length > 7
+  ) {
     return '서비스별 이용 상태를 입력해 주세요.'
+  }
+  const ottServiceIds = body.subscriptions.map((s) => s.ottServiceId)
+  if (new Set(ottServiceIds).size !== ottServiceIds.length) {
+    return '같은 서비스를 두 번 보낼 수 없습니다.'
   }
   for (const subscription of body.subscriptions) {
     if (subscription.status !== 'SUBSCRIBED') continue
+    // 구독 중이면 요금제 이름(30자 이하)이 필요하다. 결제일은 비어 있으면 1일로 저장한다(계약, PRD FR-08 기본값)
+    if (!subscription.planName || subscription.planName.length > 30) {
+      return '구독 중인 서비스는 30자 이하의 요금제 이름이 필요합니다.'
+    }
     const day = subscription.billingDay
-    if (!subscription.planName || day === null || !Number.isInteger(day) || day < 1 || day > 31) {
-      return '구독 중인 서비스는 요금제 이름과 결제일(1~31)이 필요합니다.'
+    if (day !== null && (!Number.isInteger(day) || day < 1 || day > 31)) {
+      return '결제일은 1일부터 31일 사이여야 합니다.'
     }
   }
   return null
@@ -285,19 +297,22 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
-    const requestBody = (await request.json()) as SaveUserSettingsRequest
+    const requestBody = (await request.json()) as UpdateMySettingsRequest
     const invalidReason = validateSettingsRequest(requestBody)
     if (invalidReason) return validationError(request, invalidReason)
 
-    // R11-18 두 안: 안 a(기본)는 환산 결과(분)만 저장하고 환산 입력값은 버린다. 안 b는 환산 입력값도 함께 저장한다
-    const variant = getRequestMockWatchVariant(request)
+    // 환산 결과(분)만 저장한다(R11-18 안 a 확정, 환산 입력값 필드는 계약에 없다).
+    // 구독 중인데 결제일이 비어 있으면 1일로 채우고, 구독 중이 아니면 요금제·결제일을 비운다(계약)
     savedSettings = {
       isOnboardingDone: true,
-      subscriptions: requestBody.subscriptions,
+      subscriptions: requestBody.subscriptions.map((s) =>
+        s.status === 'SUBSCRIBED'
+          ? { ...s, billingDay: s.billingDay ?? 1 }
+          : { ...s, planName: null, billingDay: null },
+      ),
       monthlyBudget: requestBody.monthlyBudget,
       monthlyWatchMinutes: requestBody.monthlyWatchMinutes,
       watchPreset: requestBody.watchPreset,
-      weeklyInput: variant === 'b' ? requestBody.weeklyInput : null,
     }
     writeMockJson(SETTINGS_STORAGE_KEY, savedSettings)
     // 로그인 콜백이 "온보딩 미완료면 SCR-07, 아니면 원래 화면"을 고를 때 본다(mockSession)

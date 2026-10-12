@@ -7,7 +7,7 @@
  * 시간 표시는 src/lib/format.ts의 formatMinutes만 거친다(frontend.md 화면 표시 규칙).
  */
 import { formatMinutes } from '@/lib/format'
-import type { WatchPreset } from '@/features/onboarding/mockTypes'
+import type { WatchPreset } from '@/api/generated/model'
 
 // 한 달을 몇 주로 볼지. 365일 / 12개월 / 7일 ≈ 4.33 (PRD 5.4)
 export const WEEKS_PER_MONTH = 4.33

@@ -59,57 +59,20 @@ export function getMockPageSize(): number | undefined {
 }
 
 /*
- * ===== 목업 안 전환 (Task 028) =====
- * R11-18(환산 입력 저장)은 사용자가 Task 030에서 정한다. 그때까지 두 안을 화면에서 비교할 수 있게 주소 파라미터로 바꾼다
- * (목업 모드에서만 동작). 기본은 a(PRD 추천안)다.
- * - ?mockVariantWatch=a|b  R11-18  a: 환산 결과를 분(monthlyWatchMinutes)으로만 저장 / b: "주 N회 × 회당 M시간" 입력값도 함께 저장
- * R11-19(드라마 찜 단위)는 계약이 시즌 단위로 확정해(Task 031 6-3) 전환 값(?mockVariant=)을 없앴다.
+ * 참고: 예전에는 R11-18(환산 입력 저장)·R11-19(드라마 찜 단위)를 화면에서 비교하려고 ?mockVariantWatch=·?mockVariant= 전환 값을 뒀다.
+ * 두 결정이 계약으로 확정돼(Task 031 6-3·6-4: 시즌 단위 찜, 환산 결과는 분으로만 저장) 전환 값과 안내 띠를 없앴다.
  */
 
-// R11-18(환산 입력 저장) 안을 고르는 쿼리 파라미터 이름. 예: /settings?mockVariantWatch=b
-export const MOCK_VARIANT_WATCH_PARAM = 'mockVariantWatch'
-
-// 목업 안의 종류
-export type MockVariant = 'a' | 'b'
-
-// 문자열을 목업 안으로 바꾼다. 'b'가 아니면 모두 기본(a)이다
-export function parseMockVariant(value: string | null | undefined): MockVariant {
-  return value === 'b' ? 'b' : 'a'
-}
-
-// 화면 주소에서 파라미터 하나를 목업 안으로 읽는다. 목업 모드(VITE_USE_MOCK=true)가 아니면 항상 'a'다
-// (운영에서 누가 주소에 붙여도 화면 동작이 바뀌지 않게 하기 위함이다. getMockScenarioParams와 같은 이유)
-function readMockVariant(paramName: string): MockVariant {
-  if (import.meta.env.VITE_USE_MOCK !== 'true') return 'a'
-  return parseMockVariant(new URLSearchParams(window.location.search).get(paramName))
-}
-
-// R11-18(환산 입력 저장) 안: 화면 주소의 mockVariantWatch 값
-export function getMockWatchVariant(): MockVariant {
-  return readMockVariant(MOCK_VARIANT_WATCH_PARAM)
-}
-
 /**
- * 목업 안을 객체로 돌려준다. 목업 모드가 아니면 빈 객체다. 안 a(기본)는 넣지 않는다.
- * 이동 링크·쿼리 키에 쓴다. API 요청에는 아래 getMockRequestHeaders가 헤더로 싣고, 핸들러(mocks/memberHandlers.ts)가 읽는다.
- */
-export function getMockVariantParams(): Record<string, string> {
-  return {
-    ...(getMockWatchVariant() === 'b' ? { [MOCK_VARIANT_WATCH_PARAM]: 'b' } : {}),
-  }
-}
-
-/**
- * 시나리오와 목업 안을 합친 객체로 돌려준다. 이동 링크에 이어 붙이거나(HeaderAccountNav 등) 회원 화면 훅의 쿼리 키에 넣어,
+ * 화면 주소의 목업 전환 값(시나리오)을 객체로 돌려준다. 이동 링크에 이어 붙이거나(HeaderAccountNav 등) 회원 화면 훅의 쿼리 키에 넣어,
  * 주소의 값이 바뀌면 같은 API라도 새로 불러오게 한다. 목업 모드가 아니면 빈 객체라 운영에는 영향이 없다.
  */
 export function getMockRequestParams(): Record<string, string> {
-  return { ...getMockScenarioParams(), ...getMockVariantParams() }
+  return getMockScenarioParams()
 }
 
 // ===== 목업 전환 값을 실어 보내는 요청 헤더 이름(Task 031 6-0) =====
 export const MOCK_SCENARIO_HEADER = 'X-Mock-Scenario' // ?mockScenario= 값
-export const MOCK_VARIANT_WATCH_HEADER = 'X-Mock-Variant-Watch' // ?mockVariantWatch=b 일 때 'b' (R11-18)
 export const MOCK_PAGE_SIZE_HEADER = 'X-Mock-Page-Size' // ?mockPageSize= 값(검색 한 페이지 크기를 줄여 "더보기" 확인)
 
 /**
@@ -119,14 +82,10 @@ export const MOCK_PAGE_SIZE_HEADER = 'X-Mock-Page-Size' // ?mockPageSize= 값(�
 export function getMockRequestHeaders(): Record<string, string> {
   if (import.meta.env.VITE_USE_MOCK !== 'true') return {}
   const scenarioParams = getMockScenarioParams()
-  const variantParams = getMockVariantParams()
   const pageSize = getMockPageSize()
   return {
     ...(scenarioParams[MOCK_SCENARIO_PARAM]
       ? { [MOCK_SCENARIO_HEADER]: scenarioParams[MOCK_SCENARIO_PARAM] }
-      : {}),
-    ...(variantParams[MOCK_VARIANT_WATCH_PARAM]
-      ? { [MOCK_VARIANT_WATCH_HEADER]: variantParams[MOCK_VARIANT_WATCH_PARAM] }
       : {}),
     ...(pageSize !== undefined ? { [MOCK_PAGE_SIZE_HEADER]: String(pageSize) } : {}),
   }

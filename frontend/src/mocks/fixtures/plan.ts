@@ -26,7 +26,7 @@ import type {
   UnscheduledReason,
   WishlistPriority,
 } from '@/features/plan/mockTypes'
-import type { UserSettings } from '@/features/onboarding/mockTypes'
+import type { UserSettings } from '@/api/generated/model'
 import { MOCK_DATA_AS_OF } from '@/mocks/fixtures/titles'
 
 // 플랜 응답 시나리오(주소의 ?mockScenario= 값과 같은 이름)

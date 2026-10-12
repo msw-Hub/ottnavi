@@ -1,10 +1,7 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { customInstance, isApiError } from '@/api/http'
-import type {
-  CommonResponseUserSettings,
-  SaveUserSettingsRequest,
-} from '@/features/onboarding/mockTypes'
+import type { CommonResponseUserSettings, UpdateMySettingsRequest } from '@/api/generated/model'
 import type {
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
@@ -45,7 +42,7 @@ async function addWishlist() {
   })
 }
 
-const SETTINGS_REQUEST: SaveUserSettingsRequest = {
+const SETTINGS_REQUEST: UpdateMySettingsRequest = {
   subscriptions: [
     { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: 5 },
     { ottServiceId: 2, status: 'NOT_SUBSCRIBED', planName: null, billingDay: null },
@@ -53,7 +50,6 @@ const SETTINGS_REQUEST: SaveUserSettingsRequest = {
   monthlyBudget: 15000,
   monthlyWatchMinutes: 1559,
   watchPreset: 'CUSTOM',
-  weeklyInput: { timesPerWeek: 3, hoursPerTime: 2 },
 }
 
 describe('내 설정', () => {
@@ -69,22 +65,47 @@ describe('내 설정', () => {
     expect(res.data).toMatchObject({ isOnboardingDone: false, monthlyBudget: null })
   })
 
-  it('안 a(기본)는 환산 입력값을 버리고, 안 b는 저장한다', async () => {
-    const a = await request<CommonResponseUserSettings>({
+  it('저장하면 분 값이 그대로 저장되고 응답에 환산 입력값 필드가 없다', async () => {
+    const saved = await request<CommonResponseUserSettings>({
       url: '/me/settings',
       method: 'PUT',
       data: SETTINGS_REQUEST,
     })
-    expect(a.data.weeklyInput).toBeNull()
-    expect(a.data.monthlyWatchMinutes).toBe(1559)
+    expect(saved.data.monthlyWatchMinutes).toBe(1559)
+    expect(saved.data).not.toHaveProperty('weeklyInput')
+  })
 
-    const b = await request<CommonResponseUserSettings>({
+  it('구독 중인데 결제일이 비어 있으면 1일로 저장하고, 구독 중이 아니면 요금제·결제일을 비운다', async () => {
+    const saved = await request<CommonResponseUserSettings>({
       url: '/me/settings',
       method: 'PUT',
-      data: SETTINGS_REQUEST,
-      headers: { 'X-Mock-Variant-Watch': 'b' },
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [
+          { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: null },
+          { ottServiceId: 2, status: 'UNKNOWN', planName: '남은 값', billingDay: 9 },
+        ],
+      },
     })
-    expect(b.data.weeklyInput).toEqual({ timesPerWeek: 3, hoursPerTime: 2 })
+    expect(saved.data.subscriptions).toEqual([
+      { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: 1 },
+      { ottServiceId: 2, status: 'UNKNOWN', planName: null, billingDay: null },
+    ])
+  })
+
+  it('같은 서비스를 두 번 보내면 400이다', async () => {
+    const error = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [
+          { ottServiceId: 1, status: 'NOT_SUBSCRIBED', planName: null, billingDay: null },
+          { ottServiceId: 1, status: 'FREE', planName: null, billingDay: null },
+        ],
+      },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
   })
 
   it('입력 규칙을 어기면 400 VALIDATION_FAILED다', async () => {
