@@ -5,18 +5,18 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { ServiceStatusEntry } from '@/components/common/ServiceStatusRow'
 import { WishlistRow } from '@/features/wishlist/components/WishlistRow'
-import type { WishlistListItem } from '@/features/wishlist/mockTypes'
+import type { WishlistItem } from '@/api/generated/model'
 
-const ITEM: WishlistListItem = {
+const ITEM: WishlistItem = {
   wishlistItemId: 1,
   mediaType: 'movie',
   tmdbId: 496243,
   title: '기생충',
-  posterUrl: null,
+  posterPath: null,
   seasonNumber: null,
   seasonName: null,
   priority: 'MUST',
-  requiredMinutes: 132,
+  requiredMin: 132,
   isRuntimeEstimated: false,
   availabilities: [],
   isWatchableNow: false,
@@ -46,7 +46,7 @@ interface RowStateProps {
 }
 
 // 있음 2곳, 없음 1곳, 모름 1곳(쿠팡플레이, 데이터 부족)
-function renderCard(entries: ServiceStatusEntry[], items: WishlistListItem[] = [ITEM]) {
+function renderCard(entries: ServiceStatusEntry[], items: WishlistItem[] = [ITEM]) {
   render(
     <MemoryRouter>
       <ExpandedStateHost>
@@ -140,7 +140,7 @@ describe('WishlistRow·WishlistCard 서비스별 시청 가능 여부', () => {
   })
 
   it('한 행의 두 카드 중 하나를 펼치면 작품 이름이 붙은 패널이 하나만 열리고 다른 카드는 접힌 채 남는다', async () => {
-    const second: WishlistListItem = {
+    const second: WishlistItem = {
       ...ITEM,
       wishlistItemId: 2,
       tmdbId: 1,

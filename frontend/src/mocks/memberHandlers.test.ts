@@ -9,7 +9,7 @@ import type {
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
 } from '@/features/plan/mockTypes'
-import type { CommonResponseWishlistList } from '@/features/wishlist/mockTypes'
+import type { CommonResponseWishlistItemList } from '@/api/generated/model'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { resetMockMemberState } from '@/mocks/memberHandlers'
 import { resetMockSession, setMockRole } from '@/mocks/mockSession'
@@ -100,23 +100,28 @@ describe('내 설정', () => {
 describe('찜 목록', () => {
   it('찜하면 목록에 보이고 다 봤음을 표시할 수 있다', async () => {
     await addWishlist()
-    const before = await request<CommonResponseWishlistList>({
+    const before = await request<CommonResponseWishlistItemList>({
       url: '/me/wishlist-items',
       method: 'GET',
     })
     expect(before.data.items).toHaveLength(1)
     expect(before.data.items[0]).toMatchObject({ title: '기생충', watchedAt: null })
+    expect(before.data).toMatchObject({ activeItemCount: 1, maxActiveItemCount: 20 })
+    expect(before.data.items[0]).toHaveProperty('posterPath')
+    expect(before.data.items[0]).toHaveProperty('requiredMin')
 
     await request({
       url: `/me/wishlist-items/${before.data.items[0].wishlistItemId}`,
       method: 'PATCH',
       data: { isWatched: true },
     })
-    const after = await request<CommonResponseWishlistList>({
+    const after = await request<CommonResponseWishlistItemList>({
       url: '/me/wishlist-items',
       method: 'GET',
     })
     expect(after.data.items[0].watchedAt).not.toBeNull()
+    // "다 봤음"은 상한에 세지 않는다
+    expect(after.data.activeItemCount).toBe(0)
   })
 })
 
@@ -175,7 +180,7 @@ describe('플랜 계산과 저장', () => {
     expect(new Set(split.data.drafts.map((d) => d.totalCost)).size).toBe(1)
   })
 
-  it('R11-19 안 b는 드라마를 시즌이 아니라 작품 단위로 묶어 보인다', async () => {
+  it('드라마 찜은 시즌 단위로 한 줄씩 보이고, 필요 시간·시즌 이름은 그 시즌 값이다', async () => {
     for (const seasonNumber of [2, 3]) {
       await request({
         url: '/me/wishlist-items',
@@ -183,19 +188,13 @@ describe('플랜 계산과 저장', () => {
         data: { mediaType: 'tv', tmdbId: 93405, seasonNumber, priority: 'WANT' },
       })
     }
-    const bySeason = await request<CommonResponseWishlistList>({
+    const list = await request<CommonResponseWishlistItemList>({
       url: '/me/wishlist-items',
       method: 'GET',
     })
-    expect(bySeason.data.items.map((item) => item.seasonNumber)).toEqual([3, 2])
-
-    const byTitle = await request<CommonResponseWishlistList>({
-      url: '/me/wishlist-items',
-      method: 'GET',
-      headers: { 'X-Mock-Variant': 'b' },
-    })
-    expect(byTitle.data.items).toHaveLength(1)
-    expect(byTitle.data.items[0].seasonNumber).toBeNull()
+    expect(list.data.items.map((item) => item.seasonNumber)).toEqual([3, 2])
+    expect(list.data.items[0]).toMatchObject({ seasonName: '시즌 3' })
+    expect(list.data.items[0].requiredMin).toBeGreaterThan(0)
   })
 
   it('stale 시나리오는 첫 저장만 409이고 다시 계산한 뒤 저장하면 성공한다', async () => {

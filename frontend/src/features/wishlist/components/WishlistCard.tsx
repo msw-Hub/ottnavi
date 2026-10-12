@@ -17,12 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { WishlistListItem } from '@/features/wishlist/mockTypes'
+import type { WishlistItem } from '@/api/generated/model'
 import { formatDate, formatMinutes } from '@/lib/format'
+import { getTmdbImageUrl } from '@/lib/tmdbImage'
 import { cn } from '@/lib/utils'
 
 export interface WishlistCardProps {
-  item: WishlistListItem // 찜 목록의 한 줄
+  item: WishlistItem // 찜 목록의 한 줄
   statusEntries: ServiceStatusEntry[] // 서비스별 제공 상태(서비스 이름과 합쳐진 모양)
   detailSearch: string // 작품 상세로 이동할 때 이어 붙일 주소 파라미터(location.search, 목업 확인용 파라미터 보존)
   isBusy: boolean // 이 항목에 대한 변경 요청이 진행 중인지. true면 조작을 잠시 막는다
@@ -110,7 +111,7 @@ export function WishlistCard({
       >
         <PosterImage
           title={item.title}
-          posterUrl={item.posterUrl}
+          posterUrl={getTmdbImageUrl(item.posterPath, 'w185')}
           className={cn('aspect-auto h-full min-h-36', isWatched && 'opacity-60 grayscale')}
         />
       </Link>
@@ -135,7 +136,7 @@ export function WishlistCard({
         </h3>
 
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground tabular-nums">
-          <span>필요 시간 {formatMinutes(item.requiredMinutes)}</span>
+          <span>필요 시간 {formatMinutes(item.requiredMin)}</span>
           {item.isRuntimeEstimated && <EstimatedTag />}
           {/* 이미 시청 가능: 구독 중이거나 무료로 이용 중인 서비스에 이 작품이 있다. 아이콘 + 글자 배지(색만으로 알리지 않음) */}
           {item.isWatchableNow && !isWatched && (

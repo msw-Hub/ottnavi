@@ -39,12 +39,11 @@ describe('목업 헤더 요청 인터셉터', () => {
     window.history.pushState(
       {},
       '',
-      '/?mockScenario=collect-failed&mockVariant=b&mockVariantWatch=b&mockPageSize=5',
+      '/?mockScenario=collect-failed&mockVariantWatch=b&mockPageSize=5',
     )
 
     expect(await captureMockHeaders()).toEqual({
       'x-mock-scenario': 'collect-failed',
-      'x-mock-variant': 'b',
       'x-mock-variant-watch': 'b',
       'x-mock-page-size': '5',
     })

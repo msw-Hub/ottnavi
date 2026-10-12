@@ -1,17 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { removeWishlistItem, updateWishlistItem } from '@/api/generated/wishlist/wishlist'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  removeWishlistItem,
+  updateWishlistItem,
+  useListWishlistItems,
+} from '@/api/generated/wishlist/wishlist'
 import type {
   CommonResponseUpdatedWishlistItem,
   UpdateWishlistItemRequest,
 } from '@/api/generated/model'
-import { customInstance, type ApiError } from '@/api/http'
-import { getMockRequestParams } from '@/lib/mockScenario'
-import type { CommonResponseWishlistList, WishlistList } from '@/features/wishlist/mockTypes'
-
-// 찜 목록의 캐시 키. 목업 안(?mockVariant=)에 따라 응답이 달라서 키에 넣는다(운영에서는 빈 객체)
-function getWishlistQueryKey() {
-  return ['/me/wishlist-items', getMockRequestParams()] as const
-}
+import type { ApiError } from '@/api/http'
 
 // 검색·상세 화면의 찜 상태 캐시 키(features/search, features/title-detail의 useWishlistItem과 같은 문자열이어야 화면 사이에 상태가 공유된다)
 const WISHLIST_STATE_KEY = ['mock-wishlist-state'] as const
@@ -22,19 +19,11 @@ type WishlistState = Record<string, { wishlistItemId: number; priority: string }
 /**
  * 내 찜 목록(SCR-08)을 불러온다. 최근에 찜한 순이며 "다 봤음" 항목도 포함한다(watchedAt에 값이 있음).
  *
- * 임시 구현: 조회(GET /me/wishlist-items)는 아직 임시 타입(mockTypes)을 쓴다. 생성 훅으로 바꾸는 일은 Task 031 6-3이다.
+ * 생성 훅(useListWishlistItems, 계약 listWishlistItems)을 감싸고 select로 CommonResponse 래퍼를 벗긴다(frontend.md).
+ * 쿼리 키는 생성 훅의 기본 키(['/me/wishlist-items'])다. 변경·삭제 뒤의 invalidateQueries가 같은 키를 쓴다.
  */
 export function useWishlist() {
-  return useQuery<CommonResponseWishlistList, ApiError, WishlistList>({
-    queryKey: getWishlistQueryKey(),
-    queryFn: ({ signal }) =>
-      customInstance<CommonResponseWishlistList>({
-        url: '/me/wishlist-items',
-        method: 'GET',
-        signal,
-      }),
-    select: (res) => res.data,
-  })
+  return useListWishlistItems({ query: { select: (res) => res.data } })
 }
 
 // 찜 항목 하나의 변경 요청 인자

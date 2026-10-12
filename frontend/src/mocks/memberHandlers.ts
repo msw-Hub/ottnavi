@@ -15,10 +15,9 @@ import type {
   PricingService,
   UpdatePricingRequest,
 } from '@/features/pricing/mockTypes'
-import type { CommonResponseWishlistList, WishlistListItem } from '@/features/wishlist/mockTypes'
+import type { CommonResponseWishlistItemList, WishlistItem } from '@/api/generated/model'
 import {
   denyGuest,
-  getRequestMockVariant,
   getRequestMockWatchVariant,
   hasMockScenario,
   mockWishlist,
@@ -62,9 +61,8 @@ import {
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
  * - same:       세 플랜 유형의 선택이 같다(유형마다 초안 3개를 응답하되 내용이 같다. 합쳐 표시는 프론트 몫: mergeIdenticalDrafts). same-split은 same의 별칭
  * - error:      플랜 계산이 500 오류를 돌려준다
- * 목업 안: ?mockVariantWatch=a|b는 R11-18(환산 입력 저장), ?mockVariant=a|b는 R11-19(드라마 찜 단위). 설명은 src/lib/mockScenario.ts.
  *
- * 화면 주소의 이 파라미터들은 계약에 없는 값이라 요청 헤더(X-Mock-Scenario / X-Mock-Variant / X-Mock-Variant-Watch)로 받는다.
+ * 화면 주소의 이 파라미터는 계약에 없는 값이라 요청 헤더(X-Mock-Scenario)로 받는다.
  * 헤더는 목업 모드에서 api/mockHeaders.ts의 요청 인터셉터가 붙인다(getMockRequestHeaders).
  */
 
@@ -227,44 +225,36 @@ function validateSettingsRequest(body: SaveUserSettingsRequest): string | null {
 
 /* ----- 찜 목록 변환 ----- */
 
-// 찜 한 건을 목록의 한 줄로 바꾼다. 작품 정보를 못 찾으면 null이다
+// 찜 한 건을 목록의 한 줄로 바꾼다. 작품 정보를 못 찾으면 null이다. 드라마는 시즌 단위다(R11-19, 계약 WishlistItem)
 function toWishlistListItem(
   wishlistItemId: number,
   entry: MockWishlistEntry,
-  isByTitle: boolean,
   watchableServiceIds: Set<number>,
-): WishlistListItem | null {
+): WishlistItem | null {
   const detail = TITLE_FIXTURES.find(
     (t) => t.mediaType === entry.mediaType && t.tmdbId === entry.tmdbId,
   )
   if (!detail) return null
 
-  // 시즌 단위 안(a)이고 시즌 번호가 있으면 그 시즌 값, 그 밖에는 작품 전체 값을 쓴다
+  // 드라마는 찜한 시즌의 값(필요 시간·제공 상태)을, 영화는 작품 값을 쓴다
   const season =
-    !isByTitle && entry.seasonNumber !== null
+    entry.seasonNumber !== null
       ? detail.seasons.find((s) => s.seasonNumber === entry.seasonNumber)
       : undefined
-  const isSeasonRow = season !== undefined
 
-  let requiredMinutes = detail.runtimeMin ?? 0
-  let isRuntimeEstimated = detail.isRuntimeEstimated
-  if (detail.mediaType === 'tv') {
-    const targetSeasons = isSeasonRow ? [season] : detail.seasons
-    requiredMinutes = targetSeasons.reduce((sum, s) => sum + s.totalRuntimeMin, 0)
-    isRuntimeEstimated = targetSeasons.some((s) => s.isRuntimeEstimated)
-  }
-
-  const availabilities = isSeasonRow ? season.availabilities : detail.availabilities
+  const requiredMin = season ? season.totalRuntimeMin : (detail.runtimeMin ?? 0)
+  const isRuntimeEstimated = season ? season.isRuntimeEstimated : detail.isRuntimeEstimated
+  const availabilities = season ? season.availabilities : detail.availabilities
   return {
     wishlistItemId,
     mediaType: detail.mediaType,
     tmdbId: detail.tmdbId,
     title: detail.title,
-    posterUrl: detail.posterPath, // 찜 목록 응답은 6-3까지 옛 모양(완성된 주소)이라 목업 포스터(data URI)를 그대로 넘긴다
-    seasonNumber: isSeasonRow ? season.seasonNumber : null,
-    seasonName: isSeasonRow ? season.name : null,
+    posterPath: detail.posterPath,
+    seasonNumber: season ? season.seasonNumber : null,
+    seasonName: season ? season.name : null,
     priority: entry.priority,
-    requiredMinutes,
+    requiredMin,
     isRuntimeEstimated,
     availabilities: availabilities.map((a) => ({ ottServiceId: a.ottServiceId, status: a.status })),
     // 구독 중이거나 무료로 이용하는 서비스에서 "있음"이면 이미 볼 수 있는 작품이다
@@ -323,8 +313,6 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
-    // R11-19 두 안: 안 a(기본)는 시즌마다 한 줄, 안 b는 같은 드라마를 작품 하나로 묶어 한 줄(가장 최근에 찜한 항목 기준)
-    const isByTitle = getRequestMockVariant(request) === 'b'
     const settings = getEffectiveSettings()
     const watchableServiceIds = new Set(
       (settings?.subscriptions ?? [])
@@ -332,22 +320,22 @@ export const memberHandlers: RequestHandler[] = [
         .map((s) => s.ottServiceId),
     )
 
-    // 최근에 찜한 순(ID가 큰 순). 안 b는 같은 작품의 첫 항목(가장 최근 찜)만 대표로 남긴다
-    const seenTitles = new Set<string>()
-    const items: WishlistListItem[] = []
+    // 최근에 찜한 순(ID가 큰 순)
+    const items: WishlistItem[] = []
     for (const [id, entry] of [...mockWishlist.entries()].sort(([x], [y]) => y - x)) {
-      if (isByTitle) {
-        const titleKey = `${entry.mediaType}:${entry.tmdbId}`
-        if (seenTitles.has(titleKey)) continue
-        seenTitles.add(titleKey)
-      }
-      const item = toWishlistListItem(id, entry, isByTitle, watchableServiceIds)
+      const item = toWishlistListItem(id, entry, watchableServiceIds)
       if (item) items.push(item)
     }
 
-    const body: CommonResponseWishlistList = {
+    const body: CommonResponseWishlistItemList = {
       success: true,
-      data: { items, dataAsOf: MOCK_DATA_AS_OF },
+      data: {
+        items,
+        // 상한(20)에 세는 개수는 "다 봤음"이 아닌 찜이다(PRD 11절 36번)
+        activeItemCount: items.filter((item) => item.watchedAt === null).length,
+        maxActiveItemCount: 20,
+        dataAsOf: MOCK_DATA_AS_OF,
+      },
     }
     return HttpResponse.json(body)
   }),

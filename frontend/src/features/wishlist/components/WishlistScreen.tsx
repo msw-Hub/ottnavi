@@ -2,13 +2,12 @@ import { useState, type ReactNode } from 'react'
 import { CalculatorIcon, SearchIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
-import type { OttService } from '@/api/generated/model'
+import type { OttService, WishlistItemList } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
 import { DataAsOf } from '@/components/common/DataAsOf'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
-import { MockVariantBanner } from '@/components/common/MockVariantBanner'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { Button } from '@/components/ui/button'
 import { WishlistRow, type WishlistRowCardProps } from '@/features/wishlist/components/WishlistRow'
@@ -17,9 +16,7 @@ import {
   useUpdateWishlistItem,
   useWishlist,
 } from '@/features/wishlist/hooks/useWishlist'
-import type { WishlistList } from '@/features/wishlist/mockTypes'
 import { useOttServices } from '@/hooks/useOttServices'
-import { getMockVariant } from '@/lib/mockScenario'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
 
 // 변경 요청이 실패했을 때 토스트로 알린다. 서버 문장(userMessage)이 있으면 그것을, 없으면 기본 문장을 쓴다
@@ -60,8 +57,8 @@ export function WishlistScreen() {
 }
 
 interface CardListProps {
-  items: WishlistList['items'] // 한 구역(계산에 쓸 작품 또는 다 봤음)의 항목
-  getCardProps: (item: WishlistList['items'][number]) => WishlistRowCardProps // 항목 하나의 카드 props
+  items: WishlistItemList['items'] // 한 구역(계산에 쓸 작품 또는 다 봤음)의 항목
+  getCardProps: (item: WishlistItemList['items'][number]) => WishlistRowCardProps // 항목 하나의 카드 props
   expandedId: number | null // 목록 전체에서 펼쳐진 항목의 id(두 구역을 통틀어 하나)
   onToggleExpanded: (wishlistItemId: number) => void // 카드의 "자세히 보기/접기"를 눌렀을 때
 }
@@ -73,7 +70,7 @@ interface CardListProps {
  * 묶는 일은 순수 계산이라 상태 없이 렌더링 중에 한다.
  */
 function CardList({ items, getCardProps, expandedId, onToggleExpanded }: CardListProps) {
-  const rows: WishlistList['items'][] = []
+  const rows: WishlistItemList['items'][] = []
   for (let index = 0; index < items.length; index += 2) {
     rows.push(items.slice(index, index + 2))
   }
@@ -93,7 +90,7 @@ function CardList({ items, getCardProps, expandedId, onToggleExpanded }: CardLis
 }
 
 interface WishlistContentProps {
-  list: WishlistList // 불러온 찜 목록(최근에 찜한 순)과 데이터 기준일
+  list: WishlistItemList // 불러온 찜 목록(최근에 찜한 순)과 데이터 기준일
   services: OttService[] // 서비스 목록 API의 7개 서비스
 }
 
@@ -149,7 +146,7 @@ function WishlistContent({ list, services }: WishlistContentProps) {
     )
   }
 
-  function getCardProps(item: WishlistList['items'][number]): WishlistRowCardProps {
+  function getCardProps(item: WishlistItemList['items'][number]): WishlistRowCardProps {
     return {
       item,
       statusEntries: buildServiceStatusEntries(sortedServices, item.availabilities),
@@ -203,15 +200,6 @@ function WishlistContent({ list, services }: WishlistContentProps) {
           </Button>
         )}
       </div>
-
-      <MockVariantBanner
-        decisionLabel="R11-19 드라마 찜 단위"
-        variant={getMockVariant()}
-        description={{
-          a: '드라마를 시즌 단위로 찜해요. 같은 드라마도 시즌마다 한 줄씩 보이고, 필요 시간은 그 시즌만 더한 값이에요.',
-          b: '드라마를 작품 단위로 묶어 한 줄로 보여요. 필요 시간은 모든 시즌을 더한 값이에요.',
-        }}
-      />
 
       <section aria-labelledby="wishlist-active-heading" className="grid gap-3">
         <h2 id="wishlist-active-heading" className="text-lg font-semibold">

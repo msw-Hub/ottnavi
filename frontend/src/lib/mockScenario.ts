@@ -60,14 +60,11 @@ export function getMockPageSize(): number | undefined {
 
 /*
  * ===== 목업 안 전환 (Task 028) =====
- * R11-18(환산 입력 저장)과 R11-19(드라마 찜 단위)는 사용자가 Task 030에서 정한다. 그때까지 두 안을 화면에서 비교할 수 있게
- * 결정마다 따로 주소 파라미터로 바꾼다(목업 모드에서만 동작). 기본은 둘 다 a(PRD 추천안)다.
+ * R11-18(환산 입력 저장)은 사용자가 Task 030에서 정한다. 그때까지 두 안을 화면에서 비교할 수 있게 주소 파라미터로 바꾼다
+ * (목업 모드에서만 동작). 기본은 a(PRD 추천안)다.
  * - ?mockVariantWatch=a|b  R11-18  a: 환산 결과를 분(monthlyWatchMinutes)으로만 저장 / b: "주 N회 × 회당 M시간" 입력값도 함께 저장
- * - ?mockVariant=a|b       R11-19  a: 드라마를 시즌 단위로 찜 / b: 드라마를 작품 단위로 표시
+ * R11-19(드라마 찜 단위)는 계약이 시즌 단위로 확정해(Task 031 6-3) 전환 값(?mockVariant=)을 없앴다.
  */
-
-// R11-19(드라마 찜 단위) 안을 고르는 쿼리 파라미터 이름. 예: /wishlist?mockVariant=b
-export const MOCK_VARIANT_PARAM = 'mockVariant'
 
 // R11-18(환산 입력 저장) 안을 고르는 쿼리 파라미터 이름. 예: /settings?mockVariantWatch=b
 export const MOCK_VARIANT_WATCH_PARAM = 'mockVariantWatch'
@@ -87,11 +84,6 @@ function readMockVariant(paramName: string): MockVariant {
   return parseMockVariant(new URLSearchParams(window.location.search).get(paramName))
 }
 
-// R11-19(드라마 찜 단위) 안: 화면 주소의 mockVariant 값
-export function getMockVariant(): MockVariant {
-  return readMockVariant(MOCK_VARIANT_PARAM)
-}
-
 // R11-18(환산 입력 저장) 안: 화면 주소의 mockVariantWatch 값
 export function getMockWatchVariant(): MockVariant {
   return readMockVariant(MOCK_VARIANT_WATCH_PARAM)
@@ -103,7 +95,6 @@ export function getMockWatchVariant(): MockVariant {
  */
 export function getMockVariantParams(): Record<string, string> {
   return {
-    ...(getMockVariant() === 'b' ? { [MOCK_VARIANT_PARAM]: 'b' } : {}),
     ...(getMockWatchVariant() === 'b' ? { [MOCK_VARIANT_WATCH_PARAM]: 'b' } : {}),
   }
 }
@@ -118,7 +109,6 @@ export function getMockRequestParams(): Record<string, string> {
 
 // ===== 목업 전환 값을 실어 보내는 요청 헤더 이름(Task 031 6-0) =====
 export const MOCK_SCENARIO_HEADER = 'X-Mock-Scenario' // ?mockScenario= 값
-export const MOCK_VARIANT_HEADER = 'X-Mock-Variant' // ?mockVariant=b 일 때 'b' (R11-19)
 export const MOCK_VARIANT_WATCH_HEADER = 'X-Mock-Variant-Watch' // ?mockVariantWatch=b 일 때 'b' (R11-18)
 export const MOCK_PAGE_SIZE_HEADER = 'X-Mock-Page-Size' // ?mockPageSize= 값(검색 한 페이지 크기를 줄여 "더보기" 확인)
 
@@ -134,9 +124,6 @@ export function getMockRequestHeaders(): Record<string, string> {
   return {
     ...(scenarioParams[MOCK_SCENARIO_PARAM]
       ? { [MOCK_SCENARIO_HEADER]: scenarioParams[MOCK_SCENARIO_PARAM] }
-      : {}),
-    ...(variantParams[MOCK_VARIANT_PARAM]
-      ? { [MOCK_VARIANT_HEADER]: variantParams[MOCK_VARIANT_PARAM] }
       : {}),
     ...(variantParams[MOCK_VARIANT_WATCH_PARAM]
       ? { [MOCK_VARIANT_WATCH_HEADER]: variantParams[MOCK_VARIANT_WATCH_PARAM] }

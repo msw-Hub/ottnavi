@@ -10,7 +10,6 @@ import type { AddWishlistItemRequest } from '@/api/generated/model'
 import {
   MOCK_PAGE_SIZE_HEADER,
   MOCK_SCENARIO_HEADER,
-  MOCK_VARIANT_HEADER,
   MOCK_VARIANT_WATCH_HEADER,
   parseMockVariant,
   type MockVariant,
@@ -25,11 +24,6 @@ import { getMockRole, readStored, writeStored } from '@/mocks/mockSession'
 // 요청 헤더에 지정한 시나리오(X-Mock-Scenario)가 붙어 있는지 확인한다
 export function hasMockScenario(request: Request, scenario: string): boolean {
   return request.headers.get(MOCK_SCENARIO_HEADER) === scenario
-}
-
-// 요청 헤더의 R11-19 목업 안(X-Mock-Variant: a|b)을 읽는다. 없으면 기본(a)이다
-export function getRequestMockVariant(request: Request): MockVariant {
-  return parseMockVariant(request.headers.get(MOCK_VARIANT_HEADER))
 }
 
 // 요청 헤더의 R11-18 목업 안(X-Mock-Variant-Watch: a|b)을 읽는다. 없으면 기본(a)이다
