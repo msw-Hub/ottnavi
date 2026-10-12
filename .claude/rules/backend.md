@@ -64,7 +64,7 @@ paths:
 - 기본 생성자는 `protected`로 막아 JPA 프록시 생성만 허용한다.
 - 필수 필드만 받는 생성자와 선택 필드까지 받는 생성자를 오버로드로 함께 둔다.
 - 공통 타임스탬프(`createdAt`/`updatedAt`)는 베이스 엔티티를 상속해서 처리한다.
-- PK는 `Long id` + `GenerationType.IDENTITY`를 기본으로 한다. 예외는 외부 ID를 그대로 PK로 쓰는 `tmdb_provider`, `genre`뿐이다.
+- PK는 `Long id` + `GenerationType.IDENTITY`를 기본으로 한다. 예외는 외부 ID를 그대로 PK로 쓰는 `tmdb_provider`, `genre`, 부모의 PK를 그대로 쓰는 `user_setting`, 복합 PK인 `product_component`·`title_genre`다.
 - enum은 `@Enumerated(EnumType.STRING)`으로 저장한다.
 - 연관관계는 단방향 `@ManyToOne(fetch = LAZY)`를 기본으로 하고, 양방향은 꼭 필요할 때만 둔다.
 - 파생 표시값은 `getXxxString()` 같은 메서드로 엔티티에 둔다.
