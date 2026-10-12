@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getTmdbImageUrl, TMDB_IMAGE_BASE_URL } from '@/lib/tmdbImage'
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 describe('getTmdbImageUrl', () => {
   it('상대 경로와 크기로 TMDB 이미지 URL을 만든다', () => {
@@ -23,4 +27,15 @@ describe('getTmdbImageUrl', () => {
       expect(getTmdbImageUrl(path, 'w342')).toBeNull()
     },
   )
+
+  // 목업 포스터는 외부 요청이 나가지 않게 SVG data URI를 posterPath 자리에 담는다. 목업 모드에서만 통과시킨다
+  it('목업 모드에서만 SVG data URI를 그대로 돌려준다', () => {
+    const dataUri = 'data:image/svg+xml;utf8,%3Csvg%3E%3C%2Fsvg%3E'
+    vi.stubEnv('VITE_USE_MOCK', 'false')
+    expect(getTmdbImageUrl(dataUri, 'w342')).toBeNull()
+    vi.stubEnv('VITE_USE_MOCK', 'true')
+    expect(getTmdbImageUrl(dataUri, 'w342')).toBe(dataUri)
+    // 목업 모드여도 다른 종류의 data URI는 받지 않는다
+    expect(getTmdbImageUrl('data:text/html,<b>x</b>', 'w342')).toBeNull()
+  })
 })

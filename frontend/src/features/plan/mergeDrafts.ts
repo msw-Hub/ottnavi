@@ -1,4 +1,4 @@
-import type { PlanDraft, PlanType } from '@/features/plan/mockTypes'
+import type { PlanDraft, PlanType } from '@/api/generated/model'
 
 /*
  * 선택이 같은 플랜 초안을 하나로 합쳐 보여 주기 위한 순수 함수다(PRD 11절 35번 "세 유형의 선택이 같으면 화면에서 하나로 합쳐 유형 이름을 함께 보여준다").
@@ -22,7 +22,7 @@ function toChoiceKey(draft: PlanDraft): string {
     draft.months.map((month) => ({
       products: month.products.map((product) => product.productId).sort((a, b) => a - b),
       assignments: month.assignments
-        .map((a) => [a.planItemId, a.ottServiceId, a.minutes])
+        .map((a) => [a.planItemId, a.ottServiceId, a.watchMin])
         .sort((x, y) => x[0] - y[0] || x[1] - y[1] || x[2] - y[2]),
     })),
   )

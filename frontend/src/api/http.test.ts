@@ -19,9 +19,9 @@ afterAll(() => server.close())
 beforeEach(() => vi.mocked(toast.error).mockClear())
 
 // 요청을 보내고, 실패하면 던져진 값을 돌려준다(성공하면 테스트 실패)
-async function catchRequestError(url: string): Promise<unknown> {
+async function catchRequestError(url: string, headers?: Record<string, string>): Promise<unknown> {
   try {
-    await AXIOS_INSTANCE.get(url)
+    await AXIOS_INSTANCE.get(url, { headers })
   } catch (error) {
     return error
   }
@@ -37,7 +37,9 @@ describe('응답 인터셉터 (MSW 목업 응답)', () => {
   })
 
   it('429 ProblemDetail을 ApiError로 정리하고 요청 제한 토스트를 한 번 띄운다', async () => {
-    const error = await catchRequestError('/public/ott-services?mockScenario=rate-limit')
+    const error = await catchRequestError('/public/ott-services', {
+      'X-Mock-Scenario': 'rate-limit',
+    })
 
     expect(error).toBeInstanceOf(ApiError)
     const apiError = error as ApiError

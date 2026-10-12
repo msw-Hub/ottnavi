@@ -1,6 +1,7 @@
-import { CircleCheckIcon, GiftIcon, RotateCcwIcon } from 'lucide-react'
+import { CircleCheckIcon, GiftIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
+import type { ServicePrice } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
 import { DataInsufficientTag } from '@/components/common/DataInsufficientTag'
 import { SUBSCRIPTION_STATUS_LABELS } from '@/components/common/displayTypes'
@@ -9,8 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useUpdatePricing } from '@/features/pricing/hooks/usePricing'
-import type { PricingService } from '@/features/pricing/mockTypes'
-import { formatWon } from '@/lib/format'
+import { getTodayDateString } from '@/lib/dateUtils'
+import { formatDataAsOf, formatWon } from '@/lib/format'
+import { isVerifiedStale } from '@/lib/priceFreshness'
 
 // 이 화면의 입력 폼 값. 입력 칸은 항상 문자열이라 문자열로 두고 제출할 때 숫자로 바꾼다
 interface PriceFormValues {
@@ -18,7 +20,7 @@ interface PriceFormValues {
 }
 
 interface PricingRowProps {
-  service: PricingService // 요금 한 줄(상품, 기본 요금, 내 금액, 적용 금액, 이용 상태)
+  service: ServicePrice // 요금 한 줄(상품, 기본 요금, 내 금액, 적용 금액, 이용 상태)
   serviceName: string // 서비스 이름(예: "넷플릭스"). 서비스 목록 API에서 온다
   isInsufficientData: boolean // 데이터 부족 서비스(쿠팡플레이)인지
   isLocked: boolean // 플랜 계산 중이라 금액을 바꾸지 못하게 잠글지(계산 도중 값이 바뀌면 결과가 어긋난다)
@@ -35,7 +37,7 @@ function toInputText(userPrice: number | null): string {
  * 표(<table>)를 쓰지 않고 한 벌의 목록 마크업을 CSS grid로 두 가지 모양에 쓰는 이유: 표와 카드를 따로 그리면 입력 칸이 두 벌이 되어
  * id·낭독기·폼 상태가 겹친다. 열 제목은 넓은 화면에서만 위에 한 번 보이고, 칸 라벨은 좁은 화면에서만 보인다(md:sr-only로 낭독기에는 항상 읽힘).
  *
- * 금액 입력: 0 이상의 정수(원). 비운 채로 "적용"을 누르면 고친 금액을 지우고 기본 요금으로 되돌린다(PATCH monthlyPrice: null).
+ * 금액 입력: 0 이상의 정수(원). 비운 채로 "적용"을 누르면 고친 금액을 지우고 기본 요금으로 되돌린다(DELETE /me/service-prices/{productId}).
  * 적용된 금액 옆에는 출처 라벨(기본 요금 / 사용자 수정)을 붙여, 이 금액이 요금표 값인지 내가 고친 값인지 알 수 있게 한다.
  */
 export function PricingRow({
@@ -52,6 +54,10 @@ export function PricingRow({
     formState: { errors, isDirty },
   } = useForm<PriceFormValues>({ defaultValues: { price: toInputText(service.userPrice) } })
 
+  // 확인일은 한국 날짜로 보인다. 날짜를 해석할 수 없으면 확인일 줄은 빼고, 오래된 요금으로 보아 안내만 띄운다(isVerifiedStale)
+  const lastVerifiedDate = formatDataAsOf(service.lastVerifiedAt)
+  const isPriceStale = isVerifiedStale(service.lastVerifiedAt, getTodayDateString())
+
   const inputId = `price-${service.ottServiceId}`
   const errorId = `${inputId}-error`
   const isFreeOrSubscribed =
@@ -61,14 +67,15 @@ export function PricingRow({
   const submit = handleSubmit(({ price }) => {
     const text = price.trim()
     update.mutate(
-      { ottServiceId: service.ottServiceId, monthlyPrice: text === '' ? null : Number(text) },
+      { productId: service.productId, monthlyPrice: text === '' ? null : Number(text) },
       {
-        onSuccess: (res) => {
-          reset({ price: toInputText(res.data.userPrice) })
+        // 되돌리기(DELETE, 204)는 본문이 없어 null이 온다
+        onSuccess: (updated) => {
+          reset({ price: toInputText(updated?.userPrice ?? null) })
           toast.success(
-            res.data.userPrice === null
+            updated?.userPrice == null
               ? `${serviceName} 요금을 기본 요금으로 되돌렸어요`
-              : `${serviceName} 요금을 ${formatWon(res.data.userPrice)}으로 바꿨어요`,
+              : `${serviceName} 요금을 ${formatWon(updated.userPrice)}으로 바꿨어요`,
           )
         },
       },
@@ -78,7 +85,7 @@ export function PricingRow({
   // "기본 요금으로 되돌리기" 버튼: 입력 칸을 비우고 바로 되돌린다
   function handleRestore() {
     update.mutate(
-      { ottServiceId: service.ottServiceId, monthlyPrice: null },
+      { productId: service.productId, monthlyPrice: null },
       {
         onSuccess: () => {
           reset({ price: '' })
@@ -97,6 +104,19 @@ export function PricingRow({
           {isInsufficientData && <DataInsufficientTag />}
         </p>
         <p className="text-sm text-muted-foreground">{service.productName}</p>
+        {/* 요금 확인일(관리자가 이 요금을 마지막으로 확인한 날, PRD 11절 41번). 90일을 넘으면 안내를 덧붙인다. 계산은 막지 않는다.
+            주의는 색만으로 알리지 않고 아이콘과 글자를 함께 쓴다 */}
+        {lastVerifiedDate && (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            요금 확인일 {lastVerifiedDate}
+          </p>
+        )}
+        {isPriceStale && (
+          <p className="flex items-start gap-1 text-sm font-semibold text-foreground">
+            <TriangleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            요금이 달라졌을 수 있어요. 실제 금액이 다르면 직접 수정해 주세요.
+          </p>
+        )}
         {/* 이용 상태: 구독 중·무료 이용이면 이번 달 비용이 달라질 수 있어 알린다. 아이콘 + 글자 */}
         {isFreeOrSubscribed && (
           <p className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-info">

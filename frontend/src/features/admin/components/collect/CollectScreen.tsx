@@ -21,7 +21,7 @@ import {
   useRestartCollect,
   useRunCollect,
 } from '@/features/admin/hooks/useAdminCollect'
-import type { CollectExecution, CollectTier } from '@/features/admin/mockTypes'
+import type { CollectExecution, CollectTier } from '@/api/generated/model'
 import { useOttServices } from '@/hooks/useOttServices'
 import { getTodayDateString } from '@/lib/dateUtils'
 import { getErrorMessage } from '@/lib/errorMessages'
@@ -67,7 +67,7 @@ export function CollectScreen() {
   const focusNonce = useRef(0)
 
   const today = getTodayDateString()
-  const list = executions.data?.executions ?? []
+  const list = executions.data?.content ?? [] // 이력은 페이지 형태라 content가 목록이다
   const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
   const lastSuccess = findLastSuccess(list)
 

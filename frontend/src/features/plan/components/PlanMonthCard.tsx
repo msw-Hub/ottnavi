@@ -13,7 +13,7 @@ import {
   formatAssignmentTitle,
   formatMonthLabel,
 } from '@/features/plan/planDisplay'
-import type { PlanAssignment, PlanMonth } from '@/features/plan/mockTypes'
+import type { PlanAssignment, PlanMonth } from '@/api/generated/model'
 import { formatMinutes, formatWon } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -139,7 +139,7 @@ export function PlanMonthCard({ month, serviceNames, withYear }: PlanMonthCardPr
                   <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground tabular-nums">
                     <span>{serviceNames.get(assignment.ottServiceId) ?? '서비스'}</span>
                     <span aria-hidden="true">·</span>
-                    <span>{formatMinutes(assignment.minutes)}</span>
+                    <span>{formatMinutes(assignment.watchMin)}</span>
                     <span aria-hidden="true">·</span>
                     <span>{WISHLIST_PRIORITY_LABELS[assignment.priority]}</span>
                   </p>

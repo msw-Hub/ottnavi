@@ -3,7 +3,7 @@ import { AdminStatusPill } from '@/features/admin/components/AdminStatusPill'
 import { formatIsoDate } from '@/lib/format'
 
 interface StaleVerifiedTagProps {
-  lastVerifiedDate: string | null // 월 구독요금의 마지막 확인일('YYYY-MM-DD'). 없거나 잘못된 값이면 "확인일 없음"으로 보인다
+  lastVerifiedDate: string | null // 월 구독요금의 마지막 확인 일시(또는 'YYYY-MM-DD'). 한국 날짜로 바꿔 보인다. 없거나 잘못된 값이면 "확인일 없음"으로 보인다
   className?: string // 놓이는 자리에 맞춘 여백 등을 덧붙일 때만 쓴다
 }
 

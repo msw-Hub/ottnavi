@@ -10,7 +10,7 @@ import {
   ProviderMappingRow,
   type ServiceChoice,
 } from '@/features/admin/components/providers/ProviderMappingRow'
-import type { AdminProvider } from '@/features/admin/mockTypes'
+import type { AdminProvider } from '@/api/generated/model'
 
 interface ProviderMappingTableProps {
   providers: AdminProvider[] // 보여 줄 제공처(필터·정렬이 끝난 목록)

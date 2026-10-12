@@ -6,29 +6,25 @@
  */
 import { HttpResponse } from 'msw'
 import type { ProblemDetail } from '@/api/generated/model'
-import type { AddWishlistItemRequest } from '@/features/search/mockTypes'
-import {
-  MOCK_SCENARIO_PARAM,
-  MOCK_VARIANT_PARAM,
-  MOCK_VARIANT_WATCH_PARAM,
-  parseMockVariant,
-  type MockVariant,
-} from '@/lib/mockScenario'
+import type { AddWishlistItemRequest } from '@/api/generated/model'
+import { MOCK_PAGE_SIZE_HEADER, MOCK_SCENARIO_HEADER } from '@/lib/mockScenario'
 import { getMockRole, readStored, writeStored } from '@/mocks/mockSession'
 
-// 요청 URL에 지정한 시나리오가 붙어 있는지 확인한다
+/*
+ * 화면 검토용 전환 값(시나리오·페이지 크기)은 API 계약에 없어 쿼리 파라미터가 아니라 요청 헤더(X-Mock-*)로 받는다.
+ * 헤더는 목업 모드에서 api/mockHeaders.ts의 요청 인터셉터가 붙인다(설명은 src/lib/mockScenario.ts).
+ */
+
+// 요청 헤더에 지정한 시나리오(X-Mock-Scenario)가 붙어 있는지 확인한다
 export function hasMockScenario(request: Request, scenario: string): boolean {
-  return new URL(request.url).searchParams.get(MOCK_SCENARIO_PARAM) === scenario
+  return request.headers.get(MOCK_SCENARIO_HEADER) === scenario
 }
 
-// 요청 URL의 R11-19 목업 안(?mockVariant=a|b)을 읽는다. 없으면 기본(a)이다
-export function getRequestMockVariant(request: Request): MockVariant {
-  return parseMockVariant(new URL(request.url).searchParams.get(MOCK_VARIANT_PARAM))
-}
-
-// 요청 URL의 R11-18 목업 안(?mockVariantWatch=a|b)을 읽는다. 없으면 기본(a)이다
-export function getRequestMockWatchVariant(request: Request): MockVariant {
-  return parseMockVariant(new URL(request.url).searchParams.get(MOCK_VARIANT_WATCH_PARAM))
+// 요청 헤더의 검색 한 페이지 크기(X-Mock-Page-Size, 1~100 정수)를 읽는다. 없거나 올바르지 않으면 undefined다
+export function getRequestMockPageSize(request: Request): number | undefined {
+  const raw = request.headers.get(MOCK_PAGE_SIZE_HEADER)
+  const size = Number(raw)
+  return raw !== null && Number.isInteger(size) && size >= 1 && size <= 100 ? size : undefined
 }
 
 // 백엔드 ProblemDetail과 같은 모양의 오류 응답을 만든다(Content-Type이 problem+json이어야 api/http.ts가 인식한다)

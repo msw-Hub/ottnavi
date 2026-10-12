@@ -1,17 +1,18 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { customInstance, isApiError } from '@/api/http'
+import { AXIOS_INSTANCE, customInstance, isApiError } from '@/api/http'
 import type {
   CommonResponseAdminProduct,
-  CommonResponseCollectChangeList,
+  CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecution,
-  CommonResponseCollectExecutionList,
-  CommonResponseRunCollectAccepted,
+  CommonResponseCollectExecutionPage,
+  CommonResponseCollectExecutionAccepted,
   CommonResponseAdminProvider,
   CommonResponseAdminProviderList,
   CommonResponseAdminProductList,
-} from '@/features/admin/mockTypes'
+} from '@/api/generated/model'
 import { addDays, getTodayDateString } from '@/lib/dateUtils'
+import { formatIsoDate } from '@/lib/format'
 import { resetMockAdminState } from '@/mocks/adminHandlers'
 import { handlers } from '@/mocks/handlers'
 
@@ -52,7 +53,7 @@ async function failureCodeOf(config: Parameters<typeof customInstance>[0]) {
 
 describe('월 구독요금 규칙 강제', () => {
   it('새 줄 시작일이 마지막 줄과 같으면 PRICE_START_DATE_DUPLICATE, 더 이르면 PRICE_START_DATE_NOT_AFTER_LAST', async () => {
-    const netflix = (await listProducts()).find((p) => p.id === NETFLIX_ID)!
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
     const lastStart = netflix.prices[netflix.prices.length - 1].effectiveFrom
     const url = `/admin/products/${NETFLIX_ID}/prices`
 
@@ -73,8 +74,8 @@ describe('월 구독요금 규칙 강제', () => {
   })
 
   it('가장 최근 줄이 아니면 수정·삭제할 수 없고, 줄이 하나뿐이면 삭제할 수 없다', async () => {
-    const netflix = (await listProducts()).find((p) => p.id === NETFLIX_ID)!
-    const oldestId = netflix.prices[0].id
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
+    const oldestId = netflix.prices[0].priceId
     expect(
       await failureCodeOf({
         url: `/admin/products/${NETFLIX_ID}/prices/${oldestId}`,
@@ -82,13 +83,22 @@ describe('월 구독요금 규칙 강제', () => {
       }),
     ).toBe('PRICE_NOT_LATEST')
 
-    const disney = (await listProducts()).find((p) => p.id === DISNEY_ID)!
+    const disney = (await listProducts()).find((p) => p.productId === DISNEY_ID)!
     expect(
       await failureCodeOf({
-        url: `/admin/products/${DISNEY_ID}/prices/${disney.prices[0].id}`,
+        url: `/admin/products/${DISNEY_ID}/prices/${disney.prices[0].priceId}`,
         method: 'DELETE',
       }),
     ).toBe('PRICE_LAST_ROW_CANNOT_DELETE')
+  })
+
+  it('가장 최근 줄을 삭제하면 204(본문 없음)이고 목록에서 줄이 하나 줄어든다', async () => {
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
+    const last = netflix.prices.at(-1)!
+    const res = await AXIOS_INSTANCE.delete(`/admin/products/${NETFLIX_ID}/prices/${last.priceId}`)
+    expect(res.status).toBe(204)
+    const after = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
+    expect(after.prices).toHaveLength(netflix.prices.length - 1)
   })
 
   it('등록할 때 첫 월 구독요금의 시작일이 오늘보다 뒤면 PRICE_FIRST_START_DATE_IN_FUTURE', async () => {
@@ -108,26 +118,29 @@ describe('월 구독요금 규칙 강제', () => {
   })
 
   it('[요금 확인함]은 지금 적용 중인 줄만 가능하다(지난·예정 줄은 409 PRICE_NOT_CURRENT)', async () => {
-    const netflix = (await listProducts()).find((p) => p.id === NETFLIX_ID)!
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
     const [past, current, upcoming] = netflix.prices
     const verify = (priceId: number) =>
       failureCodeOf({
         url: `/admin/products/${NETFLIX_ID}/prices/${priceId}/verify`,
         method: 'POST',
       })
-    expect(await verify(past.id)).toBe('PRICE_NOT_CURRENT')
-    expect(await verify(upcoming.id)).toBe('PRICE_NOT_CURRENT')
-    expect(await verify(current.id)).toBeNull()
+    expect(await verify(past.priceId)).toBe('PRICE_NOT_CURRENT')
+    expect(await verify(upcoming.priceId)).toBe('PRICE_NOT_CURRENT')
+    expect(await verify(current.priceId)).toBeNull()
   })
 
-  it('[요금 확인함]은 마지막 확인일만 오늘로 바꾼다', async () => {
-    const apple = (await listProducts()).find((p) => p.id === 103)! // 확인일이 90일을 넘은 상품
+  it('[요금 확인함]은 마지막 확인 일시만 지금으로 바꾼다(한국 날짜로는 오늘)', async () => {
+    const apple = (await listProducts()).find((p) => p.productId === 103)! // 확인일이 90일을 넘은 상품
     const row = apple.prices[0]
     const res = await customInstance<CommonResponseAdminProduct>({
-      url: `/admin/products/103/prices/${row.id}/verify`,
+      url: `/admin/products/103/prices/${row.priceId}/verify`,
       method: 'POST',
     })
-    expect(res.data.prices[0]).toEqual({ ...row, lastVerifiedAt: TODAY })
+    expect(res.data.prices[0]).toEqual({ ...row, lastVerifiedAt: expect.any(String) })
+    // 계약의 lastVerifiedAt은 일시(date-time)다. 화면과 같이 한국 날짜로 바꾸면 오늘이다
+    expect(res.data.prices[0].lastVerifiedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(formatIsoDate(res.data.prices[0].lastVerifiedAt)).toBe(TODAY)
   })
 })
 
@@ -136,14 +149,14 @@ describe('시나리오', () => {
     const empty = await customInstance<CommonResponseAdminProductList>({
       url: '/admin/products',
       method: 'GET',
-      params: { mockScenario: 'empty' },
+      headers: { 'X-Mock-Scenario': 'empty' },
     })
     expect(empty.data.products).toEqual([])
     expect(
       await failureCodeOf({
         url: '/admin/products',
         method: 'GET',
-        params: { mockScenario: 'error' },
+        headers: { 'X-Mock-Scenario': 'error' },
       }),
     ).toBe('INTERNAL_ERROR')
   })
@@ -174,10 +187,12 @@ describe('새로고침 뒤 유지', () => {
     server.use(...fresh.adminHandlers)
 
     const products = await listProducts()
-    expect(products.some((p) => p.id === created.data.id && p.name === '유지 확인용')).toBe(true)
-    expect(products.find((p) => p.id === DISNEY_ID)!.prices).toHaveLength(2)
+    expect(
+      products.some((p) => p.productId === created.data.productId && p.name === '유지 확인용'),
+    ).toBe(true)
+    expect(products.find((p) => p.productId === DISNEY_ID)!.prices).toHaveLength(2)
     // 건드리지 않은 상품은 기본 목록 그대로다
-    expect(products.find((p) => p.id === NETFLIX_ID)!.prices).toHaveLength(3)
+    expect(products.find((p) => p.productId === NETFLIX_ID)!.prices).toHaveLength(3)
 
     fresh.resetMockAdminState()
     expect(window.sessionStorage.getItem('ottnavi:mock-admin-products')).toBeNull()
@@ -243,7 +258,7 @@ describe('제공처 매핑', () => {
       await failureCodeOf({
         url: '/admin/providers/283',
         method: 'PATCH',
-        params: { mockScenario: 'save-error' },
+        headers: { 'X-Mock-Scenario': 'save-error' },
         data: { mappingState: 'IGNORED', ottServiceId: null, tier: 'STANDARD' },
       }),
     ).toBe('INTERNAL_ERROR')
@@ -271,20 +286,46 @@ describe('제공처 매핑', () => {
 
 describe('수집 실행·이력', () => {
   async function listExecutions() {
-    const res = await customInstance<CommonResponseCollectExecutionList>({
-      url: '/admin/collect',
+    const res = await customInstance<CommonResponseCollectExecutionPage>({
+      url: '/admin/collect/executions',
       method: 'GET',
     })
-    return res.data.executions
+    return res.data.content
   }
 
   async function run(targetDate: string) {
-    return customInstance<CommonResponseRunCollectAccepted>({
-      url: '/admin/collect',
+    return customInstance<CommonResponseCollectExecutionAccepted>({
+      url: '/admin/collect/executions',
       method: 'POST',
       data: { targetDate, tier: 'ALL' },
     })
   }
+
+  it('이력은 페이지 형태(content/page/size/totalElements/totalPages)다', async () => {
+    const res = await customInstance<CommonResponseCollectExecutionPage>({
+      url: '/admin/collect/executions',
+      method: 'GET',
+      params: { page: 0, size: 2 },
+    })
+    expect(res.data).toMatchObject({ page: 0, size: 2, totalElements: 5, totalPages: 3 })
+    expect(res.data.content.map((e) => e.executionId)).toEqual([5, 4])
+
+    const bad = await customInstance({
+      url: '/admin/collect/executions',
+      method: 'GET',
+      params: { size: 101 },
+    }).catch((e: unknown) => e)
+    expect(bad).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+  })
+
+  it('targetDate를 비우고 실행하면 오늘로 본다(오늘 실행 중인 5번이 있어 409다)', async () => {
+    const error = await customInstance({
+      url: '/admin/collect/executions',
+      method: 'POST',
+      data: { tier: 'ALL' },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 409, errorCode: 'BATCH_ALREADY_RUNNING' })
+  })
 
   it('기본 이력은 5건이고 최신 순이다', async () => {
     const list = await listExecutions()
@@ -300,11 +341,12 @@ describe('수집 실행·이력', () => {
     expect(second.status).toBe('COMPLETED')
     expect(second.changedCount).toBe(2)
 
-    const changes = await customInstance<CommonResponseCollectChangeList>({
-      url: `/admin/collect/${id}/changes`,
+    const changes = await customInstance<CommonResponseCollectExecutionChangePage>({
+      url: `/admin/collect/executions/${id}/changes`,
       method: 'GET',
     })
-    expect(changes.data.changes).toHaveLength(2)
+    expect(changes.data.content).toHaveLength(2)
+    expect(changes.data.totalElements).toBe(2)
   })
 
   it('기본 이력의 실행 중(5번)은 계속 실행 중으로 남는다', async () => {
@@ -317,7 +359,7 @@ describe('수집 실행·이력', () => {
   it('같은 날짜·범위 판정: 실행 중 / 성공 / 중단됨 모두 409 코드로 막는다', async () => {
     const post = (date: string) =>
       failureCodeOf({
-        url: '/admin/collect',
+        url: '/admin/collect/executions',
         method: 'POST',
         data: { targetDate: date, tier: 'ALL' },
       })
@@ -329,14 +371,14 @@ describe('수집 실행·이력', () => {
   it('범위는 ALL만, 날짜는 오늘 이하만 받는다(400)', async () => {
     expect(
       await failureCodeOf({
-        url: '/admin/collect',
+        url: '/admin/collect/executions',
         method: 'POST',
         data: { targetDate: addDays(TODAY, -9), tier: 'DAILY' },
       }),
     ).toBe('VALIDATION_FAILED')
     expect(
       await failureCodeOf({
-        url: '/admin/collect',
+        url: '/admin/collect/executions',
         method: 'POST',
         data: { targetDate: addDays(TODAY, 1), tier: 'ALL' },
       }),
@@ -344,17 +386,17 @@ describe('수집 실행·이력', () => {
   })
 
   it('복구는 중단됨만 가능하고, 복구한 실행은 실패가 되어 다시 실행할 수 있다(새 실행 ID)', async () => {
-    expect(await failureCodeOf({ url: '/admin/collect/4/recover', method: 'POST' })).toBe(
-      'BATCH_NOT_STOPPED',
-    )
+    expect(
+      await failureCodeOf({ url: '/admin/collect/executions/4/recover', method: 'POST' }),
+    ).toBe('BATCH_NOT_STOPPED')
     const recovered = await customInstance<CommonResponseCollectExecution>({
-      url: '/admin/collect/3/recover',
+      url: '/admin/collect/executions/3/recover',
       method: 'POST',
     })
     expect(recovered.data.status).toBe('FAILED')
 
-    const restarted = await customInstance<CommonResponseRunCollectAccepted>({
-      url: '/admin/collect/3/restart',
+    const restarted = await customInstance<CommonResponseCollectExecutionAccepted>({
+      url: '/admin/collect/executions/3/restart',
       method: 'POST',
     })
     expect(restarted.data.executionId).toBe(6) // 이력의 최대 ID(5) + 1
@@ -370,9 +412,9 @@ describe('수집 실행·이력', () => {
   it('?mockScenario=run-error는 실행만 500이고 이력은 정상이다', async () => {
     expect(
       await failureCodeOf({
-        url: '/admin/collect',
+        url: '/admin/collect/executions',
         method: 'POST',
-        params: { mockScenario: 'run-error' },
+        headers: { 'X-Mock-Scenario': 'run-error' },
         data: { targetDate: addDays(TODAY, -6), tier: 'ALL' },
       }),
     ).toBe('INTERNAL_ERROR')

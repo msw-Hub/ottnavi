@@ -1,4 +1,4 @@
-import type { CastMember } from '@/features/title-detail/mockTypes'
+import type { CastMember } from '@/api/generated/model'
 
 interface CastListProps {
   cast: CastMember[] // 주요 출연진(상위 10명까지)

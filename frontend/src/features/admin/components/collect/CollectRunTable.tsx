@@ -20,7 +20,7 @@ import {
 import { CollectRunDetail } from '@/features/admin/components/collect/CollectRunDetail'
 import { RunStatusBadge } from '@/features/admin/components/RunStatusBadge'
 import { canRecover, canRestart, COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
-import type { CollectExecution } from '@/features/admin/mockTypes'
+import type { CollectExecution } from '@/api/generated/model'
 import { formatIsoDate, formatDateTime, formatElapsed } from '@/lib/format'
 
 // "이력에서 보기"가 요청한 행 포커스. nonce가 바뀌면 새 요청이다(같은 행을 다시 눌러도 다시 이동한다)

@@ -10,12 +10,12 @@ import {
   isVerifiedStale,
   sortPricesAscending,
 } from '@/features/admin/priceRules'
-import type { AdminProductPrice } from '@/features/admin/mockTypes'
+import type { AdminProductPrice } from '@/api/generated/model'
 
 const TODAY = '2026-10-11'
 
-function row(id: number, effectiveFrom: string): AdminProductPrice {
-  return { id, monthlyPrice: 10000, effectiveFrom, lastVerifiedAt: '2026-10-01' }
+function row(priceId: number, effectiveFrom: string): AdminProductPrice {
+  return { priceId, monthlyPrice: 10000, effectiveFrom, lastVerifiedAt: '2026-10-01' }
 }
 
 // 지난 줄 / 지금 적용 중 / 예정
@@ -45,14 +45,14 @@ describe('종료일·적용 구분', () => {
   })
 
   it('지금 적용 중인 줄을 찾고, 전부 예정이면 null이다', () => {
-    expect(getCurrentPrice(ROWS, TODAY)?.id).toBe(2)
+    expect(getCurrentPrice(ROWS, TODAY)?.priceId).toBe(2)
     expect(getCurrentPrice([row(1, '2026-12-01')], TODAY)).toBeNull()
   })
 
   it('시작일 오름차순으로 정렬한 새 배열을 돌려준다', () => {
     const shuffled = [ROWS[2], ROWS[0], ROWS[1]]
-    expect(sortPricesAscending(shuffled).map((r) => r.id)).toEqual([1, 2, 3])
-    expect(shuffled[0].id).toBe(3)
+    expect(sortPricesAscending(shuffled).map((r) => r.priceId)).toEqual([1, 2, 3])
+    expect(shuffled[0].priceId).toBe(3)
   })
 })
 

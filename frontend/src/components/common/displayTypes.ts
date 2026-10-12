@@ -8,10 +8,15 @@
  * - 문구 표(Record)를 컴포넌트 파일에서 export하면 개발 서버의 빠른 새로고침(react-refresh) 규칙에 걸려,
  *   컴포넌트 파일과 분리했다.
  */
+import type {
+  AvailabilityStatus,
+  PriceSource,
+  ServiceSubscriptionStatus,
+  WishlistPriority,
+} from '@/api/generated/model'
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD availability.status 값: AVAILABLE / NOT_AVAILABLE / UNKNOWN)
-// 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태
-export type AvailabilityStatus = 'AVAILABLE' | 'NOT_AVAILABLE' | 'UNKNOWN'
+// 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태(확정 계약의 생성 타입을 그대로 쓴다, Task 031 6-6)
+export type { AvailabilityStatus }
 
 // 제공 상태별 화면 글자. 색을 구분하지 못해도 이 글자로 상태를 읽을 수 있어야 한다(frontend.md 화면 표시 규칙)
 export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
@@ -20,13 +25,12 @@ export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
   UNKNOWN: '모름',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD plan_month_product.price_source 값)
-// 플랜 계산에 쓴 금액이 어디서 왔는지
+// 플랜 계산에 쓴 금액이 어디서 왔는지(확정 계약의 생성 타입 PriceSource를 그대로 쓴다, Task 031 6-5)
 // - ADMIN: 관리자가 등록한 요금표의 기본 금액
 // - USER_OVERRIDE: 사용자가 직접 고친 금액
 // - ALREADY_PAID: 이미 구독 중이라 이번 달 비용에 넣지 않음
 // - FREE: 가족 공유 등으로 무료로 이용 중
-export type PriceSource = 'ADMIN' | 'USER_OVERRIDE' | 'ALREADY_PAID' | 'FREE'
+export type { PriceSource }
 
 // 가격 출처별 화면 글자(사용자 확정 문구, 2026-10-09)
 export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
@@ -36,9 +40,8 @@ export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
   FREE: '무료',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (PRD FR-09 찜 우선순위: 꼭 볼 작품 / 보고 싶음 / 여유될 때)
-// 찜 표시 컴포넌트(WishlistButton)가 받는 값이다. 기능 폴더(features/*/mockTypes.ts)의 같은 이름 타입과 문자열이 같다
-export type WishlistPriority = 'MUST' | 'WANT' | 'MAYBE'
+// 찜 우선순위(PRD FR-09: 꼭 볼 작품 / 보고 싶음 / 여유될 때). 확정 계약의 생성 타입을 그대로 쓴다(Task 031 6-6)
+export type { WishlistPriority }
 
 // 우선순위 선택지. 순서가 화면에 보이는 순서다
 export const WISHLIST_PRIORITY_OPTIONS: { value: WishlistPriority; label: string }[] = [
@@ -54,10 +57,9 @@ export const WISHLIST_PRIORITY_LABELS: Record<WishlistPriority, string> = {
   MAYBE: '여유될 때',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD user_subscription.status는 SUBSCRIBED / FREE이고 미구독은 행이 없다)
-// 온보딩에서 사용자가 서비스마다 고르는 이용 상태. UNKNOWN은 "아직 모르겠음"을 담는 화면 전용 값이다(ERD에는 없어 계약에서 확정 필요)
-// - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독
-export type ServiceSubscriptionStatus = 'SUBSCRIBED' | 'FREE' | 'NOT_SUBSCRIBED' | 'UNKNOWN'
+// 온보딩에서 사용자가 서비스마다 고르는 이용 상태. 확정 계약의 생성 타입을 그대로 쓴다(Task 031 6-4).
+// - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독 / UNKNOWN: 아직 모르겠음
+export type { ServiceSubscriptionStatus }
 
 // 이용 상태별 화면 글자
 export const SUBSCRIPTION_STATUS_LABELS: Record<ServiceSubscriptionStatus, string> = {

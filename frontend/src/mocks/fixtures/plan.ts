@@ -25,8 +25,8 @@ import type {
   UnscheduledItem,
   UnscheduledReason,
   WishlistPriority,
-} from '@/features/plan/mockTypes'
-import type { UserSettings } from '@/features/onboarding/mockTypes'
+} from '@/api/generated/model'
+import type { UserSettings } from '@/api/generated/model'
 import { MOCK_DATA_AS_OF } from '@/mocks/fixtures/titles'
 
 // 플랜 응답 시나리오(주소의 ?mockScenario= 값과 같은 이름)
@@ -156,7 +156,7 @@ const TVING = 4
 // 찜한 작품을 볼 수 있는 서비스(목업 가정: 넷플릭스·티빙). 절감액 기준(allSubscribeCost)에 쓴다
 const CANDIDATE_SERVICE_IDS = [NETFLIX, TVING]
 
-// 시즌 순서 규칙(같은 시리즈는 앞 시즌을 먼저 다 본다)은 엔진 미정, 사용자 결정 대기.
+// 시즌 순서 규칙(같은 시리즈는 앞 시즌을 먼저 다 본다, PRD 11절 37번)은 엔진에 구현돼 있다.
 // 아래 배정표는 목업 데이터 보정일 뿐이다. 오징어 게임 시즌 2가 시즌 3보다 앞선 달에 오도록 손으로 맞췄고,
 // fixtures/plan.test.ts가 세 유형·same 시나리오 모두에서 이 순서가 지켜지는지 확인한다.
 const RECOMMENDED_SPEC: PlanSpec = {
@@ -341,7 +341,7 @@ function buildDraft(
         priority: item.priority,
         // 작품을 보는 서비스는 그 달 구독 서비스다(구독이 없는 달에는 배정이 없다)
         ottServiceId: monthSpec.serviceId ?? 0,
-        minutes,
+        watchMin: minutes,
         segmentIndex,
         segmentCount: segmentCounts.get(key) ?? 1,
         isContinuation: segmentIndex > 1,
@@ -381,14 +381,19 @@ function buildDraft(
   const score = completedKeys.reduce((sum, key) => sum + SCORE_BY_PRIORITY[ITEMS[key].priority], 0)
 
   const totalCost = months.reduce((sum, month) => sum + month.cost, 0)
-  // 절감액 기준(추천안, 사용자 결정 대기 - Task 030에서 확정): 모든 플랜 유형에 같은 기준을 쓴다.
+  // 절감액 기준(PRD 11절 38번): 모든 플랜 유형에 같은 기준을 쓴다.
   // 기준 = 찜한(안 다 본) 작품을 볼 수 있는 서비스 전부(CANDIDATE_SERVICE_IDS)를 3개월 내내 적용 금액
   // (기본 요금, 사용자가 고친 금액이 있으면 그 금액)으로 구독했을 때의 비용이다.
+  // 총비용과 같은 규칙을 쓴다: 무료 이용(FREE) 서비스는 모든 달 0원, 구독 중(SUBSCRIBED) 서비스는 이번 달(0번째 달)만 0원이다.
   // 플랜이 실제로 고른 서비스로 기준을 잡으면 유형마다 기준이 달라져 절감액을 서로 비교할 수 없다.
   // 이 방식이면 같은 계산 안에서 세 유형의 allSubscribeCost가 같고, 절감액 차이는 총비용 차이뿐이다.
-  const allSubscribeCost =
-    CANDIDATE_SERVICE_IDS.reduce((sum, id) => sum + context.getPriceInfo(id).price, 0) *
-    MONTHS.length
+  const allSubscribeCost = CANDIDATE_SERVICE_IDS.reduce((sum, id) => {
+    const status = getSubscriptionStatus(context.settings, id)
+    const { price } = context.getPriceInfo(id)
+    if (status === 'FREE') return sum
+    if (status === 'SUBSCRIBED') return sum + price * (MONTHS.length - 1)
+    return sum + price * MONTHS.length
+  }, 0)
 
   return {
     planId,

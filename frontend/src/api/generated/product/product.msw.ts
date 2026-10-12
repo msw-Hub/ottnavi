@@ -3,8 +3,9 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - 아직 구현하지 않은 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시한다(Task 031).
- * - 성공 응답은 `CommonResponse` 래퍼, 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
  * OpenAPI spec version: 0.1.0
  */
@@ -17,11 +18,17 @@ import type {
 } from 'msw';
 
 import type {
-  CommonResponseOttServiceList
+  CommonResponseOttServiceList,
+  CommonResponseServicePrice,
+  CommonResponseServicePriceList
 } from '../model';
 
 
 export const getListOttServicesResponseMock = (): CommonResponseOttServiceList => ({"success":true,"data":[{"ottServiceId":1,"code":"NETFLIX","name":"넷플릭스","logoPath":"/rK1KljqmbvO9HQa1PBFLILWah72.png","displayOrder":1,"dataQuality":"NORMAL"},{"ottServiceId":2,"code":"DISNEY_PLUS","name":"디즈니+","logoPath":"/5eZ872CghnHFLB1j8grszbrx0dx.png","displayOrder":2,"dataQuality":"NORMAL"},{"ottServiceId":3,"code":"APPLE_TV_PLUS","name":"애플 TV+","logoPath":"/9icYBfYFcwgCbky5VdGUIKJ4C5i.png","displayOrder":3,"dataQuality":"NORMAL"},{"ottServiceId":4,"code":"TVING","name":"티빙","logoPath":"/w4ov8Zx73eu2TjHsDs5EmiuYKA4.png","displayOrder":4,"dataQuality":"NORMAL"},{"ottServiceId":5,"code":"WAVVE","name":"웨이브","logoPath":"/mh1vBeclG7Eq15TjRnmyustqp3v.png","displayOrder":5,"dataQuality":"NORMAL"},{"ottServiceId":6,"code":"WATCHA","name":"왓챠","logoPath":"/ppQIS7UMtBwJSspSoGqDR8wO1Gr.png","displayOrder":6,"dataQuality":"NORMAL"},{"ottServiceId":7,"code":"COUPANG_PLAY","name":"쿠팡플레이","logoPath":"/bP0TPAhxmSdIthEWbzdI1NQB4C2.png","displayOrder":7,"dataQuality":"INSUFFICIENT"}]})
+
+export const getListMyServicePricesResponseMock = (): CommonResponseServicePriceList => ({"success":true,"data":{"services":[{"ottServiceId":1,"productId":101,"productName":"넷플릭스 스탠다드","adminPrice":13500,"userPrice":null,"appliedPrice":13500,"priceSource":"ADMIN","subscriptionStatus":"SUBSCRIBED","effectiveFrom":"2026-10-02","lastVerifiedAt":"2026-10-07T09:00:00+09:00"},{"ottServiceId":3,"productId":103,"productName":"애플 TV+","adminPrice":6500,"userPrice":null,"appliedPrice":6500,"priceSource":"ADMIN","subscriptionStatus":"NOT_SUBSCRIBED","effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-06-14T09:00:00+09:00"},{"ottServiceId":5,"productId":105,"productName":"웨이브 스탠다드","adminPrice":10900,"userPrice":9900,"appliedPrice":9900,"priceSource":"USER_OVERRIDE","subscriptionStatus":"NOT_SUBSCRIBED","effectiveFrom":"2026-04-15","lastVerifiedAt":"2026-10-05T09:00:00+09:00"}]}})
+
+export const getSetMyServicePriceResponseMock = (): CommonResponseServicePrice => ({"success":true,"data":{"ottServiceId":5,"productId":105,"productName":"웨이브 스탠다드","adminPrice":10900,"userPrice":9900,"appliedPrice":9900,"priceSource":"USER_OVERRIDE","subscriptionStatus":"NOT_SUBSCRIBED","effectiveFrom":"2026-04-15","lastVerifiedAt":"2026-10-05T09:00:00+09:00"}})
 
 
 export const getListOttServicesMockHandler = (overrideResponse?: CommonResponseOttServiceList | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseOttServiceList> | CommonResponseOttServiceList), options?: RequestHandlerOptions) => {
@@ -35,6 +42,43 @@ export const getListOttServicesMockHandler = (overrideResponse?: CommonResponseO
       })
   }, options)
 }
+
+export const getListMyServicePricesMockHandler = (overrideResponse?: CommonResponseServicePriceList | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseServicePriceList> | CommonResponseServicePriceList), options?: RequestHandlerOptions) => {
+  return http.get('/api/me/service-prices', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListMyServicePricesResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getSetMyServicePriceMockHandler = (overrideResponse?: CommonResponseServicePrice | ((info: Parameters<Parameters<typeof http.put>[1]>[0]) => Promise<CommonResponseServicePrice> | CommonResponseServicePrice), options?: RequestHandlerOptions) => {
+  return http.put('/api/me/service-prices/:productId', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getSetMyServicePriceResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getResetMyServicePriceMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.delete>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.delete('/api/me/service-prices/:productId', async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+
+    return new HttpResponse(null,
+      { status: 204
+      })
+  }, options)
+}
 export const getProductMock = () => [
-  getListOttServicesMockHandler()
+  getListOttServicesMockHandler(),
+  getListMyServicePricesMockHandler(),
+  getSetMyServicePriceMockHandler(),
+  getResetMyServicePriceMockHandler()
 ]

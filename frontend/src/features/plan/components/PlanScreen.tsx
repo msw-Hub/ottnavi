@@ -24,8 +24,8 @@ import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
 import { UnscheduledList } from '@/features/plan/components/UnscheduledList'
 import { useCalculatePlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
-import type { PlanDraft, PlanType } from '@/features/plan/mockTypes'
-import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
+import type { PlanDraft, PlanType } from '@/api/generated/model'
+import { hasSeveralSeasonsOfOneSeries, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
@@ -110,9 +110,9 @@ export function PlanScreen() {
         onRecalculate={() =>
           calculate.mutate(undefined, { onSuccess: () => setHasRecalculatedNotice(false) })
         }
-        onSave={(planType, planId) =>
+        onSave={(planId) =>
           save.mutate(
-            { planType, planId },
+            { planId },
             {
               onSuccess: (result) => {
                 if (result.kind === 'saved') {
@@ -149,7 +149,7 @@ interface PlanResultProps {
   saveError: unknown // 저장 실패 원인. 없으면 null
   hasRecalculatedNotice: boolean // 저장 중 자동 재계산이 있었는지
   onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
-  onSave: (planType: PlanType, planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 첫 유형의 값을 넘긴다
+  onSave: (planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 그중 첫 초안의 planId를 넘긴다(유형은 서버가 planId로 안다)
 }
 
 // 초안이 있을 때의 결과 화면: 유형 선택 → 요약 → 달별 카드 → 남은 작품 → 기준일·출처 → 저장
@@ -278,6 +278,12 @@ function PlanResult({
         <div className="grid gap-1.5 border-t border-border pt-4">
           <SourceAttribution />
           <DataAsOf value={draft.dataAsOf} />
+          {/* 계산 기준 안내: 같은 드라마의 시즌이 둘 이상 들어 있으면 순서 규칙을 한 줄로 알린다(확정 문구, PRD SCR-08·11절 37번) */}
+          {hasSeveralSeasonsOfOneSeries(draft) && (
+            <p className="text-sm text-muted-foreground">
+              같은 드라마는 앞 시즌부터 보는 순서로 계산해요.
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             제공 여부와 요금은 확인된 범위이며, 실제와 다를 수 있습니다. 새로 가입한 서비스는 가입
             직후 해지 예약을 해 두면 다음 달 자동 결제를 피할 수 있는지 서비스에서 확인해 보세요.
@@ -299,7 +305,7 @@ function PlanResult({
           type="button"
           size="lg"
           disabled={isBusy}
-          onClick={() => onSave(selectedGroup.planTypes[0], draft.planId)}
+          onClick={() => onSave(draft.planId)}
           className="h-12 w-full text-base md:w-auto md:px-6"
         >
           {isSaving ? (

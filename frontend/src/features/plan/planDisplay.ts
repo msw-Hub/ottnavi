@@ -11,12 +11,7 @@ import {
   WalletIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type {
-  PlanAssignment,
-  PlanDraft,
-  PlanType,
-  UnscheduledReason,
-} from '@/features/plan/mockTypes'
+import type { PlanAssignment, PlanDraft, PlanType, UnscheduledReason } from '@/api/generated/model'
 
 // 플랜 유형 이름(PRD 11절 35번)
 export const PLAN_TYPE_LABELS: Record<PlanType, string> = {
@@ -79,6 +74,25 @@ export interface SplitSeasonSummary {
  * 조각이 둘 이상(segmentCount > 1)인 작품을 찾아 달 순서대로 묶는다 → "나눠 보는 시즌" 요약 박스의 재료.
  * 단순히 모든 배정을 훑으면 같은 작품이 달마다 따로 나오는데, 사용자는 "이 시즌이 몇 월에 어디서 이어지는지"를 한눈에 보고 싶어 한다.
  */
+/**
+ * 이 플랜에 같은 드라마의 시즌이 둘 이상 들어 있는지(배정된 것과 남은 작품을 함께 본다). 시즌 순서 안내 한 줄을 보일지 정하는 데 쓴다.
+ * 같은 드라마의 같은 시즌이 달을 나눠 여러 조각으로 들어 있는 경우는 한 시즌으로 센다(planItemId가 같다).
+ */
+export function hasSeveralSeasonsOfOneSeries(
+  draft: Pick<PlanDraft, 'months' | 'unscheduled'>,
+): boolean {
+  const seasonsBySeries = new Map<string, Set<number>>()
+  const items = [...draft.months.flatMap((month) => month.assignments), ...draft.unscheduled]
+  for (const item of items) {
+    if (item.mediaType !== 'tv' || item.seasonNumber === null) continue
+    const key = `${item.mediaType}:${item.tmdbId}`
+    const seasons = seasonsBySeries.get(key) ?? new Set<number>()
+    seasons.add(item.seasonNumber)
+    seasonsBySeries.set(key, seasons)
+  }
+  return [...seasonsBySeries.values()].some((seasons) => seasons.size >= 2)
+}
+
 export function collectSplitSeasons(draft: PlanDraft): SplitSeasonSummary[] {
   const byItem = new Map<number, SplitSeasonSummary>()
   for (const month of draft.months) {

@@ -1,4 +1,4 @@
-import type { MediaType, WishlistPriority } from '@/features/title-detail/mockTypes'
+import type { MediaType, WishlistPriority } from '@/api/generated/model'
 
 // 작품 구분 글자(영화 / 드라마)
 export const MEDIA_TYPE_LABELS: Record<MediaType, string> = {

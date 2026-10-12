@@ -3,6 +3,7 @@ import { act, renderHook, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'sonner'
 import { customInstance } from '@/api/http'
 import { useWishlistItem } from '@/features/title-detail/hooks/useWishlistItem'
 import { setMockRole } from '@/mocks/mockSession'
@@ -14,6 +15,8 @@ import { setMockRole } from '@/mocks/mockSession'
  */
 
 vi.mock('@/api/http', () => ({ customInstance: vi.fn() }))
+// 토스트가 실제로 그려지는지가 아니라 "어떤 문구와 버튼으로 요청했는지"를 본다
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 const WISHLIST_STATE_KEY = ['mock-wishlist-state']
 const TARGET = { mediaType: 'movie', tmdbId: 496243, seasonNumber: null } as const
@@ -81,11 +84,53 @@ describe('useWishlistItem 로그인 가드', () => {
     expect(result.current.priority).toBe('MUST')
     act(() => result.current.onRemove())
     // mutation은 비동기로 시작하므로 요청이 나갈 때까지 기다린다
+    // 생성 훅이 signal 같은 값을 함께 넘기므로 주소와 메서드만 확인한다
     await waitFor(() =>
-      expect(customInstance).toHaveBeenCalledWith({
+      expect(vi.mocked(customInstance).mock.calls[0]?.[0]).toMatchObject({
         url: '/me/wishlist-items/7',
         method: 'DELETE',
       }),
     )
+  })
+})
+
+describe('useWishlistItem 찜 20개 제한(409)', () => {
+  beforeEach(() => vi.mocked(toast.error).mockClear())
+
+  it('찜 추가가 409 WISHLIST_LIMIT_EXCEEDED면 서버 문구 토스트와 [찜 목록 가기] 버튼을 띄운다', async () => {
+    setMockRole('USER')
+    const userMessage = '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.'
+    vi.mocked(customInstance).mockRejectedValue({
+      status: 409,
+      errorCode: 'WISHLIST_LIMIT_EXCEEDED',
+      userMessage,
+    })
+    const { result } = setup()
+
+    act(() => result.current.onAdd())
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    const [message, options] = vi.mocked(toast.error).mock.calls[0]
+    expect(message).toBe(userMessage)
+    expect(options).toMatchObject({ action: { label: '찜 목록 가기' } })
+
+    // 버튼을 누르면 찜 목록으로 이동한다
+    const { action } = options as unknown as { action: { onClick: () => void } }
+    act(() => action.onClick())
+    expect(screen.getByTestId('location')).toHaveTextContent('/wishlist')
+  })
+
+  it('다른 오류는 [찜 목록 가기] 없이 문구만 토스트로 알린다', async () => {
+    setMockRole('USER')
+    vi.mocked(customInstance).mockRejectedValue({
+      status: 500,
+      errorCode: 'INTERNAL_ERROR',
+      userMessage: '일시적인 오류가 발생했습니다.',
+    })
+    const { result } = setup()
+
+    act(() => result.current.onAdd())
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('일시적인 오류가 발생했습니다.'))
   })
 })

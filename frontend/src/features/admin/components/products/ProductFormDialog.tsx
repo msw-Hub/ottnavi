@@ -19,7 +19,7 @@ import {
   useCreateAdminProduct,
   useUpdateAdminProduct,
 } from '@/features/admin/hooks/useAdminProducts'
-import type { AdminProduct } from '@/features/admin/mockTypes'
+import type { AdminProduct } from '@/api/generated/model'
 import {
   checkFirstPriceStartDate,
   checkMonthlyPriceText,
@@ -131,7 +131,7 @@ function CreateForm({
         onSuccess: (product) => {
           toast.success('OTT 구독상품을 등록했어요')
           onClose()
-          onCreated(product.id)
+          onCreated(product.productId)
         },
         onError: (error) => {
           if (isApiError(error) && error.errorCode === 'PRICE_FIRST_START_DATE_IN_FUTURE') {
@@ -284,12 +284,16 @@ function EditForm({ product, onClose }: { product: AdminProduct; onClose: () => 
     setError,
     formState: { errors },
   } = useForm<EditFormValues>({
-    defaultValues: { name: product.name, salesStatus: product.active ? 'ACTIVE' : 'ENDED' },
+    defaultValues: { name: product.name, salesStatus: product.isActive ? 'ACTIVE' : 'ENDED' },
   })
 
   const submit = handleSubmit((values) => {
     update.mutate(
-      { productId: product.id, name: values.name.trim(), active: values.salesStatus === 'ACTIVE' },
+      {
+        productId: product.productId,
+        name: values.name.trim(),
+        isActive: values.salesStatus === 'ACTIVE',
+      },
       {
         onSuccess: () => {
           toast.success('OTT 구독상품을 수정했어요')

@@ -6,7 +6,6 @@ import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
-import { MockVariantBanner } from '@/components/common/MockVariantBanner'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,7 +16,7 @@ import { RequiredMark } from '@/features/onboarding/components/RequiredMark'
 import { ServiceSubscriptionRow } from '@/features/onboarding/components/ServiceSubscriptionRow'
 import { WatchTimeField } from '@/features/onboarding/components/WatchTimeField'
 import { useSaveUserSettings } from '@/hooks/useUserSettings'
-import type { UserSettings } from '@/features/onboarding/mockTypes'
+import type { UserSettings } from '@/api/generated/model'
 import {
   onboardingFormSchema,
   toOptionalNumber,
@@ -25,7 +24,6 @@ import {
   type OnboardingFormValues,
 } from '@/features/onboarding/schema'
 import { formatWon } from '@/lib/format'
-import { getMockWatchVariant } from '@/lib/mockScenario'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
 
 interface SectionCardProps {
@@ -33,22 +31,13 @@ interface SectionCardProps {
   title: string // 구역 제목
   description: string // 구역 안내(왜 묻는지)
   children: ReactNode // 구역의 입력 칸들
-  banner?: ReactNode // 구역 제목 위에 놓는 검토용 띠 등
   notice?: ReactNode // 구역 안내 아래, 입력 칸 위에 놓는 보충 설명(선택지의 뜻 등)
 }
 
 // 입력 구역 하나를 카드로 묶는다. 번호는 장식이 아니라 순서 안내라 글자로 "1." 대신 원 안 숫자로 보인다
-function SectionCard({
-  stepNumber,
-  title,
-  description,
-  children,
-  banner,
-  notice,
-}: SectionCardProps) {
+function SectionCard({ stepNumber, title, description, children, notice }: SectionCardProps) {
   return (
     <section aria-labelledby={`settings-section-${stepNumber}`} className="grid gap-3">
-      {banner}
       <Card className="bg-card ring-1 ring-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -170,16 +159,6 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
         stepNumber={2}
         title="한 달 시청 시간"
         description="한 달에 영상을 볼 수 있는 시간이에요. 긴 드라마가 몇 달에 걸쳐 나뉘는지 계산에 쓰여요."
-        banner={
-          <MockVariantBanner
-            decisionLabel="R11-18 시청 시간 환산 입력 저장"
-            variant={getMockWatchVariant()}
-            description={{
-              a: '환산 결과를 분(월 N분)으로만 저장해요. 저장한 뒤 다시 열면 "직접 입력"으로 보여요.',
-              b: '"주 N회 × 한 번에 M시간" 입력값도 함께 저장해요. 저장한 뒤 다시 열어도 환산 입력이 그대로 보여요.',
-            }}
-          />
-        }
       >
         <div className="py-1">
           <WatchTimeField control={control} register={register} errors={errors} />

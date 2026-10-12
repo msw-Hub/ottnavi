@@ -10,13 +10,10 @@
  * - 첫 줄 시작일은 오늘 이하 / 같은 시작일 금지 / 새 줄 시작일은 마지막 줄 시작일보다 늦어야 한다.
  * - 가장 최근 줄만 수정·삭제할 수 있고, 줄이 하나뿐이면 삭제할 수 없다.
  * - 지난 날짜를 시작일로 넣는 것은 오류가 아니라 안내(isPastDate)만 한다.
- * 모든 날짜는 'YYYY-MM-DD' 문자열이며, 글자 순서가 날짜 순서와 같아 `<` 비교를 쓴다(lib/dateUtils 주석).
+ * 줄의 시작일과 오늘은 'YYYY-MM-DD' 문자열이며(마지막 확인 일시만 date-time), 글자 순서가 날짜 순서와 같아 `<` 비교를 쓴다(lib/dateUtils 주석).
  */
-import type { AdminProductPrice } from '@/features/admin/mockTypes'
-import { addDays, diffInDays } from '@/lib/dateUtils'
-
-// 마지막 확인일이 오늘로부터 이 일수를 넘으면 "요금 확인일 오래됨" 태그를 붙인다
-export const STALE_VERIFIED_DAYS = 90
+import type { AdminProductPrice } from '@/api/generated/model'
+import { addDays } from '@/lib/dateUtils'
 
 // 월 구독요금 상한(원). 오입력(0 하나 더 입력 등)을 막는 안전선이다. SCR-09의 사용자 금액 상한과 같다
 export const MAX_MONTHLY_PRICE = 1_000_000
@@ -59,11 +56,8 @@ export function getCurrentPrice(
   return started.length > 0 ? started[started.length - 1] : null
 }
 
-/** 마지막 확인일이 오늘로부터 90일을 넘었는지 돌려준다. 날짜를 해석할 수 없으면 오래된 것으로 본다(확인을 유도). */
-export function isVerifiedStale(lastVerifiedAt: string, today: string): boolean {
-  if (!DATE_PATTERN.test(lastVerifiedAt)) return true
-  return diffInDays(lastVerifiedAt, today) > STALE_VERIFIED_DAYS
-}
+// 마지막 확인 일시의 "오래됨" 판정(isVerifiedStale)은 회원 요금 화면도 쓰는 공용 규칙이라 lib/priceFreshness.ts로 옮겼다. 기존 import 경로를 유지하려고 다시 내보낸다
+export { isVerifiedStale, STALE_VERIFIED_DAYS } from '@/lib/priceFreshness'
 
 // 시작일 검사 결과 종류
 export type PriceStartDateIssue =

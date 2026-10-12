@@ -3,24 +3,107 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - 아직 구현하지 않은 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시한다(Task 031).
- * - 성공 응답은 `CommonResponse` 래퍼, 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './accessToken';
+export * from './addWishlistItemRequest';
+export * from './addWishlistItemResult';
+export * from './adminProduct';
+export * from './adminProductList';
+export * from './adminProductPrice';
+export * from './adminProductPriceRequest';
+export * from './adminProvider';
+export * from './adminProviderList';
+export * from './availabilityStatus';
 export * from './badGatewayResponse';
 export * from './badRequestResponse';
+export * from './castMember';
+export * from './collectExecution';
+export * from './collectExecutionAccepted';
+export * from './collectExecutionChange';
+export * from './collectExecutionChangePage';
+export * from './collectExecutionPage';
+export * from './collectExecutionStatus';
+export * from './collectTier';
+export * from './commonResponseAccessToken';
+export * from './commonResponseAddWishlistItemResult';
+export * from './commonResponseAdminProduct';
+export * from './commonResponseAdminProductList';
+export * from './commonResponseAdminProvider';
+export * from './commonResponseAdminProviderList';
+export * from './commonResponseCollectExecution';
+export * from './commonResponseCollectExecutionAccepted';
+export * from './commonResponseCollectExecutionChangePage';
+export * from './commonResponseCollectExecutionPage';
 export * from './commonResponseOttServiceList';
+export * from './commonResponsePlanDraftList';
+export * from './commonResponseSavedPlan';
+export * from './commonResponseServicePrice';
+export * from './commonResponseServicePriceList';
+export * from './commonResponseTitleDetail';
+export * from './commonResponseTitleSearchPage';
+export * from './commonResponseUpdatedWishlistItem';
+export * from './commonResponseUserSettings';
+export * from './commonResponseWishlistItemList';
+export * from './conflictResponse';
+export * from './createAdminProductRequest';
+export * from './createCollectExecutionRequest';
+export * from './createPlanRequest';
 export * from './fieldError';
 export * from './forbiddenResponse';
 export * from './internalErrorResponse';
+export * from './listCollectExecutionChangesParams';
+export * from './listCollectExecutionsParams';
+export * from './mediaType';
+export * from './notFoundResponse';
 export * from './ottService';
 export * from './ottServiceCode';
 export * from './ottServiceDataQuality';
+export * from './overviewLanguage';
 export * from './pageMeta';
 export * from './pageParamParameter';
+export * from './planAlgorithm';
+export * from './planAssignment';
+export * from './planDraft';
+export * from './planDraftList';
+export * from './planMonth';
+export * from './planMonthProduct';
+export * from './planStatus';
+export * from './planType';
+export * from './priceSource';
 export * from './problemDetail';
+export * from './productType';
+export * from './providerMappingState';
+export * from './providerTier';
+export * from './savedPlan';
+export * from './searchTitlesParams';
+export * from './serviceAvailability';
+export * from './servicePrice';
+export * from './servicePriceList';
+export * from './serviceSubscriptionStatus';
+export * from './setMyServicePriceRequest';
 export * from './sizeParamParameter';
+export * from './titleDetail';
+export * from './titleSearchItem';
+export * from './titleSearchPage';
+export * from './titleSeason';
 export * from './tooManyRequestsResponse';
 export * from './unauthorizedResponse';
+export * from './unscheduledItem';
+export * from './unscheduledReason';
+export * from './updateAdminProductRequest';
+export * from './updateAdminProviderRequest';
+export * from './updatedWishlistItem';
+export * from './updateMySettingsRequest';
+export * from './updateWishlistItemRequest';
+export * from './userSettings';
+export * from './userSubscription';
+export * from './watchPreset';
+export * from './wishlistItem';
+export * from './wishlistItemList';
+export * from './wishlistPriority';

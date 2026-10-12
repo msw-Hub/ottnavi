@@ -1,26 +1,25 @@
 import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import type {
-  AddProductPriceRequest,
+  AdminProductPriceRequest,
   AdminProduct,
   AdminProductPrice,
   AdminProvider,
   CommonResponseAdminProvider,
-  CollectChange,
+  CollectExecutionChange,
   CollectExecution,
   CollectTier,
-  CommonResponseCollectChangeList,
+  CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecution,
-  CommonResponseCollectExecutionList,
-  CommonResponseRunCollectAccepted,
-  RunCollectRequest,
+  CommonResponseCollectExecutionPage,
+  CommonResponseCollectExecutionAccepted,
+  CreateCollectExecutionRequest,
   CommonResponseAdminProviderList,
-  SaveProviderMappingRequest,
+  UpdateAdminProviderRequest,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CreateAdminProductRequest,
   UpdateAdminProductRequest,
-  UpdateProductPriceRequest,
-} from '@/features/admin/mockTypes'
+} from '@/api/generated/model'
 import {
   checkAddPriceStartDate,
   checkEditLastPriceStartDate,
@@ -46,15 +45,15 @@ import {
   buildMockAdminProviders,
   buildMockCollectChanges,
   buildMockCollectExecutions,
+  MOCK_PRODUCTS,
 } from '@/mocks/fixtures/admin'
-import { MOCK_PRODUCTS } from '@/mocks/fixtures/pricing'
 
 /*
  * ===== 관리자 화면 목업 핸들러 (Task 029) =====
  * 단계 1(SCR-14 OTT 구독상품·월 구독요금), 단계 2(SCR-15 제공처 매핑), 단계 3(SCR-16 수집 실행·이력)이 있다.
  *
- * 임시 경로 주의: 아래 API는 아직 계약(docs/api/openapi.yaml)에 없다. 경로·요청·응답 모양은 화면을 먼저 만들기 위한 제안이며
- * Task 031에서 계약으로 확정된다(features/admin/mockTypes.ts 상단에 목록이 있다).
+ * 경로·요청·응답은 확정된 계약(docs/api/openapi.yaml)과 같다. 응답 타입은 생성 모델이라 계약과 어긋나면 컴파일에서 걸린다(Task 031 6-7).
+ * 상태 충돌(409)의 오류 코드는 docs/api/error-codes.md의 BATCH_*·PRICE_* 코드이고, 없는 데이터의 404는 RESOURCE_NOT_FOUND다(관리자 API 예외).
  *
  * 권한: 실제 권한 검사는 백엔드 /api/admin/** ADMIN 역할이 한다(Task 053·057). 이 목업은 역할(비로그인·회원·관리자)을 검사하지 않는다
  * (사용자 결정 2026-10-11). 화면 가드(RequireAdmin)도 Task 057 전까지는 자리표시다.
@@ -64,18 +63,18 @@ import { MOCK_PRODUCTS } from '@/mocks/fixtures/pricing'
  * - PATCH  /api/admin/products/:productId                          이름·판매 상태 수정
  * - POST   /api/admin/products/:productId/prices                   월 구독요금 줄 추가
  * - PATCH  /api/admin/products/:productId/prices/:priceId          가장 최근 줄 수정(확인일도 오늘로)
- * - DELETE /api/admin/products/:productId/prices/:priceId          가장 최근 줄 삭제(하나뿐이면 불가)
- * - POST   /api/admin/products/:productId/prices/:priceId/verify   [요금 확인함]: 마지막 확인일을 오늘로
+ * - DELETE /api/admin/products/:productId/prices/:priceId          가장 최근 줄 삭제(하나뿐이면 불가, 204 본문 없음)
+ * - POST   /api/admin/products/:productId/prices/:priceId/verify   [요금 확인함]: 마지막 확인 일시를 지금으로
  * - GET    /api/admin/providers                                    제공처 목록. 시나리오: ?mockScenario=error(500) / empty(빈 목록)
  * - PATCH  /api/admin/providers/:providerId                        매핑 저장. 시나리오: ?mockScenario=save-error(저장만 500)
- * - GET    /api/admin/collect                                      실행 이력. 시나리오: ?mockScenario=error(500) / empty(빈 이력)
- * - GET    /api/admin/collect/:executionId/changes                 실행별 변경된 작품
- * - POST   /api/admin/collect                                      수동 실행(202). 시나리오: ?mockScenario=run-error(실행만 500)
- * - POST   /api/admin/collect/:executionId/recover                 중단됨 → 실패로 기록(제안)
- * - POST   /api/admin/collect/:executionId/restart                 실패한 실행 다시 실행(제안, 202, 새 executionId)
+ * - GET    /api/admin/collect/executions                           실행 이력(페이지 형태, 대상 날짜 내림차순). 시나리오: ?mockScenario=error(500) / empty(빈 이력)
+ * - GET    /api/admin/collect/executions/:executionId/changes      실행별 변경된 작품(페이지 형태, 제목 순)
+ * - POST   /api/admin/collect/executions                           수동 실행(202, targetDate는 선택). 시나리오: ?mockScenario=run-error(실행만 500)
+ * - POST   /api/admin/collect/executions/:executionId/recover      중단됨 → 실패로 기록(200)
+ * - POST   /api/admin/collect/executions/:executionId/restart      실패한 실행 다시 실행(202, 새 executionId)
  *
- * 규칙 위반은 서버처럼 409 + 제안 오류 코드로 돌려준다(상태 코드와 이름은 모두 "제안"이다. 규칙 위반은 요청 모양 오류(400)가 아니라
- * 현재 저장된 줄과의 충돌이라 409로 두었고, 422와의 선택은 Task 031 계약 절차에서 정한다). 입력 모양 오류는 400 VALIDATION_FAILED다.
+ * 규칙 위반은 서버처럼 409 + 오류 코드로 돌려준다(Task 031 계약 확정. 규칙 위반은 요청 모양 오류(400)가 아니라
+ * 현재 저장된 줄과의 충돌이라 409다). 입력 모양 오류는 400 VALIDATION_FAILED다.
  */
 
 // 요청 처리에 걸리는 시간. 테스트에서는 기다리지 않고, 브라우저에서는 로딩 상태가 눈에 보이게 잠깐 기다린다
@@ -135,7 +134,7 @@ const storedAtStart = readStoredProducts()
 if (storedAtStart) {
   nextProductId = storedAtStart.nextProductId
   nextPriceId = storedAtStart.nextPriceId
-  for (const product of storedAtStart.products) changedProducts.set(product.id, product)
+  for (const product of storedAtStart.products) changedProducts.set(product.productId, product)
 }
 
 /*
@@ -231,11 +230,12 @@ function saveExecution(execution: CollectExecution): void {
 }
 
 // 접수한 실행이 성공했을 때 보여 줄 변경 작품(예시)
-const SIMULATED_CHANGES: CollectChange[] = [
+const SIMULATED_CHANGES: CollectExecutionChange[] = [
   {
     mediaType: 'movie',
     tmdbId: 838209,
     title: '파묘',
+    seasonNumber: null,
     ottServiceId: 5,
     previousStatus: null,
     currentStatus: 'AVAILABLE',
@@ -244,6 +244,7 @@ const SIMULATED_CHANGES: CollectChange[] = [
     mediaType: 'tv',
     tmdbId: 93405,
     title: '오징어 게임',
+    seasonNumber: 1,
     ottServiceId: 1,
     previousStatus: 'AVAILABLE',
     currentStatus: 'UNKNOWN',
@@ -269,7 +270,7 @@ function advanceSimulatedRuns(): void {
   persistCollect()
 }
 
-function getChanges(executionId: number): CollectChange[] {
+function getChanges(executionId: number): CollectExecutionChange[] {
   // 화면에서 접수한 실행(시뮬레이션 대상)은 simulatedReads에 키가 있다. 기본 이력(1~5)은 fixture의 변경 목록을 쓴다
   if (String(executionId) in simulatedReads) {
     const execution = changedExecutions.get(executionId)
@@ -333,7 +334,7 @@ function startRun(request: Request, targetDate: string, tier: CollectTier) {
   }
   simulatedReads[String(execution.executionId)] = 0
   saveExecution(execution)
-  const body: CommonResponseRunCollectAccepted = {
+  const body: CommonResponseCollectExecutionAccepted = {
     success: true,
     data: { executionId: execution.executionId },
   }
@@ -358,18 +359,18 @@ export function resetMockAdminState(): void {
 // 지금 OTT 구독상품 목록: 오늘 기준 기본 목록에 건드린 상품을 얹고, 새로 등록한 상품(ID 순)을 뒤에 붙인다
 function getAllProducts(): AdminProduct[] {
   const base = buildMockAdminProducts(getTodayDateString())
-  const baseIds = new Set(base.map((product) => product.id))
-  const merged = base.map((product) => changedProducts.get(product.id) ?? product)
+  const baseIds = new Set(base.map((product) => product.productId))
+  const merged = base.map((product) => changedProducts.get(product.productId) ?? product)
   const created = [...changedProducts.values()]
-    .filter((product) => !baseIds.has(product.id))
-    .sort((a, b) => a.id - b.id)
+    .filter((product) => !baseIds.has(product.productId))
+    .sort((a, b) => a.productId - b.productId)
   return [...merged, ...created]
 }
 
 // 상품 하나를 저장소에 반영하고 돌려준다(줄은 시작일 오름차순으로 맞춘다)
 function saveProduct(product: AdminProduct): AdminProduct {
   const saved = { ...product, prices: sortPricesAscending(product.prices) }
-  changedProducts.set(saved.id, saved)
+  changedProducts.set(saved.productId, saved)
   persistProducts()
   return saved
 }
@@ -381,6 +382,39 @@ function okProduct(product: AdminProduct, status = 200) {
 
 function validationError(request: Request, detail: string) {
   return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail)
+}
+
+// 지금 시각(ISO 일시). 월 구독요금의 마지막 확인 일시(lastVerifiedAt)에 쓴다. 화면은 한국 날짜로 바꿔 보인다
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+/**
+ * 쪽 번호·크기(page 0부터, size 1~100, 기본 20)를 읽는다. 벗어나면 null이다(호출한 쪽이 400을 돌려준다, api-contract.md 페이지네이션).
+ */
+function readPageParams(request: Request): { page: number; size: number } | null {
+  const params = new URL(request.url).searchParams
+  const page = Number(params.get('page') ?? 0)
+  const size = Number(params.get('size') ?? 20)
+  if (!Number.isInteger(page) || page < 0 || !Number.isInteger(size) || size < 1 || size > 100) {
+    return null
+  }
+  return { page, size }
+}
+
+// 전체 목록에서 한 쪽을 잘라 PageMeta 형식(content, page, size, totalElements, totalPages)으로 만든다
+function toPage<T>(all: T[], { page, size }: { page: number; size: number }) {
+  return {
+    content: all.slice(page * size, (page + 1) * size),
+    page,
+    size,
+    totalElements: all.length,
+    totalPages: Math.ceil(all.length / size),
+  }
+}
+
+function invalidPageParams(request: Request) {
+  return validationError(request, 'page는 0 이상, size는 1~100 사이여야 합니다.')
 }
 
 function notFound(request: Request) {
@@ -471,17 +505,17 @@ export const adminHandlers: RequestHandler[] = [
     if (dateProblem) return dateProblem
 
     const product: AdminProduct = {
-      id: nextProductId++,
+      productId: nextProductId++,
       name,
       productType: 'SINGLE',
       ottServiceId: body.ottServiceId,
-      active: true,
+      isActive: true,
       prices: [
         {
-          id: nextPriceId++,
+          priceId: nextPriceId++,
           monthlyPrice: body.monthlyPrice,
           effectiveFrom: body.effectiveFrom,
-          lastVerifiedAt: today,
+          lastVerifiedAt: nowIso(),
         },
       ],
     }
@@ -491,7 +525,7 @@ export const adminHandlers: RequestHandler[] = [
   // 이름·판매 상태 수정
   http.patch('/api/admin/products/:productId', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.id === Number(params.productId))
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
     if (!product) return notFound(request)
 
     const body = (await request.json()) as UpdateAdminProductRequest
@@ -502,7 +536,7 @@ export const adminHandlers: RequestHandler[] = [
       saveProduct({
         ...product,
         name: body.name !== undefined ? body.name.trim() : product.name,
-        active: body.active ?? product.active,
+        isActive: body.isActive ?? product.isActive,
       }),
     )
   }),
@@ -510,10 +544,10 @@ export const adminHandlers: RequestHandler[] = [
   // 월 구독요금 줄 추가
   http.post('/api/admin/products/:productId/prices', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.id === Number(params.productId))
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
     if (!product) return notFound(request)
 
-    const body = (await request.json()) as AddProductPriceRequest
+    const body = (await request.json()) as AdminProductPriceRequest
     const priceProblem = monthlyPriceProblem(request, body.monthlyPrice)
     if (priceProblem) return priceProblem
     const today = getTodayDateString()
@@ -524,10 +558,10 @@ export const adminHandlers: RequestHandler[] = [
     if (dateProblem) return dateProblem
 
     const row: AdminProductPrice = {
-      id: nextPriceId++,
+      priceId: nextPriceId++,
       monthlyPrice: body.monthlyPrice,
       effectiveFrom: body.effectiveFrom,
-      lastVerifiedAt: today,
+      lastVerifiedAt: nowIso(),
     }
     return okProduct(saveProduct({ ...product, prices: [...product.prices, row] }), 201)
   }),
@@ -535,11 +569,11 @@ export const adminHandlers: RequestHandler[] = [
   // 가장 최근 줄 수정. 금액을 직접 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 갱신한다(사용자 결정 2026-10-11)
   http.patch('/api/admin/products/:productId/prices/:priceId', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.id === Number(params.productId))
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
     const sorted = product ? sortPricesAscending(product.prices) : []
-    const target = sorted.find((row) => row.id === Number(params.priceId))
+    const target = sorted.find((row) => row.priceId === Number(params.priceId))
     if (!product || !target) return notFound(request)
-    if (sorted[sorted.length - 1].id !== target.id) {
+    if (sorted[sorted.length - 1].priceId !== target.priceId) {
       return ruleViolation(
         request,
         'PRICE_NOT_LATEST',
@@ -547,7 +581,7 @@ export const adminHandlers: RequestHandler[] = [
       )
     }
 
-    const body = (await request.json()) as UpdateProductPriceRequest
+    const body = (await request.json()) as AdminProductPriceRequest
     const priceProblem = monthlyPriceProblem(request, body.monthlyPrice)
     if (priceProblem) return priceProblem
     const dateProblem = startDateProblem(
@@ -560,12 +594,12 @@ export const adminHandlers: RequestHandler[] = [
       saveProduct({
         ...product,
         prices: product.prices.map((row) =>
-          row.id === target.id
+          row.priceId === target.priceId
             ? {
                 ...row,
                 monthlyPrice: body.monthlyPrice,
                 effectiveFrom: body.effectiveFrom,
-                lastVerifiedAt: getTodayDateString(),
+                lastVerifiedAt: nowIso(),
               }
             : row,
         ),
@@ -576,9 +610,9 @@ export const adminHandlers: RequestHandler[] = [
   // 가장 최근 줄 삭제. 줄이 하나뿐이면 삭제할 수 없다
   http.delete('/api/admin/products/:productId/prices/:priceId', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.id === Number(params.productId))
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
     const sorted = product ? sortPricesAscending(product.prices) : []
-    const target = sorted.find((row) => row.id === Number(params.priceId))
+    const target = sorted.find((row) => row.priceId === Number(params.priceId))
     if (!product || !target) return notFound(request)
     if (sorted.length === 1) {
       return ruleViolation(
@@ -587,16 +621,19 @@ export const adminHandlers: RequestHandler[] = [
         '월 구독요금이 하나뿐이라 삭제할 수 없습니다.',
       )
     }
-    if (sorted[sorted.length - 1].id !== target.id) {
+    if (sorted[sorted.length - 1].priceId !== target.priceId) {
       return ruleViolation(
         request,
         'PRICE_NOT_LATEST',
         '가장 최근 월 구독요금만 삭제할 수 있습니다.',
       )
     }
-    return okProduct(
-      saveProduct({ ...product, prices: product.prices.filter((row) => row.id !== target.id) }),
-    )
+    saveProduct({
+      ...product,
+      prices: product.prices.filter((row) => row.priceId !== target.priceId),
+    })
+    // 삭제는 본문 없는 204다(계약). 화면은 목록을 다시 불러와 새 이력을 본다
+    return new HttpResponse(null, { status: 204 })
   }),
 
   // [요금 확인함]: 마지막 확인일만 오늘로 바꾼다. 지금 적용 중인 줄만 확인할 수 있다(지난·예정 줄은 확인 대상이 아니다)
@@ -604,15 +641,15 @@ export const adminHandlers: RequestHandler[] = [
     '/api/admin/products/:productId/prices/:priceId/verify',
     async ({ request, params }) => {
       await wait()
-      const product = getAllProducts().find((p) => p.id === Number(params.productId))
-      const target = product?.prices.find((row) => row.id === Number(params.priceId))
+      const product = getAllProducts().find((p) => p.productId === Number(params.productId))
+      const target = product?.prices.find((row) => row.priceId === Number(params.priceId))
       if (!product || !target) return notFound(request)
 
       const today = getTodayDateString()
       const sorted = sortPricesAscending(product.prices)
       const kind = getPriceRowKind(
         sorted,
-        sorted.findIndex((row) => row.id === target.id),
+        sorted.findIndex((row) => row.priceId === target.priceId),
         today,
       )
       if (kind !== 'CURRENT') {
@@ -627,7 +664,7 @@ export const adminHandlers: RequestHandler[] = [
         saveProduct({
           ...product,
           prices: product.prices.map((row) =>
-            row.id === target.id ? { ...row, lastVerifiedAt: today } : row,
+            row.priceId === target.priceId ? { ...row, lastVerifiedAt: nowIso() } : row,
           ),
         }),
       )
@@ -669,7 +706,7 @@ export const adminHandlers: RequestHandler[] = [
     const provider = getAllProviders().find((p) => p.providerId === Number(params.providerId))
     if (!provider) return notFound(request)
 
-    const body = (await request.json()) as SaveProviderMappingRequest
+    const body = (await request.json()) as UpdateAdminProviderRequest
     const problem = validateSaveRequest(
       body,
       MOCK_PRODUCTS.map((p) => p.ottServiceId),
@@ -688,54 +725,73 @@ export const adminHandlers: RequestHandler[] = [
     return HttpResponse.json(response)
   }),
 
-  // 수집 실행 이력(최신 순). 화면에서 접수한 실행(시뮬레이션)은 이력을 SIMULATED_COMPLETE_AFTER_READS번 읽으면 완료로 바뀐다
-  http.get('/api/admin/collect', async ({ request }) => {
+  // 수집 실행 이력(페이지 형태, 대상 날짜 내림차순). 화면에서 접수한 실행(시뮬레이션)은 이력을 SIMULATED_COMPLETE_AFTER_READS번 읽으면 완료로 바뀐다
+  http.get('/api/admin/collect/executions', async ({ request }) => {
     await wait()
     if (hasMockScenario(request, 'error')) return internalError(request)
+    const pageParams = readPageParams(request)
+    if (!pageParams) return invalidPageParams(request)
     if (hasMockScenario(request, 'empty')) {
-      const empty: CommonResponseCollectExecutionList = { success: true, data: { executions: [] } }
+      const empty: CommonResponseCollectExecutionPage = {
+        success: true,
+        data: toPage([], pageParams),
+      }
       return HttpResponse.json(empty)
     }
     advanceSimulatedRuns()
-    const body: CommonResponseCollectExecutionList = {
+    const body: CommonResponseCollectExecutionPage = {
       success: true,
-      data: { executions: sortExecutionsForHistory(getAllExecutions()) },
+      data: toPage(sortExecutionsForHistory(getAllExecutions()), pageParams),
     }
     return HttpResponse.json(body)
   }),
 
   // 실행별 변경된 작품
-  http.get('/api/admin/collect/:executionId/changes', async ({ request, params }) => {
+  http.get('/api/admin/collect/executions/:executionId/changes', async ({ request, params }) => {
     await wait()
     const executionId = Number(params.executionId)
     if (!getAllExecutions().some((e) => e.executionId === executionId)) return notFound(request)
-    const body: CommonResponseCollectChangeList = {
+    const pageParams = readPageParams(request)
+    if (!pageParams) return invalidPageParams(request)
+    // 제목 순, 같으면 시즌 번호·서비스 ID 순(계약)
+    const sorted = getChanges(executionId).sort(
+      (a, b) =>
+        a.title.localeCompare(b.title, 'ko') ||
+        (a.seasonNumber ?? 0) - (b.seasonNumber ?? 0) ||
+        a.ottServiceId - b.ottServiceId,
+    )
+    const body: CommonResponseCollectExecutionChangePage = {
       success: true,
-      data: { executionId, changes: getChanges(executionId) },
+      data: toPage(sorted, pageParams),
     }
     return HttpResponse.json(body)
   }),
 
   // 수동 실행: 202 접수. 판정은 judgeRun(collectRules)과 같다
-  http.post('/api/admin/collect', async ({ request }) => {
+  http.post('/api/admin/collect/executions', async ({ request }) => {
     await wait()
     if (hasMockScenario(request, 'run-error')) return internalError(request)
 
-    const body = (await request.json()) as RunCollectRequest
-    if (typeof body.targetDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.targetDate)) {
+    const body = (await request.json()) as CreateCollectExecutionRequest
+    // 계약: targetDate는 선택이다. 비우거나 null이면 오늘(KST)로 본다. 문자열이 아닌 값은 형식 오류다
+    if (body.targetDate != null && typeof body.targetDate !== 'string') {
       return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
     }
-    if (body.targetDate > getTodayDateString()) {
+    const targetDate = body.targetDate ? body.targetDate : getTodayDateString()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
+    }
+    if (targetDate > getTodayDateString()) {
       return validationError(request, '대상 날짜는 오늘 또는 그 이전이어야 합니다.')
     }
     if (!RUNNABLE_COLLECT_TIERS.includes(body.tier)) {
       return validationError(request, 'MVP는 전체(ALL)만 실행할 수 있습니다.')
     }
-    return startRun(request, body.targetDate, body.tier)
+    return startRun(request, targetDate, body.tier)
   }),
 
-  // 복구(제안): 서버가 중단됨으로 판정한 실행을 실패로 기록한다
-  http.post('/api/admin/collect/:executionId/recover', async ({ request, params }) => {
+  // 복구: 서버가 중단됨으로 판정한 실행을 실패로 기록한다
+  http.post('/api/admin/collect/executions/:executionId/recover', async ({ request, params }) => {
     await wait()
     const target = getAllExecutions().find((e) => e.executionId === Number(params.executionId))
     if (!target) return notFound(request)
@@ -746,7 +802,7 @@ export const adminHandlers: RequestHandler[] = [
       ...target,
       status: 'FAILED',
       // 복구는 "끝난 시각"을 알 수 없다(서버가 언제 멈췄는지 모른다). 그래서 종료 시각을 기록하지 않고 null로 두며 화면은 "—"로 보인다.
-      // 서버가 복구 시 종료 시각을 기록할지는 Task 031 안건이다(사용자 결정 2026-10-11)
+      // 계약(Task 031 확정): recover 응답의 endedAt은 null이다. Spring Batch의 recover는 END_TIME을 채우지만 API는 batch.recovered 표시를 읽어 null로 내린다
       failureReason: '서버가 중간에 멈춰 복구하면서 실패로 기록했습니다.',
     }
     saveExecution(recovered)
@@ -754,8 +810,8 @@ export const adminHandlers: RequestHandler[] = [
     return HttpResponse.json(body)
   }),
 
-  // 다시 실행(제안): 실패한 실행을 같은 날짜·범위로 새로 접수한다. 새 executionId를 준다(mockTypes 주석)
-  http.post('/api/admin/collect/:executionId/restart', async ({ request, params }) => {
+  // 다시 실행: 실패한 실행을 같은 날짜·범위로 새로 접수한다. 새 executionId를 준다(202)
+  http.post('/api/admin/collect/executions/:executionId/restart', async ({ request, params }) => {
     await wait()
     if (hasMockScenario(request, 'run-error')) return internalError(request)
     const target = getAllExecutions().find((e) => e.executionId === Number(params.executionId))

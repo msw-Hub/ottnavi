@@ -4,7 +4,7 @@
  * - 플랜 계산이 쓰는 월 예산·월 시청 시간의 기본값
  * 서비스 ID는 서비스 목록 API(계약 example)의 ottServiceId와 같다: 1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이.
  */
-import type { UserSettings } from '@/features/onboarding/mockTypes'
+import type { UserSettings } from '@/api/generated/model'
 
 // 서비스 7곳의 ID. 목록 순서가 곧 화면 순서다
 export const MOCK_SERVICE_IDS = [1, 2, 3, 4, 5, 6, 7] as const
@@ -25,7 +25,6 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   monthlyBudget: 20000,
   monthlyWatchMinutes: 900,
   watchPreset: 'NORMAL',
-  weeklyInput: null,
 }
 
 // 온보딩을 아직 하지 않은 회원에게 돌려주는 빈 설정. 화면은 모든 칸을 기본값으로 채워 보인다
@@ -35,5 +34,4 @@ export const EMPTY_USER_SETTINGS: UserSettings = {
   monthlyBudget: null,
   monthlyWatchMinutes: null,
   watchPreset: null,
-  weeklyInput: null,
 }

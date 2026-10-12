@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
-import type { CollectExecution } from '@/features/admin/mockTypes'
+import type { CollectExecution } from '@/api/generated/model'
 import { formatIsoDate } from '@/lib/format'
 
 interface RecoverRunDialogProps {

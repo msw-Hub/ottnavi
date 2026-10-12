@@ -5,7 +5,7 @@ import {
   formatAssignmentTitle,
   UNSCHEDULED_REASON_DISPLAY,
 } from '@/features/plan/planDisplay'
-import type { UnscheduledItem } from '@/features/plan/mockTypes'
+import type { UnscheduledItem } from '@/api/generated/model'
 
 interface UnscheduledListProps {
   items: UnscheduledItem[] // 이번 3개월에 배정하지 못한 작품과 이유

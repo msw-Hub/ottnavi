@@ -8,7 +8,7 @@ import {
   sortExecutionsForHistory,
   sortExecutionsNewestFirst,
 } from '@/features/admin/collectRules'
-import type { CollectExecution, CollectExecutionStatus } from '@/features/admin/mockTypes'
+import type { CollectExecution, CollectExecutionStatus } from '@/api/generated/model'
 
 function run(
   executionId: number,

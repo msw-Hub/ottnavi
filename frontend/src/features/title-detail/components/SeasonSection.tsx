@@ -5,7 +5,7 @@ import { AvailableServiceBadges } from '@/components/common/AvailableServiceBadg
 import { EstimatedTag } from '@/components/common/EstimatedTag'
 import { Button } from '@/components/ui/button'
 import { WishlistControl } from '@/features/title-detail/components/WishlistControl'
-import type { TitleSeason } from '@/features/title-detail/mockTypes'
+import type { TitleSeason } from '@/api/generated/model'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { formatMinutes } from '@/lib/format'

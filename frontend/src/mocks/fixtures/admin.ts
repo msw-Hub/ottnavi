@@ -10,8 +10,8 @@
  * - 제공처 매핑 8행·관련 없음 2행: docs/ROADMAP.md Task 004 기록(TMDB KR 제공처 조사, 2026-10-05)의 실제 값이다.
  * - 미매핑 3행: 화면의 "미매핑 강조"를 확인하려는 예시다. 이름과 ID는 Task 004가 기록한 "매핑되지 않은 KR 제공처" 목록의 실제 값을 썼지만,
  *   "방금 새로 발견됐다"는 발견 시각은 예시다(실제 수집 결과가 아니다).
- * - OTT 구독상품 7개: 이름과 현재 월 구독요금은 SCR-09용 mocks/fixtures/pricing.ts를 그대로 따른다(두 화면의 금액이 어긋나지 않게 가져다 쓴다).
- *   pricing.ts는 Task 004 가격표에 맞춰져 있다(2026-10-11).
+ * - OTT 구독상품 7개: 이름과 현재 월 구독요금은 이 파일의 MOCK_PRODUCTS를 그대로 따른다(회원 요금 화면과 금액이 어긋나지 않게 같은 값을 쓴다).
+ *   MOCK_PRODUCTS는 Task 004 가격표에 맞춰져 있다(2026-10-11).
  *   이력(과거 줄·예정 줄·확인일)은 화면 확인용 예시다.
  * - 수집 실행 이력과 변경된 작품: 모두 예시다.
  */
@@ -20,11 +20,54 @@ import type {
   AdminProduct,
   AdminProductPrice,
   AdminProvider,
-  CollectChange,
+  CollectExecutionChange,
   CollectExecution,
-} from '@/features/admin/mockTypes'
+} from '@/api/generated/model'
 import { addDays } from '@/lib/dateUtils'
-import { MOCK_PRODUCTS } from '@/mocks/fixtures/pricing'
+
+/* ===== OTT 구독상품 기본 데이터 (회원 요금 화면·관리자 화면이 함께 쓴다) =====
+ * 서비스별 상품·기본 요금 목업 데이터다. 원래 fixtures/pricing.ts였고(Task 028) 관리자 목업이 같은 목록을 써서 Task 031 6-7에서 여기로 옮겼다.
+ * 금액은 ROADMAP Task 004 가격표(조사일 2026-10-05, 표시 가격 그대로)에 맞췄다(2026-10-11 사용자 결정). 요금제 기준: 넷플릭스·디즈니+·티빙·웨이브
+ * 스탠다드, 왓챠 베이직(STANDARD로 사용), 애플 TV+ 단일 요금, 쿠팡플레이는 와우 멤버십(광고 포함) 월 요금 7,890원 기준이다.
+ * 상품은 서비스마다 하나(단품)로 단순화했다. 번들 상품은 2단계 이후에 다룬다.
+ * 관리자가 요금을 확인(verify)해도 회원 요금 화면의 기준 일시(MOCK_PRICE_VERIFIED_AT)는 바뀌지 않는다(연결하지 않기로 했다, 사용자 결정).
+ */
+
+export interface MockProduct {
+  ottServiceId: number // 서비스 내부 ID
+  productId: number // 상품 ID
+  productName: string // 상품(요금제) 이름
+  adminPrice: number // 관리자 기본 월 요금(원)
+}
+
+// 요금표 적용 시작일(계약 ServicePrice.effectiveFrom)
+export const MOCK_PRICE_EFFECTIVE_FROM = '2026-10-01'
+
+// 관리자가 요금을 마지막으로 확인한 일시(계약 ServicePrice.lastVerifiedAt, date-time). 화면은 한국 날짜만 보인다
+export const MOCK_PRICE_VERIFIED_AT = '2026-10-08T18:30:00+09:00'
+
+export const MOCK_PRODUCTS: MockProduct[] = [
+  { ottServiceId: 1, productId: 101, productName: '넷플릭스 스탠다드', adminPrice: 13500 },
+  { ottServiceId: 2, productId: 102, productName: '디즈니+ 스탠다드', adminPrice: 9900 },
+  { ottServiceId: 3, productId: 103, productName: '애플 TV+', adminPrice: 6500 },
+  { ottServiceId: 4, productId: 104, productName: '티빙 스탠다드', adminPrice: 13500 },
+  { ottServiceId: 5, productId: 105, productName: '웨이브 스탠다드', adminPrice: 10900 },
+  { ottServiceId: 6, productId: 106, productName: '왓챠 베이직', adminPrice: 7900 },
+  { ottServiceId: 7, productId: 107, productName: '쿠팡플레이', adminPrice: 7890 },
+]
+
+// 판매 종료로 둔 목업 상품(왓챠 베이직). 관리자 화면의 종료 상품 표시 확인용이고, 회원 요금 목록에는 나오지 않는다
+const SUSPENDED_PRODUCT_IDS = [106]
+
+// 판매 중인 상품인지 확인한다(회원 요금 API는 판매 중인 상품만 다룬다)
+export function isProductOnSale(productId: number): boolean {
+  return !SUSPENDED_PRODUCT_IDS.includes(productId)
+}
+
+// 서비스 ID로 상품을 찾는다. 없으면 undefined
+export function findMockProduct(ottServiceId: number): MockProduct | undefined {
+  return MOCK_PRODUCTS.find((product) => product.ottServiceId === ottServiceId)
+}
 
 // 한국 시간 기준 날짜 + 'HH:mm'을 ISO 일시 문자열로 만든다(+09:00 오프셋이 붙어 어느 시간대에서도 같은 시각을 가리킨다)
 function toSeoulIso(date: string, time: string): string {
@@ -41,22 +84,28 @@ function priceRow(
   effectiveFrom: string,
   lastVerifiedAt: string,
 ): AdminProductPrice {
-  return { id: productId * 10 + sequence, monthlyPrice, effectiveFrom, lastVerifiedAt }
+  // 계약의 lastVerifiedAt은 일시(date-time)라 한국 시간 오전 9시로 만든다(날짜 기준 판정이라 시각은 중요하지 않다)
+  return {
+    priceId: productId * 10 + sequence,
+    monthlyPrice,
+    effectiveFrom,
+    lastVerifiedAt: toSeoulIso(lastVerifiedAt, '09:00'),
+  }
 }
 
 /**
  * OTT 구독상품 7개(서비스마다 단품 하나)와 월 구독요금 이력을 만든다.
  * - 넷플릭스: 줄 3개(과거 / 지금 적용 중 / 예정) — "다음 줄 시작일의 전날"까지가 적용 기간임을 보이는 예시
  * - 애플 TV+: 마지막 확인일이 오늘로부터 120일 전 — 오래됨 태그(90일 초과) 확인용
- * - 왓챠: 판매 종료(active=false) — 종료 상품 표시 확인용
+ * - 왓챠: 판매 종료(isActive=false) — 종료 상품 표시 확인용
  * - 나머지: 줄 하나, 최근에 확인함
- * 지금 적용 중인 줄의 금액은 pricing.ts(SCR-09)의 기본 월 요금과 같다.
+ * 지금 적용 중인 줄의 금액은 위 MOCK_PRODUCTS(SCR-09)의 기본 월 요금과 같다.
  */
 export function buildMockAdminProducts(today: string): AdminProduct[] {
   return MOCK_PRODUCTS.map((product): AdminProduct => {
     const { productId, productName, ottServiceId, adminPrice } = product
     let prices: AdminProductPrice[]
-    let active = true
+    let isActive = true
 
     if (productId === 101) {
       // 넷플릭스: 과거 줄 → 지금 적용 중 → 예정 줄(적용 시작일이 오늘보다 뒤)
@@ -71,9 +120,16 @@ export function buildMockAdminProducts(today: string): AdminProduct[] {
     } else {
       prices = [priceRow(productId, 1, adminPrice, addDays(today, -180), addDays(today, -7))]
     }
-    if (productId === 106) active = false // 왓챠: 판매 종료
+    if (!isProductOnSale(productId)) isActive = false // 왓챠: 판매 종료
 
-    return { id: productId, name: productName, productType: 'SINGLE', ottServiceId, active, prices }
+    return {
+      productId: productId,
+      name: productName,
+      productType: 'SINGLE',
+      ottServiceId,
+      isActive,
+      prices,
+    }
   })
 }
 
@@ -100,7 +156,7 @@ function mappedProvider(
 /**
  * TMDB 제공처 목록을 만든다. 순서는 매핑됨(Task 004 표 순서) → 관련 없음 → 미매핑이다.
  * 화면이 미매핑을 맨 위로 올려 강조하는 정렬은 화면(핸들러·훅) 몫이다.
- * 서비스 ID는 pricing.ts의 서비스 번호(1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이)와 같다.
+ * 서비스 ID는 위 MOCK_PRODUCTS의 서비스 번호(1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이)와 같다.
  */
 export function buildMockAdminProviders(today: string): AdminProvider[] {
   return [
@@ -238,18 +294,19 @@ export function buildMockCollectExecutions(
 
 // 변경 한 건. 이전 상태가 null이면 이번에 처음 확인된 신규 작품이다
 function change(
-  mediaType: CollectChange['mediaType'],
+  mediaType: CollectExecutionChange['mediaType'],
   tmdbId: number,
   title: string,
   ottServiceId: number,
   previousStatus: AvailabilityStatus | null,
   currentStatus: AvailabilityStatus,
-): CollectChange {
-  return { mediaType, tmdbId, title, ottServiceId, previousStatus, currentStatus }
+  seasonNumber: number | null = mediaType === 'tv' ? 1 : null, // 드라마는 시즌 단위로 기록된다(계약). 예시는 시즌 1로 둔다
+): CollectExecutionChange {
+  return { mediaType, tmdbId, title, seasonNumber, ottServiceId, previousStatus, currentStatus }
 }
 
 // 4번 실행(어제 기준 성공)에서 바뀐 작품: 있음/없음/모름 전환 + 신규(이전 null)를 섞었다
-const MOCK_CHANGES_EXEC_4: CollectChange[] = [
+const MOCK_CHANGES_EXEC_4: CollectExecutionChange[] = [
   change('movie', 496243, '기생충', 4, 'NOT_AVAILABLE', 'AVAILABLE'),
   change('movie', 838209, '파묘', 1, 'UNKNOWN', 'AVAILABLE'),
   change('tv', 136283, '더 글로리', 1, 'AVAILABLE', 'NOT_AVAILABLE'),
@@ -259,7 +316,7 @@ const MOCK_CHANGES_EXEC_4: CollectChange[] = [
 ]
 
 // 1번 실행(4일 전 기준 성공)에서 바뀐 작품
-const MOCK_CHANGES_EXEC_1: CollectChange[] = [
+const MOCK_CHANGES_EXEC_1: CollectExecutionChange[] = [
   change('tv', 96578, '슬기로운 의사생활', 1, 'NOT_AVAILABLE', 'AVAILABLE'),
   change('movie', 496243, '기생충', 5, 'AVAILABLE', 'NOT_AVAILABLE'),
   change('movie', 838209, '파묘', 4, null, 'AVAILABLE'),
@@ -269,7 +326,7 @@ const MOCK_CHANGES_EXEC_1: CollectChange[] = [
  * 실행별 변경된 작품 목록을 만든다. 성공한 두 실행(4번·1번)에만 목록이 있다.
  * 실행 중·중단됨·실패 실행이나 없는 실행 ID는 빈 목록이다(중간까지의 변경은 이 목업에서 보여 주지 않는다).
  */
-export function buildMockCollectChanges(executionId: number): CollectChange[] {
+export function buildMockCollectChanges(executionId: number): CollectExecutionChange[] {
   if (executionId === 4) return MOCK_CHANGES_EXEC_4.map((c) => ({ ...c }))
   if (executionId === 1) return MOCK_CHANGES_EXEC_1.map((c) => ({ ...c }))
   return []

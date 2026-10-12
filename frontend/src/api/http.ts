@@ -2,6 +2,7 @@ import Axios from 'axios'
 import type { AxiosRequestConfig } from 'axios'
 import { toast } from 'sonner'
 import type { FieldError } from '@/api/generated/model'
+import { attachMockHeaders } from '@/api/mockHeaders'
 import { getErrorMessage, isKnownErrorCode, NETWORK_ERROR_MESSAGE } from '@/lib/errorMessages'
 
 // axios 인스턴스와 orval custom mutator.
@@ -11,6 +12,10 @@ import { getErrorMessage, isKnownErrorCode, NETWORK_ERROR_MESSAGE } from '@/lib/
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: '/api',
 })
+
+// 목업 모드에서만 화면 검토용 전환 값을 X-Mock-* 헤더로 붙인다(Task 031 6-0). 계약에 없는 값을 쿼리 파라미터로 보내지 않기 위함이다.
+// 운영(VITE_USE_MOCK이 true가 아님)에서는 붙일 헤더가 없다. 인증 로직과 무관하며, Task 057의 토큰 첨부 인터셉터와 따로 동작한다.
+AXIOS_INSTANCE.interceptors.request.use(attachMockHeaders)
 
 // orval이 생성한 함수가 호출하는 mutator. 응답 본문(body)을 그대로 돌려준다.
 // 성공 응답의 CommonResponse 래퍼({ success, data })는 여기서 벗기지 않는다.

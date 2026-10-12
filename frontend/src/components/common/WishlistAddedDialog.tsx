@@ -23,7 +23,7 @@ const WISHLIST_PATH = '/wishlist'
  * - 접근성은 Radix Dialog 기본을 따른다: 포커스 가두기, Esc로 닫기, 닫힌 뒤 처음 눌렀던 찜 버튼으로 포커스 복귀, 제목·설명 연결.
  *   기본 우상단 X 버튼은 영어 라벨("Close")이라 쓰지 않고, "더 둘러보기"가 닫기 역할을 한다(바깥 클릭·Esc도 가능).
  * - 두 버튼 모두 높이 44px(h-11)로 터치하기 쉽게 했고, 색만으로 구분하지 않도록 주 버튼에는 계산기 아이콘을 둔다.
- * - '찜 목록 보고 계산하기'의 이동 주소에는 목업 확인용 파라미터(mockScenario·mockVariant·mockVariantWatch)를 이어 붙인다.
+ * - '찜 목록 보고 계산하기'의 이동 주소에는 목업 확인용 파라미터(mockScenario)를 이어 붙인다.
  *   검색어 같은 다른 쿼리는 찜 목록과 무관해 가져가지 않는다. 운영(목업 아님)에서는 getMockRequestParams가 빈 객체다.
  */
 export function WishlistAddedDialog() {

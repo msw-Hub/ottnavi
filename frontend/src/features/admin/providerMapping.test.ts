@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AdminProvider } from '@/features/admin/mockTypes'
+import type { AdminProvider } from '@/api/generated/model'
 import {
   applyProviderFilter,
   buildSaveRequest,

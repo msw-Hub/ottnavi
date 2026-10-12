@@ -1,7 +1,7 @@
 import { useId } from 'react'
 import { ServiceStatusChips } from '@/features/wishlist/components/ServiceStatusChips'
 import { WishlistCard, type WishlistCardProps } from '@/features/wishlist/components/WishlistCard'
-import type { WishlistListItem } from '@/features/wishlist/mockTypes'
+import type { WishlistItem } from '@/api/generated/model'
 
 // 행이 카드에 직접 넘기지 않는 값(펼침 상태는 행이 관리한다)을 뺀 카드 props
 export type WishlistRowCardProps = Omit<
@@ -10,8 +10,8 @@ export type WishlistRowCardProps = Omit<
 >
 
 interface WishlistRowProps {
-  items: WishlistListItem[] // 이 행에 놓일 항목. 1~2개(데스크톱 2열의 한 행, 홀수 개의 마지막 행은 1개)
-  getCardProps: (item: WishlistListItem) => WishlistRowCardProps // 항목 하나의 카드 props를 만드는 함수
+  items: WishlistItem[] // 이 행에 놓일 항목. 1~2개(데스크톱 2열의 한 행, 홀수 개의 마지막 행은 1개)
+  getCardProps: (item: WishlistItem) => WishlistRowCardProps // 항목 하나의 카드 props를 만드는 함수
   expandedId: number | null // 목록 전체에서 지금 펼쳐진 항목의 id(없으면 null). 상태는 목록(WishlistScreen)이 들고 있다
   onToggleExpanded: (wishlistItemId: number) => void // 어느 카드의 "자세히 보기/접기"를 눌렀는지 목록에 알린다
 }

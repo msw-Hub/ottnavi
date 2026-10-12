@@ -9,7 +9,7 @@ import { TableCell, TableRow } from '@/components/ui/table'
 import { MappingStateBadge } from '@/features/admin/components/MappingStateBadge'
 import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
 import { useSaveProviderMapping } from '@/features/admin/hooks/useAdminProviders'
-import type { AdminProvider, AdminProviderTier } from '@/features/admin/mockTypes'
+import type { AdminProvider, ProviderTier } from '@/api/generated/model'
 import {
   buildSaveRequest,
   CHOICE_IGNORED,
@@ -51,7 +51,7 @@ const SELECT_CLASS =
 export function ProviderMappingRow({ provider, services, variant }: ProviderMappingRowProps) {
   const save = useSaveProviderMapping()
   const [choice, setChoice] = useState(() => toChoiceValue(provider))
-  const [tier, setTier] = useState<AdminProviderTier>(provider.tier)
+  const [tier, setTier] = useState<ProviderTier>(provider.tier)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const isChanged = isMappingChanged(provider, choice, tier)
@@ -108,7 +108,7 @@ export function ProviderMappingRow({ provider, services, variant }: ProviderMapp
         id={`${idBase}-tier`}
         aria-label={`${provider.tmdbName} 등급`}
         value={tier}
-        onChange={(event) => setTier(event.target.value as AdminProviderTier)}
+        onChange={(event) => setTier(event.target.value as ProviderTier)}
         disabled={save.isPending}
         className={SELECT_CLASS}
       >

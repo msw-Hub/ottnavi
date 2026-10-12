@@ -1,4 +1,4 @@
-import type { OttService } from '@/api/generated/model'
+import type { OttService, TitleDetail } from '@/api/generated/model'
 import { AvailableServiceBadges } from '@/components/common/AvailableServiceBadges'
 import { DataAsOf } from '@/components/common/DataAsOf'
 import { EstimatedTag } from '@/components/common/EstimatedTag'
@@ -9,9 +9,9 @@ import { CastList } from '@/features/title-detail/components/CastList'
 import { SeasonSection } from '@/features/title-detail/components/SeasonSection'
 import { WishlistControl } from '@/features/title-detail/components/WishlistControl'
 import { MEDIA_TYPE_LABELS } from '@/features/title-detail/constants'
-import type { TitleDetail } from '@/features/title-detail/mockTypes'
 import { formatDate, formatMinutes } from '@/lib/format'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
+import { getTmdbImageUrl } from '@/lib/tmdbImage'
 
 interface TitleDetailContentProps {
   detail: TitleDetail // 불러온 작품 상세
@@ -27,12 +27,14 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
   // 개봉일/방영일은 "2021년 9월 17일" 모양의 일반 날짜 포맷 함수로 만든다(기준일용 formatDataAsOf와 의미를 구분)
   const releaseDateText = formatDate(detail.releaseDate)
   const statusEntries = buildServiceStatusEntries(services, detail.availabilities)
+  // 계약은 TMDB 상대 경로(posterPath)를 주고, 이미지 주소 조립은 프론트가 한다(frontend.md). 포스터가 없으면 null이라 대체 표시가 나온다
+  const posterUrl = getTmdbImageUrl(detail.posterPath, 'w500')
 
   return (
     <article className="flex flex-col gap-8">
       <div className="grid gap-6 sm:grid-cols-[14rem_1fr]">
         {/* 상세에서는 제목을 옆에 크게 보이므로 제목이 없는 PosterImage를 쓴다(PosterCard를 쓰면 제목이 두 번 나온다) */}
-        <PosterImage title={detail.title} posterUrl={detail.posterUrl} className="w-40 sm:w-full" />
+        <PosterImage title={detail.title} posterUrl={posterUrl} className="w-40 sm:w-full" />
 
         <div className="grid min-w-0 content-start gap-4">
           <header className="grid gap-1">
@@ -49,7 +51,7 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
               tmdbId={detail.tmdbId}
               seasonNumber={null}
               targetName={detail.title}
-              posterUrl={detail.posterUrl}
+              posterUrl={posterUrl}
             />
           )}
 
@@ -103,7 +105,7 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
         <SeasonSection
           tmdbId={detail.tmdbId}
           title={detail.title}
-          posterUrl={detail.posterUrl}
+          posterUrl={posterUrl}
           seasons={detail.seasons}
           services={services}
         />
