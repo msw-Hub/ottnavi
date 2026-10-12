@@ -277,7 +277,7 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 | 값 | 재발급 |
 |---|---|
 | 아무 키나 커밋·채팅에 노출 | 즉시 해당 서비스에서 폐기·재발급 → 등록 위치 전부 교체. git 이력에서 지우는 것은 이미 늦다(공개 저장소). |
-| `ORIGIN_SECRET` | 새 값 생성 → Cloudtype → Vercel(Production·Preview) → GitHub secrets 순으로 교체 → 재배포 |
+| `ORIGIN_SECRET` | 새 값 생성 → Cloudtype → Vercel(Production·Preview) → GitHub secrets 순으로 교체 → 재배포. 교체하는 동안 Cloudtype과 Vercel 값이 어긋나는 구간에는 `/api` 요청이 403이 된다(재배포가 끝날 때까지 수 분). 노출 사고 대응이라 수용한다 |
 | `ADMIN_BATCH_TOKEN` | 새 값 생성 → Cloudtype → GitHub secrets 교체 |
 | `JWT_SECRET` | 새 값 생성 → Cloudtype 교체 → 재시작(모든 사용자 로그아웃됨) |
 | DB·Redis 비밀번호 | 각 서비스 콘솔에서 비밀번호 재설정 → Cloudtype 교체 |
