@@ -64,8 +64,8 @@ const WISHLIST_LIMIT_EXCEEDED_ERROR_CODE = 'WISHLIST_LIMIT_EXCEEDED'
  * - 변경:   PATCH  /me/wishlist-items/{id}
  * - 해제:   DELETE /me/wishlist-items/{id}
  * 변경·해제는 찜 항목 ID가 있어야 보낼 수 있다. 캐시에 항목이 없으면(찜하지 않은 상태) 요청을 보내지 않는다.
- * 찜 상태를 TanStack Query 캐시에 두는 이유: 목업 단계에는 "내 찜 목록 조회" API가 아직 없다. 요청이 성공할 때마다 캐시를 고쳐
- * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
+ * 찜 상태를 TanStack Query 캐시에 두는 이유: 검색 카드·상세 화면은 찜 목록 조회(listWishlistItems)를 따로 부르지 않는다. 요청이 성공할 때마다 캐시를 고쳐
+ * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 실제 백엔드를 연결하면 서버 목록 기반으로 바꾼다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
  * queryFn을 skipToken으로 둔 이유: 서버에서 가져올 값이 없고 initialData(빈 객체)가 시작값이라 요청을 보내지 않기 위함이다.
  * 비로그인이면 추가·우선순위 변경·해제 모두 요청을 보내지 않고 로그인 화면(/login)으로 보낸다(from 포함). 서버가 401을 줘도 같다.
  * 찜 상태(priority)도 비로그인이면 null이다. features/title-detail의 같은 이름 훅과 같은 방식이다.

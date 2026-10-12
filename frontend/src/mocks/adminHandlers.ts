@@ -73,8 +73,8 @@ import {
  * - POST   /api/admin/collect/executions/:executionId/recover      중단됨 → 실패로 기록(200)
  * - POST   /api/admin/collect/executions/:executionId/restart      실패한 실행 다시 실행(202, 새 executionId)
  *
- * 규칙 위반은 서버처럼 409 + 제안 오류 코드로 돌려준다(상태 코드와 이름은 모두 "제안"이다. 규칙 위반은 요청 모양 오류(400)가 아니라
- * 현재 저장된 줄과의 충돌이라 409로 두었고, 422와의 선택은 Task 031 계약 절차에서 정한다). 입력 모양 오류는 400 VALIDATION_FAILED다.
+ * 규칙 위반은 서버처럼 409 + 오류 코드로 돌려준다(Task 031 계약 확정. 규칙 위반은 요청 모양 오류(400)가 아니라
+ * 현재 저장된 줄과의 충돌이라 409다). 입력 모양 오류는 400 VALIDATION_FAILED다.
  */
 
 // 요청 처리에 걸리는 시간. 테스트에서는 기다리지 않고, 브라우저에서는 로딩 상태가 눈에 보이게 잠깐 기다린다
@@ -799,7 +799,7 @@ export const adminHandlers: RequestHandler[] = [
       ...target,
       status: 'FAILED',
       // 복구는 "끝난 시각"을 알 수 없다(서버가 언제 멈췄는지 모른다). 그래서 종료 시각을 기록하지 않고 null로 두며 화면은 "—"로 보인다.
-      // 서버가 복구 시 종료 시각을 기록할지는 Task 031 안건이다(사용자 결정 2026-10-11)
+      // 계약(Task 031 확정): recover 응답의 endedAt은 null이다. Spring Batch의 recover는 END_TIME을 채우지만 API는 batch.recovered 표시를 읽어 null로 내린다
       failureReason: '서버가 중간에 멈춰 복구하면서 실패로 기록했습니다.',
     }
     saveExecution(recovered)

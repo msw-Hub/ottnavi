@@ -265,7 +265,7 @@ export const updateAdminProduct = (
 
 export const getUpdateAdminProductMutationKey = () => ['updateAdminProduct'] as const;
 
-export const getUpdateAdminProductMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
+export const getUpdateAdminProductMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProduct>>, TError,UpdateAdminProductMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAdminProduct>>, TError,UpdateAdminProductMutationVariables, TContext> => {
 
@@ -294,13 +294,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateAdminProductMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminProduct>>>
     export type UpdateAdminProductMutationBody = BodyType<UpdateAdminProductRequest>
-    export type UpdateAdminProductMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>
+    export type UpdateAdminProductMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>
     export type UpdateAdminProductMutationVariables = {productId: number;data: BodyType<UpdateAdminProductRequest>}
 
     /**
  * @summary OTT 구독상품 이름·판매 여부 수정 (제안)
  */
-export const useUpdateAdminProduct = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
+export const useUpdateAdminProduct = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProduct>>, TError,UpdateAdminProductMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateAdminProduct>>,

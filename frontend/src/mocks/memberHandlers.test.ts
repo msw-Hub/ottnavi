@@ -298,13 +298,17 @@ describe('플랜 계산과 저장', () => {
 describe('요금', () => {
   // 넷플릭스 스탠다드의 상품 ID(101). 요금 API의 키는 서비스 ID가 아니라 상품 ID다
   const NETFLIX_PRODUCT_ID = 101
+  // 판매 종료로 둔 왓챠 베이직의 상품 ID(106)
+  const WATCHA_PRODUCT_ID = 106
 
   it('요금 목록은 상품 단위 줄이고 요금 기준 일시(lastVerifiedAt)를 date-time으로 준다', async () => {
     const res = await request<CommonResponseServicePriceList>({
       url: '/me/service-prices',
       method: 'GET',
     })
-    expect(res.data.services).toHaveLength(7)
+    // 판매 종료인 왓챠(106)는 빠지고 6개만 나온다
+    expect(res.data.services).toHaveLength(6)
+    expect(res.data.services.map((p) => p.productId)).not.toContain(WATCHA_PRODUCT_ID)
     expect(res.data.services[0]).toMatchObject({
       ottServiceId: 1,
       productId: NETFLIX_PRODUCT_ID,
@@ -354,6 +358,21 @@ describe('요금', () => {
     const deleteError = await request({ url: '/me/service-prices/999', method: 'DELETE' }).catch(
       (e: unknown) => e,
     )
+    expect(deleteError).toMatchObject({ status: 404, errorCode: 'SERVICE_PRICE_NOT_FOUND' })
+  })
+
+  it('판매 종료 상품도 PUT·DELETE가 404 SERVICE_PRICE_NOT_FOUND다', async () => {
+    const putError = await request({
+      url: `/me/service-prices/${WATCHA_PRODUCT_ID}`,
+      method: 'PUT',
+      data: { monthlyPrice: 1000 },
+    }).catch((e: unknown) => e)
+    expect(putError).toMatchObject({ status: 404, errorCode: 'SERVICE_PRICE_NOT_FOUND' })
+
+    const deleteError = await request({
+      url: `/me/service-prices/${WATCHA_PRODUCT_ID}`,
+      method: 'DELETE',
+    }).catch((e: unknown) => e)
     expect(deleteError).toMatchObject({ status: 404, errorCode: 'SERVICE_PRICE_NOT_FOUND' })
   })
 

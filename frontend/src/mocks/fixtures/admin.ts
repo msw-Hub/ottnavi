@@ -56,6 +56,14 @@ export const MOCK_PRODUCTS: MockProduct[] = [
   { ottServiceId: 7, productId: 107, productName: '쿠팡플레이', adminPrice: 7890 },
 ]
 
+// 판매 종료로 둔 목업 상품(왓챠 베이직). 관리자 화면의 종료 상품 표시 확인용이고, 회원 요금 목록에는 나오지 않는다
+const SUSPENDED_PRODUCT_IDS = [106]
+
+// 판매 중인 상품인지 확인한다(회원 요금 API는 판매 중인 상품만 다룬다)
+export function isProductOnSale(productId: number): boolean {
+  return !SUSPENDED_PRODUCT_IDS.includes(productId)
+}
+
 // 서비스 ID로 상품을 찾는다. 없으면 undefined
 export function findMockProduct(ottServiceId: number): MockProduct | undefined {
   return MOCK_PRODUCTS.find((product) => product.ottServiceId === ottServiceId)
@@ -91,7 +99,7 @@ function priceRow(
  * - 애플 TV+: 마지막 확인일이 오늘로부터 120일 전 — 오래됨 태그(90일 초과) 확인용
  * - 왓챠: 판매 종료(isActive=false) — 종료 상품 표시 확인용
  * - 나머지: 줄 하나, 최근에 확인함
- * 지금 적용 중인 줄의 금액은 pricing.ts(SCR-09)의 기본 월 요금과 같다.
+ * 지금 적용 중인 줄의 금액은 위 MOCK_PRODUCTS(SCR-09)의 기본 월 요금과 같다.
  */
 export function buildMockAdminProducts(today: string): AdminProduct[] {
   return MOCK_PRODUCTS.map((product): AdminProduct => {
@@ -112,7 +120,7 @@ export function buildMockAdminProducts(today: string): AdminProduct[] {
     } else {
       prices = [priceRow(productId, 1, adminPrice, addDays(today, -180), addDays(today, -7))]
     }
-    if (productId === 106) isActive = false // 왓챠: 판매 종료
+    if (!isProductOnSale(productId)) isActive = false // 왓챠: 판매 종료
 
     return {
       productId: productId,
@@ -148,7 +156,7 @@ function mappedProvider(
 /**
  * TMDB 제공처 목록을 만든다. 순서는 매핑됨(Task 004 표 순서) → 관련 없음 → 미매핑이다.
  * 화면이 미매핑을 맨 위로 올려 강조하는 정렬은 화면(핸들러·훅) 몫이다.
- * 서비스 ID는 pricing.ts의 서비스 번호(1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이)와 같다.
+ * 서비스 ID는 위 MOCK_PRODUCTS의 서비스 번호(1 넷플릭스, 2 디즈니+, 3 애플 TV+, 4 티빙, 5 웨이브, 6 왓챠, 7 쿠팡플레이)와 같다.
  */
 export function buildMockAdminProviders(today: string): AdminProvider[] {
   return [

@@ -32,6 +32,7 @@ import {
   MOCK_PRICE_EFFECTIVE_FROM,
   MOCK_PRICE_VERIFIED_AT,
   MOCK_PRODUCTS,
+  isProductOnSale,
 } from '@/mocks/fixtures/admin'
 import { DEFAULT_USER_SETTINGS, EMPTY_USER_SETTINGS } from '@/mocks/fixtures/settings'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
@@ -44,22 +45,21 @@ import {
 /*
  * ===== 회원 화면 목업 핸들러 (Task 028, SCR-07~10) =====
  *
- * 임시 경로 주의: 아래 API는 아직 계약(docs/api/openapi.yaml)에 없다. 경로·요청·응답 모양은 화면을 먼저 만들기 위한 제안이며
- * Task 031에서 계약으로 확정된다. 그때 orval이 만드는 생성 목업으로 바뀌면 이 핸들러와 fixtures는 지운다.
+ * 경로·요청·응답 모양은 확정 계약(docs/api/openapi.yaml, Task 031)을 따른다. 생성 목업(*.msw.ts)은 example 한 가지만 주므로
+ * 검색 필터·찜 저장·20개 상한 같은 동작은 이 핸들러가 맡는다.
  * 모두 로그인이 필요하다(목업 로그인 역할이 GUEST면 401).
  *
  * - 내 설정:   GET  /api/me/settings                 (온보딩 전에는 isOnboardingDone=false인 빈 설정)
  *              PUT  /api/me/settings                 (저장하면 온보딩 완료. 입력 규칙 위반은 400 VALIDATION_FAILED)
  * - 찜 목록:   GET  /api/me/wishlist-items           (추가·우선순위·다 봤음 PATCH·삭제는 handlers.ts의 Task 027 핸들러를 쓴다)
- * - 요금:      GET    /api/me/service-prices                (상품별 요금 줄)
- *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없는 상품은 404 SERVICE_PRICE_NOT_FOUND)
+ * - 요금:      GET    /api/me/service-prices                (판매 중인 상품별 요금 줄. 판매 종료 상품은 나오지 않는다)
+ *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없거나 판매 종료인 상품은 404 SERVICE_PRICE_NOT_FOUND)
  *              DELETE /api/me/service-prices/{productId}    (고친 금액을 지우고 기본 요금으로 되돌림, 204)
- *              PATCH /api/me/pricing/{ottServiceId}  ({ monthlyPrice: 정수 | null }. null이면 기본 요금으로 되돌림)
  * - 플랜:      POST /api/me/plan-drafts              (유형 3종 초안을 새로 계산, 201 + 초안 3개)
  *              GET  /api/me/plan-drafts              (계산 전이거나 저장한 뒤에는 빈 목록)
  *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 저장하면 나머지 초안은 삭제)
  *
- * 시나리오(?mockScenario=):
+ * 시나리오(주소의 ?mockScenario= 값을 목업 모드가 X-Mock-Scenario 요청 헤더로 보낸다):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
  * - same:       세 플랜 유형의 선택이 같다(유형마다 초안 3개를 응답하되 내용이 같다. 합쳐 표시는 프론트 몫: mergeIdenticalDrafts). same-split은 same의 별칭
  * - error:      플랜 계산이 500 오류를 돌려준다
@@ -385,20 +385,23 @@ export const memberHandlers: RequestHandler[] = [
     const body: CommonResponseServicePriceList = {
       success: true,
       data: {
-        services: MOCK_PRODUCTS.map((product) => toServicePrice(product.ottServiceId, settings)),
+        // 판매 종료 상품은 목록에서 뺀다(계약: 판매 중인 상품만 준다)
+        services: MOCK_PRODUCTS.filter((product) => isProductOnSale(product.productId)).map(
+          (product) => toServicePrice(product.ottServiceId, settings),
+        ),
       },
     }
     return HttpResponse.json(body)
   }),
 
-  // 내 월 요금 설정(PUT). 0원 이상 100만 원 이하 정수만 받는다. 요금을 고칠 수 없는 상품이면 404 SERVICE_PRICE_NOT_FOUND
+  // 내 월 요금 설정(PUT). 0원 이상 100만 원 이하 정수만 받는다. 없는 상품이거나 판매 종료 상품이면 404 SERVICE_PRICE_NOT_FOUND
   http.put('/api/me/service-prices/:productId', async ({ request, params }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
-    if (!product) return servicePriceNotFound(request)
+    if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 
     const { monthlyPrice } = (await request.json()) as SetMyServicePriceRequest
     if (!Number.isInteger(monthlyPrice) || monthlyPrice < 0 || monthlyPrice > 1_000_000) {
@@ -421,7 +424,7 @@ export const memberHandlers: RequestHandler[] = [
     if (denied) return denied
 
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
-    if (!product) return servicePriceNotFound(request)
+    if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 
     priceOverrides.delete(product.productId)
     persistPriceOverrides()
