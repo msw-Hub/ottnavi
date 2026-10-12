@@ -18,7 +18,10 @@ import type { ProductType } from './productType';
 export interface AdminProduct {
   /** OTT 구독상품 ID */
   productId: number;
-  /** 이름. 예 "넷플릭스 스탠다드" */
+  /**
+     * 이름. 예 "넷플릭스 스탠다드"
+     * @maxLength 100
+     */
   name: string;
   productType: ProductType;
   /** 이 상품이 속한 서비스 ID */

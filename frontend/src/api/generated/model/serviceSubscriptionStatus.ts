@@ -12,7 +12,7 @@
 
 /**
  * 서비스 이용 상태. SUBSCRIBED 구독 중 / FREE 가족 공유 등 무료 이용 / NOT_SUBSCRIBED 미구독 / UNKNOWN 잘 모르겠음.
- * UNKNOWN도 저장한다. 설정을 다시 열면 고른 값 그대로 보인다. 계산에서는 NOT_SUBSCRIBED와 같이 취급한다(볼 수 있는 서비스로 세지 않음). ERD `user_subscription` 상태 값에 `UNKNOWN`을 추가해야 한다(Task 032).
+ * UNKNOWN도 저장한다. 설정을 다시 열면 고른 값 그대로 보인다. 계산에서는 NOT_SUBSCRIBED와 같이 취급한다(볼 수 있는 서비스로 세지 않음). ERD `user_subscription` 상태 값에 `UNKNOWN`이 있다(ERD v0.4에 반영됨).
  */
 export type ServiceSubscriptionStatus = typeof ServiceSubscriptionStatus[keyof typeof ServiceSubscriptionStatus];
 

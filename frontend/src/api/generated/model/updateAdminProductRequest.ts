@@ -15,8 +15,9 @@
  */
 export interface UpdateAdminProductRequest {
   /**
-     * 이름
+     * 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
      * @minLength 1
+     * @maxLength 100
      */
   name?: string;
   /** false 판매 종료 / true 판매 재개 */

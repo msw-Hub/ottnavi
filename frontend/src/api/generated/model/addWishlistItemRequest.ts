@@ -20,6 +20,7 @@ export interface AddWishlistItemRequest {
   /**
      * TMDB ID
      * @minimum 1
+     * @maximum 2147483647
      */
   tmdbId: number;
   /**
