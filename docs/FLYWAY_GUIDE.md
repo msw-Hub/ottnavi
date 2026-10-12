@@ -28,8 +28,8 @@
 | 의존성 | `spring-boot-starter-flyway` (Boot 4에서는 이게 없으면 Flyway가 돌지 않는다), PostgreSQL용 `flyway-database-postgresql` |
 | 실행 시점 | 앱 시작 시 자동. JPA보다 먼저 돌아서 테이블이 만들어진 뒤에 엔티티를 검사한다 |
 | 역할 분담 | `ddl-auto: validate`는 **엔티티와 DB 구조가 같은지 검사만** 한다(테이블을 만들지 않는다). 구조를 만드는 건 Flyway뿐이다 |
-| Spring Batch | `initialize-schema: never`라 라이브러리가 표를 안 만든다. `BATCH_*`는 Flyway V4가 만든다(Task 033에서 추가 예정) |
-| 번호 배정 | **현재 있는 파일은 V1 `ott_service`뿐이다.** 앞으로 V2~V4 작품·상품·배치는 Task 033, V5~V7 사용자·플랜·알림은 Task 034에서 추가한다. 번호는 Task에 미리 배정돼 있다 |
+| Spring Batch | `initialize-schema: never`라 라이브러리가 표를 안 만든다. `BATCH_*`는 Flyway V4가 만든다(Task 033에서 추가 완료) |
+| 번호 배정 | **현재 있는 파일은 V1~V4다**(V1 `ott_service`, V2~V4 작품·상품·배치는 Task 033에서 완료). V5~V7 사용자·플랜·알림은 Task 034에서 추가할 예정이다. 번호는 Task에 미리 배정돼 있다 |
 | 테스트 | Testcontainers가 빈 PostgreSQL 17.6을 띄우고 그 시점에 있는 파일(V1부터)을 전부 적용한 뒤 검사한다. 파일에 오타가 있으면 테스트가 바로 실패한다 |
 
 ## 4. 작업할 때 지킬 것
