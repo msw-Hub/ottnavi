@@ -254,7 +254,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 키는 저장소 밖(비밀번호 관리자 등)에만 보관. Gemini 키는 Task 085, Grafana Cloud 계정은 Task 096에서 발급한다
 - 완료 기준
   - V-H: 서비스별 발급 여부·발급일·보관 위치(값 제외)를 기록했고, 저장소·채팅에 키가 없음을 확인했다.
-- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 켜 둔 상태(백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/TECH.md` 8절 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
+- 기록: 2026-10-05 사용자가 완료를 보고했다. 키·비밀번호는 모두 저장소 밖(비밀번호 관리자)에 보관하고 값은 어디에도 적지 않는다. 서비스별 발급일은 사용자의 비밀번호 관리자 기록을 따른다. 확인한 설정: **Supabase** PostgreSQL 17.11(로컬 compose는 17.6이며 17.x 마이너 차이라 호환에 문제 없다고 보고 맞추지 않음), Session Pooler 5432, Data API는 꺼 둔 상태(2026-10-13 사용자 확인. 백엔드는 JDBC 직접 접속, 이 프로젝트는 Supabase 클라이언트 라이브러리를 쓰지 않음). **Redis Cloud** 8.6, eviction `allkeys-lru`, persistence 없음, TLS는 꺼 둔 상태(Task 016·020에서 Spring 접속 확인과 함께 켤지 정함), 프로토콜 RESP3, 비밀번호는 Redis Cloud가 자동 생성한 기본 사용자 비밀번호. **Cloudtype** 가입과 GitHub 저장소 연동 확인(`ottnavi`가 목록에 표시됨, 서비스는 아직 만들지 않음). **Gmail 앱 비밀번호**는 SMTP 시험용으로 발급(`MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`). GitHub 저장소는 소유자 계정으로 `admin` 권한이다. 변수별 등록 위치와 난수 생성 방법은 `docs/TECH.md` 8절 "비밀 값 보관 규칙"에 정리했다. **주의**: Redis Cloud 무료 DB는 14일 동안 Redis 명령이 없으면 삭제된다(Task 003 `기록:`). 백엔드가 Redis를 쓰기 전까지 삭제되면 다시 만든다.
 
 #### Task 003: 약관·운영 정책 조사로 표현과 제약 확정 ✅
 - 태그: [H] · PRD: H2, R11-27 · 선행: 없음
@@ -912,7 +912,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
-  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개, 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
+  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
   - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
   - [ ] TV 시즌 호출량 지표(R11-26 측정용)

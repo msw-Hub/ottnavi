@@ -1,7 +1,7 @@
 # Task 034 작업 안내서 (V5~V7 Flyway 마이그레이션)
 
 > 2026-10-13 작성. 기준은 `docs/ERD.md` v0.4(C·D·E 영역), `docs/ROADMAP.md` Task 034, ROADMAP Task 032 `기록:`의 확정 결정(D1~D9)이다.
-> **아래 SQL과 테스트는 실제로 실행해 확인했다.** 임시 PostgreSQL 17.6에서 정상·거부 케이스를 돌렸고, V1~V7을 모두 적용한 Gradle 테스트(새 11건)도 통과했다(V2~V4는 033 안내서의 SQL로 채움). 백엔드 전체 테스트는 돌리지 않았다. Flyway가 처음이면 `docs/FLYWAY_GUIDE.md`를 먼저 본다(5분).
+> **아래 SQL과 테스트는 실제로 실행해 확인했다.** 임시 PostgreSQL 17.6에서 정상·거부 케이스를 돌렸고, V1~V7을 모두 적용한 Gradle 테스트(새 13건)도 통과했다(V2~V4는 033 안내서의 SQL로 채움). 백엔드 전체 테스트는 돌리지 않았다. Flyway가 처음이면 `docs/FLYWAY_GUIDE.md`를 먼저 본다(5분).
 
 ## 1. 한눈에 보기
 
@@ -291,7 +291,7 @@ CREATE TABLE shedlock (
 | ② V5 | 3절 SQL로 `V5__create_user.sql` 생성(밑줄 **두 개**) | 로컬 DB를 켜고(`docker compose -f infra/docker-compose.yml up -d`) `.\gradlew.bat bootRun`, 로그에 V5 적용 |
 | ③ V6 | 4절 SQL로 `V6__create_plan.sql` 생성 | 다시 기동해 V6 적용 |
 | ④ V7 | 5절 SQL로 `V7__create_notification.sql` 생성 | 다시 기동, 앱이 정상 기동 |
-| ⑤ 테스트 | 7절 테스트를 `UserPlanMigrationTest.java`로 생성 | `.\gradlew.bat test --tests "com.ottnavi.migration.UserPlanMigrationTest"` 11건 통과 |
+| ⑤ 테스트 | 7절 테스트를 `UserPlanMigrationTest.java`로 생성 | `.\gradlew.bat test --tests "com.ottnavi.migration.UserPlanMigrationTest"` 13건 통과 |
 | ⑥ 전체 | `.\gradlew.bat build` | 실패 0건. `build/test-results/test/`의 XML에서 `tests`·`failures`·`errors` 확인 |
 | ⑦ 기록 | ROADMAP Task 034 `기록:` 작성(9절 틀) | 사용자가 요청하면 커밋·PR |
 
@@ -299,7 +299,7 @@ CREATE TABLE shedlock (
 
 기존 `IntegrationTestSupport`를 상속하므로 Testcontainers가 PostgreSQL 17.6을 띄우고 V1~V7을 적용한 DB로 검사한다. `@Transactional`이라 테스트마다 롤백된다. 작품·상품 FK가 필요한 테스트는 헬퍼가 `title`·`watch_unit`·`subscription_product`를 직접 넣는다(V2·V3 컬럼 기준).
 
-**이 테스트가 확인하는 것** — 거부 5건, 정상 통과 1건, 삭제 동작 3건, 구조 2건.
+**이 테스트가 확인하는 것** — 거부 7건, 정상 통과 1건, 삭제 동작 3건, 구조 2건.
 
 | # | 테스트 | 확인하는 것 | 막으려는 사고 |
 |---|---|---|---|
@@ -309,11 +309,13 @@ CREATE TABLE shedlock (
 | 4 | 한_사용자의_ACTIVE_플랜이_둘이면_거부한다 | 부분 유니크 `uk_plan_active` | 현재 플랜이 둘이라 알림·재계산 대상이 모호해지는 것 |
 | 5 | 같은_유형_DRAFT가_둘이면_거부한다 | 부분 유니크 `uk_plan_draft_type` | 같은 유형 계산 결과가 겹쳐 쌓이는 것 |
 | 6 | 서로_다른_유형_DRAFT_3개는_허용한다 | 추천형·절약형·간편형 DRAFT 3개가 한꺼번에 저장된다 | 5번 제약이 정상 입력까지 막는 것(반대쪽 검증) |
-| 7 | 구독_중이_아닌데_결제일이_있으면_거부한다 | `ck_user_subscription_paid_only` | 무료·잘 모르겠음 상태에 결제일이 남는 것 |
-| 8 | 확정_여부가_달_번호와_다르면_거부한다 | `confirmed`는 `month_index = 0`일 때만 true | 이번 달이 아닌데 확정으로 표시되는 것 |
-| 9 | 같은_dedupe_key_알림은_거부한다 | `notification_outbox.dedupe_key` 유니크 | 같은 달 알림 메일이 두 번 생기는 것 |
-| 10 | ShedLock_표가_있고_이름이_기본키다 | `shedlock`이 만들어져 있고 같은 이름은 중복 불가 | ShedLock이 표를 못 찾아 스케줄 작업이 실패하는 것 |
-| 11 | 참조_컬럼_인덱스가_모두_있다 | ERD가 정한 인덱스 6개 존재 | 인덱스를 빼먹어 삭제·조회가 느려지는 것 |
+| 7 | 구독_중이_아닌데_결제일이_있으면_거부한다 | `ck_user_subscription_paid_only`가 결제일을 막는다 | 무료·잘 모르겠음 상태에 결제일이 남는 것 |
+| 8 | 구독_중이_아닌데_플랜명이_있으면_거부한다 | 같은 CHECK가 플랜명도 막는다(결제일만 막는 잘못된 CHECK를 잡는다) | 무료 상태에 요금제 이름이 남는 것 |
+| 9 | 확정_여부가_달_번호와_다르면_거부한다 | 1번째 달인데 `confirmed = true`면 거부 | 이번 달이 아닌데 확정으로 표시되는 것 |
+| 10 | 이번_달인데_확정이_아니면_거부한다 | 0번째 달인데 `confirmed = false`면 거부(9번과 합쳐 `confirmed ⇔ month_index = 0` 양방향 확인) | 이번 달이 확정으로 표시되지 않는 것 |
+| 11 | 같은_dedupe_key_알림은_거부한다 | `notification_outbox.dedupe_key` 유니크 | 같은 달 알림 메일이 두 번 생기는 것 |
+| 12 | ShedLock_표가_있고_이름이_기본키다 | `shedlock`이 만들어져 있고 같은 이름은 중복 불가 | ShedLock이 표를 못 찾아 스케줄 작업이 실패하는 것 |
+| 13 | 참조_컬럼_인덱스가_모두_있다 | ERD가 정한 인덱스 6개 존재 | 인덱스를 빼먹어 삭제·조회가 느려지는 것 |
 
 ```java
 package com.ottnavi.migration;
@@ -484,11 +486,29 @@ class UserPlanMigrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void 구독_중이_아닌데_플랜명이_있으면_거부한다() {
+        long userId = insertUser("g2@test.com");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO user_subscription (user_id, ott_service_id, status, plan_name) VALUES (?, 1, 'FREE', '스탠다드')", userId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void 확정_여부가_달_번호와_다르면_거부한다() {
         long planId = insertPlan(insertUser("h@test.com"), "DRAFT", "RECOMMENDED");
 
         assertThatThrownBy(() -> jdbc.update(
                 "INSERT INTO plan_month (plan_id, month_index, month, confirmed, cost) VALUES (?, 1, DATE '2026-12-01', TRUE, 0)", planId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void 이번_달인데_확정이_아니면_거부한다() {
+        long planId = insertPlan(insertUser("h2@test.com"), "DRAFT", "RECOMMENDED");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO plan_month (plan_id, month_index, month, confirmed, cost) VALUES (?, 0, DATE '2026-11-01', FALSE, 0)", planId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -543,10 +563,10 @@ class UserPlanMigrationTest extends IntegrationTestSupport {
 - ROADMAP Task 034 구현 사항의 추가 인덱스 목록에 `plan_month_product(plan_month_id)`가 있지만 ERD 규칙(유니크 인덱스 선두 컬럼이 덮는 FK는 따로 만들지 않는다)에 따라 **만들지 않았다**. `UNIQUE(plan_month_id, product_id)`가 그 역할을 한다. 같은 PR에서 ROADMAP 문구도 고친다.
 - 열거 값(`status`, `plan_type`, `price_source` 등)과 금액·분 `>= 0` 하한 CHECK를 넣었다(Task 032 D3). 입력 상·하한(120~44640분, 100만 원)은 계약 검증에 맡겼다.
 
-**확인한 것(`실행 확인`):** V5~V7 적용, 정상 입력 통과, 거부 14건(유니크·CHECK 위반), DRAFT 삭제 CASCADE(하위 4개 표 0행), 사용자 삭제 CASCADE와 `calc_run.plan_id` NULL, 인덱스 존재, Gradle 테스트 11건 통과(V1~V7).
+**확인한 것(`실행 확인`):** V5~V7 적용, 정상 입력 통과, 거부 14건(유니크·CHECK 위반), DRAFT 삭제 CASCADE(하위 4개 표 0행), 사용자 삭제 CASCADE와 `calc_run.plan_id` NULL, 인덱스 존재, Gradle 테스트 13건 통과(V1~V7).
 
 **확인 못 한 것:** 033 병합 전이라 실제 V2~V4 파일이 아니라 033 안내서의 SQL로 확인했다. Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035·062), 백엔드 전체 테스트.
 
 ## 10. ROADMAP `기록:` 틀 (완료 때 채운다)
 
-- 기록: {날짜} 완료(브랜치 `feature/b0-schema-user-plan`, PR #{번호}). V5(사용자 영역 5개 테이블), V6(플랜 영역 6개), V7(`notification_outbox`, `shedlock`). 마이그레이션 테스트 11건, 전체 {N}건 통과. `plan_month_product(plan_month_id)` 별도 인덱스는 유니크 인덱스가 덮어 만들지 않았다. 확정: `users` 컬럼 모두 NOT NULL, `plan_item.completed_month_index`는 UNSCHEDULED면 NULL, `plan.change_summary`는 TEXT(형식은 Task 069). 넘길 내용: Task 035·062(엔티티 타입 매핑), 056(찜 20개 직렬화), 066·069(ACTIVE 교체 순서), 069(`change_summary` 형식).
+- 기록: {날짜} 완료(브랜치 `feature/b0-schema-user-plan`, PR #{번호}). V5(사용자 영역 5개 테이블), V6(플랜 영역 6개), V7(`notification_outbox`, `shedlock`). 마이그레이션 테스트 13건, 전체 {N}건 통과. `plan_month_product(plan_month_id)` 별도 인덱스는 유니크 인덱스가 덮어 만들지 않았다. 확정: `users` 컬럼 모두 NOT NULL, `plan_item.completed_month_index`는 UNSCHEDULED면 NULL, `plan.change_summary`는 TEXT(형식은 Task 069). 넘길 내용: Task 035·062(엔티티 타입 매핑), 056(찜 20개 직렬화), 066·069(ACTIVE 교체 순서), 069(`change_summary` 형식).

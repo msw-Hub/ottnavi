@@ -28,7 +28,7 @@ DB가 막아 주는 잘못된 데이터는 이렇다. 테스트와 1:1로 대응
 | `uk_title_media_tmdb` | 같은 종류의 같은 TMDB ID 중복(영화 100과 드라마 100은 허용) |
 | `uk_watch_unit_title_season` + `NULLS NOT DISTINCT` | 영화(시즌 NULL)를 한 작품에 둘 넣기. 일반 UNIQUE는 NULL끼리 다른 값으로 봐서 못 막는다 |
 | `ck_watch_unit_season` | 시즌인데 시즌 번호 없음 / 영화인데 시즌 번호 있음 |
-| `ck_watch_unit_episode_counts` | 회차 수(전체·방영·러닝타임 없음)가 음수. 영화 작품에 시즌 단위를 넣는 것은 DB가 막지 않고 수집 Job이 지킨다(Task 043·044) |
+| `ck_watch_unit_episode_counts` | 회차 수(전체·방영·러닝타임 없음)가 음수. 영화 작품에 시즌 단위를 넣는 것과 영화 단위의 `episode_count`가 1이 아닌 것은 DB가 막지 않고 수집 Job이 지킨다(Task 043·044) |
 | `ck_availability_unknown_reason` | 모름 상태인데 이유 없음 / 모름이 아닌데 이유 있음 |
 | `uk_availability_unit_service` | 같은 시청 단위·서비스 조합 중복 |
 | `ck_tmdb_provider_mapped` | 연결됨(MAPPED) 상태인데 서비스 없음 / 그 반대 |
