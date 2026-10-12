@@ -35,7 +35,6 @@ export function useUserSettings(options?: { enabled?: boolean }) {
       customInstance<CommonResponseUserSettings>({
         url: '/me/settings',
         method: 'GET',
-        params: getMockRequestParams(),
         signal,
       }),
     select: (res) => res.data,
@@ -57,7 +56,6 @@ export function useSaveUserSettings() {
         url: '/me/settings',
         method: 'PUT',
         data: request,
-        params: getMockRequestParams(),
       }),
     onSuccess: (res) => {
       queryClient.setQueryData(getSettingsQueryKey(), res)

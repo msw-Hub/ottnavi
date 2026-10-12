@@ -32,7 +32,6 @@ export function useAdminProducts() {
       customInstance<CommonResponseAdminProductList>({
         url: '/admin/products',
         method: 'GET',
-        params: getMockScenarioParams(),
         signal,
       }),
     select: (res) => res.data,

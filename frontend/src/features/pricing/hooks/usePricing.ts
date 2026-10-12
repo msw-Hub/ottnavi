@@ -20,7 +20,6 @@ export function usePricing() {
       customInstance<CommonResponsePricingOverview>({
         url: '/me/pricing',
         method: 'GET',
-        params: getMockRequestParams(),
         signal,
       }),
     select: (res) => res.data,

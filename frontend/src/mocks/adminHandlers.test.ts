@@ -136,14 +136,14 @@ describe('시나리오', () => {
     const empty = await customInstance<CommonResponseAdminProductList>({
       url: '/admin/products',
       method: 'GET',
-      params: { mockScenario: 'empty' },
+      headers: { 'X-Mock-Scenario': 'empty' },
     })
     expect(empty.data.products).toEqual([])
     expect(
       await failureCodeOf({
         url: '/admin/products',
         method: 'GET',
-        params: { mockScenario: 'error' },
+        headers: { 'X-Mock-Scenario': 'error' },
       }),
     ).toBe('INTERNAL_ERROR')
   })
@@ -243,7 +243,7 @@ describe('제공처 매핑', () => {
       await failureCodeOf({
         url: '/admin/providers/283',
         method: 'PATCH',
-        params: { mockScenario: 'save-error' },
+        headers: { 'X-Mock-Scenario': 'save-error' },
         data: { mappingState: 'IGNORED', ottServiceId: null, tier: 'STANDARD' },
       }),
     ).toBe('INTERNAL_ERROR')
@@ -372,7 +372,7 @@ describe('수집 실행·이력', () => {
       await failureCodeOf({
         url: '/admin/collect',
         method: 'POST',
-        params: { mockScenario: 'run-error' },
+        headers: { 'X-Mock-Scenario': 'run-error' },
         data: { targetDate: addDays(TODAY, -6), tier: 'ALL' },
       }),
     ).toBe('INTERNAL_ERROR')

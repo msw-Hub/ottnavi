@@ -30,7 +30,6 @@ function requestCalculatePlan() {
   return customInstance<CommonResponsePlanDraftList>({
     url: '/me/plans/calculate',
     method: 'POST',
-    params: getMockRequestParams(),
   })
 }
 
@@ -48,7 +47,6 @@ export function usePlanDrafts() {
       customInstance<CommonResponsePlanDraftList>({
         url: '/me/plans/drafts',
         method: 'GET',
-        params: getMockRequestParams(),
         signal,
       }),
     select: (res) => res.data.drafts,
@@ -99,7 +97,6 @@ export function useSavePlan() {
           url: `/me/plans/${planType}/save`,
           method: 'POST',
           data: { planId },
-          params: getMockRequestParams(),
         })
         return { kind: 'saved', plan: res.data }
       } catch (error) {

@@ -82,7 +82,7 @@ describe('내 설정', () => {
       url: '/me/settings',
       method: 'PUT',
       data: SETTINGS_REQUEST,
-      params: { mockVariantWatch: 'b' },
+      headers: { 'X-Mock-Variant-Watch': 'b' },
     })
     expect(b.data.weeklyInput).toEqual({ timesPerWeek: 3, hoursPerTime: 2 })
   })
@@ -131,7 +131,7 @@ describe('플랜 계산과 저장', () => {
     return request<CommonResponsePlanDraftList>({
       url: '/me/plans/calculate',
       method: 'POST',
-      params: scenario ? { mockScenario: scenario } : undefined,
+      headers: scenario ? { 'X-Mock-Scenario': scenario } : undefined,
     })
   }
 
@@ -169,7 +169,7 @@ describe('플랜 계산과 저장', () => {
     const split = await request<CommonResponsePlanDraftList>({
       url: '/me/plans/calculate',
       method: 'POST',
-      params: { mockScenario: 'same-split' },
+      headers: { 'X-Mock-Scenario': 'same-split' },
     })
     expect(split.data.drafts).toHaveLength(3)
     expect(new Set(split.data.drafts.map((d) => d.totalCost)).size).toBe(1)
@@ -192,7 +192,7 @@ describe('플랜 계산과 저장', () => {
     const byTitle = await request<CommonResponseWishlistList>({
       url: '/me/wishlist-items',
       method: 'GET',
-      params: { mockVariant: 'b' },
+      headers: { 'X-Mock-Variant': 'b' },
     })
     expect(byTitle.data.items).toHaveLength(1)
     expect(byTitle.data.items[0].seasonNumber).toBeNull()
@@ -205,7 +205,7 @@ describe('플랜 계산과 저장', () => {
         url: '/me/plans/RECOMMENDED/save',
         method: 'POST',
         data: { planId },
-        params: { mockScenario: 'stale' },
+        headers: { 'X-Mock-Scenario': 'stale' },
       })
 
     const error = await save(data.drafts[0].planId).catch((e: unknown) => e)
@@ -214,7 +214,7 @@ describe('플랜 계산과 저장', () => {
     const recalculated = await request<CommonResponsePlanDraftList>({
       url: '/me/plans/calculate',
       method: 'POST',
-      params: { mockScenario: 'stale' },
+      headers: { 'X-Mock-Scenario': 'stale' },
     })
     // 다시 계산하면 플랜 ID가 새로 발급된다
     expect(recalculated.data.drafts[0].planId).not.toBe(data.drafts[0].planId)

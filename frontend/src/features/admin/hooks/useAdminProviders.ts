@@ -30,7 +30,6 @@ export function useAdminProviders() {
       customInstance<CommonResponseAdminProviderList>({
         url: '/admin/providers',
         method: 'GET',
-        params: getMockScenarioParams(),
         signal,
       }),
     select: (res) => res.data,
@@ -50,8 +49,6 @@ export function useSaveProviderMapping() {
         url: `/admin/providers/${providerId}`,
         method: 'PATCH',
         data,
-        // save-error 같은 목업 시나리오를 저장 요청에도 실어 보낸다(운영에서는 빈 객체)
-        params: getMockScenarioParams(),
       }).then((res) => res.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [PROVIDERS_QUERY_KEY] }),
   })

@@ -14,7 +14,7 @@ import { resetMockSession, setMockOnboardingDone, setMockRole } from '@/mocks/mo
  * 플랜 결과 화면 테스트(Task 028). 저장 중 409(데이터 갱신)가 오면 자동으로 다시 계산해 안내 띠를 보이고 두 번째 저장이 성공하는지,
  * 세 유형의 선택이 같으면 카드 한 장으로 합쳐 보이는지를 본다. API는 앱의 목업 핸들러(MSW)다.
  *
- * 시나리오(?mockScenario=)는 훅이 화면 주소(window.location)에서 읽어 요청에 싣는다. 메모리 라우터는 window 주소를 바꾸지 않으므로
+ * 시나리오(?mockScenario=)는 목업 모드에서 요청 인터셉터(api/mockHeaders.ts)가 화면 주소(window.location)에서 읽어 헤더(X-Mock-Scenario)로 싣는다. 메모리 라우터는 window 주소를 바꾸지 않으므로
  * 테스트에서는 history.pushState로 주소를 직접 바꿔 시나리오를 고른다.
  */
 
@@ -39,13 +39,12 @@ afterAll(() => server.close())
 // 시나리오를 고른 뒤, 찜 하나를 만들고 플랜을 한 번 계산해 둔 상태에서 결과 화면을 연다(계산 전이면 "아직 계산한 플랜이 없어요"만 보인다)
 async function renderPlanAfterCalculate(scenario: 'stale' | 'same' | null) {
   window.history.pushState({}, '', scenario ? `/plan?mockScenario=${scenario}` : '/plan')
-  const params = scenario ? { mockScenario: scenario } : undefined
   await customInstance({
     url: '/me/wishlist-items',
     method: 'POST',
     data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
   })
-  await customInstance({ url: '/me/plans/calculate', method: 'POST', params })
+  await customInstance({ url: '/me/plans/calculate', method: 'POST' })
 
   const router = createMemoryRouter([{ path: '/plan', element: <PlanScreen /> }], {
     initialEntries: ['/plan'],

@@ -35,7 +35,6 @@ export function useCollectExecutions() {
       customInstance<CommonResponseCollectExecutionList>({
         url: '/admin/collect',
         method: 'GET',
-        params: getMockScenarioParams(),
         signal,
       }),
     select: (res) => res.data,
@@ -74,8 +73,6 @@ export function useRunCollect() {
         url: '/admin/collect',
         method: 'POST',
         data,
-        // run-error 같은 목업 시나리오를 실행 요청에도 실어 보낸다(운영에서는 빈 객체)
-        params: getMockScenarioParams(),
       }).then((res) => res.data),
     onSuccess: invalidate,
   })
@@ -102,7 +99,6 @@ export function useRestartCollect() {
       customInstance<CommonResponseRunCollectAccepted>({
         url: `/admin/collect/${executionId}/restart`,
         method: 'POST',
-        params: getMockScenarioParams(),
       }).then((res) => res.data),
     onSuccess: invalidate,
   })
