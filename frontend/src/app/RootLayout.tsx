@@ -57,9 +57,13 @@ export function RootLayout() {
         <Outlet />
       </main>
 
+      {/* 푸터 링크는 inline-flex min-h-10으로 누르는 영역을 세로 40px로 넓혔다(Task 037 ⑫) */}
       <footer className="border-t">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-sm text-muted-foreground">
-          <Link to="/about" className="underline-offset-4 hover:underline">
+          <Link
+            to="/about"
+            className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
+          >
             서비스 소개(About)
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
@@ -74,25 +78,25 @@ export function RootLayout() {
               <span>개발용 이동</span>
               <Link
                 to={{ pathname: '/settings', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 내 설정
               </Link>
               <Link
                 to={{ pathname: '/wishlist', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 찜 목록
               </Link>
               <Link
                 to={{ pathname: '/pricing', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 요금 확인
               </Link>
               <Link
                 to={{ pathname: '/plan', search }}
-                className="underline-offset-4 hover:underline"
+                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
               >
                 플랜 결과
               </Link>

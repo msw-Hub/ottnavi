@@ -19,7 +19,7 @@ export function CloseLabeledDialogContent({
     <DialogContent showCloseButton={false} {...props}>
       {children}
       <DialogPrimitive.Close asChild>
-        <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm">
+        <Button variant="ghost" className="absolute top-1 right-1 size-11" size="icon-sm">
           <XIcon aria-hidden="true" />
           <span className="sr-only">닫기</span>
         </Button>

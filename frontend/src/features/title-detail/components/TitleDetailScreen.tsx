@@ -99,7 +99,7 @@ function StateLayout({ children }: { children: ReactNode }) {
 // 검색 화면으로 돌아가는 링크 버튼
 function BackToSearchLink() {
   return (
-    <Button asChild variant="outline" className="h-10 w-fit">
+    <Button asChild variant="outline" className="h-11 w-fit">
       <Link to="/">작품 검색으로 돌아가기</Link>
     </Button>
   )

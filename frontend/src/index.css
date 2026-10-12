@@ -159,3 +159,16 @@
     @apply font-sans;
   }
 }
+
+/*
+ * 키보드 포커스 표시를 진하게 한다(Task 037 ⑪).
+ * 문제: shadcn 원본은 포커스 때 `ring-ring/50`(--ring의 50% 투명)과 base 층의 `outline-ring/50`을 써서 어두운 바탕 대비가 약 3.28:1로 옅다.
+ * 해결: 원본(components/ui)을 고치지 않고, 그 표시가 쓰는 색 변수(--tw-ring-color)와 윤곽선 색을 --ring 그대로(투명도 없이)로 되돌린다.
+ * 이 규칙이 @layer 밖(층 없음)에 있는 이유: CSS에서는 층 없는 규칙이 Tailwind 유틸리티 층(@layer utilities)의 규칙보다 항상 이기므로,
+ * 원본 클래스의 우선순위와 상관없이 덮어쓸 수 있다. 모양(두께·간격)은 각 부품이 정한 그대로고 색만 진해진다.
+ * --ring 색(하늘색)과 페이지 바탕의 대비는 약 10.7:1이다. 마우스로 누를 때는 :focus-visible이 아니라 적용되지 않는다.
+ */
+:focus-visible {
+  --tw-ring-color: var(--ring);
+  outline-color: var(--ring);
+}

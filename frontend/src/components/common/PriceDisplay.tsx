@@ -18,7 +18,7 @@ interface PriceSourceLabelProps {
 export function PriceSourceLabel({ priceSource }: PriceSourceLabelProps) {
   const Icon = PRICE_SOURCE_ICONS[priceSource]
   return (
-    <span className="inline-flex items-center gap-1.25 rounded-full bg-muted px-2 py-0.5 text-[0.8125rem] font-semibold whitespace-nowrap text-foreground">
+    <span className="inline-flex items-center gap-1.25 rounded-full border border-input bg-muted px-2 py-0.5 text-[0.8125rem] font-semibold whitespace-nowrap text-foreground">
       <Icon aria-hidden="true" className="size-3.5 shrink-0" />
       {PRICE_SOURCE_LABELS[priceSource]}
     </span>

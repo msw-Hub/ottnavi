@@ -162,7 +162,7 @@ function SearchResultList({
                 type="button"
                 variant="outline"
                 size="lg"
-                className="h-10 w-full"
+                className="h-11 w-full"
                 disabled={isFetchingNextPage}
                 aria-label={isFetchingNextPage ? '검색 결과 불러오는 중' : '검색 결과 더보기'}
                 onClick={onLoadMore}
