@@ -56,20 +56,20 @@ stateDiagram-v2
 ```
 
 **계산(`calculatePlan`).** 입력 수집(readOnly) → 엔진 실행(트랜잭션 밖, CPU만) → 쓰기 트랜잭션 순이다. 쓰기 트랜잭션은 다음 순서다.
-1. `user_setting` 행을 `PESSIMISTIC_WRITE`로 잠가 같은 사용자의 동시 계산을 직렬화한다(도출). 없으면 더블 클릭 시 `UNIQUE(user_id, plan_type) WHERE status='DRAFT'` 위반이 난다.
+1. `user_setting` 행을 `PESSIMISTIC_WRITE`로 잠가 같은 사용자의 동시 계산을 직렬화한다(도출). 없으면 더블 클릭 시 `UNIQUE(user_id, plan_type) WHERE status='DRAFT'` 위반이 난다. 저장(`activatePlan`)과 매월 재계산도 같은 잠금을 쓴다. 같은 사용자가 두 유형을 동시에 저장할 때 행을 서로 다른 순서로 잠그면 교착(deadlock detected)이 나기 때문이다(Task 032 db-reviewer 검토 후 확정).
 2. 기존 DRAFT(세 유형 전부)를 벌크 JPQL 한 문장으로 삭제한다. 하위 행은 FK `ON DELETE CASCADE`가 지운다(T-1 확정). 이 삭제는 트랜잭션에서 엔티티를 읽기 전 첫 동작이다.
 3. 유형별 새 DRAFT(최대 3개)와 하위 행, 유형별 `calc_run`을 저장한다. 엔진 실행은 추천형을 먼저 풀고 그 점수로 절약형·간편형 기준을 만든다(트랜잭션 밖).
 
 **저장(`activatePlan`)과 409 규칙.**
 1. 사용자가 고른 유형의 DRAFT를 잠그고 존재·소유자를 확인한다. 없으면 404 `PLAN_DRAFT_NOT_FOUND`(제안). 저장이 끝나면 같은 사용자의 나머지 DRAFT를 벌크 삭제한다(PRD 11절 35번).
-2. `data_as_of`가 최신 수집 완료 시각(수집 Job의 마지막 COMPLETED 종료 시각, `BATCH_JOB_EXECUTION` 조회, 도출)보다 이르면 **409 `PLAN_DRAFT_STALE`**(제안)로 막는다.
+2. `data_as_of`(TIMESTAMPTZ)가 최신 수집 완료 시각(수집 Job의 마지막 COMPLETED 종료 시각, `BATCH_JOB_EXECUTION` 조회, 도출. 검색·상세·찜 목록 응답의 `dataAsOf`도 같은 시각을 한국 날짜로 바꾼 값이다, Task 032 D9)보다 이르면 **409 `PLAN_DRAFT_STALE`**(제안)로 막는다.
    - 이 기준은 수집이 매일 돌기 때문에 대부분의 DRAFT가 다음 날이면 막힌다.
    - MVP 대응: 프론트가 409 `PLAN_DRAFT_STALE`을 받으면 자동으로 재계산을 요청해 새 결과를 보여준다(도출).
    - 2단계 개선 후보: 판정 기준을 좁히는 안은 T-9(결정 필요).
 3. **함정: 기존 ACTIVE를 ARCHIVED로 바꾸고 명시적으로 flush한 뒤** DRAFT를 ACTIVE로 바꾸고 `previous_plan_id`를 연결한다. 부분 유니크 인덱스 `UNIQUE(user_id) WHERE status='ACTIVE'`는 문장마다 검사되므로, Hibernate의 UPDATE 순서에 맡기면 ACTIVE가 잠시 두 개가 되어 위반이 난다.
 4. 이번 달 가입 상품이 있으면 SUBSCRIBE_GUIDE outbox 행을 만든다(1회 판정 조건은 R11-17).
 
-**대상 범위.** 매월 재계산, 변경 알림, 월초 알림은 `status = ACTIVE`만 읽는다. DRAFT는 어떤 배치도 읽지 않는다(R FR-14). 매월 재계산은 새 ACTIVE 생성 → 이전 ACTIVE ARCHIVED → `previous_plan_id` 연결 → `change_summary` 기록을 한 트랜잭션으로 하며, 3번의 flush 순서를 그대로 지킨다.
+**대상 범위.** 매월 재계산, 변경 알림, 월초 알림은 `status = ACTIVE`만 읽는다. DRAFT는 어떤 배치도 읽지 않는다(R FR-14). 매월 재계산은 이전 ACTIVE를 ARCHIVED로 바꾸고 flush → 새 ACTIVE 생성 → `previous_plan_id` 연결 → `change_summary` 기록을 한 트랜잭션으로 하며, 3번의 flush 순서를 그대로 지킨다(새 ACTIVE를 먼저 만들면 ACTIVE가 잠시 둘이 되어 부분 유니크 인덱스 위반이 난다).
 
 신규 오류 코드 제안(`docs/api/error-codes.md` 작성 시 등록): `PLAN_DRAFT_STALE`(409), `PLAN_DRAFT_NOT_FOUND`(404), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409).
 
@@ -84,7 +84,7 @@ stateDiagram-v2
 - **TMDB는 언제 호출하나(요청 제한 버킷을 두 개로 나눈 이유 — 기록).** 평소 사용자 요청은 **우리 DB를 읽을 뿐 TMDB를 호출하지 않는다.** TMDB 호출은 두 경우뿐이다. ① **수집 배치**(서버가 정한 시간에 자동, 속도를 서버가 조절) ② **단건 수집**(사용자가 검색했는데 DB에 없는 작품이면 그 순간 TMDB에서 가져와 저장, FR-01). ②는 익명 사용자가 일으킬 수 있는 TMDB 호출이라 TMDB 한도(초당 약 40회)를 배치와 나눠 쓰는 문제가 생기므로, 공개 요청 제한에 **단건 수집 검색 버킷을 일반 버킷보다 낮게** 따로 둔다(R11-12 확정: 일반 IP당 분당 60회, 단건 수집 IP당 분당 10회). 일반 버킷은 서버·Redis를 보호하는 용도다. 한 번 저장된 작품은 이후 DB에서 바로 나오므로 다시 단건 수집하지 않는다.
 - GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
 
-**중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(예: `POST /api/admin/collect/{executionId}/recover`, 제안).
+**중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(`POST /api/admin/collect/executions/{executionId}/recover`, 계약 `recoverCollectExecution`. 재시작은 `POST …/{executionId}/restart`로 새 실행을 만든다). `recover`는 `END_TIME`을 복구 시각으로 채우고 STOPPED 여부를 확인하지 않으므로(Spring Batch 6.0.5 소스), API가 먼저 STOPPED 판정을 하고 응답 `endedAt`은 계약대로 null로 내린다(구현 때 실행 컨텍스트의 `batch.recovered`를 읽어 판별, Task 032 안내서 4.11).
 
 **Reader 페이지 밀림.** `JpaPagingItemReader`로 읽는 중 같은 Step이 갱신하는 컬럼(예: `fetched_at`)으로 필터하면 행을 건너뛴다. 필터는 Job 파라미터의 고정 기준 시각을 쓰고 정렬은 `id` 순으로 한다(도출).
 
@@ -165,6 +165,7 @@ sequenceDiagram
 | Redis 캐시 기본 값 직렬화가 JDK 직렬화 | JSON 직렬화기로 교체(Jackson 3용 클래스명은 구현 시 확인) | c7 |
 | `@Modifying`의 `flushAutomatically`·`clearAutomatically` 기본 `false`, 벌크 연산은 1차 캐시를 갱신하지 않음 | 두 값 `true`, 벌크를 트랜잭션 첫 동작으로 | c7 |
 | 부분 유니크 인덱스와 UPDATE 순서 | ARCHIVED 전환 후 명시 flush(2절) | 도출 |
+| 같은 트랜잭션에서 `delete` 뒤 `save`로 같은 유니크 키를 넣으면 Hibernate가 INSERT를 먼저 실행해 위반 | 벌크 JPQL 삭제를 트랜잭션 첫 동작으로 먼저 하거나, 기존 행과 비교해 갱신(대상: `user_subscription` 전체 교체, 출연진·장르 재수집) | 도출(Task 032 db-reviewer) |
 | Batch chunk 안 TMDB 호출이 DB 연결을 점유해 풀(약 5) 고갈 | T-2 확정: 배치 예외 인정, 작은 chunk | rules 충돌 |
 | `@MockBean` 제거 | `@MockitoBean` | web |
 | Testcontainers 2 아티팩트·패키지 변경 | `testcontainers-postgresql`, `org.testcontainers.postgresql.*` | c7 |
