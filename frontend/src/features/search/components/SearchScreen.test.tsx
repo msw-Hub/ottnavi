@@ -52,7 +52,7 @@ function serveFakePagedTitles(total: number) {
         tmdbId: i + 1,
         title: `${q} 작품 ${i + 1}`,
         releaseYear: 2000,
-        posterUrl: null,
+        posterPath: null,
         availabilities: [],
       }))
       return HttpResponse.json({
@@ -142,7 +142,7 @@ describe('검색 화면', () => {
                 tmdbId: 1,
                 title: '제공처 없는 작품',
                 releaseYear: 2000,
-                posterUrl: null,
+                posterPath: null,
                 availabilities: allNotAvailable,
               },
             ],
