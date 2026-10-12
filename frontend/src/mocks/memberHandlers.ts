@@ -64,7 +64,8 @@ import {
  * - error:      플랜 계산이 500 오류를 돌려준다
  * 목업 안: ?mockVariantWatch=a|b는 R11-18(환산 입력 저장), ?mockVariant=a|b는 R11-19(드라마 찜 단위). 설명은 src/lib/mockScenario.ts.
  *
- * 화면 주소의 이 파라미터들은 features의 훅이 API 요청에 실어 보낸다(getMockScenarioParams, getMockVariantParams).
+ * 화면 주소의 이 파라미터들은 계약에 없는 값이라 요청 헤더(X-Mock-Scenario / X-Mock-Variant / X-Mock-Variant-Watch)로 받는다.
+ * 헤더는 목업 모드에서 api/mockHeaders.ts의 요청 인터셉터가 붙인다(getMockRequestHeaders).
  */
 
 // 요청 처리에 걸리는 시간. 테스트(Vitest)에서는 기다리지 않고, 브라우저에서는 로딩 상태가 눈에 보이게 잠깐 기다린다
@@ -259,7 +260,7 @@ function toWishlistListItem(
     mediaType: detail.mediaType,
     tmdbId: detail.tmdbId,
     title: detail.title,
-    posterUrl: detail.posterUrl,
+    posterUrl: detail.posterPath, // 찜 목록 응답은 6-3까지 옛 모양(완성된 주소)이라 목업 포스터(data URI)를 그대로 넘긴다
     seasonNumber: isSeasonRow ? season.seasonNumber : null,
     seasonName: isSeasonRow ? season.name : null,
     priority: entry.priority,

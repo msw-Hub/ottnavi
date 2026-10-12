@@ -81,8 +81,9 @@ describe('useWishlistItem 로그인 가드', () => {
     expect(result.current.priority).toBe('MUST')
     act(() => result.current.onRemove())
     // mutation은 비동기로 시작하므로 요청이 나갈 때까지 기다린다
+    // 생성 훅이 signal 같은 값을 함께 넘기므로 주소와 메서드만 확인한다
     await waitFor(() =>
-      expect(customInstance).toHaveBeenCalledWith({
+      expect(vi.mocked(customInstance).mock.calls[0]?.[0]).toMatchObject({
         url: '/me/wishlist-items/7',
         method: 'DELETE',
       }),

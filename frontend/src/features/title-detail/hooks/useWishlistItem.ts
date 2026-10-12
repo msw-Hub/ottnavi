@@ -1,16 +1,15 @@
-import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { customInstance, type ApiError } from '@/api/http'
+import {
+  useAddWishlistItem,
+  useRemoveWishlistItem,
+  useUpdateWishlistItem,
+} from '@/api/generated/wishlist/wishlist'
+import type { MediaType, WishlistPriority } from '@/api/generated/model'
+import type { ApiError } from '@/api/http'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { useWishlistAddedDialog } from '@/hooks/useWishlistAddedDialog'
-import type {
-  AddWishlistItemRequest,
-  CommonResponseAddWishlistItem,
-  MediaType,
-  UpdateWishlistPriorityRequest,
-  WishlistPriority,
-} from '@/features/title-detail/mockTypes'
 
 // 우선순위를 묻지 않고 찜할 때 쓰는 기본값(보고 싶음)
 const DEFAULT_WISHLIST_PRIORITY: WishlistPriority = 'WANT'
@@ -53,10 +52,11 @@ const UNAUTHORIZED_STATUS = 401
 /**
  * 작품(영화) 또는 시즌(드라마) 하나의 찜 상태와 찜 추가·우선순위 변경·해제를 돌려준다.
  *
- * 임시 구현: 이 API들은 아직 계약에 없어 생성 훅이 없다. 경로는 임시이며 Task 031에서 확정되고 생성 훅으로 바뀐다.
+ * 생성 훅(useAddWishlistItem / useUpdateWishlistItem / useRemoveWishlistItem, 계약 addWishlistItem / updateWishlistItem / removeWishlistItem)을 감싼다.
  * - 추가:   POST   /me/wishlist-items          (우선순위는 묻지 않고 기본값 WANT로 추가)
  * - 변경:   PATCH  /me/wishlist-items/{id}
  * - 해제:   DELETE /me/wishlist-items/{id}
+ * 변경·해제는 찜 항목 ID가 있어야 보낼 수 있다. 캐시에 항목이 없으면(찜하지 않은 상태) 요청을 보내지 않는다.
  * 찜 상태를 TanStack Query 캐시에 두는 이유: 목업 단계에는 "내 찜 목록 조회" API가 아직 없다. 요청이 성공할 때마다 캐시를 고쳐
  * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
  * queryFn을 skipToken으로 둔 이유: 서버에서 가져올 값이 없고 initialData(빈 객체)가 시작값이라 요청을 보내지 않기 위함이다.
@@ -119,24 +119,24 @@ export function useWishlistItem(
     })
   }
 
-  const add = useMutation<CommonResponseAddWishlistItem, ApiError, void>({
-    mutationFn: () => {
-      const body: AddWishlistItemRequest = { ...target, priority: DEFAULT_WISHLIST_PRIORITY }
-      return customInstance<CommonResponseAddWishlistItem>({
-        url: '/me/wishlist-items',
-        method: 'POST',
-        data: body,
-      })
+  // 찜 추가(계약 addWishlistItem). 새로 추가면 201, 이미 찜한 작품(시즌)이면 200으로 같은 모양의 응답({ wishlistItemId })이 온다.
+  // 두 경우 모두 성공이라 화면은 구분하지 않는다. 활성 찜이 20개일 때 새 항목은 409 WISHLIST_LIMIT_EXCEEDED이고,
+  // handleError가 userMessage(errorMessages.ts의 getErrorMessage 결과)를 토스트로 알린다.
+  const add = useAddWishlistItem({
+    mutation: {
+      onSuccess: (res) => {
+        writeEntry({
+          wishlistItemId: res.data.wishlistItemId,
+          priority: DEFAULT_WISHLIST_PRIORITY,
+        })
+        showWishlistAddedDialog({
+          entryKey,
+          name: popup?.name ?? targetName,
+          posterUrl: popup?.posterUrl ?? null,
+        })
+      },
+      onError: handleError,
     },
-    onSuccess: (res) => {
-      writeEntry({ wishlistItemId: res.data.wishlistItemId, priority: DEFAULT_WISHLIST_PRIORITY })
-      showWishlistAddedDialog({
-        entryKey,
-        name: popup?.name ?? targetName,
-        posterUrl: popup?.posterUrl ?? null,
-      })
-    },
-    onError: handleError,
   })
 
   // 비로그인이면 캐시에 이전 찜이 남아 있어도 "찜하지 않음"으로 본다.
@@ -144,36 +144,36 @@ export function useWishlistItem(
   // 로그인 판단은 useIsLoggedIn 한 곳만 거치므로 Task 057에서 훅 내부를 authStore로 바꾸면 이 가드도 그대로 따라간다.
   const entry = isLoggedIn ? (state?.[entryKey] ?? null) : null
 
-  const changePriority = useMutation<unknown, ApiError, WishlistPriority>({
-    mutationFn: (priority) => {
-      const body: UpdateWishlistPriorityRequest = { priority }
-      return customInstance({
-        url: `/me/wishlist-items/${entry?.wishlistItemId}`,
-        method: 'PATCH',
-        data: body,
-      })
+  const changePriority = useUpdateWishlistItem({
+    mutation: {
+      onSuccess: (_res, { data }) => {
+        if (entry && data.priority) writeEntry({ ...entry, priority: data.priority })
+      },
+      onError: handleError,
     },
-    onSuccess: (_res, priority) => {
-      if (entry) writeEntry({ ...entry, priority })
-    },
-    onError: handleError,
   })
 
-  const remove = useMutation<unknown, ApiError, void>({
-    mutationFn: () =>
-      customInstance({ url: `/me/wishlist-items/${entry?.wishlistItemId}`, method: 'DELETE' }),
-    onSuccess: () => {
-      writeEntry(null)
-      toast.success(`${targetName} 찜을 해제했습니다.`)
+  const remove = useRemoveWishlistItem({
+    mutation: {
+      onSuccess: () => {
+        writeEntry(null)
+        toast.success(`${targetName} 찜을 해제했습니다.`)
+      },
+      onError: handleError,
     },
-    onError: handleError,
   })
 
   return {
     priority: entry?.priority ?? null, // 찜하지 않았으면 null
     isPending: add.isPending || changePriority.isPending || remove.isPending,
-    onAdd: requireLogin(() => add.mutate()),
-    onChangePriority: requireLogin((priority: WishlistPriority) => changePriority.mutate(priority)),
-    onRemove: requireLogin(() => remove.mutate()),
+    onAdd: requireLogin(() =>
+      add.mutate({ data: { ...target, priority: DEFAULT_WISHLIST_PRIORITY } }),
+    ),
+    onChangePriority: requireLogin((priority: WishlistPriority) => {
+      if (entry) changePriority.mutate({ wishlistItemId: entry.wishlistItemId, data: { priority } })
+    }),
+    onRemove: requireLogin(() => {
+      if (entry) remove.mutate({ wishlistItemId: entry.wishlistItemId })
+    }),
   }
 }

@@ -8,6 +8,8 @@
  * 외부(TMDB) 이미지를 실제로 불러올지, 목업에서는 막을지는 Task 027에서 정한다. 여기서는 URL만 만든다.
  */
 
+import { isMockMode } from '@/lib/mockScenario'
+
 // TMDB 이미지 기본 URL.
 // 출처: TMDB API GET /3/configuration 응답의 images.secure_base_url (developer.themoviedb.org, Configuration Details 문서 예시).
 // TMDB는 이 값을 설정 API로 받아 쓰라고 안내하지만, 값이 거의 바뀌지 않아 요청 한 번을 아끼려고 상수로 둔다.
@@ -45,6 +47,10 @@ export function getTmdbImageUrl(
 ): string | null {
   if (path == null) return null
   const trimmed = path.trim()
+  // 목업 모드 전용: 목업 포스터(src/mocks/fixtures/posters.ts)는 외부 요청이 나가지 않게 그림 자체를 담은 SVG data URI를
+  // posterPath 자리에 넣는다. 그 값만 그대로 통과시킨다. 운영(목업이 아님)에서는 이 분기가 항상 거짓이라, 서버가 이런 값을
+  // 보내도 아래 검사에서 null이 된다(Vite가 빌드 때 VITE_USE_MOCK 비교를 상수로 바꿔 분기째 지운다).
+  if (isMockMode() && trimmed.startsWith('data:image/svg+xml')) return trimmed
   if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null
   // 기본 URL이 '/'로 끝나고 경로가 '/'로 시작하므로 크기 뒤에 경로를 그대로 붙이면 '/w342/abc.jpg'가 된다
   return `${TMDB_IMAGE_BASE_URL}${size}${trimmed}`

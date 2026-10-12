@@ -14,18 +14,18 @@
  * - 시즌이 많은 드라마(가상): "예시 장편 드라마 (12시즌)" → 처음 5개만 보이고 "시즌 더 보기"로 나머지를 연다
  * - 영어 대체 줄거리: "버닝"(한국어 줄거리 없음 → overviewLang = 'en')
  * - 추정 러닝타임: "헌트"(영화), "오징어 게임" 시즌 3(시즌)
- * - 포스터 없음: "안나", "헌트", "카지노"(영화) → posterUrl = null
+ * - 포스터 없음: "안나", "헌트", "카지노"(영화) → posterPath = null
  * - 출연진 10명: "오징어 게임", "슬기로운 의사생활", "더 글로리", "기생충", "파묘"
  *
  * 서비스 ID는 서비스 목록 API(계약 example)의 ottServiceId와 같다. 값이 어긋나면 서비스 이름이 맞지 않으니 함께 고친다.
  */
-import type { AvailabilityStatus } from '@/components/common/displayTypes'
 import type {
+  AvailabilityStatus,
   CastMember,
   ServiceAvailability,
   TitleDetail,
   TitleSeason,
-} from '@/features/title-detail/mockTypes'
+} from '@/api/generated/model'
 import { createMockPosterUrl } from '@/mocks/fixtures/posters'
 
 // 서비스 ID(서비스 목록 API의 ottServiceId와 같다)
@@ -235,7 +235,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 93405,
     title: '오징어 게임',
     originalTitle: '오징어 게임',
-    posterUrl: createMockPosterUrl(15),
+    posterPath: createMockPosterUrl(15),
     overview:
       '거액의 상금이 걸린 의문의 서바이벌에 참가한 사람들이 목숨을 걸고 어린 시절의 놀이에 도전하는 이야기다.',
     overviewLang: 'ko',
@@ -264,7 +264,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 96578,
     title: '슬기로운 의사생활',
     originalTitle: '슬기로운 의사생활',
-    posterUrl: createMockPosterUrl(150),
+    posterPath: createMockPosterUrl(150),
     overview:
       '같은 병원에서 일하는 오랜 친구 다섯 명이 환자를 돌보고 밴드 연습을 하며 함께 지내는 일상을 그린 드라마다.',
     overviewLang: 'ko',
@@ -295,7 +295,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 900001,
     title: '예시 드라마 A (시즌별 제공처 다름)',
     originalTitle: '예시 드라마 A (시즌별 제공처 다름)',
-    posterUrl: createMockPosterUrl(30),
+    posterPath: createMockPosterUrl(30),
     overview: '화면 확인을 위해 만든 가상의 드라마다. 시즌에 따라 볼 수 있는 서비스가 다르다.',
     overviewLang: 'ko',
     genres: ['드라마'],
@@ -313,7 +313,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 900002,
     title: '예시 장편 드라마 (12시즌)',
     originalTitle: '예시 장편 드라마 (12시즌)',
-    posterUrl: createMockPosterUrl(60),
+    posterPath: createMockPosterUrl(60),
     overview:
       '화면 확인을 위해 만든 가상의 드라마다. 시즌이 12개라 시즌 목록이 길어지는 경우를 보여 준다.',
     overviewLang: 'ko',
@@ -331,7 +331,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 136283,
     title: '더 글로리',
     originalTitle: '더 글로리',
-    posterUrl: createMockPosterUrl(265),
+    posterPath: createMockPosterUrl(265),
     overview:
       '학창 시절 큰 상처를 입은 주인공이 오랜 시간 준비한 계획으로 가해자들을 찾아가는 복수극이다.',
     overviewLang: 'ko',
@@ -364,7 +364,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 118243,
     title: '안나',
     originalTitle: '안나',
-    posterUrl: null,
+    posterPath: null,
     overview: '거짓된 삶을 살게 된 한 여성의 이야기를 그린 심리 스릴러 드라마다.',
     overviewLang: 'ko',
     genres: ['드라마', '미스터리'],
@@ -395,7 +395,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 205123,
     title: '카지노',
     originalTitle: '카지노',
-    posterUrl: createMockPosterUrl(45),
+    posterPath: createMockPosterUrl(45),
     overview: '필리핀의 카지노 업계에서 성공한 한국인 사업가가 위기에 빠지는 과정을 그린 드라마다.',
     overviewLang: 'ko',
     genres: ['드라마', '범죄'],
@@ -444,7 +444,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 524,
     title: '카지노',
     originalTitle: 'Casino',
-    posterUrl: null,
+    posterPath: null,
     overview:
       '1970년대 라스베이거스 카지노를 맡은 도박 전문가와 그의 오랜 친구, 아내가 얽히며 몰락해 가는 과정을 그린 범죄 영화다.',
     overviewLang: 'ko',
@@ -466,7 +466,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 496243,
     title: '기생충',
     originalTitle: '기생충',
-    posterUrl: createMockPosterUrl(100),
+    posterPath: createMockPosterUrl(100),
     overview:
       '반지하에 사는 가족이 부유한 가족의 집에 하나둘 들어가면서 벌어지는 일을 그린 영화다.',
     overviewLang: 'ko',
@@ -501,7 +501,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 838209,
     title: '파묘',
     originalTitle: '파묘',
-    posterUrl: createMockPosterUrl(330),
+    posterPath: createMockPosterUrl(330),
     overview:
       '거액의 의뢰를 받은 무당과 풍수사, 장의사가 수상한 묘를 옮기며 겪는 일을 그린 영화다.',
     overviewLang: 'ko',
@@ -537,7 +537,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 837799,
     title: '헌트',
     originalTitle: '헌트',
-    posterUrl: null,
+    posterPath: null,
     overview: '조직 안에 숨어든 스파이를 찾는 두 요원의 대립을 그린 첩보 액션 영화다.',
     overviewLang: 'ko',
     genres: ['액션', '스릴러'],
@@ -555,7 +555,7 @@ export const TITLE_FIXTURES: TitleDetail[] = [
     tmdbId: 491584,
     title: '버닝',
     originalTitle: '버닝',
-    posterUrl: createMockPosterUrl(200),
+    posterPath: createMockPosterUrl(200),
     overview:
       'A young man who works odd jobs meets a girl from his old neighborhood, and her return from a trip with a mysterious new friend draws him into a quiet obsession.',
     overviewLang: 'en',

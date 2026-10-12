@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { removeWishlistItem, updateWishlistItem } from '@/api/generated/wishlist/wishlist'
+import type {
+  CommonResponseUpdatedWishlistItem,
+  UpdateWishlistItemRequest,
+} from '@/api/generated/model'
 import { customInstance, type ApiError } from '@/api/http'
 import { getMockRequestParams } from '@/lib/mockScenario'
-import type {
-  CommonResponseWishlistItemUpdated,
-  CommonResponseWishlistList,
-  UpdateWishlistItemRequest,
-  WishlistList,
-} from '@/features/wishlist/mockTypes'
+import type { CommonResponseWishlistList, WishlistList } from '@/features/wishlist/mockTypes'
 
 // 찜 목록의 캐시 키. 목업 안(?mockVariant=)에 따라 응답이 달라서 키에 넣는다(운영에서는 빈 객체)
 function getWishlistQueryKey() {
@@ -22,7 +22,7 @@ type WishlistState = Record<string, { wishlistItemId: number; priority: string }
 /**
  * 내 찜 목록(SCR-08)을 불러온다. 최근에 찜한 순이며 "다 봤음" 항목도 포함한다(watchedAt에 값이 있음).
  *
- * 임시 구현: 이 API(GET /me/wishlist-items)는 아직 계약에 없어 생성 훅이 없다. Task 031에서 바뀐다.
+ * 임시 구현: 조회(GET /me/wishlist-items)는 아직 임시 타입(mockTypes)을 쓴다. 생성 훅으로 바꾸는 일은 Task 031 6-3이다.
  */
 export function useWishlist() {
   return useQuery<CommonResponseWishlistList, ApiError, WishlistList>({
@@ -31,7 +31,6 @@ export function useWishlist() {
       customInstance<CommonResponseWishlistList>({
         url: '/me/wishlist-items',
         method: 'GET',
-        params: getMockRequestParams(),
         signal,
       }),
     select: (res) => res.data,
@@ -50,13 +49,9 @@ export interface UpdateWishlistItemVariables extends UpdateWishlistItemRequest {
 export function useUpdateWishlistItem() {
   const queryClient = useQueryClient()
 
-  return useMutation<CommonResponseWishlistItemUpdated, ApiError, UpdateWishlistItemVariables>({
-    mutationFn: ({ wishlistItemId, ...body }) =>
-      customInstance<CommonResponseWishlistItemUpdated>({
-        url: `/me/wishlist-items/${wishlistItemId}`,
-        method: 'PATCH',
-        data: body,
-      }),
+  return useMutation<CommonResponseUpdatedWishlistItem, ApiError, UpdateWishlistItemVariables>({
+    // 생성 함수(updateWishlistItem)를 쓴다. 화면이 넘기는 { wishlistItemId, priority?, isWatched? } 모양은 그대로 둔다
+    mutationFn: ({ wishlistItemId, ...body }) => updateWishlistItem(wishlistItemId, body),
     onSuccess: (res) => {
       // 검색·상세 화면의 찜 버튼은 이 캐시에서 우선순위를 읽는다. 목록만 다시 불러오면 거기엔 옛 값이 남으므로,
       // 응답의 같은 항목(wishlistItemId)만 새 우선순위로 바꾼다. 캐시에 없는 항목은 새로 만들지 않는다(키 정보가 없다).
@@ -85,8 +80,7 @@ export function useRemoveWishlistItem() {
   const queryClient = useQueryClient()
 
   return useMutation<unknown, ApiError, number>({
-    mutationFn: (wishlistItemId) =>
-      customInstance({ url: `/me/wishlist-items/${wishlistItemId}`, method: 'DELETE' }),
+    mutationFn: (wishlistItemId) => removeWishlistItem(wishlistItemId),
     onSuccess: (_res, wishlistItemId) => {
       queryClient.setQueryData<WishlistState>(WISHLIST_STATE_KEY, (current = {}) =>
         Object.fromEntries(

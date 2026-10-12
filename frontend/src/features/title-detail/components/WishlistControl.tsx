@@ -1,6 +1,6 @@
 import { WishlistButton } from '@/components/common/WishlistButton'
 import { useWishlistItem } from '@/features/title-detail/hooks/useWishlistItem'
-import type { MediaType } from '@/features/title-detail/mockTypes'
+import type { MediaType } from '@/api/generated/model'
 
 interface WishlistControlProps {
   mediaType: MediaType // 찜할 작품의 구분

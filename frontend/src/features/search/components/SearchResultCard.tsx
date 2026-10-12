@@ -1,9 +1,9 @@
 import { Link } from 'react-router'
-import type { OttService } from '@/api/generated/model'
+import type { OttService, TitleSearchItem } from '@/api/generated/model'
 import { PosterImage } from '@/components/common/PosterImage'
 import { MEDIA_TYPE_LABELS } from '@/features/search/constants'
-import type { TitleSearchItem } from '@/features/search/mockTypes'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
+import { getTmdbImageUrl } from '@/lib/tmdbImage'
 
 // 포스터 위에 얹는 서비스 칩의 최대 개수. 넘치면 "+N"으로 줄여 포스터를 가리지 않게 한다
 const MAX_CHIPS = 2
@@ -42,7 +42,7 @@ export function SearchResultCard({ item, services }: SearchResultCardProps) {
     // has-[a:focus-visible]: 안쪽 제목 링크에 키보드 포커스가 오면 카드 전체에 링을 그린다(늘어난 링크 영역과 같은 크기)
     <article className="group relative grid content-start gap-2 rounded-lg transition-opacity hover:opacity-90 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background">
       <div className="relative">
-        <PosterImage title={item.title} posterUrl={item.posterUrl} />
+        <PosterImage title={item.title} posterUrl={getTmdbImageUrl(item.posterPath, 'w342')} />
         {available.length > 0 && (
           <ul
             aria-label="볼 수 있는 곳"

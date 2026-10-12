@@ -1,9 +1,8 @@
 /*
  * 임시 타입 파일 (Task 028, SCR-08 찜 목록).
  *
- * 내 찜 목록 조회(GET /me/wishlist-items)는 아직 계약(docs/api/openapi.yaml)에 없다.
- * 추가·삭제 요청 타입은 features/search, features/title-detail의 mockTypes.ts에 있고, 기능 폴더끼리는 import하지 않으므로
- * 이 기능에서 필요한 것만 여기에 따로 둔다. Task 031에서 생성 타입으로 바꾸고 이 파일을 지운다.
+ * 찜 추가·변경·삭제는 Task 031 6-2에서 생성 타입·훅으로 바꿨다. 이 파일에는 내 찜 목록 조회(GET /me/wishlist-items)의
+ * 옛 응답 타입만 남아 있고, 6-3에서 생성 타입(WishlistItemList)으로 바꾸며 이 파일을 지운다.
  */
 import type { AvailabilityStatus, WishlistPriority } from '@/components/common/displayTypes'
 
@@ -45,16 +44,4 @@ export interface WishlistList {
 export interface CommonResponseWishlistList {
   success: boolean
   data: WishlistList
-}
-
-// 임시: 계약 반영 후 생성 타입으로 교체 — 찜 항목 변경 요청(PATCH /me/wishlist-items/{id}). 보낸 필드만 바꾼다
-export interface UpdateWishlistItemRequest {
-  priority?: WishlistPriority // 우선순위 변경
-  isWatched?: boolean // true면 "다 봤음"(watchedAt 기록), false면 되돌림
-}
-
-// 임시: 계약 반영 후 생성 타입으로 교체 — 찜 항목 변경 응답 래퍼
-export interface CommonResponseWishlistItemUpdated {
-  success: boolean
-  data: { wishlistItemId: number; priority: WishlistPriority; watchedAt: string | null }
 }
