@@ -25,7 +25,7 @@ import type {
   UnscheduledItem,
   UnscheduledReason,
   WishlistPriority,
-} from '@/features/plan/mockTypes'
+} from '@/api/generated/model'
 import type { UserSettings } from '@/api/generated/model'
 import { MOCK_DATA_AS_OF } from '@/mocks/fixtures/titles'
 
@@ -341,7 +341,7 @@ function buildDraft(
         priority: item.priority,
         // 작품을 보는 서비스는 그 달 구독 서비스다(구독이 없는 달에는 배정이 없다)
         ottServiceId: monthSpec.serviceId ?? 0,
-        minutes,
+        watchMin: minutes,
         segmentIndex,
         segmentCount: segmentCounts.get(key) ?? 1,
         isContinuation: segmentIndex > 1,

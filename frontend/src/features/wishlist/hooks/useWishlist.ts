@@ -55,7 +55,7 @@ export function useUpdateWishlistItem() {
         ),
       )
       void queryClient.invalidateQueries({ queryKey: ['/me/wishlist-items'] })
-      void queryClient.invalidateQueries({ queryKey: ['/me/plans/drafts'] })
+      void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
     },
   })
 }
@@ -77,7 +77,7 @@ export function useRemoveWishlistItem() {
         ),
       )
       void queryClient.invalidateQueries({ queryKey: ['/me/wishlist-items'] })
-      void queryClient.invalidateQueries({ queryKey: ['/me/plans/drafts'] })
+      void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
     },
   })
 }

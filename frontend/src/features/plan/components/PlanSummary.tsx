@@ -4,7 +4,7 @@ import {
   formatAssignmentTitle,
   formatMonthLabel,
 } from '@/features/plan/planDisplay'
-import type { PlanDraft } from '@/features/plan/mockTypes'
+import type { PlanDraft } from '@/api/generated/model'
 import { formatWon } from '@/lib/format'
 
 // 한 달에 최소로 배정하는 시청 시간 안내(PRD 5.4 긴 시즌 규칙). 120분 = 2시간

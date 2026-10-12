@@ -1,16 +1,14 @@
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { customInstance, isApiError } from '@/api/http'
+import { AXIOS_INSTANCE, customInstance, isApiError } from '@/api/http'
 import type {
+  CommonResponsePlanDraftList,
+  CommonResponseSavedPlan,
   CommonResponseServicePrice,
   CommonResponseServicePriceList,
   CommonResponseUserSettings,
   UpdateMySettingsRequest,
 } from '@/api/generated/model'
-import type {
-  CommonResponsePlanDraftList,
-  CommonResponseSavedPlan,
-} from '@/features/plan/mockTypes'
 import type { CommonResponseWishlistItemList } from '@/api/generated/model'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { resetMockMemberState } from '@/mocks/memberHandlers'
@@ -160,16 +158,14 @@ describe('플랜 계산과 저장', () => {
     })
     await addWishlist()
     return request<CommonResponsePlanDraftList>({
-      url: '/me/plans/calculate',
+      url: '/me/plan-drafts',
       method: 'POST',
       headers: scenario ? { 'X-Mock-Scenario': scenario } : undefined,
     })
   }
 
   it('찜이 없으면 계산할 수 없다', async () => {
-    const error = await request({ url: '/me/plans/calculate', method: 'POST' }).catch(
-      (e: unknown) => e,
-    )
+    const error = await request({ url: '/me/plan-drafts', method: 'POST' }).catch((e: unknown) => e)
     expect(isApiError(error) && error.status).toBe(400)
   })
 
@@ -198,7 +194,7 @@ describe('플랜 계산과 저장', () => {
     expect(new Set(same.data.drafts.map((d) => d.totalCost)).size).toBe(1)
 
     const split = await request<CommonResponsePlanDraftList>({
-      url: '/me/plans/calculate',
+      url: '/me/plan-drafts',
       method: 'POST',
       headers: { 'X-Mock-Scenario': 'same-split' },
     })
@@ -227,7 +223,7 @@ describe('플랜 계산과 저장', () => {
     const { data } = await calculate('stale')
     const save = (planId: number) =>
       request<CommonResponseSavedPlan>({
-        url: '/me/plans/RECOMMENDED/save',
+        url: '/me/plans',
         method: 'POST',
         data: { planId },
         headers: { 'X-Mock-Scenario': 'stale' },
@@ -237,7 +233,7 @@ describe('플랜 계산과 저장', () => {
     expect(isApiError(error) && error.status === 409 && error.errorCode).toBe('PLAN_DRAFT_STALE')
 
     const recalculated = await request<CommonResponsePlanDraftList>({
-      url: '/me/plans/calculate',
+      url: '/me/plan-drafts',
       method: 'POST',
       headers: { 'X-Mock-Scenario': 'stale' },
     })
@@ -249,10 +245,53 @@ describe('플랜 계산과 저장', () => {
 
     // 저장하면 나머지 초안은 삭제되어 조회 결과가 비어 있다
     const drafts = await request<CommonResponsePlanDraftList>({
-      url: '/me/plans/drafts',
+      url: '/me/plan-drafts',
       method: 'GET',
     })
     expect(drafts.data.drafts).toEqual([])
+  })
+
+  it('계산은 201로 초안 3개를 주고 배정 시간 필드는 watchMin이다', async () => {
+    await request({ url: '/me/settings', method: 'PUT', data: SETTINGS_REQUEST })
+    await addWishlist()
+    const res = await AXIOS_INSTANCE.post('/me/plan-drafts')
+    expect(res.status).toBe(201)
+    const assignment = res.data.data.drafts[0].months[0].assignments[0]
+    expect(assignment).toHaveProperty('watchMin')
+    expect(assignment).not.toHaveProperty('minutes')
+  })
+
+  it('없는 planId로 저장하면 404 PLAN_DRAFT_NOT_FOUND이고, 저장하면 초안 3개가 모두 사라진다', async () => {
+    const { data } = await calculate()
+    const notFound = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: 999999 },
+    }).catch((e: unknown) => e)
+    expect(notFound).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
+
+    // 절약형 초안을 저장하면 응답의 유형은 그 초안의 유형이고, 나머지 초안도 함께 삭제된다
+    const saver = data.drafts.find((d) => d.planType === 'SAVER')!
+    const saved = await request<CommonResponseSavedPlan>({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: saver.planId },
+    })
+    expect(saved.data).toMatchObject({ planId: saver.planId, planType: 'SAVER', status: 'ACTIVE' })
+    const drafts = await request<CommonResponsePlanDraftList>({
+      url: '/me/plan-drafts',
+      method: 'GET',
+    })
+    expect(drafts.data.drafts).toEqual([])
+  })
+
+  it('계산 전에 저장하면 404 PLAN_DRAFT_NOT_FOUND다', async () => {
+    const error = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: 1 },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
   })
 })
 

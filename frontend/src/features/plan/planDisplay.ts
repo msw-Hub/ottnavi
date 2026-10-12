@@ -11,12 +11,7 @@ import {
   WalletIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type {
-  PlanAssignment,
-  PlanDraft,
-  PlanType,
-  UnscheduledReason,
-} from '@/features/plan/mockTypes'
+import type { PlanAssignment, PlanDraft, PlanType, UnscheduledReason } from '@/api/generated/model'
 
 // 플랜 유형 이름(PRD 11절 35번)
 export const PLAN_TYPE_LABELS: Record<PlanType, string> = {

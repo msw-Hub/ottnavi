@@ -7,8 +7,8 @@ import type {
 import type {
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
-  PlanType,
-} from '@/features/plan/mockTypes'
+  CreatePlanRequest,
+} from '@/api/generated/model'
 import type {
   CommonResponseServicePrice,
   CommonResponseServicePriceList,
@@ -26,12 +26,7 @@ import {
   readMockJson,
   writeMockJson,
 } from '@/mocks/handlerUtils'
-import {
-  buildPlanDrafts,
-  PLAN_TYPES,
-  type PlanPriceInfo,
-  type PlanScenario,
-} from '@/mocks/fixtures/plan'
+import { buildPlanDrafts, type PlanPriceInfo, type PlanScenario } from '@/mocks/fixtures/plan'
 import {
   findMockProduct,
   MOCK_PRICE_EFFECTIVE_FROM,
@@ -60,9 +55,9 @@ import {
  *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없는 상품은 404 SERVICE_PRICE_NOT_FOUND)
  *              DELETE /api/me/service-prices/{productId}    (고친 금액을 지우고 기본 요금으로 되돌림, 204)
  *              PATCH /api/me/pricing/{ottServiceId}  ({ monthlyPrice: 정수 | null }. null이면 기본 요금으로 되돌림)
- * - 플랜:      POST /api/me/plans/calculate          (유형 3종 초안을 새로 계산)
- *              GET  /api/me/plans/drafts             (계산 전이거나 저장한 뒤에는 빈 목록)
- *              POST /api/me/plans/{planType}/save    ({ planId })
+ * - 플랜:      POST /api/me/plan-drafts              (유형 3종 초안을 새로 계산, 201 + 초안 3개)
+ *              GET  /api/me/plan-drafts              (계산 전이거나 저장한 뒤에는 빈 목록)
+ *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 저장하면 나머지 초안은 삭제)
  *
  * 시나리오(?mockScenario=):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
@@ -429,8 +424,8 @@ export const memberHandlers: RequestHandler[] = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  // 플랜 계산: 유형 3종 초안을 새로 만든다(기존 초안은 덮어쓴다)
-  http.post('/api/me/plans/calculate', async ({ request }) => {
+  // 플랜 계산(계약 createPlanDrafts): 유형 3종 초안을 새로 만든다(기존 초안은 덮어쓴다). 새 초안 3개를 201로 돌려준다
+  http.post('/api/me/plan-drafts', async ({ request }) => {
     await wait(CALCULATE_DELAY_MS)
     const denied = denyGuest(request)
     if (denied) return denied
@@ -462,11 +457,11 @@ export const memberHandlers: RequestHandler[] = [
       success: true,
       data: { drafts: buildCurrentDrafts(request, settings) },
     }
-    return HttpResponse.json(body)
+    return HttpResponse.json(body, { status: 201 })
   }),
 
-  // 플랜 초안 조회: 계산 전이거나 저장한 뒤에는 빈 목록이다(저장하면 나머지 DRAFT는 삭제되기 때문)
-  http.get('/api/me/plans/drafts', async ({ request }) => {
+  // 플랜 초안 조회(계약 listPlanDrafts): 계산 전이거나 저장한 뒤에는 빈 목록이다(저장하면 나머지 DRAFT는 삭제되기 때문)
+  http.get('/api/me/plan-drafts', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
@@ -479,15 +474,15 @@ export const memberHandlers: RequestHandler[] = [
     return HttpResponse.json(body)
   }),
 
-  // 플랜 저장: 고른 유형의 초안을 ACTIVE로 만든다. stale 시나리오에서는 첫 요청만 409다
-  http.post('/api/me/plans/:planType/save', async ({ request, params }) => {
+  // 플랜 저장(계약 createPlan): 본문의 planId인 초안을 ACTIVE로 만든다(유형은 초안이 안다). stale 시나리오에서는 첫 요청만 409다
+  http.post('/api/me/plans', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
-    const planType = params.planType as PlanType
-    if (!PLAN_TYPES.includes(planType)) {
-      return validationError(request, '플랜 유형이 올바르지 않습니다.')
+    const { planId } = (await request.json()) as CreatePlanRequest
+    if (!Number.isInteger(planId) || planId < 1) {
+      return validationError(request, '저장할 플랜 ID가 올바르지 않습니다.')
     }
 
     const settings = getEffectiveSettings()
@@ -513,7 +508,8 @@ export const memberHandlers: RequestHandler[] = [
       )
     }
 
-    const draft = buildCurrentDrafts(request, settings).find((d) => d.planType === planType)
+    // 지금 초안 중 planId가 같은 것을 찾는다. 다시 계산해 ID가 바뀐 옛 초안이나 없는 ID는 404다
+    const draft = buildCurrentDrafts(request, settings).find((d) => d.planId === planId)
     if (!draft) {
       return problemResponse(
         request,
@@ -529,7 +525,7 @@ export const memberHandlers: RequestHandler[] = [
       success: true,
       data: {
         planId: draft.planId,
-        planType,
+        planType: draft.planType,
         status: 'ACTIVE',
         activatedAt: new Date().toISOString(),
       },

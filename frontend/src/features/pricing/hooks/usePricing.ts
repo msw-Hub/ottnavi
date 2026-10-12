@@ -43,7 +43,7 @@ export function useUpdatePricing() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['/me/service-prices'] })
-      void queryClient.invalidateQueries({ queryKey: ['/me/plans/drafts'] })
+      void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
     },
   })
 }

@@ -24,7 +24,7 @@ import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
 import { UnscheduledList } from '@/features/plan/components/UnscheduledList'
 import { useCalculatePlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
-import type { PlanDraft, PlanType } from '@/features/plan/mockTypes'
+import type { PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
 
@@ -110,9 +110,9 @@ export function PlanScreen() {
         onRecalculate={() =>
           calculate.mutate(undefined, { onSuccess: () => setHasRecalculatedNotice(false) })
         }
-        onSave={(planType, planId) =>
+        onSave={(planId) =>
           save.mutate(
-            { planType, planId },
+            { planId },
             {
               onSuccess: (result) => {
                 if (result.kind === 'saved') {
@@ -149,7 +149,7 @@ interface PlanResultProps {
   saveError: unknown // 저장 실패 원인. 없으면 null
   hasRecalculatedNotice: boolean // 저장 중 자동 재계산이 있었는지
   onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
-  onSave: (planType: PlanType, planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 첫 유형의 값을 넘긴다
+  onSave: (planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 그중 첫 초안의 planId를 넘긴다(유형은 서버가 planId로 안다)
 }
 
 // 초안이 있을 때의 결과 화면: 유형 선택 → 요약 → 달별 카드 → 남은 작품 → 기준일·출처 → 저장
@@ -299,7 +299,7 @@ function PlanResult({
           type="button"
           size="lg"
           disabled={isBusy}
-          onClick={() => onSave(selectedGroup.planTypes[0], draft.planId)}
+          onClick={() => onSave(draft.planId)}
           className="h-12 w-full text-base md:w-auto md:px-6"
         >
           {isSaving ? (

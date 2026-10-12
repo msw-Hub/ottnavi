@@ -42,7 +42,7 @@ export function useSaveUserSettings() {
       queryClient.setQueryData(getGetMySettingsQueryKey(), res)
       // 다른 기능(pricing, plan)의 캐시 키를 문자열로 직접 무효화한다. 기능 폴더끼리 import하지 않기 위함이다
       void queryClient.invalidateQueries({ queryKey: ['/me/pricing'] })
-      void queryClient.invalidateQueries({ queryKey: ['/me/plans/drafts'] })
+      void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
     },
   })
 }

@@ -44,7 +44,7 @@ async function renderPlanAfterCalculate(scenario: 'stale' | 'same' | null) {
     method: 'POST',
     data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
   })
-  await customInstance({ url: '/me/plans/calculate', method: 'POST' })
+  await customInstance({ url: '/me/plan-drafts', method: 'POST' })
 
   const router = createMemoryRouter([{ path: '/plan', element: <PlanScreen /> }], {
     initialEntries: ['/plan'],

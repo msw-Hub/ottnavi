@@ -1,7 +1,7 @@
 import { CircleCheckIcon, CircleIcon, EqualIcon } from 'lucide-react'
 import { PLAN_TYPE_DESCRIPTIONS, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import type { MergedPlanGroup } from '@/features/plan/mergeDrafts'
-import type { PlanType } from '@/features/plan/mockTypes'
+import type { PlanType } from '@/api/generated/model'
 import { formatWon } from '@/lib/format'
 import { cn } from '@/lib/utils'
 

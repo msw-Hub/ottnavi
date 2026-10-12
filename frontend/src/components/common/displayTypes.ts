@@ -8,11 +8,15 @@
  * - 문구 표(Record)를 컴포넌트 파일에서 export하면 개발 서버의 빠른 새로고침(react-refresh) 규칙에 걸려,
  *   컴포넌트 파일과 분리했다.
  */
-import type { PriceSource, ServiceSubscriptionStatus } from '@/api/generated/model'
+import type {
+  AvailabilityStatus,
+  PriceSource,
+  ServiceSubscriptionStatus,
+  WishlistPriority,
+} from '@/api/generated/model'
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (ERD availability.status 값: AVAILABLE / NOT_AVAILABLE / UNKNOWN)
-// 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태
-export type AvailabilityStatus = 'AVAILABLE' | 'NOT_AVAILABLE' | 'UNKNOWN'
+// 작품(또는 시즌)이 어느 서비스에서 구독(정액제)으로 제공되는지의 3상태(확정 계약의 생성 타입을 그대로 쓴다, Task 031 6-6)
+export type { AvailabilityStatus }
 
 // 제공 상태별 화면 글자. 색을 구분하지 못해도 이 글자로 상태를 읽을 수 있어야 한다(frontend.md 화면 표시 규칙)
 export const AVAILABILITY_LABELS: Record<AvailabilityStatus, string> = {
@@ -36,9 +40,8 @@ export const PRICE_SOURCE_LABELS: Record<PriceSource, string> = {
   FREE: '무료',
 }
 
-// 임시: 계약 반영 후 생성 타입으로 교체 (PRD FR-09 찜 우선순위: 꼭 볼 작품 / 보고 싶음 / 여유될 때)
-// 찜 표시 컴포넌트(WishlistButton)가 받는 값이다. 기능 폴더(features/*/mockTypes.ts)의 같은 이름 타입과 문자열이 같다
-export type WishlistPriority = 'MUST' | 'WANT' | 'MAYBE'
+// 찜 우선순위(PRD FR-09: 꼭 볼 작품 / 보고 싶음 / 여유될 때). 확정 계약의 생성 타입을 그대로 쓴다(Task 031 6-6)
+export type { WishlistPriority }
 
 // 우선순위 선택지. 순서가 화면에 보이는 순서다
 export const WISHLIST_PRIORITY_OPTIONS: { value: WishlistPriority; label: string }[] = [

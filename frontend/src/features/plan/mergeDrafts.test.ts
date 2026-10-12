@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
-import type { PlanDraft, PlanType } from '@/features/plan/mockTypes'
+import type { PlanDraft, PlanType } from '@/api/generated/model'
 import { buildPlanDrafts, type PlanScenario } from '@/mocks/fixtures/plan'
 import { DEFAULT_USER_SETTINGS } from '@/mocks/fixtures/settings'
 
