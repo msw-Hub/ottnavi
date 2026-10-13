@@ -1,4 +1,4 @@
-package com.ottnavi.provider.api;
+package com.ottnavi.provider.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;

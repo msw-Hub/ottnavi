@@ -1,6 +1,6 @@
-package com.ottnavi.provider.application;
+package com.ottnavi.provider.service;
 
-import com.ottnavi.provider.api.dto.response.OttServiceResponse;
+import com.ottnavi.provider.domain.entity.OttService;
 import com.ottnavi.provider.domain.repository.OttServiceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +16,7 @@ public class OttServiceQueryService {
 	private final OttServiceRepository ottServiceRepository;
 
 	/** 서비스 목록을 화면 정렬 순서대로 조회한다 */
-	public List<OttServiceResponse> listOttServices() {
-		return ottServiceRepository.findAllByOrderByDisplayOrderAsc().stream()
-				.map(OttServiceResponse::from)
-				.toList();
+	public List<OttService> listOttServices() {
+		return ottServiceRepository.findAllByOrderByDisplayOrderAsc();
 	}
 }

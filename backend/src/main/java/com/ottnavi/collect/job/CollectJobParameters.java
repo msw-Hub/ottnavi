@@ -1,4 +1,4 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.job;
 
 import java.time.LocalDate;
 import org.springframework.batch.core.job.parameters.InvalidJobParametersException;

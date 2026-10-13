@@ -1,4 +1,4 @@
-package com.ottnavi.provider.application;
+package com.ottnavi.provider.service.model;
 
 /** TMDB 제공처 전체 목록의 한 곳(우리 서비스 여부와 무관) */
 public record DiscoveredProvider(

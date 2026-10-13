@@ -1,11 +1,11 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.step;
 
 import com.ottnavi.infra.tmdb.TmdbClient;
 import com.ottnavi.infra.tmdb.TmdbMediaType;
 import com.ottnavi.infra.tmdb.dto.TmdbProviderInfo;
 import com.ottnavi.infra.tmdb.dto.TmdbProviderListResponse;
-import com.ottnavi.provider.application.DiscoveredProvider;
-import com.ottnavi.provider.application.ProviderCollectService;
+import com.ottnavi.provider.service.ProviderCollectService;
+import com.ottnavi.provider.service.model.DiscoveredProvider;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;

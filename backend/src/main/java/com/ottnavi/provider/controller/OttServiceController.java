@@ -1,8 +1,8 @@
-package com.ottnavi.provider.api;
+package com.ottnavi.provider.controller;
 
 import com.ottnavi.global.common.CommonResponse;
-import com.ottnavi.provider.api.dto.response.OttServiceResponse;
-import com.ottnavi.provider.application.OttServiceQueryService;
+import com.ottnavi.provider.dto.response.OttServiceResponse;
+import com.ottnavi.provider.service.OttServiceQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -26,6 +26,8 @@ public class OttServiceController {
 	@Operation(operationId = "listOttServices", summary = "OTT 서비스 목록 조회")
 	@GetMapping
 	public CommonResponse<List<OttServiceResponse>> listOttServices() {
-		return CommonResponse.success(ottServiceQueryService.listOttServices());
+		return CommonResponse.success(ottServiceQueryService.listOttServices().stream()
+				.map(OttServiceResponse::from)
+				.toList());
 	}
 }

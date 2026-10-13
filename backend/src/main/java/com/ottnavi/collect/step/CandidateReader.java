@@ -1,8 +1,8 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.step;
 
-import com.ottnavi.catalog.application.CandidateTitle;
-import com.ottnavi.provider.application.DiscoverTarget;
-import com.ottnavi.provider.application.ProviderCollectService;
+import com.ottnavi.catalog.service.model.CandidateTitle;
+import com.ottnavi.provider.service.ProviderCollectService;
+import com.ottnavi.provider.service.model.DiscoverTarget;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;

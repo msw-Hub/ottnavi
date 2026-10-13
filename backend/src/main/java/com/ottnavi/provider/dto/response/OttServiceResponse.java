@@ -1,4 +1,4 @@
-package com.ottnavi.provider.api.dto.response;
+package com.ottnavi.provider.dto.response;
 
 import com.ottnavi.provider.domain.entity.OttService;
 import com.ottnavi.provider.domain.enums.DataQuality;

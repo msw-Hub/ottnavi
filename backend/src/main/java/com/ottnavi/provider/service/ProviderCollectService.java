@@ -1,8 +1,10 @@
-package com.ottnavi.provider.application;
+package com.ottnavi.provider.service;
 
 import com.ottnavi.provider.domain.entity.TmdbProvider;
 import com.ottnavi.provider.domain.enums.OttServiceCode;
 import com.ottnavi.provider.domain.repository.TmdbProviderRepository;
+import com.ottnavi.provider.service.model.DiscoverTarget;
+import com.ottnavi.provider.service.model.DiscoveredProvider;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
