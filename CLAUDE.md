@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 저장소 현황
 
-- **골격 단계다(Phase 1 진행 중).** `backend/`(Spring Boot 골격)·`frontend/`(Vite 골격 + 개발 도구 구성)·`docs/api/`·`infra/`·`.env.example`은 있다. `.github/workflows/`(Task 010)와 `frontend/vercel.json`(Task 009)도 있다. 백엔드는 Task 016에서 의존성 전체·프로필(`local`·`prod`)·임시 `SecurityConfig`(전 경로 `permitAll`)·Testcontainers 테스트 베이스를, Task 023에서 `CommonResponse`·`ProblemDetail` 예외 처리·계약 대조 테스트(`OpenApiContractTest`)를 구성했다. Task 019에서 첫 도메인(`provider`: `ott_service` Flyway V1, 서비스 목록 API `GET /api/public/ott-services`)과 오리진 비밀 헤더 필터(`app.origin-secret.enabled`, local만 꺼짐)·진입 IP 로그가 생겼다. 다른 도메인 패키지는 아직 없다. 백엔드는 Task 020에서 Cloudtype 서비스 `ottnavi`(프리티어 1GB)에 올라가 있다(Task 021에서 `develop` → `main` 병합으로 첫 배포를 마쳤고 배포 브랜치는 `main`이다. 운영 프론트는 `ottnavi.vercel.app`. 배포는 콘솔 `배포하기`로 수동이며 GitHub Actions 배포 파일은 없다. 방문자 IP는 `remoteAddr`로 본다(`x-real-ip`는 Vercel IP). 런타임 환경 변수는 `Environment variables`, 프로필은 Start Command의 `-D`로 지정, TECH 6절).
+- **MVP 구현 중이다(Phase 3 진행).** 진행 숫자는 `docs/ROADMAP.md`가 기준이다(2026-10-13: Phase 2 완료, Phase 3는 038~043 완료, 다음 Task 044). 프론트는 목업(MSW) 화면이 끝났고 실제 API 연결은 백엔드 API가 나오는 대로 Task 052·057·058·061·067에서 한다. 백엔드는 스키마(Flyway V1~V7), 엔티티, 계산 엔진, TMDB 클라이언트, 제공 상태 판정·러닝타임 규칙, 수집 Job의 후보 단계(`collect`)까지 있고 API는 서비스 목록(`GET /api/public/ott-services`) 하나만 구현돼 있다(나머지 30개 operation은 `x-planned`). 오리진 비밀 헤더 필터(`app.origin-secret.enabled`, local만 꺼짐)·진입 IP 로그가 있다. 백엔드는 Cloudtype 서비스 `ottnavi`(프리티어 1GB)에 올라가 있다(`develop` → `main` 병합으로 첫 배포를 마쳤고 배포 브랜치는 `main`이다. 운영 프론트는 `ottnavi.vercel.app`. 배포는 콘솔 `배포하기`로 수동이며 GitHub Actions 배포 파일은 없다. 방문자 IP는 `remoteAddr`로 본다(`x-real-ip`는 Vercel IP). 런타임 환경 변수는 `Environment variables`, 프로필은 Start Command의 `-D`로 지정, TECH 6절). Supabase Data API는 꺼 둔 상태다. 세션이 바뀌었을 때 이어가는 방법과 미결 항목은 `docs/HANDOFF.md`에 있다.
 - 진행 상황과 다음 Task는 `docs/ROADMAP.md`(5단계 Phase, 105개 Task)가 기준이다. 새 작업 전에 해당 Task의 선행·완료 기준을 확인한다. 사용자가 직접 하는 `[H]` Task는 ROADMAP의 태그로 구분하고, 비밀 값 보관 규칙은 `docs/TECH.md` 8절에 있다.
 - Task 진행은 쉬림프 태스크 매니저(MCP)로 추적한다. 데이터는 `shrimp_data/`(git 제외)에 있고, 경로는 `.claude/settings.local.json`의 `SHRIMP_DATA_DIR`이 정한다(`.mcp.json`이 `${SHRIMP_DATA_DIR}`로 참조). 로드맵이 기준이고 쉬림프는 보조다.
 - 사용자 전역 규칙(`~/.claude/CLAUDE.md`)이 적용된다: 주석·로그·에러 메시지·UI 문자열은 한국어, 식별자는 영어, 커밋은 한국어 Conventional Commits, 터미널 명령은 PowerShell 기준(Windows 11), 탐색 → 계획 제시 → 승인 → 구현 순서.
@@ -25,9 +25,12 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/ENGINE_ALGORITHM.md` | 계산 엔진 알고리즘 상세 설명(평가기·완전탐색·그리디·플랜 유형 3종·시즌 순서·측정 결과). 쉬운 설명과 작은 예시. 규칙의 근거는 PRD 5.4·TECH 1절이고 이 문서는 구현을 설명한다 |
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
 | `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
+| `docs/HANDOFF.md` | 세션·계정이 바뀌어도 이어가기 위한 문서: 현재 상태, 다음 작업 순서, 미결·이월 항목, 사용자 직접 할 일, 환경 함정. 근거 문서가 아니고 오래되면 ROADMAP이 기준 |
+| `docs/FLYWAY_GUIDE.md`, `docs/JPA_COMPOSITE_KEY_GUIDE.md`, `docs/OPENFEIGN_GUIDE.md` | 학습용 설명 문서: Flyway(엔티티로 테이블 만들던 방식과의 차이 포함), JPA 복합 기본키, OpenFeign(TMDB 클라이언트). 근거 문서가 아니다 |
+| `docs/AVAILABILITY_RULES.md`, `docs/COLLECT_JOB_FLOW.md`, `docs/COLLECT_CODE_WALKTHROUGH.md` | 수집 데이터 손질 설명: 제공 상태 판정·러닝타임 규칙(Task 042), 수집 Job이 무엇인가(Task 043), 수집 코드를 호출 흐름 순서로 읽는 안내. 근거 문서가 아니다 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
 | `docs/PROJECT_STORY.md` | 프로젝트를 만든 이유(포트폴리오·README·자기소개서·면접용 문구). 사용자가 직접 겪은 경험만 담고 용도별(문단·두 문장·구두)로 다듬어 둠. 근거 문서가 아니다 |
-| `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation은 서비스 목록(`listOttServices`, Task 019) 하나이고 나머지는 Task 031부터 추가된다 |
+| `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation 31개(구현됨 1 + `x-planned: true` 30). 변경 절차는 api-contract.md |
 | `.claude/rules/backend.md` | `backend/**` 작업 시 자동 로드. Java/Spring 스타일·스택·패키지 구조 |
 | `.claude/rules/frontend.md` | `frontend/**` 작업 시 자동 로드. React/TS 스타일·상태 관리·인증 규칙 |
 | `.claude/rules/api-contract.md` | OpenAPI 계약 변경 절차, 응답·오류·페이지네이션 형식 |
@@ -41,7 +44,7 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 
 **API 계약이 두 쪽을 묶는다.** `docs/api/openapi.yaml`이 유일한 계약이다. 변경 순서는 계약 수정 → 프론트 `npm run api:generate`(orval이 타입·TanStack Query 훅·MSW 목업 생성, `src/api/generated/`는 수정 금지) → 백엔드 구현. springdoc 생성 명세와 `openapi.yaml`이 다르면 CI 실패(`x-planned: true`인 미구현 operation은 제외). 계약 변경과 코드 변경은 같은 PR에 담는다. UI를 먼저 목업(MSW)으로 세우고 API를 하나씩 실제로 교체하는 UI 선행 방식이다.
 
-**백엔드 패키지(`com.ottnavi`)**: `global`(config·security·ratelimit·error·common) / `infra`(tmdb·mail·llm 외부 연동) / 도메인별(`catalog`, `provider`, `product`, `user`, `wishlist`, `plan`, `notification` — 각각 `api` → `application` → `domain` 단방향. `domain`은 `entity`·`repository`·`enums` 하위 패키지로 나눈다) / `engine` / `collect` / `admin`. 다른 도메인의 리포지토리를 직접 쓰지 않고 서비스를 호출한다.
+**백엔드 패키지(`com.ottnavi`)**: `global`(config·security·ratelimit·error·common) / `infra`(tmdb·mail·llm 외부 연동) / 도메인별(`catalog`, `provider`, `product`, `user`, `wishlist`, `plan`, `notification` — 각각 `controller` → `service` → `domain` 단방향. `dto/{request,response}`는 프론트와 주고받는 틀, `service/model`은 서버 안 값 묶음이다. `domain`은 `entity`·`repository`·`enums`(catalog는 `rule`도) 하위 패키지로 나눈다) / `engine` / `collect`(`job`·`step`) / `admin`. 다른 도메인의 리포지토리를 직접 쓰지 않고 서비스를 호출한다.
 
 **계산 엔진(`engine`)**: 순수 Java(프레임워크 의존 금지). `plan` 도메인만 호출한다. `ExactSolver`(후보 상품 제외 S6와 추천형 동치 제거 S7 뒤 남은 조합을 전부 훑고 챔피언 한 명만 들고 가는 완전탐색)와 `GreedySolver`가 `PlanSolver` 인터페이스를 공유하고, 후보 조합 수가 상한을 넘으면 그리디로 전환한다. 목적함수는 사전식 비교기와 시작 조합(baseline)을 묶은 `PlanObjective`를 `solve(input, PlanObjective)`로 받으며, 같은 입력에서 플랜 유형 3종(추천형: 꼭 시청 완료 수 → 점수 → 총비용 → 조기 시청 → 결제 미루기 → 상품 ID 순 / 절약형 / 간편형, PRD 11절 35번)을 계산한다. 규칙 구현부에는 PRD 5.4의 어느 규칙인지 주석을 남긴다. 같은 시리즈의 시즌은 번호 순서대로 시청 완료한다는 규칙(PRD 11절 37번, 2026-10-10)은 구현됐다(정렬 뒤 한 번 훑으며 앞 시즌을 끼워 넣는 방식, ROADMAP Task 040 후속 항목 S). 찜은 최대 20개(11절 36번), 절감액 = 전체 구독 비용 − 플랜 총비용(11절 38번). 상세는 TECH 1절.
 
@@ -94,4 +97,10 @@ cd frontend; npm run api:generate                                      # openapi
 - **푸시·PR 뒤에는 CI·CodeRabbit을 기다리지 않는다.** `sleep`이나 `gh pr checks` 반복 조회로 대기하지 않고 상태를 한 번만 알린 뒤 다른 작업을 이어간다. 사용자가 "코드래빗 왔다"고 알려 주면 그때 `coderabbit-triage`로 정리한다.
 - **에이전트를 쓰면 능률이 오르거나 토큰이 절약되는 작업은 시작 전에 먼저 제안한다.** 계획 단계에서 이득과 비용(콜드 스타트)을 한 줄로 알리고, 이득이 불분명하면 쓰지 않는다고 말한다. 병렬 작업은 별도 워크트리가 필요하므로 허락을 먼저 구한다.
 - **모델 방침**: 구현·테스트·검수 에이전트는 sonnet, 어려운 알고리즘의 설계·계획만 opus를 명시한다(opus로 구현까지 맡기면 5시간 할당량이 한 작업에 거의 소진된 적이 있다). 예외로 DB 설계 검토형 `db-reviewer`는 opus를 쓴다(스키마 결함은 ERD·계약·PRD·TECH를 가로지르는 추론이 필요하고 읽기 전용이다, 2026-10-13 사용자 결정). 파일을 많이 읽는 큰 에이전트 작업은 시작 전에 소모 규모를 한 줄로 알린다.
+- **설명은 배경부터 한다.** 듣는 사람이 전후 사정과 배경지식이 없다고 보고, 첫 문장에 이 작업이 무엇을 하는지를 말한 뒤 ① 흐름과 각 단계의 주체(서버, DB, 외부 서비스가 누구에게 무엇을 요청하는지) ② 실제 요청·응답 값 예시 ③ 용어와 설계 선택지 순으로 쓴다. 처음 쓰는 용어는 그 자리에서 정의한다. "이 작업에 포함되지 않는 것"은 따로 말하지 않는다. 번호는 `1.`, `2.`로 쓰고 ①②처럼 작은 기호를 쓰지 않는다(사용자가 보기 어렵다고 했다).
+- **백엔드 설계와 모든 검증은 `backend-dev` 에이전트가 한다.** 설계·안내서 코드는 임시 워크트리(`$CLAUDE_JOB_DIR/tmp/wtNN`)에서 컴파일·테스트한 결과를 근거로 쓰고, 사용자가 구현한 코드의 검수, 테스트·빌드 결과 확인(`build/test-results/test/*.xml` 집계), `git status`의 `AM`/`AD` 확인도 에이전트로 한다. 사용자의 작업 워크트리 소스는 에이전트가 수정하지 않게 지시하고, 에이전트를 쓰기 전에 소모 규모를 한 줄로 알린다.
+- **백엔드 안내서(`docs/TASKxxx_GUIDE.md`)는 사용자 작업 워크트리의 `docs/`에 추적되지 않는 파일로 두고 커밋하지 않는다.** 사용자가 보면서 구현하고 마지막에 지운다(문서만 위한 PR과 CodeRabbit 재리뷰를 줄이려는 것). 대신 영구히 남길 짧은 설명 문서(100줄 안팎)는 구현 PR에 함께 커밋한다. 안내서는 코드 전체와 핵심 흐름만 쓰고, 테스트 코드 옆에 "무엇을 확인하는지 / 막으려는 사고" 표를 붙인다. 분량이 길어지면(코드 포함 1000줄 이상) 사용자에게 알린다.
+- **문서만 고치는 변경은 따로 PR을 올리지 않고 다음 구현 PR에 묶는다**(ROADMAP 기록, 규칙 갱신 등). 사용자가 PR과 재리뷰를 늘리는 것을 싫어한다. 단 사용자가 문서 PR을 요청하면 올린다.
+- **CodeRabbit 정리는 `coderabbit-triage`에 프로젝트 결정을 같이 넘긴다.** 이미 결정한 사항(예: 쿠팡플레이 영화는 항상 모름, tier는 ALL만, Reader 진행 위치 미저장, Supabase Data API 꺼 둠)을 프롬프트에 적어 그 결정과 충돌하는 지적은 걸러 달라고 한다. 반영하기로 하면 푸시는 한 번에 모아서 한다. Docstring Coverage 경고, "Generate docstrings"·Autofix는 무시한다.
+- **병합·푸시 규칙**: 병합은 Squash이고 제목 끝에 `(#PR번호)`를 붙인다. 병합하면 메인 워크트리 `develop`을 `git fetch` 후 `merge --ff-only origin/develop`으로 최신화한다. 쉬림프는 Task를 착수할 때 등록하고(`split_tasks` append) `execute_task` 후 완료 때 `verify_task`로 처리한다(앞으로 할 Task는 착수 직전에 올린다).
 - **MCP(playwright, shadcn, shrimp)가 자주 끊긴다.** 끊기면 사용자에게 `/mcp` 재연결을 요청한다.

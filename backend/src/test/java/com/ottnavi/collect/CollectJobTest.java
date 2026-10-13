@@ -15,6 +15,8 @@ import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.enums.MediaType;
 import com.ottnavi.catalog.domain.enums.RefreshTier;
 import com.ottnavi.catalog.domain.repository.TitleRepository;
+import com.ottnavi.collect.job.CollectJobParameters;
+import com.ottnavi.collect.job.CollectTier;
 import com.ottnavi.provider.domain.entity.TmdbProvider;
 import com.ottnavi.provider.domain.enums.MappingState;
 import com.ottnavi.provider.domain.repository.TmdbProviderRepository;

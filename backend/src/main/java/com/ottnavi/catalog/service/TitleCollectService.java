@@ -1,7 +1,8 @@
-package com.ottnavi.catalog.application;
+package com.ottnavi.catalog.service;
 
 import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.repository.TitleRepository;
+import com.ottnavi.catalog.service.model.CandidateTitle;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

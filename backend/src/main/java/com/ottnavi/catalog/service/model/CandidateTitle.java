@@ -1,4 +1,4 @@
-package com.ottnavi.catalog.application;
+package com.ottnavi.catalog.service.model;
 
 import com.ottnavi.catalog.domain.enums.MediaType;
 import java.math.BigDecimal;

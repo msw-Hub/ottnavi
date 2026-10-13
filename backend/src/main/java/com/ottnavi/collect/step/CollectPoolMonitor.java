@@ -1,4 +1,4 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.step;
 
 import com.zaxxer.hikari.HikariDataSource;
 import com.zaxxer.hikari.HikariPoolMXBean;

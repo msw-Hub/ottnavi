@@ -1,4 +1,4 @@
-package com.ottnavi.provider.application;
+package com.ottnavi.provider.service.model;
 
 import com.ottnavi.provider.domain.enums.OttServiceCode;
 

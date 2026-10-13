@@ -1,7 +1,7 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.step;
 
-import com.ottnavi.catalog.application.CandidateTitle;
-import com.ottnavi.catalog.application.TitleCollectService;
+import com.ottnavi.catalog.service.TitleCollectService;
+import com.ottnavi.catalog.service.model.CandidateTitle;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.ottnavi.collect;
+package com.ottnavi.collect.job;
 
 /**
  * 수집 Job 파라미터 tier. 작품의 RefreshTier(DAILY/WEEKLY)와 달리 ALL이 있다.
