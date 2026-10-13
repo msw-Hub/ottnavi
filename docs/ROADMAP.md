@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 12/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 13/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 38/105 | |
+| 합계 | | 39/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -605,7 +605,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 12/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 13/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -759,19 +759,22 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: 마이그레이션 테스트 통과. 영화 행(시즌 NULL) 중복과 `title` (media_type, tmdb_id) 중복이 거부된다.
 - 기록: 2026-10-13 완료(브랜치 `feature/b0-schema-catalog`, PR #51). 사용자가 직접 구현했다. V2(작품 영역 8개 테이블 + `tmdb_provider` 시드 8행, 전부 MAPPED이고 1796은 AD), V3(상품 영역 3개, 가격 시드는 넣지 않음), V4(Spring Batch 6.0.5 `BATCH_*` 6개 + 시퀀스 3개). 마이그레이션 테스트 `CatalogMigrationTest` 13건, 전체 442건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 안내서(`TASK033_GUIDE.md`)는 정리로 삭제했다(`git log -- docs/TASK033_GUIDE.md`).
   - CodeRabbit 결정: ① `watch_unit` 회차 수 3개 컬럼에 `>= 0` CHECK(`ck_watch_unit_episode_counts`)를 추가했다. `aired <= episode` 같은 비교는 TMDB 값에 따라 수집이 막힐 수 있어 두지 않았다. ② `unit_type`과 `title.media_type`의 일치, 영화 단위의 `episode_count = 1`은 DB가 막지 않고 수집 Job이 지킨다(Task 044에 반영). ③ 새 테이블에 RLS 없음 우려는 Supabase Data API를 꺼 둔 상태(2026-10-13 확인)라 조치하지 않았다.
-  - 넘길 내용: Task 034(V5~V7, 안내서 `TASK034_GUIDE.md`), 035(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`), 043·044(수집이 `unknown_reason`을 UNKNOWN일 때만 채움, 작품 종류에 맞는 단위만 생성). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035).
-#### Task 034: 사용자·플랜·알림 영역(C·D·E) 마이그레이션과 FK 동작 테스트 작성으로 사용자 데이터 스키마 확정 ⬜
+  - 넘길 내용: Task 034(V5~V7, 안내서 `TASK034_GUIDE.md`는 정리로 삭제), 035(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`), 043·044(수집이 `unknown_reason`을 UNKNOWN일 때만 채움, 작품 종류에 맞는 단위만 생성). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035).
+#### Task 034: 사용자·플랜·알림 영역(C·D·E) 마이그레이션과 FK 동작 테스트 작성으로 사용자 데이터 스키마 확정 ✅
 - 태그: [B] · PRD: B0, FR-07, 12, 14 · 선행: 032, 033 · 브랜치: `feature/b0-schema-user-plan`
 - 관련: ERD C·D·E, "FK 삭제 동작"·"참조 컬럼 인덱스", TECH T-1
 - 구현 사항
-  - [ ] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
-  - [ ] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
-  - [ ] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
-  - [ ] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
-  - [ ] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
+  - [x] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
+  - [x] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
+  - [x] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
+  - [x] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
+  - [x] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
 - 완료 기준
   - V-B: 위 테스트가 통과한다(`ddl-auto=validate`는 ON DELETE를 검사하지 않으므로 이 테스트가 기준).
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b0-schema-user-plan`, PR #54). 사용자가 직접 구현했다. V5(사용자 영역 5개 테이블), V6(플랜 영역 6개, ACTIVE·DRAFT 부분 유니크 인덱스), V7(`notification_outbox`, `shedlock`). 마이그레이션 테스트 `UserPlanMigrationTest` 13건, 전체 455건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 안내서(`TASK034_GUIDE.md`)는 정리로 삭제했다(`git log -- docs/TASK034_GUIDE.md`). `plan_month_product(plan_month_id)` 별도 인덱스는 유니크 인덱스가 덮어 만들지 않았다.
+  - 확정: `users` 컬럼은 모두 NOT NULL(구글 이름이 비면 서비스가 이메일 앞부분으로 채움, `oauth_provider`는 GOOGLE만), `plan_item.completed_month_index`는 UNSCHEDULED면 NULL, `plan.change_summary`는 TEXT(형식은 Task 069), `calc_run.input_hash`는 CHAR(64).
+  - CodeRabbit 결정: ① `plan_month.month_index`는 `>= 0`만 DB가 검사하고 상한(0~2)은 앱이 지킨다(ERD D3, PR #50). ② `plan_assignment`가 한 플랜의 찜·달만 묶는 것과 `previous_plan_id`가 같은 사용자의 플랜만 가리키는 것은 DB 제약(복합 FK)을 두지 않고 앱이 보장한다(ERD 설계 결정, Task 063·064·069 통합 테스트).
+  - 넘길 내용: Task 035·062(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`, `JSONB`→`@JdbcTypeCode(SqlTypes.JSON)`, `TIMESTAMPTZ`→`Instant`), 056(찜 20개 직렬화), 063(소속 일치, 월 번호 범위), 064·069(소속 일치 테스트, ACTIVE 교체 순서), 069(`change_summary` 형식). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035·062).
 #### Task 035: 작품·상품 영역 엔티티와 리포지토리 작성으로 도메인 모델 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 033, 023 · 브랜치: `feature/b0-catalog-entities`
 - 구현 사항
@@ -1098,6 +1101,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 063: 계산 입력 수집과 엔진 입출력 변환 구현으로 엔진 연결 ⬜
 - 태그: [B] · PRD: B7, FR-12 · 선행: 062, 039, 056, 060 · 기한 전제: R11-13(2026-10-29) · 브랜치: `feature/b7-plan-input`
 - 구현 사항
+  - [ ] 소속 일치: `plan_assignment`는 한 플랜의 `plan_item`과 `plan_month`만 묶는다(DB가 `plan_id` 일치를 검사하지 않는다, Task 034 결정, ERD 설계 결정). 이 변환 단계가 지킨다
   - [ ] 월 번호 범위: `plan_month.month_index`는 DB가 `>= 0`만 검사하므로(Task 034 결정, ERD D3) 변환 단계가 0~2만 만든다
   - [ ] 입력 수집(readOnly): 다 봤음 제외 찜, 제공 상태, 적용 가격, 구독 상태, 설정, `data_as_of`(수집 Job 마지막 COMPLETED 종료 시각)
   - [ ] 쿠팡플레이 포함 여부 필터(R11-13, 입력 단계). 상품을 걸러낼 때 시청 단위의 시청 가능 상품 ID 집합에서도 같은 상품을 함께 거른다(`PlanInput` 생성자가 `products`에 없는 시청 가능 상품 ID를 예외로 막는다). 제외로 시청 가능 상품이 비게 된 단위를 어떤 이유 코드(`NO_PROVIDER` 등)로 보일지는 R11-13 결정(2026-10-29)에 따라 정한다. 원천 상태(모름·없음)를 구분해 넘기지 않으면 `NO_PROVIDER`로 오분류될 수 있어서다(PR #24 CodeRabbit 지적)
@@ -1112,6 +1116,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `POST /api/me/plan-drafts`(`createPlanDrafts`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
   - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
+  - [ ] 소속 일치 통합 테스트: 한 번의 계산 저장으로 만든 `plan_assignment`의 `plan_item`과 `plan_month`가 모두 같은 `plan_id`이다(DB 제약이 없어 테스트로 고정)
   - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
   - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
   - [ ] 절감액(2026-10-10 결정, PRD 5.4·11절 38번): `plan.all_subscribe_cost`는 Task 063이 만든 값으로 저장하고 세 유형의 DRAFT에 같은 값을 넣는다. 절감액 = `all_subscribe_cost` − `total_cost`. `input_hash` 정규화에는 시리즈 식별자·시즌 번호(시즌 순서 규칙, 후속 항목 S)도 포함한다
@@ -1169,6 +1174,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 계약 추가(Task 068 변경안) + 재계산 Job
   - [ ] 연결(R-21 확정): 수집 Job의 `JobExecutionListener.afterJob`이 상태가 COMPLETED일 때만 재계산 Job을 비동기로 시작한다. 수집이 실패하면 재계산하지 않는다. GitHub Actions(`collect.yml`)는 수정하지 않는다(수집 시작만 호출)
   - [ ] 실패 복구용 관리자 수동 재실행 API(제안: `POST /api/admin/plans/monthly/run`, 202·중복 409). 배치 토큰 허용 여부는 TECH 4절 갱신을 따른다
+  - [ ] `previous_plan_id`는 같은 `user_id`의 이전 플랜만 가리킨다(DB가 검사하지 않는다, Task 034 결정). 통합 테스트로 확인한다
   - [ ] ACTIVE만 대상. 이전 ACTIVE → ARCHIVED(명시 flush) → 새 ACTIVE 생성 → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
   - [ ] 영향 플랜 선정(제안, R-19): 이번 수집 실행의 `availability_change`(`job_execution_id`)에 걸린 `watch_unit`을 `plan_item`으로 가진 ACTIVE 플랜. 월초(제안: 그 달 첫 COMPLETED 수집)에는 전체 ACTIVE
   - [ ] 재계산 대상 플랜 수를 실행 기록으로 남기고(제안: 재계산 Job의 실행 컨텍스트 또는 읽기 건수) Task 045 수집 이력 응답에 필드로 추가한다(계약 변경, SCR-16 연결은 Task 070)
