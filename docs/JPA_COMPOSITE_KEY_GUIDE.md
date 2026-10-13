@@ -94,7 +94,7 @@ titleGenreRepository.findById(new TitleGenreId(title.getId(), 16));         // �
 | 하는 일 | **표 하나** 안에서 줄을 구분 | **표 여러 개**를 합쳐 조회 |
 | 시점 | 표를 만들 때 | 조회할 때마다 |
 
-연결 표를 "조인 표"라고도 불러서 헷갈리지만, 복합키가 조인을 뜻하는 것은 아니다. 번호만 들어 있는 `title_genre`에서 "기생충은 드라마"를 읽으려면 `title`, `genre`와 **조인**한다. JPA에서는 `titleGenre.getTitle().getName()`처럼 객체를 따라가면 필요할 때 조인 SQL을 만들어 준다.
+연결 표를 "조인 표"라고도 불러서 헷갈리지만, 복합키가 조인을 뜻하는 것은 아니다. 번호만 들어 있는 `title_genre`에서 "기생충은 드라마"를 읽으려면 `title`, `genre`와 **조인**한다. JPA에서는 `titleGenre.getTitle().getTitle()`처럼 객체를 따라가면 필요할 때 조인 SQL을 만들어 준다.
 
 ## 6. 주의할 점
 
