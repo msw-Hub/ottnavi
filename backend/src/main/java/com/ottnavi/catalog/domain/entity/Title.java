@@ -14,6 +14,8 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Objects;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -111,4 +113,50 @@ public class Title extends BaseTimeEntity {
     public void changeRefreshTier(RefreshTier refreshTier) {
         this.refreshTier = refreshTier;
     }
+
+    /**
+     * discover 목록 요약 값으로 작품을 만든다(수집 Job 후보 단계). create에 요약 필드를 얹은 것이다.
+     * 줄거리·줄거리 언어·드라마 상태는 비워 둔다(한국어→영어 대체 규칙과 함께 상세 수집이 채운다, updateDetail).
+     */
+    public static Title createFromSummary(MediaType mediaType, Integer tmdbId, String title, String originalTitle,
+                                          LocalDate releaseDate, String posterPath, String backdropPath,
+                                          String originalLanguage, BigDecimal popularity, BigDecimal voteAverage,
+                                          Instant fetchedAt) {
+        Title entity = create(mediaType, tmdbId, title, fetchedAt);
+        entity.originalTitle = originalTitle;
+        entity.releaseDate = releaseDate;
+        entity.posterPath = posterPath;
+        entity.backdropPath = backdropPath;
+        entity.originalLanguage = originalLanguage;
+        entity.popularity = popularity;
+        entity.voteAverage = voteAverage;
+        return entity;
+    }
+
+    /**
+     * 자주 바뀌는 요약 값(포스터·배경·인기도·평점)만 갱신한다. fetchedAt은 상세 수집 시각이라 건드리지 않는다.
+     * 값이 같으면 대입하지 않는다: 더티 체킹이 변경 없음으로 보아 UPDATE가 나가지 않는다(BigDecimal은 scale 차이를 무시하고 비교).
+     */
+    public void refreshSummary(String posterPath, String backdropPath, BigDecimal popularity, BigDecimal voteAverage) {
+        if (!Objects.equals(this.posterPath, posterPath)) {
+            this.posterPath = posterPath;
+        }
+        if (!Objects.equals(this.backdropPath, backdropPath)) {
+            this.backdropPath = backdropPath;
+        }
+        if (differs(this.popularity, popularity)) {
+            this.popularity = popularity;
+        }
+        if (differs(this.voteAverage, voteAverage)) {
+            this.voteAverage = voteAverage;
+        }
+    }
+
+    private static boolean differs(BigDecimal current, BigDecimal incoming) {
+        if (current == null || incoming == null) {
+            return current != incoming;
+        }
+        return current.compareTo(incoming) != 0;
+    }
+
 }
