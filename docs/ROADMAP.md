@@ -901,7 +901,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: B3, FR-02, 03, 8.2 · 선행: 035, 041 · 브랜치: `feature/b3-availability-rules`
 - 구현 사항
   - [x] 작품·시즌별 제공처의 KR flatrate에 매핑 서비스가 직접 있을 때만 AVAILABLE, 대여·구매만이면 아님, KR 없음 UNKNOWN(`NO_KR_DATA`), 쿠팡플레이 영화 UNKNOWN(`STRUCTURAL_GAP`)
-  - [x] 상태가 바뀌면 `availability_change` 기록
+  - [x] 상태 변경 비교 로직 구현(`AvailabilityChangeDetector`, status 변화만). `availability_change` 이력의 **저장은 Task 044**가 한다
   - [x] 러닝타임: 영화 runtime, 시즌은 방영 회차 합, 빈 값은 120/45/24분 추정(설정 키, R11-25)
   - [x] 시즌 0 제외, 한국어 줄거리 없으면 영어 대체·`overview_lang`, 출연진 상위 10명
 - 완료 기준
@@ -934,6 +934,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 ⬜
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항
+  - [ ] Task 043에서 이월: `CandidateReader`는 읽는 위치(`targets`, 쪽 번호, 버퍼)를 필드로 가지는 Step 단위 빈이라, **날짜가 다른 두 Job이 한 프로세스에서 동시에 돌면 서로의 상태를 덮어쓴다**(같은 `targetDate`+`tier`는 Spring Batch가 막지만 다른 날짜끼리는 막는 장치가 없다). 실행 API·cron을 만들 때 수집 Job을 한 번에 하나만 돌게 하거나(전체 동시 실행 금지) Reader를 `@StepScope`(실행마다 새로 만듦)로 바꾼다
   - [ ] `POST /api/admin/collect/executions`: `TaskExecutor`를 가진 `JobOperator`로 비동기 시작, 202 + `jobExecutionId`. 실행 중 409 `BATCH_ALREADY_RUNNING`, 완료 409 `BATCH_ALREADY_COMPLETED`, 실패는 restart
   - [ ] 관리자 수집 API의 `tier` 파라미터 enum은 `DAILY`·`WEEKLY`·`ALL`이다(R-16 확정). MVP 일괄 수집은 `ALL`을 쓴다. 계약(`openapi.yaml`)과 코드의 enum을 같게 둔다
   - [ ] `targetDate` 직접 지정은 `local` 프로필에서만 허용한다(설정 키 제안: `app.collect.allow-target-date-override`, local만 `true`). 운영(`prod`)에서 지정하면 거부(제안: 400 `VALIDATION_FAILED`)하고 서버 날짜를 쓴다. 같은 날 409를 피해 재수집을 재현하는 용도다(Task 067, 069)
