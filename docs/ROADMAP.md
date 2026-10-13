@@ -1098,6 +1098,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 063: 계산 입력 수집과 엔진 입출력 변환 구현으로 엔진 연결 ⬜
 - 태그: [B] · PRD: B7, FR-12 · 선행: 062, 039, 056, 060 · 기한 전제: R11-13(2026-10-29) · 브랜치: `feature/b7-plan-input`
 - 구현 사항
+  - [ ] 소속 일치: `plan_assignment`는 한 플랜의 `plan_item`과 `plan_month`만 묶는다(DB가 `plan_id` 일치를 검사하지 않는다, Task 034 결정, ERD 설계 결정). 이 변환 단계가 지킨다
   - [ ] 월 번호 범위: `plan_month.month_index`는 DB가 `>= 0`만 검사하므로(Task 034 결정, ERD D3) 변환 단계가 0~2만 만든다
   - [ ] 입력 수집(readOnly): 다 봤음 제외 찜, 제공 상태, 적용 가격, 구독 상태, 설정, `data_as_of`(수집 Job 마지막 COMPLETED 종료 시각)
   - [ ] 쿠팡플레이 포함 여부 필터(R11-13, 입력 단계). 상품을 걸러낼 때 시청 단위의 시청 가능 상품 ID 집합에서도 같은 상품을 함께 거른다(`PlanInput` 생성자가 `products`에 없는 시청 가능 상품 ID를 예외로 막는다). 제외로 시청 가능 상품이 비게 된 단위를 어떤 이유 코드(`NO_PROVIDER` 등)로 보일지는 R11-13 결정(2026-10-29)에 따라 정한다. 원천 상태(모름·없음)를 구분해 넘기지 않으면 `NO_PROVIDER`로 오분류될 수 있어서다(PR #24 CodeRabbit 지적)
@@ -1112,6 +1113,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `POST /api/me/plan-drafts`(`createPlanDrafts`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
   - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
+  - [ ] 소속 일치 통합 테스트: 한 번의 계산 저장으로 만든 `plan_assignment`의 `plan_item`과 `plan_month`가 모두 같은 `plan_id`이다(DB 제약이 없어 테스트로 고정)
   - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
   - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
   - [ ] 절감액(2026-10-10 결정, PRD 5.4·11절 38번): `plan.all_subscribe_cost`는 Task 063이 만든 값으로 저장하고 세 유형의 DRAFT에 같은 값을 넣는다. 절감액 = `all_subscribe_cost` − `total_cost`. `input_hash` 정규화에는 시리즈 식별자·시즌 번호(시즌 순서 규칙, 후속 항목 S)도 포함한다
@@ -1169,6 +1171,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 계약 추가(Task 068 변경안) + 재계산 Job
   - [ ] 연결(R-21 확정): 수집 Job의 `JobExecutionListener.afterJob`이 상태가 COMPLETED일 때만 재계산 Job을 비동기로 시작한다. 수집이 실패하면 재계산하지 않는다. GitHub Actions(`collect.yml`)는 수정하지 않는다(수집 시작만 호출)
   - [ ] 실패 복구용 관리자 수동 재실행 API(제안: `POST /api/admin/plans/monthly/run`, 202·중복 409). 배치 토큰 허용 여부는 TECH 4절 갱신을 따른다
+  - [ ] `previous_plan_id`는 같은 `user_id`의 이전 플랜만 가리킨다(DB가 검사하지 않는다, Task 034 결정). 통합 테스트로 확인한다
   - [ ] ACTIVE만 대상. 이전 ACTIVE → ARCHIVED(명시 flush) → 새 ACTIVE 생성 → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
   - [ ] 영향 플랜 선정(제안, R-19): 이번 수집 실행의 `availability_change`(`job_execution_id`)에 걸린 `watch_unit`을 `plan_item`으로 가진 ACTIVE 플랜. 월초(제안: 그 달 첫 COMPLETED 수집)에는 전체 ACTIVE
   - [ ] 재계산 대상 플랜 수를 실행 기록으로 남기고(제안: 재계산 Job의 실행 컨텍스트 또는 읽기 건수) Task 045 수집 이력 응답에 필드로 추가한다(계약 변경, SCR-16 연결은 Task 070)
