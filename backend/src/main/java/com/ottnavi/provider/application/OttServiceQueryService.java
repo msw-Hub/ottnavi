@@ -1,7 +1,7 @@
 package com.ottnavi.provider.application;
 
 import com.ottnavi.provider.api.dto.response.OttServiceResponse;
-import com.ottnavi.provider.domain.OttServiceRepository;
+import com.ottnavi.provider.domain.repository.OttServiceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;

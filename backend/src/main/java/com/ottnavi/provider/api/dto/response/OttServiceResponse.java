@@ -1,8 +1,8 @@
 package com.ottnavi.provider.api.dto.response;
 
-import com.ottnavi.provider.domain.DataQuality;
-import com.ottnavi.provider.domain.OttService;
-import com.ottnavi.provider.domain.OttServiceCode;
+import com.ottnavi.provider.domain.entity.OttService;
+import com.ottnavi.provider.domain.enums.DataQuality;
+import com.ottnavi.provider.domain.enums.OttServiceCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**

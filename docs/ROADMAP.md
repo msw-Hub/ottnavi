@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 13/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 39/105 | |
+| 합계 | | 40/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -605,7 +605,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 13/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 14/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -775,14 +775,17 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 확정: `users` 컬럼은 모두 NOT NULL(구글 이름이 비면 서비스가 이메일 앞부분으로 채움, `oauth_provider`는 GOOGLE만), `plan_item.completed_month_index`는 UNSCHEDULED면 NULL, `plan.change_summary`는 TEXT(형식은 Task 069), `calc_run.input_hash`는 CHAR(64).
   - CodeRabbit 결정: ① `plan_month.month_index`는 `>= 0`만 DB가 검사하고 상한(0~2)은 앱이 지킨다(ERD D3, PR #50). ② `plan_assignment`가 한 플랜의 찜·달만 묶는 것과 `previous_plan_id`가 같은 사용자의 플랜만 가리키는 것은 DB 제약(복합 FK)을 두지 않고 앱이 보장한다(ERD 설계 결정, Task 063·064·069 통합 테스트).
   - 넘길 내용: Task 035·062(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`, `JSONB`→`@JdbcTypeCode(SqlTypes.JSON)`, `TIMESTAMPTZ`→`Instant`), 056(찜 20개 직렬화), 063(소속 일치, 월 번호 범위), 064·069(소속 일치 테스트, ACTIVE 교체 순서), 069(`change_summary` 형식). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035·062).
-#### Task 035: 작품·상품 영역 엔티티와 리포지토리 작성으로 도메인 모델 마련 ⬜
+#### Task 035: 작품·상품 영역 엔티티와 리포지토리 작성으로 도메인 모델 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 033, 023 · 브랜치: `feature/b0-catalog-entities`
 - 구현 사항
-  - [ ] `catalog/domain`(Title, WatchUnit, Availability, AvailabilityChange, Genre, TitleCast), `provider/domain/TmdbProvider`, `product/domain`(SubscriptionProduct, ProductComponent, ProductPrice)
-  - [ ] Setter 없음, `protected` 기본 생성자, enum `STRING`, 단방향 `@ManyToOne(LAZY)`. `Availability` 상태·tier 플래그는 도메인 메서드 하나에서만 변경
+  - [x] `catalog/domain`(Title, WatchUnit, Availability, AvailabilityChange, Genre, TitleCast), `provider/domain/TmdbProvider`, `product/domain`(SubscriptionProduct, ProductComponent, ProductPrice)
+  - [x] Setter 없음, `protected` 기본 생성자, enum `STRING`, 단방향 `@ManyToOne(LAZY)`. `Availability` 상태·tier 플래그는 도메인 메서드 하나에서만 변경
 - 완료 기준
   - V-B: `ddl-auto=validate` 통합 테스트와 리포지토리 기본 조회 테스트가 통과한다.
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b0-catalog-entities`, PR #56, 이후 구조 정리 PR). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). 엔티티 11개(+복합 키 클래스 2개 `TitleGenreId`, `ProductComponentId`), enum 8개, 리포지토리 11개(조회 메서드는 `TitleRepository.findByMediaTypeAndTmdbId`, `TmdbProviderRepository.findByMappingState` 두 개만). 테스트 20건(`EntityMappingValidateTest` 1, `TmdbProviderRepositoryTest` 2, `TitleRepositoryTest` 3, `AvailabilityTest` 4, `CatalogRelationTest` 7, `ProductEntityTest` 3), 전체 475건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 정적 팩토리 `create`, Setter 없음, 단방향 `@ManyToOne(LAZY)`, `NUMERIC`→`BigDecimal`, 복합 키는 `@EmbeddedId`+`@MapsId`.
+  - 구조 정리: 각 도메인의 `domain` 패키지를 `entity`(엔티티·키 클래스), `repository`, `enums`로 나눴다(`enum`은 자바 예약어라 `enums`). 기존 `OttService` 계열 포함 41개 파일을 `git mv`로 옮겼고 이동 전후 전체 테스트 475건이 같다. `.claude/rules/backend.md`의 패키지 구조와 Entity 규칙을 갱신했다. 아래 항목의 옛 경로 표기(`catalog/domain` 등)는 이동 전 이름이다.
+  - CodeRabbit 결정: `MediaType`의 대소문자 변환에 `Locale.ROOT`를 적용했다. 이력 자동 기록, 중복 방지, 낙관적 락(`@Version`)은 쓰기 코드를 만드는 Task 044로 넘겼다.
+  - 넘길 내용: Task 042~044(`Availability` 쓰기 설계, 아래 044 항목), 056·062(엔티티 매핑 규칙은 backend.md Entity 절). 확인하지 못한 것: `TmdbProvider`·`Genre` 같은 PK 직접 지정 엔티티의 `save` 때 SELECT 선행 여부, Supabase·Cloudtype 환경 기동. `BaseTimeEntity` 주석("기본 매핑은 TIMESTAMP")과 달리 `Instant`에 `@JdbcTypeCode`가 없어도 `validate`가 통과함을 확인했다(TECH 6절). 주석 정정은 별도 확인.
 #### Task 036: 디자인 방향 결정으로 토큰 확정 근거 마련 ✅
 - 태그: [H] · PRD: H3, R11-1 · 선행: 027~029 · 기한: 2026-10-21(MVP 2주차)
 - 구현 사항
@@ -917,6 +920,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
+  - [ ] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
   - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
   - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
@@ -1004,7 +1008,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 053: Google OAuth2 로그인·JWT 발급·AT 검증 구현으로 회원 인증 확보 ⬜
 - 태그: [B] · PRD: B5, FR-06, TECH 4절, T-7 · 선행: 034, 023 · 브랜치: `feature/b5-oauth-login`
 - 구현 사항
-  - [ ] `user/domain/User` 엔티티·리포지토리(`UNIQUE(oauth_provider, oauth_subject)`로 조회·생성)
+  - [ ] `user/domain/entity/User` 엔티티와 `user/domain/repository` 리포지토리(`UNIQUE(oauth_provider, oauth_subject)`로 조회·생성)
   - [ ] Task 016 임시 설정을 실제 `SecurityConfig`로 교체: STATELESS, `permitAll`은 `/api/public/**`와 인증 경로(`/api/auth/**`, `/api/oauth2/**`, `/api/login/**`), 그 외 `/api/**`는 인증 필요
   - [ ] OAuth 경로를 `/api` 아래로(`authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`), 쿠키 기반 `AuthorizationRequestRepository`
   - [ ] 성공 핸들러: RT 쿠키(HttpOnly, Secure, SameSite=Lax, Path=`/api/auth`) + 302 `/auth/callback`, URL에 토큰 없음. AT 30분(`app.jwt.access-ttl`), `jjwt-jackson` runtime

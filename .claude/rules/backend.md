@@ -68,6 +68,10 @@ paths:
 - enum은 `@Enumerated(EnumType.STRING)`으로 저장한다.
 - 연관관계는 단방향 `@ManyToOne(fetch = LAZY)`를 기본으로 하고, 양방향은 꼭 필요할 때만 둔다.
 - 파생 표시값은 `getXxxString()` 같은 메서드로 엔티티에 둔다.
+- 엔티티 생성은 정적 팩토리 `create(...)`로 하고, 상태 변경은 도메인 메서드로만 한다.
+- DB `DEFAULT`는 Hibernate가 INSERT에 쓰지 않으므로 `create`가 기본값을 직접 채운다.
+- 복합 기본키는 키 클래스(`@Embeddable`, `Serializable`, `equals/hashCode`) + 엔티티의 `@EmbeddedId` + 연관 `@MapsId`로 만든다. 키 클래스에는 리포지토리를 만들지 않는다.
+- NUMERIC 컬럼은 `BigDecimal`로 매핑한다.
 
 **DTO**
 - Request/Response 모두 **record**로 작성한다 (불변).
@@ -163,13 +167,17 @@ com.ottnavi
 ├── {도메인}/                  # catalog, provider, product, user, wishlist, plan, notification
 │   ├── api/                   # 컨트롤러(+Interface), dto/{request,response}
 │   ├── application/           # 서비스
-│   └── domain/                # 엔티티, 리포지토리, enums
+│   └── domain/                # 엔티티 영역
+│       ├── entity/            # 엔티티와 복합 키 클래스
+│       ├── repository/        # JPA 리포지토리
+│       └── enums/             # enum
 ├── engine/                    # 계산 엔진 (순수 Java, 프레임워크 의존 없음)
 ├── collect/                   # Spring Batch Job과 Step
 └── admin/                     # 관리자 전용 API (각 도메인 서비스를 호출)
 ```
 
 - 각 도메인은 api → application → domain 순으로 단방향 의존한다.
+- `enum`은 자바 예약어라 패키지 이름이 될 수 없으므로 하위 패키지는 `enums`를 쓴다.
 - 다른 도메인의 데이터가 필요하면 그 도메인의 서비스를 호출한다. 다른 도메인의 리포지토리를 직접 쓰지 않는다.
 - 외부 API/LLM 호출 책임은 `infra`에 두고, 도메인 서비스는 `infra`의 클라이언트를 호출해 결과를 도메인 모델로 변환한다. 프롬프트 조립은 `infra/llm` 안에서 `XxxPromptService`로 분리한다.
 - `plan`은 `engine`을 호출하는 유일한 도메인이다. `engine`은 다른 패키지를 참조하지 않는다.

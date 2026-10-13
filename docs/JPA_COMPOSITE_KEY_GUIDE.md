@@ -1,7 +1,7 @@
 # JPA 복합 기본키 쉬운 설명 (우리 프로젝트 코드로 배우기)
 
 > 2026-10-13 작성. Task 035를 구현하며 오간 설명을 정리한 학습 문서다. 규칙의 근거 문서가 아니다.
-> 코드 예시는 `backend/src/main/java/com/ottnavi/catalog/domain/`의 `TitleGenre`, `TitleGenreId`에서 가져왔다. `ProductComponent`도 같은 구조다.
+> 코드 예시는 `backend/src/main/java/com/ottnavi/catalog/domain/entity/`의 `TitleGenre`, `TitleGenreId`에서 가져왔다. `ProductComponent`도 같은 구조다.
 
 ## 1. 복합키가 뭐고 왜 쓰나
 

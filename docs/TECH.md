@@ -206,6 +206,11 @@ sequenceDiagram
 | 설치된 Vitest는 5.0.3이고 이 문서의 위 줄은 "Vitest 4"로 적혀 있음. Vitest 5의 Node 요구 버전은 확인하지 못함 | Vite 8 기준(Node 20.19+/22.12+)을 유지 | 실측(Task 017) |
 | `docker compose -f infra/docker-compose.yml`은 `.env`를 compose 파일이 있는 `infra/` 기준으로 찾아 루트 `.env`를 읽지 않음 | compose에 로컬 전용 기본값을 두고, 루트 `.env`가 필요하면 `--env-file .env`. DB·Redis 포트는 `127.0.0.1`에만 공개 | 도출(Task 008) |
 | CodeRabbit은 기본값으로 기본 브랜치(`main`) 대상 PR만 자동 리뷰해 `develop` 대상 PR은 건너뜀. 코멘트 틀(제목·안내문)은 `language: ko-KR`에서도 영어로 나옴 | `.coderabbit.yaml`의 `reviews.auto_review.base_branches`에 `develop` 추가. Autopilot·Autofix 체크박스는 누르지 않음 | c7, 실측 |
+| DB `DEFAULT`는 Hibernate가 INSERT에 쓰지 않아 필드가 null이면 `NOT NULL` 위반이 난다 | 엔티티 정적 팩토리 `create`가 기본값(`WEEKLY`, `STANDARD`, `active=true` 등)을 직접 채운다 | Task 035 테스트 |
+| 복합 키 **키 클래스**(`@Embeddable`)에 리포지토리를 만들면 `The given domain class does not contain an id attribute`로 앱 기동이 실패한다 | 리포지토리는 엔티티에만 만들고 키 클래스는 `JpaRepository<엔티티, 키 클래스>`의 키 타입 칸에만 쓴다 | Task 035 실측 |
+| `NUMERIC` 컬럼을 `Double`로 매핑하면 `validate`가 `found [numeric], but expecting [float(53)]`로 기동에 실패한다 | `BigDecimal`로 매핑한다 | Task 035 실측 |
+| 복합 키 엔티티의 `create`에 저장 전 부모(id가 null)를 넘기면 `null value in column "name"` 같은 헷갈리는 NOT NULL 오류가 난다 | 부모를 먼저 저장한 뒤 넘긴다 | Task 035 실측 |
+| `Instant`에 `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)`가 없어도 `validate`가 통과한다(Hibernate 7, PostgreSQL 17.6). `BaseTimeEntity` 주석("기본 매핑은 TIMESTAMP")과 다르다 | 어노테이션은 일관성을 위해 유지하고, 주석 정정은 별도로 확인한다 | Task 035 실측(`backend-dev` 검증) |
 
 ---
 
