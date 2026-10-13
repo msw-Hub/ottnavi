@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 5/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 40/105 | |
+| 합계 | | 41/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -815,7 +815,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 4/30
+## 7. Phase 3 — 핵심 기능 개발 · 5/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -897,16 +897,18 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 아직 확인 못 함(5.8 실제 응답 확인은 선택이라 건너뜀, 소비 Task 시작 전 로컬 1회 호출로): TMDB가 429에 `Retry-After`를 보내는지, 오류 본문 구조, discover 페이지 상한, 파이프(`|`) OR 쿼리, 한국어 줄거리가 `""`인지 `null`인지, 시즌 응답의 정수 `id`, TV `credits`와 `aggregate_credits`.
   - 넘길 내용: Task 042·044는 `TmdbNotFoundException`을 받으면 그 작품만 건너뛰고 계속한다. Task 043은 `listProviders`로 받은 전체 제공처 목록 중 우리 7곳이 아닌 제공처를 `tmdb_provider`에 "미매핑"으로 저장하고(저장은 043, 041은 목록을 받아 오는 호출까지) 관리자가 나중에 "관련 없음"으로 정리한다. DTO의 날짜는 `String`이고 `""`일 수 있어 변환은 소비 쪽(042)이 한다.
 
-#### Task 042: 제공 상태 판정과 러닝타임 계산 도메인 로직 구현으로 3상태 판정 확정 ⬜
+#### Task 042: 제공 상태 판정과 러닝타임 계산 도메인 로직 구현으로 3상태 판정 확정 ✅
 - 태그: [B] · PRD: B3, FR-02, 03, 8.2 · 선행: 035, 041 · 브랜치: `feature/b3-availability-rules`
 - 구현 사항
-  - [ ] 작품·시즌별 제공처의 KR flatrate에 매핑 서비스가 직접 있을 때만 AVAILABLE, 대여·구매만이면 아님, KR 없음 UNKNOWN(`NO_KR_DATA`), 쿠팡플레이 영화 UNKNOWN(`STRUCTURAL_GAP`)
-  - [ ] 상태가 바뀌면 `availability_change` 기록
-  - [ ] 러닝타임: 영화 runtime, 시즌은 방영 회차 합, 빈 값은 120/45/24분 추정(설정 키, R11-25)
-  - [ ] 시즌 0 제외, 한국어 줄거리 없으면 영어 대체·`overview_lang`, 출연진 상위 10명
+  - [x] 작품·시즌별 제공처의 KR flatrate에 매핑 서비스가 직접 있을 때만 AVAILABLE, 대여·구매만이면 아님, KR 없음 UNKNOWN(`NO_KR_DATA`), 쿠팡플레이 영화 UNKNOWN(`STRUCTURAL_GAP`)
+  - [x] 상태가 바뀌면 `availability_change` 기록
+  - [x] 러닝타임: 영화 runtime, 시즌은 방영 회차 합, 빈 값은 120/45/24분 추정(설정 키, R11-25)
+  - [x] 시즌 0 제외, 한국어 줄거리 없으면 영어 대체·`overview_lang`, 출연진 상위 10명
 - 완료 기준
   - V-B: discover 오판정(웨이브 구매만), 시즌별 제공처 상이(8.2 랑야방 구조), 추정 표시 케이스가 통과한다.
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b3-availability-rules`, PR #58). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). `catalog/domain/rule`(새 패키지)에 Spring·DB·TMDB에 의존하지 않는 순수 Java 클래스 14개: `AvailabilityJudge`(판정), `KrProviders`·`ProviderMapping`·`ServiceInfo`(입력 record)·`AvailabilityVerdict`(출력), `AvailabilityChangeDetector`·`StatusChange`(변경 비교), `RuntimeCalculator`·`RuntimeDefaults`·`EpisodeRuntime`·`RuntimeResult`(러닝타임), `TitleDetailRules`·`OverviewPick`·`CastCandidate`(시즌 0 제외·영어 줄거리 대체·출연진 10명·날짜 변환). 새 테스트 37건(판정 11, 변경 비교 5, 러닝타임 12, 소규모 규칙 9), 전체 512건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 규칙 설명은 `docs/AVAILABILITY_RULES.md`.
+  - 결정: ① 쿠팡플레이 영화는 KR 데이터와 flatrate 유무에 상관없이 항상 UNKNOWN(`STRUCTURAL_GAP`)이 먼저다(PRD R11-13 "영화는 구조적 공백"의 해석) ② `data_quality`는 판정에 쓰지 않는다(화면 표시용, 쿠팡플레이 드라마는 일반 규칙) ③ 러닝타임 기본값은 `RuntimeDefaults`로 주입하고 설정 키는 `app.collect.runtime-defaults.{movie-minutes 120, episode-minutes 45, animation-episode-minutes 24}`(`application.yml`에 추가, 바인딩 클래스는 043·044) ④ 변경 비교는 status 변화만 이력 대상이다 ⑤ `parseDate`는 형식 오류를 null(미방영)로 처리해 수집이 멈추지 않게 한다. `backend.md` 패키지 구조에 `rule/`을 추가했다.
+  - 넘길 내용: Task 044(TMDB 응답 객체 → `KrProviders`·`EpisodeRuntime`·`CastCandidate` 변환, 방영 0회 시즌 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 영어 줄거리를 얻는 추가 호출). 확인하지 못한 것: 장르 id 16(Animation)을 TMDB 공식 문서로 확인(ERD 장르 표가 근거), 실제 TMDB 응답 end-to-end, 시즌 `air_date`가 `""`·null 외 형태로 오는지.
 #### Task 043: 수집 Job 후보 discover Step 구현으로 수집 대상 확보 ⬜
 - 태그: [B] · PRD: B3, FR-18(MVP 일괄), 5.5 · 선행: 033, 042 · 브랜치: `feature/b3-collect-candidates`
 - 관련: TECH 3절, T-2
@@ -920,6 +922,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
+  - [ ] Task 042에서 이월: TMDB 응답 객체(DTO)를 `catalog/domain/rule`의 입력 record(`KrProviders`, `EpisodeRuntime`, `CastCandidate`)로 바꾸는 변환(`flatrate`만 넣고, KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없으면 `KrProviders.of(빈 집합)`), 방영된 회차가 0개인 시즌(합계 0분)의 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 한국어 줄거리가 없을 때 영어 줄거리를 얻는 추가 호출, `MAPPED`인 제공처만 판정 매핑에 넣기
   - [ ] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
   - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
