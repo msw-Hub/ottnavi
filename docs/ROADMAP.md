@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 5/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 6/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 41/105 | |
+| 합계 | | 42/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -815,7 +815,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 5/30
+## 7. Phase 3 — 핵심 기능 개발 · 6/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -909,16 +909,19 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 기록: 2026-10-13 완료(브랜치 `feature/b3-availability-rules`, PR #58). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). `catalog/domain/rule`(새 패키지)에 Spring·DB·TMDB에 의존하지 않는 순수 Java 클래스 14개: `AvailabilityJudge`(판정), `KrProviders`·`ProviderMapping`·`ServiceInfo`(입력 record)·`AvailabilityVerdict`(출력), `AvailabilityChangeDetector`·`StatusChange`(변경 비교), `RuntimeCalculator`·`RuntimeDefaults`·`EpisodeRuntime`·`RuntimeResult`(러닝타임), `TitleDetailRules`·`OverviewPick`·`CastCandidate`(시즌 0 제외·영어 줄거리 대체·출연진 10명·날짜 변환). 새 테스트 37건(판정 11, 변경 비교 5, 러닝타임 12, 소규모 규칙 9), 전체 512건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 규칙 설명은 `docs/AVAILABILITY_RULES.md`.
   - 결정: ① 쿠팡플레이 영화는 KR 데이터와 flatrate 유무에 상관없이 항상 UNKNOWN(`STRUCTURAL_GAP`)이 먼저다(PRD R11-13 "영화는 구조적 공백"의 해석) ② `data_quality`는 판정에 쓰지 않는다(화면 표시용, 쿠팡플레이 드라마는 일반 규칙) ③ 러닝타임 기본값은 `RuntimeDefaults`로 주입하고 설정 키는 `app.collect.runtime-defaults.{movie-minutes 120, episode-minutes 45, animation-episode-minutes 24}`(`application.yml`에 추가, 바인딩 클래스는 043·044) ④ 변경 비교는 status 변화만 이력 대상이다 ⑤ `parseDate`는 형식 오류를 null(미방영)로 처리해 수집이 멈추지 않게 한다. `backend.md` 패키지 구조에 `rule/`을 추가했다.
   - 넘길 내용: Task 044(TMDB 응답 객체 → `KrProviders`·`EpisodeRuntime`·`CastCandidate` 변환, 방영 0회 시즌 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 영어 줄거리를 얻는 추가 호출). 확인하지 못한 것: 장르 id 16(Animation)을 TMDB 공식 문서로 확인(ERD 장르 표가 근거), 실제 TMDB 응답 end-to-end, 시즌 `air_date`가 `""`·null 외 형태로 오는지.
-#### Task 043: 수집 Job 후보 discover Step 구현으로 수집 대상 확보 ⬜
+#### Task 043: 수집 Job 후보 discover Step 구현으로 수집 대상 확보 ✅
 - 태그: [B] · PRD: B3, FR-18(MVP 일괄), 5.5 · 선행: 033, 042 · 브랜치: `feature/b3-collect-candidates`
 - 관련: TECH 3절, T-2
 - 구현 사항
-  - [ ] `collect/` Job 골격과 첫 Step: 서비스별 discover(KR 구독)로 후보 `title` 저장. 제공처 전체 목록(`TmdbClient.listProviders`, Task 041)을 받아 우리 7곳이 아닌 제공처를 **버리지 않고** `tmdb_provider`에 `first_seen_at`과 함께 "미매핑"으로 저장한다(관리자가 나중에 "관련 없음"으로 정리, Task 041 안내서 8절 1번)
-  - [ ] Job 파라미터 `targetDate`(LocalDate) + `tier`. MVP 일괄 수집은 **`tier=ALL`**(R-16 확정, `tier`의 뜻은 TECH 3절 설명 참고). 작품의 `title.refresh_tier`(DAILY/WEEKLY)와 Job 파라미터 `tier`가 같은 enum을 공유하는지는 이 Task에서 정한다(공유하지 않으면 `ALL`은 Job 파라미터에만 둔다)
-  - [ ] 작은 chunk, 짧은 Feign 타임아웃, 연결 풀 사용량 지표(T-2)
+  - [x] `collect/` Job 골격과 첫 Step: 서비스별 discover(KR 구독)로 후보 `title` 저장. 제공처 전체 목록(`TmdbClient.listProviders`, Task 041)을 받아 우리 7곳이 아닌 제공처를 **버리지 않고** `tmdb_provider`에 `first_seen_at`과 함께 "미매핑"으로 저장한다(관리자가 나중에 "관련 없음"으로 정리, Task 041 안내서 8절 1번)
+  - [x] Job 파라미터 `targetDate`(LocalDate) + `tier`. MVP 일괄 수집은 **`tier=ALL`**(R-16 확정, `tier`의 뜻은 TECH 3절 설명 참고). 작품의 `title.refresh_tier`(DAILY/WEEKLY)와 Job 파라미터 `tier`가 같은 enum을 공유하는지는 이 Task에서 정한다(공유하지 않으면 `ALL`은 Job 파라미터에만 둔다)
+  - [x] 작은 chunk, 짧은 Feign 타임아웃, 연결 풀 사용량 지표(T-2)
 - 완료 기준
   - V-B: Testcontainers + WireMock으로 작은 discover 응답을 수집했을 때 후보 `title`·`tmdb_provider` 행이 기대값과 같다.
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b3-collect-candidates`, PR #59). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). 수집 Job `collectJob`(Step 3개: 제공처 전체 목록을 `tmdb_provider`에 UNMAPPED로 저장 → 영화 후보 → 드라마 후보), chunk 20, Reader는 진행 위치를 저장하지 않고 실패하면 그 Step을 처음부터 다시 읽는다(이미 있는 작품은 건너뛰거나 요약만 갱신해 결과가 같다). 신규 테스트 11건(`CollectJobTest`, Testcontainers + WireMock), 전체 523건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). Job 설명은 `docs/COLLECT_JOB_FLOW.md`, 코드 읽기는 `docs/COLLECT_CODE_WALKTHROUGH.md`.
+  - 결정: ① `title.refresh_tier`용 `RefreshTier`(DAILY/WEEKLY)와 Job 파라미터용 `CollectTier`(DAILY/WEEKLY/ALL)는 공유하지 않고, MVP는 `tier=ALL`만 허용한다(DAILY·WEEKLY는 계층별 갱신 Task 077에서 연다) ② discover 요약 필드(원제·개봉일·포스터·배경·원어·인기도·평점)를 `title`에 저장하고, 이미 있는 작품은 포스터·배경·인기도·평점만 갱신한다(`Title.createFromSummary`·`refreshSummary`, 제목·개봉일은 상세 값이 정답이라 갱신하지 않는다) ③ 같은 작품이 여러 서비스에 나오면 `findByMediaTypeAndTmdbId`로 확인해 한 줄만 둔다 ④ chunk 안 TMDB 호출은 TECH T-2 예외, Batch 6 기본 트랜잭션 매니저가 트랜잭션 없는 것이라 `chunk(20).transactionManager(tm)`을 지정한다.
+  - 구조 정리(같은 브랜치 `feature/b3-layer-rename`): `api` → `controller` + `dto`, `application` → `service`, 입력·출력 record는 `service/model`, `collect`는 `job/`·`step/`로 나눴고 `CollectJobConfig`를 Job 조립·Step 조립(`CollectStepConfig`)·TMDB 응답 변환(`CandidateMapper`)으로 쪼갰다. `OttServiceQueryService`가 응답 DTO를 import하던 역방향 의존은 서비스가 엔티티를 반환하고 컨트롤러가 변환하도록 고쳤다. 이동 전후 전체 테스트 523건이 같다. `.claude/rules/backend.md`와 `CLAUDE.md`의 패키지 구조를 갱신했다.
+  - 넘길 내용: Task 044(`title`에는 요약 필드까지 있고 줄거리·`overview_lang`·`tv_status`만 비어 있다. 044가 `updateDetail`로 채우고 `fetched_at`을 갱신한다. title을 읽는 Reader는 `id` 순으로 읽고 `fetched_at`으로 거르지 않는다(TECH 3절 페이지 밀림). 이 시점 `collect/step`이 15개 안팎이 되면 `step/candidate`·`step/detail`로 더 나누는 것을 검토), Task 045(`CollectJobParameters.of(targetDate, tier)` 재사용, 비동기는 `TaskExecutor`를 가진 `JobOperator`, 완료=`JobInstanceAlreadyCompleteException`·실행 중=`JobExecutionAlreadyRunningException`을 409로 매핑, 계약 `tier` enum에 `ALL` 포함, 다른 날짜 Job의 Reader 상태 공유는 045 이월 항목). 새 제공처(UNMAPPED)는 관리자 화면에서 정리한다. 확인하지 못한 것: 실제 TMDB 응답으로 수집, `|`(OR) 구분자의 TMDB 공식 문서 확인, 운영 환경 연결 점유, discover 500쪽 상한에 걸리는 서비스 여부, 인기도·평점 UPDATE 부하(첫 실제 수집 Task 048에서 측정).
 #### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항

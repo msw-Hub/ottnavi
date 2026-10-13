@@ -165,19 +165,27 @@ com.ottnavi
 │   ├── mail/                  # 메일 발송 (2단계)
 │   └── llm/                   # Spring AI 연동 (3단계)
 ├── {도메인}/                  # catalog, provider, product, user, wishlist, plan, notification
-│   ├── api/                   # 컨트롤러(+Interface), dto/{request,response}
-│   ├── application/           # 서비스
+│   ├── controller/            # 컨트롤러 (문서 어노테이션이 많아지면 같은 폴더에 XxxControllerInterface)
+│   ├── dto/                   # 프론트(JSON)와 주고받는 틀
+│   │   ├── request/
+│   │   └── response/
+│   ├── service/               # 서비스 (흐름 조율: 트랜잭션, 도메인 호출)
+│   │   └── model/             # 서버 안에서 서비스와 호출하는 쪽이 주고받는 값 묶음(record)
 │   └── domain/                # 엔티티 영역
 │       ├── entity/            # 엔티티와 복합 키 클래스
 │       ├── repository/        # JPA 리포지토리
 │       ├── enums/             # enum
 │       └── rule/              # 순수 Java 규칙(판정·계산, 프레임워크 의존 없음. catalog)
 ├── engine/                    # 계산 엔진 (순수 Java, 프레임워크 의존 없음)
-├── collect/                   # Spring Batch Job과 Step
+├── collect/                   # Spring Batch 수집 (업무 도메인이 아니라 Job 실행 입구라 domain·service 폴더가 없다)
+│   ├── job/                   # Job 조립, Job 파라미터
+│   └── step/                  # Step 조립, Reader·Writer·Tasklet
 └── admin/                     # 관리자 전용 API (각 도메인 서비스를 호출)
 ```
 
-- 각 도메인은 api → application → domain 순으로 단방향 의존한다.
+- 각 도메인은 controller → service → domain 순으로 단방향 의존한다.
+- `domain/rule`은 순수 업무 규칙, `service`는 흐름 조율(트랜잭션, 도메인 호출)이다.
+- `service/model`은 서버 안에서 서비스와 호출하는 쪽이 주고받는 값 묶음이고, `dto`는 프론트(JSON)와 주고받는 틀이다(이름을 겹치지 않게 `model`을 쓴다).
 - `enum`은 자바 예약어라 패키지 이름이 될 수 없으므로 하위 패키지는 `enums`를 쓴다.
 - 다른 도메인의 데이터가 필요하면 그 도메인의 서비스를 호출한다. 다른 도메인의 리포지토리를 직접 쓰지 않는다.
 - 외부 API/LLM 호출 책임은 `infra`에 두고, 도메인 서비스는 `infra`의 클라이언트를 호출해 결과를 도메인 모델로 변환한다. 프롬프트 조립은 `infra/llm` 안에서 `XxxPromptService`로 분리한다.

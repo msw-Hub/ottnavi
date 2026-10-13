@@ -1,7 +1,7 @@
 # 수집 Job의 후보 모으기 흐름 (Task 043)
 
 > 2026-10-13 작성. Task 043이 만든 수집 Job의 첫 단계를 정리한 설명 문서다. 규칙의 근거는 PRD FR-18·5.5, TECH 3절·T-2, ERD A 영역이고 이 문서는 구현을 설명한다.
-> 코드는 `backend/src/main/java/com/ottnavi/collect/`(Job·Step), `catalog/application/`, `provider/application/`, 테스트는 `CollectJobTest`(11건).
+> 코드는 `backend/src/main/java/com/ottnavi/collect/`(`job/`·`step/`), `catalog/service/`, `provider/service/`, 테스트는 `CollectJobTest`(11건).
 
 ## 1. 배경
 
