@@ -170,7 +170,8 @@ com.ottnavi
 │   └── domain/                # 엔티티 영역
 │       ├── entity/            # 엔티티와 복합 키 클래스
 │       ├── repository/        # JPA 리포지토리
-│       └── enums/             # enum
+│       ├── enums/             # enum
+│       └── rule/              # 순수 Java 규칙(판정·계산, 프레임워크 의존 없음. catalog)
 ├── engine/                    # 계산 엔진 (순수 Java, 프레임워크 의존 없음)
 ├── collect/                   # Spring Batch Job과 Step
 └── admin/                     # 관리자 전용 API (각 도메인 서비스를 호출)
