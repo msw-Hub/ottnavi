@@ -42,11 +42,11 @@
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
-| 2 | 공통 모듈/컴포넌트 개발 | 12/14 | 🔄 진행 중 |
+| 2 | 공통 모듈/컴포넌트 개발 | 13/14 | 🔄 진행 중 |
 | 3 | 핵심 기능 개발 | 4/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 38/105 | |
+| 합계 | | 39/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -605,7 +605,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 12/14
+## 6. Phase 2 — 공통 모듈/컴포넌트 개발 · 13/14
 
 **목표.**
 - 공통 응답·예외, 공통 설정, 프론트 공통 유틸·컴포넌트를 한 번만 정의해 Phase 3~4에서 재사용한다.
@@ -759,19 +759,22 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: 마이그레이션 테스트 통과. 영화 행(시즌 NULL) 중복과 `title` (media_type, tmdb_id) 중복이 거부된다.
 - 기록: 2026-10-13 완료(브랜치 `feature/b0-schema-catalog`, PR #51). 사용자가 직접 구현했다. V2(작품 영역 8개 테이블 + `tmdb_provider` 시드 8행, 전부 MAPPED이고 1796은 AD), V3(상품 영역 3개, 가격 시드는 넣지 않음), V4(Spring Batch 6.0.5 `BATCH_*` 6개 + 시퀀스 3개). 마이그레이션 테스트 `CatalogMigrationTest` 13건, 전체 442건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 안내서(`TASK033_GUIDE.md`)는 정리로 삭제했다(`git log -- docs/TASK033_GUIDE.md`).
   - CodeRabbit 결정: ① `watch_unit` 회차 수 3개 컬럼에 `>= 0` CHECK(`ck_watch_unit_episode_counts`)를 추가했다. `aired <= episode` 같은 비교는 TMDB 값에 따라 수집이 막힐 수 있어 두지 않았다. ② `unit_type`과 `title.media_type`의 일치, 영화 단위의 `episode_count = 1`은 DB가 막지 않고 수집 Job이 지킨다(Task 044에 반영). ③ 새 테이블에 RLS 없음 우려는 Supabase Data API를 꺼 둔 상태(2026-10-13 확인)라 조치하지 않았다.
-  - 넘길 내용: Task 034(V5~V7, 안내서 `TASK034_GUIDE.md`), 035(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`), 043·044(수집이 `unknown_reason`을 UNKNOWN일 때만 채움, 작품 종류에 맞는 단위만 생성). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035).
-#### Task 034: 사용자·플랜·알림 영역(C·D·E) 마이그레이션과 FK 동작 테스트 작성으로 사용자 데이터 스키마 확정 ⬜
+  - 넘길 내용: Task 034(V5~V7, 안내서 `TASK034_GUIDE.md`는 정리로 삭제), 035(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`), 043·044(수집이 `unknown_reason`을 UNKNOWN일 때만 채움, 작품 종류에 맞는 단위만 생성). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035).
+#### Task 034: 사용자·플랜·알림 영역(C·D·E) 마이그레이션과 FK 동작 테스트 작성으로 사용자 데이터 스키마 확정 ✅
 - 태그: [B] · PRD: B0, FR-07, 12, 14 · 선행: 032, 033 · 브랜치: `feature/b0-schema-user-plan`
 - 관련: ERD C·D·E, "FK 삭제 동작"·"참조 컬럼 인덱스", TECH T-1
 - 구현 사항
-  - [ ] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
-  - [ ] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
-  - [ ] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
-  - [ ] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
-  - [ ] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
+  - [x] V5·V6·V7: `users`, `user_setting`, `user_subscription`, `user_price_override`, `wishlist_item`, `plan`, `plan_month`, `plan_month_product`, `plan_item`, `plan_assignment`, `calc_run`, `notification_outbox`, `shedlock`(Task 032 보정 반영)
+  - [x] 유니크 제약 전부: `users.email` UK, `users(oauth_provider, oauth_subject)`, `user_subscription(user_id, ott_service_id)`, `user_price_override(user_id, product_id)`, `wishlist_item(user_id, watch_unit_id)`, `plan(user_id) WHERE status='ACTIVE'`, `plan(user_id, plan_type) WHERE status='DRAFT'`(유형마다 DRAFT 1개), `plan_month(plan_id, month_index)`, `plan_item(plan_id, watch_unit_id)`, `plan_assignment(plan_item_id, plan_month_id)`, `notification_outbox.dedupe_key`. ERD "참조 컬럼 인덱스"가 일부 FK 인덱스를 생략한 근거가 이 유니크 제약의 선두 컬럼이므로 하나도 빠뜨리지 않는다
+  - [x] FK 동작은 ERD 표 그대로(CASCADE / SET NULL / NO ACTION, 각 FK에 SQL 주석). 추가 인덱스: `plan_assignment(plan_month_id)`, `calc_run(plan_id)`, `plan(previous_plan_id)`, `plan(user_id)`, `notification_outbox(user_id)`, `notification_outbox(status, next_attempt_at)`
+  - [x] `plan.plan_type`(RECOMMENDED / SAVER / SIMPLE)·`calc_run.plan_type` 컬럼(ERD, PRD 11절 35번)
+  - [x] Testcontainers 테스트: DRAFT 삭제 후 하위 4개 테이블 0행, `users` 삭제 후 사용자 소유 행 0행·`calc_run.plan_id` NULL, ACTIVE 2개 삽입 시 유니크 위반, 같은 유형 DRAFT 2개 삽입 시 유니크 위반(다른 유형 DRAFT 3개는 허용)
 - 완료 기준
   - V-B: 위 테스트가 통과한다(`ddl-auto=validate`는 ON DELETE를 검사하지 않으므로 이 테스트가 기준).
-
+- 기록: 2026-10-13 완료(브랜치 `feature/b0-schema-user-plan`, PR #54). 사용자가 직접 구현했다. V5(사용자 영역 5개 테이블), V6(플랜 영역 6개, ACTIVE·DRAFT 부분 유니크 인덱스), V7(`notification_outbox`, `shedlock`). 마이그레이션 테스트 `UserPlanMigrationTest` 13건, 전체 455건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 안내서(`TASK034_GUIDE.md`)는 정리로 삭제했다(`git log -- docs/TASK034_GUIDE.md`). `plan_month_product(plan_month_id)` 별도 인덱스는 유니크 인덱스가 덮어 만들지 않았다.
+  - 확정: `users` 컬럼은 모두 NOT NULL(구글 이름이 비면 서비스가 이메일 앞부분으로 채움, `oauth_provider`는 GOOGLE만), `plan_item.completed_month_index`는 UNSCHEDULED면 NULL, `plan.change_summary`는 TEXT(형식은 Task 069), `calc_run.input_hash`는 CHAR(64).
+  - CodeRabbit 결정: ① `plan_month.month_index`는 `>= 0`만 DB가 검사하고 상한(0~2)은 앱이 지킨다(ERD D3, PR #50). ② `plan_assignment`가 한 플랜의 찜·달만 묶는 것과 `previous_plan_id`가 같은 사용자의 플랜만 가리키는 것은 DB 제약(복합 FK)을 두지 않고 앱이 보장한다(ERD 설계 결정, Task 063·064·069 통합 테스트).
+  - 넘길 내용: Task 035·062(엔티티 타입 매핑: `NUMERIC`→`BigDecimal`, `JSONB`→`@JdbcTypeCode(SqlTypes.JSON)`, `TIMESTAMPTZ`→`Instant`), 056(찜 20개 직렬화), 063(소속 일치, 월 번호 범위), 064·069(소속 일치 테스트, ACTIVE 교체 순서), 069(`change_summary` 형식). 확인하지 못한 것: Supabase(17.11)·Cloudtype 배포 환경에서 적용, 엔티티와의 `validate`(Task 035·062).
 #### Task 035: 작품·상품 영역 엔티티와 리포지토리 작성으로 도메인 모델 마련 ⬜
 - 태그: [B] · PRD: B0 · 선행: 033, 023 · 브랜치: `feature/b0-catalog-entities`
 - 구현 사항
