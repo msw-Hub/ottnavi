@@ -13,7 +13,7 @@ import type { ProviderMappingState } from './providerMappingState';
 import type { ProviderTier } from './providerTier';
 
 /**
- * 제공처 매핑 저장 요청. MAPPED면 ottServiceId 필수, UNMAPPED·IGNORED면 null
+ * 제공처 매핑 저장 요청. MAPPED면 ottServiceId 필수, UNMAPPED·IGNORED면 null. 필드를 생략하면 null로 본다(생략과 null을 구분하지 않는다)
  */
 export interface UpdateAdminProviderRequest {
   mappingState: ProviderMappingState;
