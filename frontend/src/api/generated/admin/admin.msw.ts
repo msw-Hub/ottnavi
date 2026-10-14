@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -45,13 +45,13 @@ export const getListAdminProvidersResponseMock = (): CommonResponseAdminProvider
 
 export const getUpdateAdminProviderResponseMock = (): CommonResponseAdminProvider => ({"success":true,"data":{"providerId":1881,"tmdbName":"Coupang Play","ottServiceId":7,"tier":"STANDARD","firstSeenAt":"2026-03-26T03:10:00+09:00","mappingState":"MAPPED"}})
 
-export const getListCollectExecutionsResponseMock = (): CommonResponseCollectExecutionPage => ({"success":true,"data":{"page":0,"size":20,"totalElements":2,"totalPages":1,"content":[{"executionId":5,"targetDate":"2026-10-12","tier":"ALL","status":"COMPLETED","startedAt":"2026-10-12T03:00:00+09:00","endedAt":"2026-10-12T03:42:00+09:00","processedCount":1840,"changedCount":2,"failureReason":null},{"executionId":4,"targetDate":"2026-10-11","tier":"ALL","status":"FAILED","startedAt":"2026-10-11T03:00:00+09:00","endedAt":"2026-10-11T03:05:00+09:00","processedCount":120,"changedCount":0,"failureReason":"TMDB 호출 제한 초과로 중단됨"}]}})
+export const getListCollectExecutionsResponseMock = (): CommonResponseCollectExecutionPage => ({"success":true,"data":{"page":0,"size":20,"totalElements":2,"totalPages":1,"content":[{"executionId":5,"targetDate":"2026-10-12","tier":"ALL","status":"COMPLETED","startedAt":"2026-10-12T03:00:00+09:00","endedAt":"2026-10-12T03:42:00+09:00","processedCount":1840,"changedCount":2,"failureReason":null,"canRecover":false,"canRestart":false},{"executionId":4,"targetDate":"2026-10-11","tier":"ALL","status":"FAILED","startedAt":"2026-10-11T03:00:00+09:00","endedAt":"2026-10-11T03:05:00+09:00","processedCount":120,"changedCount":0,"failureReason":"TMDB 호출 제한 초과로 중단됨","canRecover":false,"canRestart":false}]}})
 
 export const getCreateCollectExecutionResponseMock = (): CommonResponseCollectExecutionAccepted => ({"success":true,"data":{"executionId":6}})
 
 export const getListCollectExecutionChangesResponseMock = (): CommonResponseCollectExecutionChangePage => ({"success":true,"data":{"page":0,"size":20,"totalElements":3,"totalPages":1,"content":[{"mediaType":"movie","tmdbId":496243,"title":"기생충","seasonNumber":null,"ottServiceId":6,"previousStatus":"AVAILABLE","currentStatus":"UNKNOWN"},{"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"ottServiceId":1,"previousStatus":null,"currentStatus":"AVAILABLE"},{"mediaType":"movie","tmdbId":838209,"title":"파묘","seasonNumber":null,"ottServiceId":2,"previousStatus":null,"currentStatus":"AVAILABLE"}]}})
 
-export const getRecoverCollectExecutionResponseMock = (): CommonResponseCollectExecution => ({"success":true,"data":{"executionId":3,"targetDate":"2026-10-10","tier":"ALL","status":"FAILED","startedAt":"2026-10-10T03:00:00+09:00","endedAt":null,"processedCount":640,"changedCount":0,"failureReason":"중단된 실행을 관리자가 실패로 복구함"}})
+export const getRecoverCollectExecutionResponseMock = (): CommonResponseCollectExecution => ({"success":true,"data":{"executionId":3,"targetDate":"2026-10-10","tier":"ALL","status":"FAILED","startedAt":"2026-10-10T03:00:00+09:00","endedAt":null,"processedCount":640,"changedCount":0,"failureReason":"중단된 실행을 관리자가 실패로 복구함","canRecover":false,"canRestart":true}})
 
 export const getRestartCollectExecutionResponseMock = (): CommonResponseCollectExecutionAccepted => ({"success":true,"data":{"executionId":6}})
 

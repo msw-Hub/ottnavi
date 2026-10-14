@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -754,11 +754,11 @@ export const useUpdateAdminProvider = <TError = ErrorType<BadRequestResponse | U
       return useMutation(getUpdateAdminProviderMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 수집 실행 이력을 대상 날짜 내림차순, 같으면 실행 ID 내림차순으로 돌려준다(Task 029 화면 정렬). 서버가 멈춰 기록만 "실행 중"으로 남은 실행은 서버가 `STOPPED`로 판정해 내려준다.
+ * 수집 실행 이력을 대상 날짜 내림차순, 같으면 실행 ID 내림차순으로 돌려준다(Task 029 화면 정렬). 서버가 멈춰 기록만 "실행 중"으로 남은 실행은 서버가 `STOPPED`로 판정해 내려준다(저장하지 않고 조회할 때마다 판정한다).
  * 페이지네이션 응답이다. 수집은 매일 1회 이상 돌고 Spring Batch 메타데이터는 지우지 않으므로 이력이 계속 늘어난다.
  * 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절).
- * 오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
- * @summary 수집 실행 이력 조회 (제안)
+ * 오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401, 배치 토큰이 없거나 틀림), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 수집 실행 이력 조회
  */
 export const listCollectExecutions = (
     params?: ListCollectExecutionsParams,
@@ -830,7 +830,7 @@ export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listC
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 수집 실행 이력 조회 (제안)
+ * @summary 수집 실행 이력 조회
  */
 
 export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listCollectExecutions>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
@@ -851,11 +851,12 @@ export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listC
 
 
 /**
- * **제안(Task 031, 미구현).** 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
- * MVP는 `tier: ALL`만 받는다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 로컬 프로필에서만 허용하고(오늘 이하), 운영 프로필에서 오늘이 아닌 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
+ * 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
+ * MVP는 `tier: ALL`만 받는다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 설정 키 `app.collect.allow-target-date-override`가 true인 환경(로컬)에서만 허용하고(오늘 이하), 운영에서는 오늘(KST)만 받으며 다른 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
+ * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도 `BATCH_ALREADY_RUNNING`(409)이다. 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
  * 같은 날짜·범위의 마지막 실행이 실패(`FAILED`)면 새 실행으로 다시 시작해 202다(Spring Batch는 같은 식별 파라미터로 시작하면 실패한 인스턴스를 재시작한다, TECH 3절 "실패한 실행은 같은 파라미터로 restart").
- * 오류: `VALIDATION_FAILED`(400, 날짜 형식 오류·미래 날짜·운영에서 오늘이 아닌 날짜·ALL이 아닌 범위), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
- * @summary 수집 실행 요청 (제안)
+ * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 범위 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
+ * @summary 수집 실행 요청
  */
 export const createCollectExecution = (
     createCollectExecutionRequest: BodyType<CreateCollectExecutionRequest>,
@@ -909,7 +910,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateCollectExecutionMutationVariables = {data: BodyType<CreateCollectExecutionRequest>}
 
     /**
- * @summary 수집 실행 요청 (제안)
+ * @summary 수집 실행 요청
  */
 export const useCreateCollectExecution = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollectExecution>>, TError,CreateCollectExecutionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -922,10 +923,10 @@ export const useCreateCollectExecution = <TError = ErrorType<BadRequestResponse 
       return useMutation(getCreateCollectExecutionMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 이 실행에서 제공 상태가 바뀐 건(시청 단위 × 서비스, ERD `availability_change`)을 제목 순, 같으면 시즌 번호·서비스 ID 순으로 돌려준다. 끝나지 않은 실행은 빈 페이지일 수 있다.
+ * 이 실행에서 제공 상태가 바뀐 건(시청 단위 × 서비스, ERD `availability_change`)을 제목 순, 같으면 시즌 번호·서비스 ID 순으로 돌려준다. 끝나지 않은 실행은 빈 페이지일 수 있다.
  * 페이지네이션 응답이다. 첫 전체 수집은 모든 작품이 "처음 확인됨"이라 한 실행에 수천~수만 건이 생길 수 있다.
  * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·page/size 범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `INTERNAL_ERROR`(500).
- * @summary 실행별 제공 상태가 바뀐 작품 조회 (제안)
+ * @summary 실행별 제공 상태가 바뀐 작품 조회
  */
 export const listCollectExecutionChanges = (
     executionId: number,
@@ -1003,7 +1004,7 @@ export function useListCollectExecutionChanges<TData = Awaited<ReturnType<typeof
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 실행별 제공 상태가 바뀐 작품 조회 (제안)
+ * @summary 실행별 제공 상태가 바뀐 작품 조회
  */
 
 export function useListCollectExecutionChanges<TData = Awaited<ReturnType<typeof listCollectExecutionChanges>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>>(
@@ -1025,9 +1026,10 @@ export function useListCollectExecutionChanges<TData = Awaited<ReturnType<typeof
 
 
 /**
- * **제안(Task 031, 미구현).** `STOPPED`(중단됨) 실행을 `FAILED`로 바꾼다(TECH 3절). 요청 본문은 없다. 언제 멈췄는지 알 수 없어 `endedAt`은 `null`로 둔다.
+ * `STOPPED`(중단됨) 실행을 `FAILED`로 바꾸고 바뀐 실행을 돌려준다(TECH 3절). 요청 본문은 없다. 언제 멈췄는지 알 수 없어 `endedAt`은 `null`로 두고 `failureReason`은 고정 문구다.
+ * 응답의 `canRestart`로 이어서 재시작할 수 있는지(`restartCollectExecution`) 바로 알 수 있다.
  * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_NOT_STOPPED`(409, 중단된 실행이 아님), `INTERNAL_ERROR`(500).
- * @summary 중단된 실행을 실패로 복구 (제안)
+ * @summary 중단된 실행을 실패로 복구
  */
 export const recoverCollectExecution = (
     executionId: number,
@@ -1079,7 +1081,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RecoverCollectExecutionMutationVariables = {executionId: number}
 
     /**
- * @summary 중단된 실행을 실패로 복구 (제안)
+ * @summary 중단된 실행을 실패로 복구
  */
 export const useRecoverCollectExecution = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recoverCollectExecution>>, TError,RecoverCollectExecutionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -1092,10 +1094,11 @@ export const useRecoverCollectExecution = <TError = ErrorType<BadRequestResponse
       return useMutation(getRecoverCollectExecutionMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** `FAILED` 실행을 같은 대상 날짜·범위로 다시 실행한다. 요청 본문은 없다. 새 실행으로 접수해 202와 새 `executionId`를 돌려주고, 실패 기록은 이력에 남는다.
+ * `FAILED` 실행을 같은 대상 날짜·범위로 다시 실행한다. 요청 본문은 없다. 새 실행으로 접수해 202와 새 `executionId`를 돌려주고, 실패 기록은 이력에 남는다.
  * 실패가 아닌 실행은 그 날짜·범위의 현재 상태에 맞는 코드로 거절한다: 실행 중이면 `BATCH_ALREADY_RUNNING`, 완료면 `BATCH_ALREADY_COMPLETED`, 중단됨이면 `BATCH_RECOVERY_REQUIRED`(먼저 복구). 그래서 "실패한 실행이 아님" 전용 코드는 두지 않는다. 같은 날짜·범위에 더 나중 실행이 있으면 그 실행의 상태로 판단한다.
- * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409), `INTERNAL_ERROR`(500).
- * @summary 실패한 실행을 새 실행으로 재시작 (제안)
+ * 운영 환경에서는 그 실행의 대상 날짜가 오늘(KST)이 아니면 거절한다. 다른 날짜·범위의 수집이 실행 중이어도 시작할 수 없다(전체 동시 실행 금지).
+ * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·운영에서 대상 날짜가 오늘이 아님), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409), `INTERNAL_ERROR`(500).
+ * @summary 실패한 실행을 새 실행으로 재시작
  */
 export const restartCollectExecution = (
     executionId: number,
@@ -1147,7 +1150,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RestartCollectExecutionMutationVariables = {executionId: number}
 
     /**
- * @summary 실패한 실행을 새 실행으로 재시작 (제안)
+ * @summary 실패한 실행을 새 실행으로 재시작
  */
 export const useRestartCollectExecution = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof restartCollectExecution>>, TError,RestartCollectExecutionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

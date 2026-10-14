@@ -318,18 +318,35 @@ describe('수집 실행·이력', () => {
     expect(bad).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
   })
 
-  it('targetDate를 비우고 실행하면 오늘로 본다(오늘 실행 중인 5번이 있어 409다)', async () => {
+  it('targetDate를 비우고 실행하면 오늘로 본다(오늘 성공한 5번이 있어 409다)', async () => {
     const error = await customInstance({
       url: '/admin/collect/executions',
       method: 'POST',
       data: { tier: 'ALL' },
     }).catch((e: unknown) => e)
-    expect(error).toMatchObject({ status: 409, errorCode: 'BATCH_ALREADY_RUNNING' })
+    expect(error).toMatchObject({ status: 409, errorCode: 'BATCH_ALREADY_COMPLETED' })
   })
 
-  it('기본 이력은 5건이고 최신 순이다', async () => {
+  it('기본 이력은 5건이고 최신 순이며, 버튼 값은 중단됨(3번)만 복구·최신 실패(2번)만 다시 실행이다', async () => {
     const list = await listExecutions()
     expect(list.map((e) => e.executionId)).toEqual([5, 4, 3, 2, 1])
+    expect(list.map((e) => [e.executionId, e.canRecover, e.canRestart])).toEqual([
+      [5, false, false],
+      [4, false, false],
+      [3, true, false],
+      [2, false, true],
+      [1, false, false],
+    ])
+  })
+
+  it('다른 실행이 돌고 있으면 실패 행의 canRestart가 거짓이 되고, 끝나면 다시 참이다(응답마다 다시 계산)', async () => {
+    await run(addDays(TODAY, -6)) // 6번 실행 중
+    const first = await listExecutions() // 조회 1번째: 6번은 아직 실행 중
+    expect(first.find((e) => e.executionId === 6)!.status).toBe('RUNNING')
+    expect(first.find((e) => e.executionId === 2)!.canRestart).toBe(false)
+    const second = await listExecutions() // 조회 2번째: 6번 성공
+    expect(second.find((e) => e.executionId === 6)!.status).toBe('COMPLETED')
+    expect(second.find((e) => e.executionId === 2)!.canRestart).toBe(true)
   })
 
   it('실행을 접수하면 이력 두 번째 조회에서 성공으로 바뀐다(조회 횟수로 정하는 결정적 규칙)', async () => {
@@ -349,40 +366,42 @@ describe('수집 실행·이력', () => {
     expect(changes.data.totalElements).toBe(2)
   })
 
-  it('기본 이력의 실행 중(5번)은 계속 실행 중으로 남는다', async () => {
-    await listExecutions()
-    await listExecutions()
-    await listExecutions()
-    expect((await listExecutions()).find((e) => e.executionId === 5)!.status).toBe('RUNNING')
-  })
-
-  it('같은 날짜·범위 판정: 실행 중 / 성공 / 중단됨 모두 409 코드로 막는다', async () => {
+  it('같은 날짜·범위의 최신 상태를 먼저 보고(성공 / 중단됨), 그다음 다른 실행 중을 본다(전체 동시 실행 금지)', async () => {
     const post = (date: string) =>
       failureCodeOf({
         url: '/admin/collect/executions',
         method: 'POST',
         data: { targetDate: date, tier: 'ALL' },
       })
-    expect(await post(TODAY)).toBe('BATCH_ALREADY_RUNNING')
+    expect(await post(TODAY)).toBe('BATCH_ALREADY_COMPLETED')
+    expect(await post(addDays(TODAY, -2))).toBe('BATCH_RECOVERY_REQUIRED')
+
+    await run(addDays(TODAY, -6)) // 6번 실행 중(이력을 읽지 않아 계속 실행 중)
+    expect(await post(addDays(TODAY, -6))).toBe('BATCH_ALREADY_RUNNING') // 같은 날짜·범위가 실행 중
+    expect(await post(addDays(TODAY, -7))).toBe('BATCH_ALREADY_RUNNING') // 다른 날짜가 실행 중
+    // 같은 날짜·범위의 상태가 먼저다: 다른 실행이 돌아도 성공·중단됨은 그 코드다
     expect(await post(addDays(TODAY, -1))).toBe('BATCH_ALREADY_COMPLETED')
     expect(await post(addDays(TODAY, -2))).toBe('BATCH_RECOVERY_REQUIRED')
   })
 
-  it('범위는 ALL만, 날짜는 오늘 이하만 받는다(400)', async () => {
-    expect(
-      await failureCodeOf({
-        url: '/admin/collect/executions',
-        method: 'POST',
-        data: { targetDate: addDays(TODAY, -9), tier: 'DAILY' },
-      }),
-    ).toBe('VALIDATION_FAILED')
-    expect(
-      await failureCodeOf({
-        url: '/admin/collect/executions',
-        method: 'POST',
-        data: { targetDate: addDays(TODAY, 1), tier: 'ALL' },
-      }),
-    ).toBe('VALIDATION_FAILED')
+  it('범위는 ALL만, 날짜는 오늘 이하만 받고(400) 서버처럼 fieldErrors로 필드를 알린다', async () => {
+    const tierError = await customInstance({
+      url: '/admin/collect/executions',
+      method: 'POST',
+      data: { targetDate: addDays(TODAY, -9), tier: 'DAILY' },
+    }).catch((e: unknown) => e)
+    expect(tierError).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(tierError) && tierError.fieldErrors.map((f) => f.field)).toEqual(['tier'])
+
+    const dateError = await customInstance({
+      url: '/admin/collect/executions',
+      method: 'POST',
+      data: { targetDate: addDays(TODAY, 1), tier: 'ALL' },
+    }).catch((e: unknown) => e)
+    expect(dateError).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(dateError) && dateError.fieldErrors).toEqual([
+      { field: 'targetDate', message: '미래 날짜는 실행할 수 없습니다.' },
+    ])
   })
 
   it('복구는 중단됨만 가능하고, 복구한 실행은 실패가 되어 다시 실행할 수 있다(새 실행 ID)', async () => {
@@ -393,20 +412,41 @@ describe('수집 실행·이력', () => {
       url: '/admin/collect/executions/3/recover',
       method: 'POST',
     })
-    expect(recovered.data.status).toBe('FAILED')
+    // 계약: 복구 응답은 실패, 종료 시각 없음, 고정 사유, 버튼 값은 서버 규칙으로 계산(최신 실패이고 실행 중 없음 → 다시 실행 가능)
+    expect(recovered.data).toMatchObject({
+      status: 'FAILED',
+      endedAt: null,
+      failureReason: '중단된 실행을 관리자가 실패로 복구함',
+      canRecover: false,
+      canRestart: true,
+    })
 
     const restarted = await customInstance<CommonResponseCollectExecutionAccepted>({
       url: '/admin/collect/executions/3/restart',
       method: 'POST',
     })
     expect(restarted.data.executionId).toBe(6) // 이력의 최대 ID(5) + 1
-    expect(recovered.data.endedAt).toBeNull() // 복구는 종료 시각을 기록하지 않는다
     const list = await listExecutions()
-    expect(list.find((e) => e.executionId === 3)!.status).toBe('FAILED') // 실패 기록은 남는다
+    expect(list.find((e) => e.executionId === 3)).toMatchObject({
+      status: 'FAILED', // 실패 기록은 남는다
+      canRestart: false, // 같은 날짜·범위에 더 나중 실행(6번)이 생겼다
+    })
     expect(list.find((e) => e.executionId === 6)).toMatchObject({
       targetDate: recovered.data.targetDate,
       status: 'RUNNING',
     })
+    expect(list.find((e) => e.executionId === 2)!.canRestart).toBe(false) // 6번이 실행 중이라 막힌다
+  })
+
+  it('다시 실행 거절 코드는 그 날짜·범위의 최신 상태와 다른 실행 중 여부로 정한다(BATCH_NOT_STOPPED는 쓰지 않는다)', async () => {
+    const restart = (id: number) =>
+      failureCodeOf({ url: `/admin/collect/executions/${id}/restart`, method: 'POST' })
+    expect(await restart(4)).toBe('BATCH_ALREADY_COMPLETED') // 성공
+    expect(await restart(3)).toBe('BATCH_RECOVERY_REQUIRED') // 중단됨
+    expect(await restart(99)).toBe('RESOURCE_NOT_FOUND')
+
+    await run(addDays(TODAY, -6)) // 다른 날짜가 실행 중
+    expect(await restart(2)).toBe('BATCH_ALREADY_RUNNING')
   })
 
   it('?mockScenario=run-error는 실행만 500이고 이력은 정상이다', async () => {

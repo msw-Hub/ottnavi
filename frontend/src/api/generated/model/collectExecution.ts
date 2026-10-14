@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -22,20 +22,24 @@ export interface CollectExecution {
   targetDate: string;
   tier: CollectTier;
   status: CollectExecutionStatus;
-  /** 시작 시각 */
+  /** 시작 시각(KST 오프셋). 아직 시작 전이면 접수 시각 */
   startedAt: string;
   /**
-     * 끝난 시각. 실행 중·중단됨이면 null, 복구로 실패가 된 실행도 null
+     * 끝난 시각. 완료되었거나 스스로 실패한 실행만 값이 있다. 실행 중·중단됨이면 null, 복구로 실패가 된 실행도 null(복구를 누른 시각은 실제 종료가 아니다)
      * @nullable
      */
   endedAt: string | null;
-  /** 처리한 작품 수(실행 중이면 지금까지) */
+  /** 영화·드라마 상세 단계에서 저장한 작품 수(실행 중이면 지금까지). TMDB가 404를 줘 건너뛴 작품은 세지 않는다. 재시작한 실행은 그 실행이 처리한 몫만 센다 */
   processedCount: number;
   /** 제공 상태가 바뀐 건수(시청 단위 × 서비스). `listCollectExecutionChanges`의 `totalElements`와 같다 */
   changedCount: number;
   /**
-     * 실패 사유. 실패가 아니면 null
+     * 실패 사유. 실패가 아니면 null. 예외가 원인이면 첫 줄 "예외명: 메시지"를 300자까지 담고, 중단을 관리자가 복구한 실행은 "중단된 실행을 관리자가 실패로 복구함"이다
      * @nullable
      */
   failureReason: string | null;
+  /** 복구 버튼을 켤 수 있는지. 중단됨(`STOPPED`)이면 true */
+  canRecover: boolean;
+  /** 재시작 버튼을 켤 수 있는지. 실패(`FAILED`)이고 같은 날짜·범위의 가장 최근 실행이며, 운영에서는 대상 날짜가 오늘이고 다른 수집이 실행 중이 아닐 때 true. 서버가 시작·재시작 거절 규칙과 같은 코드로 계산한다 */
+  canRestart: boolean;
 }

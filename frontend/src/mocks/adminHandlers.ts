@@ -19,6 +19,7 @@ import type {
   CommonResponseAdminProductList,
   CreateAdminProductRequest,
   UpdateAdminProductRequest,
+  ProblemDetail,
 } from '@/api/generated/model'
 import {
   checkAddPriceStartDate,
@@ -30,12 +31,13 @@ import {
   type PriceStartDateIssue,
 } from '@/features/admin/priceRules'
 import {
-  canRecover,
-  canRestart,
+  computeCanRecover,
+  findRunning,
   judgeRun,
   RUNNABLE_COLLECT_TIERS,
   SIMULATED_COMPLETE_AFTER_READS,
   sortExecutionsForHistory,
+  withActionFlags,
 } from '@/features/admin/collectRules'
 import { validateSaveRequest } from '@/features/admin/providerMapping'
 import { getTodayDateString } from '@/lib/dateUtils'
@@ -170,7 +172,10 @@ function getAllProviders(): AdminProvider[] {
  * 완료 시뮬레이션(결정적 규칙): 화면에서 접수한 실행(수동 실행·다시 실행)은 실제로 도는 일이 없으므로,
  * 이력 조회를 SIMULATED_COMPLETE_AFTER_READS번 받으면 완료로 바뀐다. 시간이 아니라 요청 횟수로 정하는 이유는
  * 시간에 기대면 테스트와 화면 확인이 흔들리기 때문이다(조회 1번째는 실행 중, [새로 고침] 뒤 2번째에서 성공).
- * 기본 이력의 "실행 중"(5번)은 시뮬레이션 대상이 아니라 계속 실행 중으로 남는다. 같은 날짜 재실행 409를 보여 주려는 것이다.
+ * 기본 이력에는 계속 실행 중으로 남는 행이 없다(fixtures/admin.ts 주석: 전체 동시 실행 금지라 모든 실행이 막힌다).
+ *
+ * 버튼 값(canRecover·canRestart, Task 045): 저장한 값을 믿지 않고 목록을 꺼낼 때마다 서버와 같은 규칙(withActionFlags)으로 다시 계산한다.
+ * 다른 실행이 시작되거나 끝나면 같은 행의 canRestart도 바뀌기 때문이다(예: 6번이 실행 중인 동안 2번의 [다시 실행]이 사라진다).
  */
 const COLLECT_STORAGE_KEY = 'ottnavi:mock-admin-collect'
 
@@ -215,13 +220,13 @@ if (storedCollectAtStart) {
   }
 }
 
-// 지금 실행 목록: 오늘 기준 기본 이력에 바뀐 실행을 얹고, 새로 접수한 실행을 더한다
+// 지금 실행 목록: 오늘 기준 기본 이력에 바뀐 실행을 얹고, 새로 접수한 실행을 더한 뒤 버튼 값을 지금 상태로 다시 계산한다
 function getAllExecutions(): CollectExecution[] {
   const base = buildMockCollectExecutions(getTodayDateString())
   const baseIds = new Set(base.map((e) => e.executionId))
   const merged = base.map((e) => changedExecutions.get(e.executionId) ?? e)
   const created = [...changedExecutions.values()].filter((e) => !baseIds.has(e.executionId))
-  return [...merged, ...created]
+  return withActionFlags([...merged, ...created])
 }
 
 function saveExecution(execution: CollectExecution): void {
@@ -289,21 +294,32 @@ function internalError(request: Request) {
   )
 }
 
-// 같은 날짜·범위 판정이 OK가 아니면 409 응답을, OK면 undefined를 돌려준다.
-// 상태 코드는 모두 409(제안): 요청 모양이 아니라 이미 있는 실행과의 충돌이라서다. 복구가 먼저 필요한 경우의 코드 이름은 제안이다
+// 시작·재시작 판정(judgeRun, 서버 judgeLaunch와 같은 순서)이 OK가 아니면 409 응답을, OK면 undefined를 돌려준다.
+// 상태 코드는 모두 409: 요청 모양이 아니라 이미 있는 실행과의 충돌이라서다. detail 문구는 서버와 같게 둔다(화면은 errorCode로 문장을 고른다)
 function judgementResponse(request: Request, targetDate: string, tier: CollectTier) {
-  switch (judgeRun(getAllExecutions(), targetDate, tier)) {
-    case 'ALREADY_RUNNING':
+  const executions = getAllExecutions()
+  switch (judgeRun(executions, targetDate, tier)) {
+    case 'ALREADY_RUNNING': {
+      // 같은 날짜·범위가 실행 중인지, 다른 날짜가 실행 중인지에 따라 서버 detail이 다르다(코드는 같다)
+      if (findRunning(executions, targetDate, tier)) {
+        return ruleViolation(
+          request,
+          'BATCH_ALREADY_RUNNING',
+          '같은 날짜의 수집이 이미 실행 중입니다.',
+        )
+      }
+      const other = executions.find((e) => e.status === 'RUNNING')
       return ruleViolation(
         request,
         'BATCH_ALREADY_RUNNING',
-        '같은 날짜·범위의 수집이 이미 실행 중입니다.',
+        `수집이 이미 실행 중입니다(실행 중인 대상 날짜: ${other?.targetDate ?? '알 수 없음'}).`,
       )
+    }
     case 'ALREADY_COMPLETED':
       return ruleViolation(
         request,
         'BATCH_ALREADY_COMPLETED',
-        '같은 날짜·범위의 수집이 이미 완료되었습니다.',
+        '해당 날짜의 수집은 이미 완료되었습니다.',
       )
     case 'RECOVERY_REQUIRED':
       return ruleViolation(
@@ -331,6 +347,8 @@ function startRun(request: Request, targetDate: string, tier: CollectTier) {
     processedCount: 0,
     changedCount: 0,
     failureReason: null,
+    canRecover: false, // 버튼 값은 목록을 꺼낼 때 다시 계산한다(getAllExecutions)
+    canRestart: false,
   }
   simulatedReads[String(execution.executionId)] = 0
   saveExecution(execution)
@@ -382,6 +400,25 @@ function okProduct(product: AdminProduct, status = 200) {
 
 function validationError(request: Request, detail: string) {
   return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail)
+}
+
+/**
+ * 필드를 알려 주는 400 VALIDATION_FAILED. 서버처럼 fieldErrors에 필드 이름과 문구를 담는다(계약 createCollectExecution:
+ * 날짜 형식·미래 날짜·운영에서 오늘이 아닌 날짜는 targetDate, ALL이 아닌 범위는 tier). 화면은 이 문구를 해당 입력 아래에 보인다.
+ */
+function fieldValidationError(request: Request, field: string, message: string) {
+  const body: ProblemDetail = {
+    title: 'Bad Request',
+    status: 400,
+    detail: '입력값이 올바르지 않습니다.',
+    instance: new URL(request.url).pathname,
+    errorCode: 'VALIDATION_FAILED',
+    fieldErrors: [{ field, message }],
+  }
+  return HttpResponse.json(body, {
+    status: 400,
+    headers: { 'Content-Type': 'application/problem+json' },
+  })
 }
 
 // 지금 시각(ISO 일시). 월 구독요금의 마지막 확인 일시(lastVerifiedAt)에 쓴다. 화면은 한국 날짜로 바꿔 보인다
@@ -774,55 +811,70 @@ export const adminHandlers: RequestHandler[] = [
 
     const body = (await request.json()) as CreateCollectExecutionRequest
     // 계약: targetDate는 선택이다. 비우거나 null이면 오늘(KST)로 본다. 문자열이 아닌 값은 형식 오류다
+    // 날짜·범위 오류는 서버처럼 fieldErrors로 필드를 알린다. 목업은 날짜 지정을 허용하는 로컬 환경처럼 미래만 막는다
+    // (운영은 오늘만 받아 "운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다."가 온다)
     if (body.targetDate != null && typeof body.targetDate !== 'string') {
-      return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
+      return fieldValidationError(
+        request,
+        'targetDate',
+        '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.',
+      )
     }
     const targetDate = body.targetDate ? body.targetDate : getTodayDateString()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-      return validationError(request, '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.')
+      return fieldValidationError(
+        request,
+        'targetDate',
+        '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.',
+      )
     }
     if (targetDate > getTodayDateString()) {
-      return validationError(request, '대상 날짜는 오늘 또는 그 이전이어야 합니다.')
+      return fieldValidationError(request, 'targetDate', '미래 날짜는 실행할 수 없습니다.')
     }
     if (!RUNNABLE_COLLECT_TIERS.includes(body.tier)) {
-      return validationError(request, 'MVP는 전체(ALL)만 실행할 수 있습니다.')
+      return fieldValidationError(request, 'tier', 'MVP는 ALL만 실행할 수 있습니다.')
     }
     return startRun(request, targetDate, body.tier)
   }),
 
-  // 복구: 서버가 중단됨으로 판정한 실행을 실패로 기록한다
+  // 복구: 서버가 중단됨으로 판정한 실행을 실패로 기록한다. 응답은 버튼 값을 다시 계산한 실행이다(canRestart로 이어서 재시작할 수 있는지 안다)
   http.post('/api/admin/collect/executions/:executionId/recover', async ({ request, params }) => {
     await wait()
-    const target = getAllExecutions().find((e) => e.executionId === Number(params.executionId))
+    const executionId = Number(params.executionId)
+    const target = getAllExecutions().find((e) => e.executionId === executionId)
     if (!target) return notFound(request)
-    if (!canRecover(target.status)) {
+    if (!computeCanRecover(target)) {
       return ruleViolation(request, 'BATCH_NOT_STOPPED', '중단된 실행만 복구할 수 있습니다.')
     }
-    const recovered: CollectExecution = {
+    saveExecution({
       ...target,
       status: 'FAILED',
       // 복구는 "끝난 시각"을 알 수 없다(서버가 언제 멈췄는지 모른다). 그래서 종료 시각을 기록하지 않고 null로 두며 화면은 "—"로 보인다.
-      // 계약(Task 031 확정): recover 응답의 endedAt은 null이다. Spring Batch의 recover는 END_TIME을 채우지만 API는 batch.recovered 표시를 읽어 null로 내린다
-      failureReason: '서버가 중간에 멈춰 복구하면서 실패로 기록했습니다.',
-    }
-    saveExecution(recovered)
+      // 계약: recover 응답의 endedAt은 null이다. Spring Batch의 recover는 END_TIME을 채우지만 API는 복구 표시를 읽어 null로 내린다
+      endedAt: null,
+      // 계약: 관리자가 복구한 실행의 실패 사유는 이 고정 문구다
+      failureReason: '중단된 실행을 관리자가 실패로 복구함',
+    })
+    const recovered = getAllExecutions().find((e) => e.executionId === executionId)!
     const body: CommonResponseCollectExecution = { success: true, data: recovered }
     return HttpResponse.json(body)
   }),
 
-  // 다시 실행: 실패한 실행을 같은 날짜·범위로 새로 접수한다. 새 executionId를 준다(202)
+  // 다시 실행: 실패한 실행을 같은 날짜·범위로 새로 접수한다. 새 executionId를 준다(202).
+  // 거절은 그 날짜·범위의 최신 실행 상태(실행 중 / 성공 / 중단됨)와 다른 실행 중 여부로 정한다(startRun의 judgeRun).
+  // "실패한 실행이 아님" 전용 코드는 없다. BATCH_NOT_STOPPED는 복구 API에서만 쓴다(계약)
   http.post('/api/admin/collect/executions/:executionId/restart', async ({ request, params }) => {
     await wait()
     if (hasMockScenario(request, 'run-error')) return internalError(request)
     const target = getAllExecutions().find((e) => e.executionId === Number(params.executionId))
     if (!target) return notFound(request)
-    if (!canRestart(target.status)) {
-      // 실패가 아니면 판정 결과(실행 중 / 성공 / 중단됨)를 그대로 알린다. 판정이 OK여도 실패한 실행이 아니면 다시 실행할 대상이 아니다
-      return (
-        judgementResponse(request, target.targetDate, target.tier) ??
-        ruleViolation(request, 'BATCH_NOT_STOPPED', '실패한 실행만 다시 실행할 수 있습니다.')
-      )
-    }
+    // 예전 방식(Task 029~044): 실패가 아니면 판정 결과, 판정이 OK면 BATCH_NOT_STOPPED로 거절했다
+    // if (!canRestart(target.status)) {
+    //   return (
+    //     judgementResponse(request, target.targetDate, target.tier) ??
+    //     ruleViolation(request, 'BATCH_NOT_STOPPED', '실패한 실행만 다시 실행할 수 있습니다.')
+    //   )
+    // }
     return startRun(request, target.targetDate, target.tier)
   }),
 ]

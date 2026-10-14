@@ -50,8 +50,9 @@ function CollectSkeleton() {
  * 실행 결과 안내(notice)를 이 화면이 들고 있는 이유: 수동 실행(양식)과 [다시 실행](이력 행)이 같은 안내 띠를 써야 해서다.
  * 한 곳에서 접수·충돌 안내를 보여 주면 운영자가 "방금 누른 것이 어떻게 됐는지"를 같은 자리에서 본다.
  *
- * 복구는 확인 대화상자를 거치고(RecoverRunDialog), 성공하면 그 행이 "실패"로 바뀌어 [복구] 버튼이 사라진다.
- * 사라진 버튼 대신 같은 행의 [다시 실행]으로 포커스를 옮겨, 키보드 사용자가 이어서 누를 수 있게 한다.
+ * 복구는 확인 대화상자를 거치고(RecoverRunDialog), 성공하면 이력을 다시 불러와(쿼리 무효화) 그 행이 "실패"로 바뀌고 [복구] 버튼이 사라진다.
+ * 복구 응답의 canRestart가 참이면 사라진 버튼 대신 같은 행의 [다시 실행]으로 포커스를 옮겨, 키보드 사용자가 이어서 누를 수 있게 한다.
+ * 거짓이면(다른 수집이 실행 중 등) [다시 실행]이 없으므로 그 행으로 포커스를 옮긴다.
  */
 export function CollectScreen() {
   const executions = useCollectExecutions()
@@ -99,8 +100,11 @@ export function CollectScreen() {
       {
         onSuccess: (accepted) =>
           handleAccepted(accepted.executionId, execution.targetDate, execution.tier),
-        onError: (error) =>
-          setNotice(noticeFromError(error, execution.targetDate, execution.tier, list)),
+        onError: (error) => {
+          const next = noticeFromError(error, execution.targetDate, execution.tier, list)
+          // 다시 실행에는 날짜 입력이 없다. 날짜 거절(운영에서 오늘이 아닌 실행)은 양식의 날짜 칸이 아니라 오류 문장으로 보인다
+          setNotice(next.kind === 'DATE_INVALID' ? { kind: 'ERROR', message: next.message } : next)
+        },
       },
     )
   }
@@ -109,10 +113,16 @@ export function CollectScreen() {
     recover.mutate(
       { executionId: execution.executionId },
       {
-        onSuccess: () => {
-          toast.success(
-            `실행 ${execution.executionId}${josa(String(execution.executionId), '을/를')} 실패로 기록했습니다. [다시 실행]으로 이어서 수집하세요.`,
-          )
+        onSuccess: (recovered) => {
+          const label = `실행 ${execution.executionId}${josa(String(execution.executionId), '을/를')} 실패로 기록했습니다.`
+          // 복구 응답의 canRestart로 이어서 다시 실행할 수 있는지 안다(다른 수집이 돌거나, 운영에서 오늘이 아니면 거짓)
+          if (!recovered.canRestart) {
+            toast.success(label)
+            // [복구] 버튼이 사라지므로 포커스를 그 행으로 옮겨 키보드 사용자가 위치를 잃지 않게 한다
+            viewRun(execution.executionId)
+            return
+          }
+          toast.success(`${label} [다시 실행]으로 이어서 수집하세요.`)
           // 이력을 다시 불러와 행이 바뀐 뒤에 [다시 실행]으로 포커스를 옮긴다(requestAnimationFrame은 다음 그리기 뒤에 한 번 더 시도)
           const moveFocus = (triesLeft: number) => {
             const buttons = document.querySelectorAll<HTMLElement>(

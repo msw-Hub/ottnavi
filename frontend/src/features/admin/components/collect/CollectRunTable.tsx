@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table'
 import { CollectRunDetail } from '@/features/admin/components/collect/CollectRunDetail'
 import { RunStatusBadge } from '@/features/admin/components/RunStatusBadge'
-import { canRecover, canRestart, COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
+import { COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
 import type { CollectExecution } from '@/api/generated/model'
 import { formatIsoDate, formatDateTime, formatElapsed } from '@/lib/format'
 
@@ -89,7 +89,9 @@ function FailureReason({ execution, variant }: { execution: CollectExecution; va
  *
  * 표와 카드를 둘 다 그리고 CSS로 하나만 보이게 한다(OTT 구독상품·제공처 화면과 같은 방식). 375px에서 7열 표는 넘치고 가로 스크롤은 뒤쪽 열을 숨긴다.
  *
- * 행 동작: 중단됨은 [복구](확인 대화상자), 실패는 [다시 실행]. 서버가 "중단됨"으로 판정해 내려준 상태만 보고, 시간으로 추측하지 않는다.
+ * 행 동작: [복구](확인 대화상자)는 서버가 내려준 canRecover(중단됨)가 참일 때, [다시 실행]은 canRestart가 참일 때만 보인다.
+ * canRestart는 실패이면서 같은 날짜·범위의 최신 실행이고 다른 수집이 돌지 않을 때(운영은 대상 날짜가 오늘일 때도)만 참이라,
+ * 실패 행이어도 버튼이 없을 수 있다. 화면은 시간이나 상태로 추측하지 않고 서버 값만 본다.
  * 변경된 작품 펼침은 한 번에 하나만 열린다(expandedId 하나). 여러 개가 열리면 긴 목록이 쌓여 이력을 훑기 어려워서다.
  * 표와 카드에서 같은 펼침 상태를 쓰므로 화면 폭을 바꿔도 열린 행이 유지된다.
  */
@@ -147,7 +149,8 @@ export function CollectRunTable({
 
   const actions = (execution: CollectExecution, variant: Variant) => (
     <>
-      {canRecover(execution.status) && (
+      {/* 버튼 표시는 서버가 계산한 값만 본다(Task 045 결정 3). 상태만 보고 추측하면 서버의 재시작 거절 규칙과 어긋난다 */}
+      {execution.canRecover && (
         <Button
           type="button"
           variant="outline"
@@ -159,7 +162,7 @@ export function CollectRunTable({
           <span className="sr-only"> (실행 {execution.executionId})</span>
         </Button>
       )}
-      {canRestart(execution.status) && (
+      {execution.canRestart && (
         <Button
           type="button"
           variant="outline"

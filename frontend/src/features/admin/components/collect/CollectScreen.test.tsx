@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +13,9 @@ import { handlers } from '@/mocks/handlers'
 /*
  * 수집 실행·이력 화면 테스트(Task 029, SCR-16): 이력 표시, 수동 실행 202와 409 안내, 복구 확인 대화상자, 다시 실행,
  * 변경된 작품 펼침(한 번에 하나), 실패 사유 펼침, 비활성 범위, 오류·빈 상태를 본다. API는 앱의 목업 핸들러(MSW)다.
- * 기본 이력(오늘 기준): 5번 실행 중(오늘) / 4번 성공(어제) / 3번 중단됨(2일 전) / 2번 실패(3일 전) / 1번 성공(4일 전).
+ * 기본 이력(오늘 기준): 5번 성공(오늘) / 4번 성공(어제) / 3번 중단됨(2일 전) / 2번 실패(3일 전) / 1번 성공(4일 전).
+ * 실행 중은 [수집 실행]으로 접수해 만든다(수집은 한 번에 하나만 돌아 기본 이력에 실행 중을 두지 않는다, fixtures/admin.ts).
+ * [복구]·[다시 실행]은 서버가 내려준 canRecover·canRestart만 보고 보인다(Task 045).
  * 표(md 이상)와 카드(좁은 화면)가 CSS로만 갈리므로 테스트(CSS 없음)에서는 둘 다 보인다. 그래서 표 안으로 범위를 좁혀 찾는다.
  */
 
@@ -76,7 +79,7 @@ async function submitRun(user: ReturnType<typeof userEvent.setup>, date: string)
 }
 
 describe('이력', () => {
-  it('실행 5건과 상태 배지 4종, 마지막 성공 수집 한 줄이 보인다', async () => {
+  it('실행 5건과 상태 배지(성공·중단됨·실패), 마지막 성공 수집 한 줄이 보인다', async () => {
     renderCollect()
     const table = await findTable()
 
@@ -84,7 +87,7 @@ describe('이력', () => {
       .getAllByRole('row')
       .filter((r) => r.hasAttribute('data-run-row'))
     expect(rows.map((r) => r.getAttribute('data-run-row'))).toEqual(['5', '4', '3', '2', '1']) // 최신 순
-    expect(within(runRow(table, 5)).getByText('실행 중')).toBeInTheDocument()
+    expect(within(runRow(table, 5)).getByText('성공')).toBeInTheDocument()
     expect(within(runRow(table, 4)).getByText('성공')).toBeInTheDocument()
     expect(within(runRow(table, 3)).getByText('중단됨')).toBeInTheDocument()
     expect(within(runRow(table, 2)).getByText('실패')).toBeInTheDocument()
@@ -134,13 +137,33 @@ describe('수동 실행', () => {
   it('같은 날짜·범위가 실행 중이면 오류가 아니라 안내 띠(409)가 나온다', async () => {
     const user = userEvent.setup()
     renderCollect()
-    await findTable()
+    const table = await findTable()
+    await submitRun(user, addDays(TODAY, -5)) // 6번 접수
+    await waitFor(() => expect(within(runRow(table, 6)).getByText('실행 중')).toBeInTheDocument())
 
-    await submitRun(user, TODAY) // 5번이 오늘 ALL로 실행 중
+    await submitRun(user, addDays(TODAY, -5)) // 같은 날짜·범위를 한 번 더
 
     expect(
-      await screen.findByText(/이미 실행 중입니다\. 끝난 뒤 이력에서 결과를 확인하세요/),
+      await screen.findByText(
+        /같은 날짜·범위.*이미 실행 중입니다\. 끝난 뒤 이력에서 결과를 확인하세요/,
+      ),
     ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '실행 중인 이력 보기' })).toBeInTheDocument()
+  })
+
+  it('다른 날짜가 실행 중이어도 막히고, 막고 있는 실행을 안내한다(수집은 한 번에 하나)', async () => {
+    const user = userEvent.setup()
+    renderCollect()
+    const table = await findTable()
+    await submitRun(user, addDays(TODAY, -5)) // 6번 접수
+    await waitFor(() => expect(within(runRow(table, 6)).getByText('실행 중')).toBeInTheDocument())
+
+    await submitRun(user, addDays(TODAY, -6)) // 다른 날짜
+
+    expect(
+      await screen.findByText(/다른 날짜·범위의 수집이 실행 중입니다\(실행 6 ·/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/수집은 한 번에 하나만 돌기 때문에/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '실행 중인 이력 보기' })).toBeInTheDocument()
   })
 
@@ -177,6 +200,45 @@ describe('수동 실행', () => {
     expect(screen.getByLabelText('대상 날짜')).toHaveAttribute('aria-invalid', 'true')
   })
 
+  it('서버가 대상 날짜를 거절하면(fieldErrors.targetDate) 그 문구가 날짜 입력 아래에 보이고, 날짜를 고치면 사라진다', async () => {
+    // 운영 서버는 오늘이 아닌 날짜를 400으로 거절한다. 목업은 로컬처럼 허용하므로 이 테스트에서만 응답을 바꾼다
+    server.use(
+      http.post('/api/admin/collect/executions', () =>
+        HttpResponse.json(
+          {
+            title: 'Bad Request',
+            status: 400,
+            errorCode: 'VALIDATION_FAILED',
+            fieldErrors: [
+              {
+                field: 'targetDate',
+                message: '운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다.',
+              },
+            ],
+          },
+          { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderCollect()
+    await findTable()
+
+    await submitRun(user, addDays(TODAY, -5))
+
+    expect(
+      await screen.findByText('운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다.'),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('대상 날짜')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument() // 빨간 오류 문장이 아니라 입력 칸 오류다
+
+    fireEvent.change(screen.getByLabelText('대상 날짜'), { target: { value: TODAY } })
+    expect(
+      screen.queryByText('운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다.'),
+    ).not.toBeInTheDocument()
+    expect(screen.getByLabelText('대상 날짜')).not.toHaveAttribute('aria-invalid')
+  })
+
   it('?mockScenario=run-error면 실행만 실패하고 오류 문장이 보인다', async () => {
     window.history.replaceState({}, '', '/?mockScenario=run-error')
     const user = userEvent.setup()
@@ -201,6 +263,11 @@ describe('복구와 다시 실행', () => {
     const dialog = await screen.findByRole('alertdialog', { name: '중단된 실행을 복구할까요?' })
     expect(within(dialog).getByRole('button', { name: '취소' })).toHaveFocus()
     expect(dialog).toHaveTextContent('아직 실제로 돌고 있는 실행이라면 복구하지 마세요')
+    // 복구 뒤에도 다시 실행할 수 없는 경우가 있어(canRestart 거짓) 이어서 수집할 수 있다고 약속하지 않는다
+    expect(dialog).toHaveTextContent(
+      '이어서 실행할 수 있는지는 복구 뒤 [다시 실행] 버튼이 보이는지로 알 수 있습니다.',
+    )
+    expect(dialog).not.toHaveTextContent('이어서 수집할 수 있습니다')
 
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
@@ -235,6 +302,89 @@ describe('복구와 다시 실행', () => {
       .filter((r) => r.hasAttribute('data-run-row'))
       .map((r) => r.getAttribute('data-run-row'))
     expect(ids).toEqual(['5', '4', '6', '3', '2', '1'])
+    // 복구한 실행의 실패 사유는 서버 고정 문구다. 6번이 실행 중이라 다른 실패(2번)의 [다시 실행]도 사라진다(canRestart 거짓)
+    expect(within(table).getByText('중단된 실행을 관리자가 실패로 복구함')).toBeInTheDocument()
+    expect(
+      within(runRow(table, 3)).queryByRole('button', { name: /^다시 실행/ }),
+    ).not.toBeInTheDocument()
+    expect(
+      within(runRow(table, 2)).queryByRole('button', { name: /^다시 실행/ }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('버튼은 상태가 아니라 서버가 내려준 canRecover·canRestart만 보고 보인다', async () => {
+    // 상태와 버튼 값이 엇갈린 응답: 실패지만 canRestart 거짓(예: 운영에서 오늘이 아님), 중단됨이지만 canRecover 거짓
+    const base = {
+      tier: 'ALL',
+      startedAt: '2026-10-10T03:00:00+09:00',
+      endedAt: null,
+      processedCount: 0,
+      changedCount: 0,
+    } as const
+    server.use(
+      http.get('/api/admin/collect/executions', () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            content: [
+              {
+                ...base,
+                executionId: 13,
+                targetDate: '2026-10-12',
+                status: 'FAILED',
+                failureReason: '사유 A',
+                canRecover: false,
+                canRestart: true,
+              },
+              {
+                ...base,
+                executionId: 12,
+                targetDate: '2026-10-11',
+                status: 'FAILED',
+                failureReason: '사유 B',
+                canRecover: false,
+                canRestart: false,
+              },
+              {
+                ...base,
+                executionId: 11,
+                targetDate: '2026-10-10',
+                status: 'STOPPED',
+                failureReason: null,
+                canRecover: false,
+                canRestart: false,
+              },
+              {
+                ...base,
+                executionId: 10,
+                targetDate: '2026-10-09',
+                status: 'STOPPED',
+                failureReason: null,
+                canRecover: true,
+                canRestart: false,
+              },
+            ],
+            page: 0,
+            size: 100,
+            totalElements: 4,
+            totalPages: 1,
+          },
+        }),
+      ),
+    )
+    renderCollect()
+    const table = await findTable()
+
+    const restartIn = (id: number) =>
+      within(runRow(table, id)).queryByRole('button', { name: /^다시 실행/ })
+    const recoverIn = (id: number) =>
+      within(runRow(table, id)).queryByRole('button', { name: /^복구/ })
+    expect(restartIn(13)).toBeInTheDocument()
+    expect(restartIn(12)).not.toBeInTheDocument()
+    expect(within(runRow(table, 12)).getByText('실패')).toBeInTheDocument() // 상태 배지는 그대로 보인다
+    expect(within(table).getByText('사유 B')).toBeInTheDocument() // 실패 사유 줄도 그대로다
+    expect(recoverIn(11)).not.toBeInTheDocument()
+    expect(recoverIn(10)).toBeInTheDocument()
   })
 
   it('실패한 실행에는 [다시 실행]이 있고 실패 사유를 전체 보기로 펼칠 수 있다', async () => {
@@ -281,8 +431,10 @@ describe('변경된 작품 펼침', () => {
     const user = userEvent.setup()
     renderCollect()
     const table = await findTable()
+    await submitRun(user, addDays(TODAY, -5)) // 6번 접수(실행 중)
+    await waitFor(() => expect(within(runRow(table, 6)).getByText('실행 중')).toBeInTheDocument())
 
-    await user.click(within(runRow(table, 5)).getByRole('button', { name: /^변경 12건/ }))
+    await user.click(within(runRow(table, 6)).getByRole('button', { name: /^변경 0건/ }))
 
     expect(within(table).getByText('실행이 끝나면 변경된 작품이 보입니다.')).toBeInTheDocument()
   })
