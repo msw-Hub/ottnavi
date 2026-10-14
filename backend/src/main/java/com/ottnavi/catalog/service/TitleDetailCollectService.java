@@ -45,12 +45,14 @@ public class TitleDetailCollectService {
     public int saveDetails(List<TitleDetail> details, Instant fetchedAt) {
         int saved = 0;
         for (TitleDetail detail : details) {
+            // 1. 작품을 찾는다(DB에 없으면 건너뛴다)
             Optional<Title> found = titleRepository.findByMediaTypeAndTmdbId(detail.mediaType(), detail.tmdbId());
             if (found.isEmpty()) {
                 log.warn("상세를 저장할 작품이 DB에 없어 건너뛴다: mediaType={}, tmdbId={}", detail.mediaType(), detail.tmdbId());
                 continue;
             }
             Title title = found.get();
+            // 2. 새 응답 값으로 title을 갱신한다(비어 있는 줄거리·제목은 기존 값을 유지한다)
             // 영속 상태의 엔티티라 값을 바꾸면 커밋 때 UPDATE가 나간다(더티 체킹). save를 부르지 않아도 된다
             // 새 응답의 줄거리가 한국어·영어 모두 비어 null이면 기존 줄거리와 언어 표시를 지우지 않고 유지한다
             boolean keepOverview = detail.overview() == null;
@@ -68,6 +70,7 @@ public class TitleDetailCollectService {
                     detail.releaseDate(), detail.posterPath(),
                     detail.backdropPath(), detail.originalLanguage(), detail.tvStatus(), detail.popularity(),
                     detail.voteAverage(), fetchedAt);
+            // 3. 장르·출연진·시청 단위를 작품 단위로 맞춘다
             syncGenres(title, detail.genres());
             syncCast(title, detail.cast());
             syncUnits(title, detail.units(), fetchedAt);
@@ -81,6 +84,7 @@ public class TitleDetailCollectService {
      * 같은 키를 지웠다 다시 넣으면 Hibernate가 INSERT를 먼저 실행해 위반이 나므로(TECH 6절) 차이만 반영한다.
      */
     private void syncGenres(Title title, List<GenreInfo> incoming) {
+        // 1. 응답의 장르 중 이름이 있는 것만 모은다
         Map<Integer, String> wanted = new LinkedHashMap<>();
         for (GenreInfo genre : incoming) {
             if (genre.name() == null || genre.name().isBlank()) {
@@ -89,10 +93,12 @@ public class TitleDetailCollectService {
             }
             wanted.putIfAbsent(genre.id(), genre.name());
         }
+        // 2. genre 표에 이미 있는 장르를 조회한다
         Map<Integer, Genre> known = new HashMap<>();
         for (Genre genre : genreRepository.findAllById(wanted.keySet())) {
             known.put(genre.getId(), genre);
         }
+        // 3. 표에 없는 장르는 새로 등록한다
         // genre 표에 없는 장르는 새로 등록한다
         for (Map.Entry<Integer, String> entry : wanted.entrySet()) {
             if (!known.containsKey(entry.getKey())) {
@@ -100,6 +106,7 @@ public class TitleDetailCollectService {
             }
         }
 
+        // 4. 기존 연결 중 이번 응답에서 빠진 것을 가린다
         List<TitleGenre> existing = titleGenreRepository.findByTitleId(title.getId());
         List<TitleGenre> toDelete = new ArrayList<>(); // 이번 응답에서 빠진 연결
         List<Integer> alreadyLinked = new ArrayList<>();
@@ -110,6 +117,7 @@ public class TitleDetailCollectService {
                 toDelete.add(link);
             }
         }
+        // 5. 빠진 연결은 지우고 새 연결만 넣는다(같은 키를 지웠다 다시 넣지 않는다)
         titleGenreRepository.deleteAll(toDelete);
         for (Integer genreId : wanted.keySet()) {
             if (!alreadyLinked.contains(genreId)) {
@@ -120,10 +128,12 @@ public class TitleDetailCollectService {
 
     /** 출연진을 출연 순서 자리(0부터)마다 제자리에서 갱신하고, 남는 자리는 지운다 */
     private void syncCast(Title title, List<CastCandidate> incoming) {
+        // 1. 기존 출연진을 출연 순서 자리별로 모은다
         Map<Integer, TitleCast> byOrder = new LinkedHashMap<>();
         for (TitleCast cast : titleCastRepository.findByTitleIdOrderByCastOrder(title.getId())) {
             byOrder.put(cast.getCastOrder(), cast);
         }
+        // 2. 응답 순서대로 자리마다 제자리 갱신하거나 새로 넣는다
         for (int order = 0; order < incoming.size(); order++) {
             CastCandidate candidate = incoming.get(order);
             TitleCast current = byOrder.remove(order);
@@ -135,17 +145,21 @@ public class TitleDetailCollectService {
                         candidate.character(), candidate.profilePath());
             }
         }
+        // 3. 응답에 없는 남는 자리는 지운다
         titleCastRepository.deleteAll(byOrder.values()); // 이번 응답에 없는 자리(출연진이 줄어든 경우)
     }
 
     /** 시청 단위를 시즌 번호(영화는 null)로 맞춰 갱신하거나 새로 만든다. 응답에 없는 기존 단위는 건드리지 않는다 */
     private void syncUnits(Title title, List<UnitDetail> incoming, Instant fetchedAt) {
+        // 1. 기존 시청 단위를 시즌 번호별로 모은다
         Map<Integer, WatchUnit> bySeason = new HashMap<>(); // 영화 단위의 키는 null
         for (WatchUnit unit : watchUnitRepository.findByTitleId(title.getId())) {
             bySeason.put(unit.getSeasonNumber(), unit);
         }
+        // 2. 응답의 단위마다 기존 단위를 갱신하거나 새로 만든다
         for (UnitDetail detail : incoming) {
             WatchUnit current = bySeason.get(detail.seasonNumber());
+            // 3. 있으면 수집 값으로 갱신하고, 없으면 영화·시즌 단위를 새로 만든다
             if (current != null) {
                 current.applyCollected(detail.tmdbSeasonId(), detail.name(), detail.posterPath(), detail.airDate(),
                         detail.runtime(), fetchedAt);

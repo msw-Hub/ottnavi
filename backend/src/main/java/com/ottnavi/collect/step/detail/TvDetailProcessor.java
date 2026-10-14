@@ -60,10 +60,12 @@ public class TvDetailProcessor implements ItemProcessor<DetailTarget, TitleDetai
     @Override
     public TitleDetail process(DetailTarget target) {
         try {
+            // 1. 한국어 상세를 받는다(없으면 건너뛴다)
             TmdbTvDetail ko = tmdbClient.getTv(target.tmdbId(), LANGUAGE_KO, APPEND_CREDITS);
             if (ko == null) {
                 return null;
             }
+            // 2. 한국어 줄거리가 비었을 때만 영어 상세를 한 번 더 받는다
             String englishOverview = null;
             if (ko.overview() == null || ko.overview().isBlank()) {
                 TmdbTvDetail en = tmdbClient.getTv(target.tmdbId(), LANGUAGE_EN, null);
@@ -71,9 +73,11 @@ public class TvDetailProcessor implements ItemProcessor<DetailTarget, TitleDetai
                     englishOverview = en.overview();
                 }
             }
+            // 3. 애니메이션 여부를 정하고 시즌별 상세까지 모아 저장용 값을 만든다
             boolean animation = RuntimeCalculator.isAnimation(DetailMapper.genreIds(ko.genres()));
             return DetailMapper.fromTv(ko, englishOverview, collectSeasons(target, ko, animation));
         } catch (TmdbNotFoundException e) {
+            // 4. TMDB에 없으면(404) 이 작품만 건너뛴다
             log.warn("TMDB에 없는 드라마(또는 시즌)라 이 작품을 건너뛴다: titleId={}, tmdbId={}", target.titleId(), target.tmdbId());
             return null;
         }
@@ -81,19 +85,23 @@ public class TvDetailProcessor implements ItemProcessor<DetailTarget, TitleDetai
 
     /** 수집 대상 시즌(시즌 0 제외)마다 시즌 상세를 받아 방영된 회차가 있는 시즌만 단위로 만든다 */
     private List<UnitDetail> collectSeasons(DetailTarget target, TmdbTvDetail tv, boolean animation) {
+        // 1. 시즌 요약을 시즌 번호순으로 모은다
         Map<Integer, TmdbSeasonSummary> summaries = new TreeMap<>(); // 시즌 번호순
         if (tv.seasons() != null) {
             for (TmdbSeasonSummary summary : tv.seasons()) {
                 summaries.putIfAbsent(summary.seasonNumber(), summary);
             }
         }
+        // 2. 수집 대상 시즌 번호(시즌 0 제외)를 정하고 분포를 기록한다
         List<Integer> numbers = TitleDetailRules.collectableSeasonNumbers(new ArrayList<>(summaries.keySet()));
         seasonCount.record(numbers.size());
 
+        // 3. 방영 여부 기준일을 정한다
         LocalDate baseDate = today; // 파라미터 없이 단독으로 쓸 때의 대비
         if (baseDate == null) {
             baseDate = LocalDate.now(KST);
         }
+        // 4. 시즌마다 상세를 받아 방영된 회차가 있는 시즌만 단위로 만든다
         List<UnitDetail> units = new ArrayList<>();
         for (int number : numbers) {
             TmdbTvSeasonDetail season = tmdbClient.getTvSeason(target.tmdbId(), number, LANGUAGE_KO);

@@ -22,14 +22,17 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
     @Override
     public UnitProviders process(AvailabilityTarget target) {
         try {
+            // 1. 단위 종류(영화·시즌)에 맞는 제공처 조회를 고른다
             TmdbWatchProvidersResponse response;
             if (target.unitType() == UnitType.MOVIE) {
                 response = tmdbClient.getMovieWatchProviders(target.tmdbId());
             } else {
                 response = tmdbClient.getTvSeasonWatchProviders(target.tmdbId(), target.seasonNumber());
             }
+            // 2. KR 구독 제공처를 판정 입력으로 바꿔 돌려준다
             return new UnitProviders(target.watchUnitId(), DetailMapper.toKrProviders(response));
         } catch (TmdbNotFoundException e) {
+            // 3. TMDB에 제공처 정보가 없으면(404) 이 단위만 건너뛴다
             log.warn("TMDB에 제공처 정보가 없어 이 단위를 건너뛴다: watchUnitId={}, tmdbId={}, seasonNumber={}",
                     target.watchUnitId(), target.tmdbId(), target.seasonNumber());
             return null;

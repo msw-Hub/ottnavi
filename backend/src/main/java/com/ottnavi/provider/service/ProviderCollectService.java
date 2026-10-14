@@ -50,11 +50,14 @@ public class ProviderCollectService {
     /** 처음 보는 제공처만 UNMAPPED로 저장하고 새로 저장한 개수를 돌려준다. 이미 있는 행은 덮어쓰지 않는다 */
     @Transactional
     public int registerDiscovered(List<DiscoveredProvider> providers, Instant firstSeenAt) {
+        // 1. 이미 저장된 제공처 번호를 구한다
         Set<Integer> existingIds = tmdbProviderRepository.findAll().stream()
                 .map(TmdbProvider::getProviderId)
                 .collect(Collectors.toSet());
         int saved = 0;
+        // 2. 받은 제공처를 하나씩 확인한다
         for (DiscoveredProvider provider : providers) {
+            // 3. 이미 있는 제공처는 덮어쓰지 않고 처음 보는 것만 UNMAPPED로 저장한다
             if (existingIds.contains(provider.providerId())) {
                 continue; // MAPPED·IGNORED 같은 관리자 결정을 지우지 않는다
             }

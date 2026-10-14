@@ -30,14 +30,18 @@ public final class RuntimeCalculator {
      */
     public static RuntimeResult forSeason(List<EpisodeRuntime> episodes, LocalDate today, boolean animation,
                                           RuntimeDefaults defaults) {
+        // 1. 회차 runtime이 비었을 때 쓸 기본값을 정한다(애니메이션은 24분)
         int fallback = animation ? defaults.animationEpisodeMinutes() : defaults.episodeMinutes();
         int aired = 0;
         int total = 0;
         int missing = 0;
+        // 2. 회차를 하나씩 본다
         for (EpisodeRuntime episode : episodes) {
+            // 3. 방영일 미정·미방영 회차는 합계와 missing 수에서 뺀다
             if (episode.airDate() == null || episode.airDate().isAfter(today)) {
                 continue;
             }
+            // 4. 방영된 회차는 runtime을 더하고, 비었으면 기본값으로 채워 추정으로 센다
             aired++;
             if (isPresent(episode.runtime())) {
                 total += episode.runtime();
@@ -46,6 +50,7 @@ public final class RuntimeCalculator {
                 missing++;
             }
         }
+        // 5. 전체·방영 회차 수와 합계로 결과를 만든다
         return new RuntimeResult(episodes.size(), aired, total, missing, missing > 0);
     }
 

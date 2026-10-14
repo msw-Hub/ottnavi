@@ -48,10 +48,13 @@ final class DetailMapper {
 
     /** 영화 상세 -> 저장용 값. englishOverview는 한국어 줄거리가 비었을 때만 받아 온 영어 줄거리(없으면 null) */
     static TitleDetail fromMovie(TmdbMovieDetail movie, String englishOverview, RuntimeDefaults defaults) {
+        // 1. 줄거리를 한국어 우선으로 고른다
         OverviewPick overview = TitleDetailRules.pickOverview(movie.overview(), englishOverview);
+        // 2. 영화 단위 1개를 만든다
         // 영화는 MOVIE 단위 1개. 이름·포스터·방영일은 title 값을 쓰므로 비운다(ERD watch_unit)
         UnitDetail unit = new UnitDetail(UnitType.MOVIE, null, null, null, null, null,
                 RuntimeCalculator.forMovie(movie.runtime(), defaults));
+        // 3. 컬럼 길이·소수 자릿수에 맞춰 저장용 값을 만든다
         return new TitleDetail(MediaType.MOVIE, Math.toIntExact(movie.id()), chooseTitle(movie.title(), movie.originalTitle()),
                 cut(movie.originalTitle(), MAX_TITLE_LENGTH), overview.overview(), overview.overviewLang(),
                 TitleDetailRules.parseDate(movie.releaseDate()), cut(movie.posterPath(), MAX_PATH_LENGTH),
@@ -79,6 +82,7 @@ final class DetailMapper {
      */
     static UnitDetail toSeasonUnit(TmdbSeasonSummary summary, TmdbTvSeasonDetail season, LocalDate today,
                                    boolean animation, RuntimeDefaults defaults) {
+        // 1. 시즌 상세의 회차 목록을 규칙 입력(방영일·runtime)으로 바꾼다
         List<TmdbEpisode> episodes = season.episodes();
         if (episodes == null) {
             episodes = List.of();
@@ -87,10 +91,13 @@ final class DetailMapper {
         for (TmdbEpisode episode : episodes) {
             runtimes.add(new EpisodeRuntime(TitleDetailRules.parseDate(episode.airDate()), episode.runtime()));
         }
+        // 2. 방영된 회차의 runtime 합과 추정 여부를 계산한다
         RuntimeResult runtime = RuntimeCalculator.forSeason(runtimes, today, animation, defaults);
+        // 3. 방영된 회차가 없으면 저장하지 않는다(null)
         if (runtime.airedEpisodeCount() == 0) {
             return null;
         }
+        // 4. 이름·방영일은 시즌 상세를 우선하고 비면 요약 값으로 채운다
         String name = firstText(season.name(), summary.name());
         LocalDate airDate = TitleDetailRules.parseDate(season.airDate());
         if (name == null) {
@@ -99,6 +106,7 @@ final class DetailMapper {
         if (airDate == null) {
             airDate = TitleDetailRules.parseDate(summary.airDate()); // 시즌 상세에 방영일이 없으면 요약의 값을 쓴다
         }
+        // 5. 컬럼 길이에 맞춰 시즌 단위 값을 만든다
         return new UnitDetail(UnitType.SEASON, summary.seasonNumber(), Math.toIntExact(summary.id()),
                 cut(name, MAX_TITLE_LENGTH),
                 cut(firstText(season.posterPath(), summary.posterPath()), MAX_PATH_LENGTH),
@@ -110,13 +118,16 @@ final class DetailMapper {
      * flatrate(구독)만 넣는다(PRD FR-02).
      */
     static KrProviders toKrProviders(TmdbWatchProvidersResponse response) {
+        // 1. KR 키가 없으면 KR 데이터 없음으로 본다
         if (response == null || response.results() == null || !response.results().containsKey(REGION)) {
             return KrProviders.noKrData();
         }
+        // 2. KR은 있는데 구독(flatrate)이 없으면 빈 집합이다
         TmdbRegionProviders kr = response.results().get(REGION);
         if (kr == null || kr.flatrate() == null) {
             return KrProviders.of(Set.of());
         }
+        // 3. 구독 제공처 번호만 모아 판정 입력을 만든다
         Set<Integer> ids = new HashSet<>();
         for (TmdbProviderRef ref : kr.flatrate()) {
             ids.add(ref.providerId());
@@ -150,9 +161,11 @@ final class DetailMapper {
 
     /** 출연진 -> 이름이 있는 사람만 order순 상위 10명 */
     private static List<CastCandidate> toCast(TmdbCredits credits) {
+        // 1. 출연진 정보가 없으면 빈 목록이다
         if (credits == null || credits.cast() == null) {
             return List.of();
         }
+        // 2. 이름이 있는 출연자만 후보로 만든다
         List<CastCandidate> candidates = new ArrayList<>();
         for (TmdbCastMember member : credits.cast()) {
             // title_cast.name이 NOT NULL이라 이름이 없는 사람은 건너뛴다
@@ -161,6 +174,7 @@ final class DetailMapper {
             }
             candidates.add(toCandidate(member));
         }
+        // 3. 출연 순서로 정렬해 상위 10명만 남긴다
         return TitleDetailRules.topCast(candidates);
     }
 

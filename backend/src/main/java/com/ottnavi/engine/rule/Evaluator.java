@@ -74,6 +74,7 @@ public final class Evaluator {
 
 	/** 입력 하나에 대한 평가 준비물(상품 위치·비트마스크·고정 결과)을 한 번 만든다. */
 	public Evaluator(PlanInput input) {
+		// 1. 입력과 상품 수 한도를 검증한다
 		if (input == null) {
 			throw new IllegalArgumentException("계산 입력은 null일 수 없다");
 		}
@@ -83,6 +84,7 @@ public final class Evaluator {
 		}
 		this.monthlyWatchMinutes = input.monthlyWatchMinutes();
 
+		// 2. 상품을 ID 오름차순으로 놓고 비트 자리·월 가격·FREE/SUBSCRIBED 마스크를 만든다
 		List<OttProduct> sortedProducts = new ArrayList<>(products);
 		sortedProducts.sort(Comparator.comparingLong(OttProduct::id));
 		this.productIds = new long[sortedProducts.size()];
@@ -102,6 +104,7 @@ public final class Evaluator {
 		this.freeMask = free;
 		this.subscribedMask = subscribed;
 
+		// 3. 시청 단위마다 시청 가능 상품 마스크와 미배정 결과를 준비한다
 		this.units = input.units();
 		int unitCount = units.size();
 		this.watchableMasks = new int[unitCount];
@@ -128,6 +131,7 @@ public final class Evaluator {
 		this.watchableUnitCount = watchableCount;
 		this.fixedResults = List.copyOf(fixed);
 
+		// 4. 시즌 순서 준비물(앞 시즌 인덱스·항상 막힘)을 채운다
 		this.prereqIndexes = new int[unitCount];
 		Arrays.fill(prereqIndexes, -1);
 		this.blockedAlways = new boolean[unitCount];
@@ -141,6 +145,7 @@ public final class Evaluator {
 	 * Solver는 달마다 예산 이하 조합만 넘기므로 운영 경로에는 영향이 없다(KnownCornerOffBudgetTest로 고정).
 	 */
 	private void prepareSeasonOrder(PlanInput input) {
+		// 1. 작품별로 시즌 번호 → 단위 인덱스를 모은다
 		Map<Long, TreeMap<Integer, Integer>> indexesByTitle = new HashMap<>(); // 작품 ID → (시즌 번호 → 단위 인덱스)
 		for (int i = 0; i < units.size(); i++) {
 			WatchUnit unit = units.get(i);
@@ -148,13 +153,16 @@ public final class Evaluator {
 				indexesByTitle.computeIfAbsent(unit.titleId(), key -> new TreeMap<>()).put(unit.seasonNumber(), i);
 			}
 		}
+		// 2. 시즌 단위가 없으면 준비할 것이 없다
 		if (indexesByTitle.isEmpty()) {
 			return; // 시즌이 없는 입력: 모든 단위의 앞 시즌이 -1이라 평가 때 시즌 순서 분기를 타지 않는다
 		}
+		// 3. 정적 불가능 판정에 쓸 상품 ID 조회표를 만든다
 		Map<Long, OttProduct> productsById = new HashMap<>();
 		for (OttProduct product : input.products()) {
 			productsById.put(product.id(), product);
 		}
+		// 4. 작품마다 시즌 번호 오름차순으로 앞 시즌과 항상 막힘 여부를 채운다
 		for (TreeMap<Integer, Integer> seasons : indexesByTitle.values()) {
 			int previous = -1; // 바로 아래 시즌 번호 단위의 인덱스(시즌 1·3만 찜이면 3의 앞은 1)
 			for (int index : seasons.values()) {
@@ -175,6 +183,7 @@ public final class Evaluator {
 			throw new IllegalArgumentException("구독 조합은 null일 수 없다");
 		}
 
+		// 1. 달별로 볼 수 있는 상품 마스크와 비용을 구한다
 		// 달별 "지금 볼 수 있는 상품" 마스크와 비용을 먼저 구한다
 		int[] availableMasks = new int[MONTH_COUNT];
 		int totalCost = 0; // 최대 9,600만 원이라 int로 넘치지 않는다(MAX_PRODUCT_COUNT 옆 주석)
@@ -185,11 +194,13 @@ public final class Evaluator {
 			availableMasks[month] = selectedMask | freeMask | (month == 0 ? subscribedMask : 0);
 		}
 
+		// 2. 달별 남은 시청 시간을 준비한다
 		// 달별 남은 시청 시간. 서비스와 무관하게 그 달 전체에서 센다(PRD 5.4 긴 시즌)
 		int[] remainingMinutes = {monthlyWatchMinutes, monthlyWatchMinutes, monthlyWatchMinutes};
 		List<UnitResult> results = new ArrayList<>(units.size());
 		int mustCompleted = 0;
 		int score = 0;
+		// 3. 정렬된 순서대로 단위를 배정하고 시청 완료 수·점수를 센다
 		// PRD 5.4 배정 규칙 1: 정렬된 순서대로 한 단위씩 배정한다(정렬은 PlanInput 생성 때 끝남).
 		// 시청 가능 상품이 없는 뒤쪽 단위는 시간을 쓰지 않으므로 루프에서 빼고, 끝에 미리 만든 결과를 순서대로 붙인다
 		for (int i = 0; i < watchableUnitCount; i++) {
@@ -205,6 +216,7 @@ public final class Evaluator {
 				}
 			}
 		}
+		// 4. 시청 가능 상품이 없는 단위의 고정 결과를 붙여 평가 결과를 만든다
 		// PRD 5.4 이유 코드 판정 순서 NO_PROVIDER → UNKNOWN: 시청 가능 상품이 하나도 없으면 조합과 무관하게 정해진다
 		results.addAll(fixedResults);
 		return new Evaluation(selection, mustCompleted, score, totalCost, results);
@@ -218,6 +230,7 @@ public final class Evaluator {
 	 * ③ 아니면 앞 시즌의 시청 완료 달 이상에서만 시청 완료하도록 배정한다(시작 달은 제약하지 않는다).
 	 */
 	private UnitResult assign(int unitIndex, int[] availableMasks, int[] remainingMinutes, List<UnitResult> results) {
+		// 1. 이 단위를 볼 수 있는 달을 구한다
 		int watchableMask = watchableMasks[unitIndex];
 		// 달 3개를 비트 3개로: 비트 m이 1이면 m번째 달에 이 단위를 볼 수 있는 상품이 있다(예: 0b011 = 0·1번째 달)
 		int watchableMonths = 0;
@@ -226,11 +239,13 @@ public final class Evaluator {
 				watchableMonths |= 1 << month;
 			}
 		}
+		// 2. 볼 수 있는 달이 없으면 BUDGET으로 끝낸다
 		// 이유 코드 BUDGET(TECH 1절, 도출): 시청 가능 상품이 있지만 어느 달에도 선택되지 않았다
 		if (watchableMonths == 0) {
 			return budgetResults[unitIndex];
 		}
 
+		// 3. 앞 시즌이 있으면 시청 완료할 수 있는 가장 이른 달을 정한다(앞 시즌이 막혔거나 미배정이면 TIME으로 끝낸다)
 		// 시즌 순서: 이 단위가 시청 완료할 수 있는 가장 이른 달(앞 시즌의 시청 완료 달). 앞 시즌이 없으면 0이라 제약이 없다
 		int minCompletedMonth = 0;
 		int prereqIndex = prereqIndexes[unitIndex];
@@ -250,10 +265,12 @@ public final class Evaluator {
 			minCompletedMonth = prereqResult.completedMonthIndex();
 		}
 
+		// 4. 긴 시즌이면 나눠서, 아니면 한 달 안에 배정한다
 		WatchUnit unit = units.get(unitIndex);
 		UnitResult scheduled = unit.requiredMinutes() > monthlyWatchMinutes
 				? assignLongSeason(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes, minCompletedMonth)
 				: assignWithinMonth(unit, watchableMask, watchableMonths, availableMasks, remainingMinutes, minCompletedMonth);
+		// 5. 배정하지 못했으면 TIME으로 끝낸다
 		// 이유 코드 TIME(TECH 1절, 도출): 볼 수 있는 달은 있으나 시간이 모자라 3개월 안에 다 보지 못한다
 		return scheduled != null ? scheduled : timeResults[unitIndex];
 	}
@@ -302,14 +319,17 @@ public final class Evaluator {
 	private UnitResult assignLongSeason(WatchUnit unit, int watchableMask, int watchableMonths,
 			int[] availableMasks, int[] remainingMinutes, int minCompletedMonth) {
 		int requiredMinutes = unit.requiredMinutes();
+		// 1. 시작 달을 이른 순서로 시도한다
 		for (int startMonth = 0; startMonth < MONTH_COUNT; startMonth++) {
 			if (!isWatchableMonth(watchableMonths, startMonth)) {
 				continue;
 			}
+			// 2. 남은 시간을 바꾸지 않는 시험 계산으로 시청 완료 달을 구한다
 			int completedMonth = findCompletedMonth(startMonth, requiredMinutes, watchableMonths, remainingMinutes);
 			if (completedMonth < minCompletedMonth) { // 시청 완료 불가(-1)이거나 앞 시즌보다 먼저 끝나는 시작 달
 				continue;
 			}
+			// 3. 성공이 확인된 시작 달부터 다 본 달까지 실제로 배정한다
 			// 성공이 확인됐으니 시작 달부터 다 본 달까지 실제로 배정한다(시험 계산과 같은 순서·같은 값)
 			List<Assignment> assignments = new ArrayList<>(completedMonth - startMonth + 1);
 			int leftMinutes = requiredMinutes;
@@ -323,27 +343,33 @@ public final class Evaluator {
 			// PRD 5.4 배정 규칙 5: 3개월에 걸쳐도 다 본 달 한 번만 점수
 			return UnitResult.scheduled(unit.id(), completedMonth, assignments);
 		}
+		// 4. 어느 시작 달로도 끝내지 못하면 미배정(null)이다
 		// PRD 5.4 배정 규칙 6: 3개월 안에 끝나지 않으면 배정하지 않는다
 		return null;
 	}
 
 	/** startMonth부터 연속으로 이어 볼 때 다 보는 달을 돌려준다. 남은 시간은 바꾸지 않는다. 못 보면 -1. */
 	private int findCompletedMonth(int startMonth, int requiredMinutes, int watchableMonths, int[] remainingMinutes) {
+		// 1. 시작 달부터 이어지는 달에 남은 필요 시간을 채워 본다
 		int leftMinutes = requiredMinutes;
+		// 2. 시청 가능한 달이 이어지는 동안 달마다 조각을 채운다
 		// 시청 가능한 달이 끊기면(비트가 0이면) 거기서 멈춘다: 선택된 달이 연속이어야 나눠 볼 수 있다(PRD 5.4 긴 시즌)
 		for (int month = startMonth; month < MONTH_COUNT && isWatchableMonth(watchableMonths, month); month++) {
 			int remaining = remainingMinutes[month];
+			// 3. 마지막 조각이 아닌데 120분 미만이면 이어 보기가 끊긴 것으로 본다
 			// 결정 4: 마지막 조각이 아닌데(남은 시간 < 잔여 분) 120분 미만이면 이 시작 달은 실패(0분이면 결정 1과 같다).
 			// 시작 달은 필요 시간 > M ≥ 남은 시간이라 항상 마지막 조각이 아니므로, 시작 달이 120분 미만이면 다음 시작 달을 시도하는 셈이다
 			if (remaining < leftMinutes && remaining < MIN_LONG_SEASON_SEGMENT_MINUTES) {
 				return -1;
 			}
+			// 4. 이 달 조각만큼 빼고 다 채웠으면 이 달이 시청 완료 달이다
 			int minutes = Math.min(remaining, leftMinutes);
 			leftMinutes -= minutes;
 			if (leftMinutes == 0) {
 				return month;
 			}
 		}
+		// 5. 끝까지 채우지 못했으면 시청 완료 불가(-1)다
 		return -1;
 	}
 

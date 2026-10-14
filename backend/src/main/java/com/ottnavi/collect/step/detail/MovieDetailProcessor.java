@@ -28,10 +28,12 @@ public class MovieDetailProcessor implements ItemProcessor<DetailTarget, TitleDe
     @Override
     public TitleDetail process(DetailTarget target) {
         try {
+            // 1. 한국어 상세를 받는다(없으면 건너뛴다)
             TmdbMovieDetail ko = tmdbClient.getMovie(target.tmdbId(), LANGUAGE_KO, APPEND_CREDITS);
             if (ko == null) {
                 return null;
             }
+            // 2. 한국어 줄거리가 비었을 때만 영어 상세에서 줄거리를 가져온다
             // 한국어 줄거리가 비었을 때만 영어로 한 번 더 부른다(모든 작품을 이중 호출하지 않는다)
             String englishOverview = null;
             if (ko.overview() == null || ko.overview().isBlank()) {
@@ -40,8 +42,10 @@ public class MovieDetailProcessor implements ItemProcessor<DetailTarget, TitleDe
                     englishOverview = en.overview();
                 }
             }
+            // 3. 저장용 값으로 바꿔 돌려준다
             return DetailMapper.fromMovie(ko, englishOverview, defaults);
         } catch (TmdbNotFoundException e) {
+            // 4. TMDB에 없으면(404) 이 작품만 건너뛴다
             log.warn("TMDB에 없는 영화라 건너뛴다: titleId={}, tmdbId={}", target.titleId(), target.tmdbId());
             return null;
         }

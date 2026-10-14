@@ -37,14 +37,17 @@ public final class AvailabilityJudge {
                                                 Map<Integer, ProviderMapping> mappings) {
         long serviceId = service.ottServiceId();
 
+        // 1. 쿠팡플레이 영화는 구조적으로 모름이다
         // 쿠팡플레이는 TMDB에 영화 데이터가 구조적으로 없어, KR 데이터 유무와 상관없이 가장 먼저 모름으로 둔다(PRD 11절 13번)
         if (unitType == UnitType.MOVIE && service.code() == OttServiceCode.COUPANG_PLAY) {
             return new AvailabilityVerdict(serviceId, AvailabilityStatus.UNKNOWN, UnknownReason.STRUCTURAL_GAP, false, false);
         }
+        // 2. KR 데이터 자체가 없으면 모름이다
         if (!kr.krDataPresent()) {
             return new AvailabilityVerdict(serviceId, AvailabilityStatus.UNKNOWN, UnknownReason.NO_KR_DATA, false, false);
         }
 
+        // 3. 구독 제공처 중 이 서비스로 매핑된 것을 일반·광고형으로 나눠 찾는다
         // flatrate(구독)에 이 서비스로 매핑된 제공처가 직접 있는지만 본다. 대여·구매와 매핑되지 않은 번호는 무시한다
         boolean inStandard = false;
         boolean inAdTier = false;
@@ -59,6 +62,7 @@ public final class AvailabilityJudge {
                 inStandard = true;
             }
         }
+        // 4. 하나라도 찾았으면 있음, 아니면 없음으로 판정한다
         // AVAILABLE이면 inStandard·inAdTier 중 하나는 반드시 true다(Task 044 이월 규칙 ①)
         AvailabilityStatus status = (inStandard || inAdTier) ? AvailabilityStatus.AVAILABLE : AvailabilityStatus.NOT_AVAILABLE;
         return new AvailabilityVerdict(serviceId, status, null, inStandard, inAdTier);

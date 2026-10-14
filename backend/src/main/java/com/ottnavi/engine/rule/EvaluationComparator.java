@@ -106,9 +106,11 @@ public final class EvaluationComparator implements Comparator<Evaluation> {
 	 */
 	private long completedUpTo(Evaluation evaluation, int month) {
 		List<UnitResult> units = evaluation.units();
+		// 1. 평가 결과의 단위 수가 입력과 같은지 확인한다
 		if (units.size() != mustUnit.length) {
 			throw new IllegalArgumentException("평가 결과의 단위 수가 입력과 다르다: 평가=" + units.size() + ", 입력=" + mustUnit.length);
 		}
+		// 2. 그 달까지 시청 완료한 단위의 꼭 작품 수와 점수 합을 센다
 		long mustCount = 0;
 		long scoreSum = 0;
 		for (int i = 0; i < mustUnit.length; i++) {
@@ -122,6 +124,7 @@ public final class EvaluationComparator implements Comparator<Evaluation> {
 				scoreSum += unitScore[i];
 			}
 		}
+		// 3. 꼭 작품 수(위 32비트)와 점수 합(아래 32비트)을 long 하나로 묶어 돌려준다
 		return (mustCount << 32) | scoreSum;
 	}
 

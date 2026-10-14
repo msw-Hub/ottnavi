@@ -29,11 +29,15 @@ public final class PlanTypeSolver {
 		if (input == null) {
 			throw new IllegalArgumentException("입력은 null일 수 없다");
 		}
+		// 1. 기준이 되는 추천형을 먼저 푼다
 		// PRD 11절 35번: 추천형을 먼저 푼다. 그리디로 풀렸어도 그 결과의 점수·조합을 그대로 기준으로 쓴다
 		SolveResult recommended = solver.solve(input, PlanObjective.recommended(input));
+		// 2. 추천형 결과로 점수 하한과 시작 조합을 정해 절약형을 푼다
 		SolveResult saver = solver.solve(input, PlanObjective.saver(input, recommended.evaluation()));
+		// 3. 같은 기준으로 간편형을 푼다
 		SolveResult simple = solver.solve(input, PlanObjective.simple(input, recommended.evaluation()));
 
+		// 4. 유형 순서대로 담아 수정할 수 없는 맵으로 돌려준다
 		// EnumMap은 enum 선언 순서(RECOMMENDED, SAVER, SIMPLE)로 순회된다. 세 유형의 조합이 같아도 합치지 않는다(호출하는 쪽의 몫)
 		Map<PlanType, SolveResult> results = new EnumMap<>(PlanType.class);
 		results.put(PlanType.RECOMMENDED, recommended);

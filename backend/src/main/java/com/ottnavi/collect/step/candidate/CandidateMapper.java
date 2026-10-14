@@ -46,10 +46,13 @@ final class CandidateMapper {
     private static CandidateTitle toCandidate(MediaType mediaType, long id, String title, String originalTitle,
                                               String date, String posterPath, String backdropPath,
                                               String originalLanguage, Double popularity, Double voteAverage) {
+        // 1. 한국어 제목이 없으면 원제를 고른다
         String chosen = (title != null && !title.isBlank()) ? title : originalTitle;
+        // 2. 둘 다 없으면 저장할 수 없어 건너뛴다(null)
         if (chosen == null || chosen.isBlank()) {
             return null;
         }
+        // 3. 컬럼 길이·소수 자릿수에 맞춰 후보를 만든다
         return new CandidateTitle(mediaType, Math.toIntExact(id), cut(chosen, MAX_TITLE_LENGTH),
                 originalTitle == null ? null : cut(originalTitle, MAX_TITLE_LENGTH),
                 TitleDetailRules.parseDate(date), posterPath, backdropPath, originalLanguage,

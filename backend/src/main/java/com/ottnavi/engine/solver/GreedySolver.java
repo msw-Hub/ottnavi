@@ -28,29 +28,38 @@ public final class GreedySolver implements PlanSolver {
 		if (input == null || objective == null) {
 			throw new IllegalArgumentException("입력과 목적함수는 null일 수 없다");
 		}
+		// 1. 평가기를 준비한다
 		Evaluator evaluator = new Evaluator(input); // 풀이마다 한 번 만들고 evaluate만 반복한다(038 호출 규칙)
+		// 2. 달별 후보(예산 이하 부분집합)를 만든다
 		List<List<Set<Long>>> candidates = MonthCandidates.budgetSubsets(input);
+		// 3. 시작 조합이 없으면(추천형) 달마다 확정하고, 있으면(절약형·간편형) 시작 조합에서 개선한다
 		Evaluation best = objective.baseline() == null
 				? fixMonthByMonth(evaluator, objective.comparator(), candidates)
 				: improveFromBaseline(evaluator, objective.comparator(), candidates, objective.baseline());
+		// 4. 푼 결과를 그리디 풀이로 표시해 돌려준다
 		return new SolveResult(best, objective.planType(), SolverType.GREEDY);
 	}
 
 	/** S4: 달 0 → 1 → 2 순서로, 앞선 달은 확정값·뒤의 달은 빈 집합으로 두고 그 달의 최선을 확정한다. */
 	private static Evaluation fixMonthByMonth(Evaluator evaluator, Comparator<Evaluation> comparator, List<List<Set<Long>>> candidates) {
+		// 1. 확정 조합을 빈 달 3개로 시작한다
 		Selection fixed = Selection.of(Set.of(), Set.of(), Set.of()); // 아직 확정하지 않은 달은 빈 집합
 		Evaluation best = null;
+		// 2. 달 0 → 2 순서로 그 달의 최선 후보를 고른다
 		for (int month = 0; month < Selection.MONTH_COUNT; month++) {
 			Evaluation monthBest = null;
+			// 3. 그 달의 후보를 하나씩 끼워 넣어 3개월 전체를 평가한다
 			for (Set<Long> subset : candidates.get(month)) {
 				Evaluation evaluation = evaluator.evaluate(MonthCandidates.replaceMonth(fixed, month, subset));
 				if (monthBest == null || comparator.compare(evaluation, monthBest) > 0) {
 					monthBest = evaluation;
 				}
 			}
+			// 4. 그 달의 최선을 확정해 다음 달 계산에 넘긴다
 			fixed = monthBest.selection();
 			best = monthBest;
 		}
+		// 5. 마지막 달까지 확정한 평가를 돌려준다
 		// 마지막 달까지 확정한 조합의 평가가 곧 최종 Evaluation이다(뒤에 빈 달이 남지 않는다)
 		return best;
 	}
@@ -61,11 +70,15 @@ public final class GreedySolver implements PlanSolver {
 	 */
 	private static Evaluation improveFromBaseline(Evaluator evaluator, Comparator<Evaluation> comparator,
 			List<List<Set<Long>>> candidates, Selection baseline) {
+		// 1. 시작 조합을 먼저 평가해 현재 최선으로 둔다
 		Evaluation current = evaluator.evaluate(baseline);
 		boolean isChanged = true;
+		// 2. 한 바퀴 동안 바뀐 달이 없을 때까지 반복한다
 		while (isChanged) {
 			isChanged = false;
+			// 3. 달 0 → 2 순서로 그 달 선택만 후보로 바꿔 본다
 			for (int month = 0; month < Selection.MONTH_COUNT; month++) {
+				// 4. 3개월 전체를 평가해 더 좋으면 현재 최선을 바꾼다
 				for (Set<Long> subset : candidates.get(month)) {
 					Evaluation evaluation = evaluator.evaluate(MonthCandidates.replaceMonth(current.selection(), month, subset));
 					if (comparator.compare(evaluation, current) > 0) {
@@ -75,6 +88,7 @@ public final class GreedySolver implements PlanSolver {
 				}
 			}
 		}
+		// 5. 더 좋아지지 않는 조합이 최종 결과다
 		return current;
 	}
 }

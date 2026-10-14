@@ -33,14 +33,17 @@ final class MonthCandidates {
 	 * 결과는 길이 3이고 각 달 목록의 첫 번째는 항상 빈 집합이다. 후보 상품이 MAX_PRODUCT_COUNT를 넘는 달이 있으면 IllegalArgumentException.
 	 */
 	static List<List<Set<Long>>> budgetSubsets(PlanInput input) {
+		// 1. 어떤 시청 단위가 볼 수 있는 상품 ID를 모은다
 		// S6: 어떤 시청 단위의 시청 가능 상품에도 없는 상품은 골라도 볼 수 있는 작품이 늘지 않는다
 		Set<Long> watchableProductIds = new HashSet<>();
 		for (WatchUnit unit : input.units()) {
 			watchableProductIds.addAll(unit.watchableProductIds());
 		}
+		// 2. 상품을 ID 오름차순으로 놓는다(결과 순서가 항상 같아진다)
 		List<OttProduct> sortedProducts = new ArrayList<>(input.products());
 		sortedProducts.sort(Comparator.comparingLong(OttProduct::id));
 
+		// 3. 0번째 달과 1·2번째 달의 예산 이하 부분집합을 각각 만든다
 		List<Set<Long>> month0 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, input.monthlyBudget(), 0), input.monthlyBudget());
 		// 1·2번째 달은 후보 상품 규칙이 같아(SUBSCRIBED 제외는 0번째 달만) 같은 목록을 함께 쓴다(불변 목록이라 공유해도 안전)
 		List<Set<Long>> month1 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, input.monthlyBudget(), 1), input.monthlyBudget());
@@ -59,6 +62,7 @@ final class MonthCandidates {
 	 */
 	static List<List<Set<Long>>> representatives(PlanInput input, Evaluator evaluator, Comparator<Evaluation> comparator,
 			List<List<Set<Long>>> subsetsByMonth) {
+		// 1. FREE·SUBSCRIBED 상품 ID를 가른다(달별로 볼 수 있는 단위를 계산하는 데 쓴다)
 		Set<Long> freeIds = new HashSet<>();
 		Set<Long> subscribedIds = new HashSet<>();
 		for (OttProduct product : input.products()) {
@@ -69,8 +73,10 @@ final class MonthCandidates {
 			}
 		}
 
+		// 2. 달마다 같은 시청 단위 집합이 보이는 부분집합끼리 묶어 1등만 남긴다
 		List<List<Set<Long>>> result = new ArrayList<>(Selection.MONTH_COUNT);
 		for (int month = 0; month < Selection.MONTH_COUNT; month++) {
+			// 3. 그 달의 부분집합을 그룹별로 비교해 1등을 고른다
 			// 처음 나온 순서를 지키는 맵이라 결과 순서가 항상 같다(결정성)
 			Map<BitSet, Evaluation> bestByGroup = new LinkedHashMap<>();
 			for (Set<Long> subset : subsetsByMonth.get(month)) {
@@ -81,6 +87,7 @@ final class MonthCandidates {
 					bestByGroup.put(key, candidate);
 				}
 			}
+			// 4. 그룹별 1등의 그 달 부분집합만 후보로 남긴다
 			List<Set<Long>> kept = new ArrayList<>(bestByGroup.size());
 			for (Evaluation best : bestByGroup.values()) {
 				kept.add(best.selection().productIdsOf(month));
@@ -151,12 +158,15 @@ final class MonthCandidates {
 	 */
 	private static List<Set<Long>> subsetsOf(List<OttProduct> candidates, int monthlyBudget) {
 		int productCount = candidates.size();
+		// 1. 상품 ID를 한 번만 박싱해 둔다
 		Long[] boxedIds = new Long[productCount]; // 상품 ID를 한 번만 박싱해 부분집합이 같은 Long 객체를 공유하게 한다
 		for (int bit = 0; bit < productCount; bit++) {
 			boxedIds[bit] = candidates.get(bit).id();
 		}
+		// 2. 켜고 끄는 모양(비트마스크)을 전부 훑는다
 		List<Set<Long>> subsets = new ArrayList<>();
 		for (int mask = 0; mask < (1 << productCount); mask++) {
+			// 3. 이 모양의 비용 합과 상품 ID 목록을 만든다
 			int cost = 0;
 			List<Long> ids = new ArrayList<>(Integer.bitCount(mask));
 			for (int bit = 0; bit < productCount; bit++) {
@@ -165,6 +175,7 @@ final class MonthCandidates {
 					ids.add(boxedIds[bit]);
 				}
 			}
+			// 4. 예산 이하인 모양만 후보로 담는다
 			// S1: 달별 예산은 달마다 따로 적용한다(3개월 합산 한도 없음)
 			if (cost <= monthlyBudget) {
 				subsets.add(SortedIdSet.of(ids));
