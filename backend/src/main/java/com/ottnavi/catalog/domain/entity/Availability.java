@@ -71,7 +71,8 @@ public class Availability extends BaseTimeEntity {
 
     /**
      * 제공 상태·이유·tier 플래그·확인 시각을 한 번에 바꾼다.
-     * DB CHECK(UNKNOWN일 때만 unknown_reason이 있다)와 같은 규칙을 먼저 검사해, 저장 전에 의미 있는 예외로 막는다.
+     * DB CHECK(UNKNOWN일 때만 unknown_reason이 있다)와 같은 규칙, 그리고 DB에는 없는 "AVAILABLE이면 tier 플래그 하나는 true" 규칙을
+     * 먼저 검사해, 저장 전에 의미 있는 예외로 막는다.
      */
     public void changeState(AvailabilityStatus status, UnknownReason unknownReason, boolean inStandard,
                             boolean inAdTier, Instant checkedAt) {
@@ -84,6 +85,10 @@ public class Availability extends BaseTimeEntity {
         }
         if (!unknown && unknownReason != null) {
             throw new IllegalArgumentException("UNKNOWN이 아닌 상태에는 이유를 둘 수 없다: " + status);
+        }
+        // AVAILABLE이면 어느 tier로든 제공 중이라는 뜻이므로 플래그 하나는 true여야 한다(DB에는 없는 규칙,Task 044)
+        if (status == AvailabilityStatus.AVAILABLE && !inStandard && !inAdTier) {
+            throw new IllegalArgumentException("AVAILABLE 상태에는 inStandard 또는 inAdTier가 true여야 한다");
         }
         this.status = status;
         this.unknownReason = unknownReason;

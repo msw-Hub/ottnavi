@@ -21,6 +21,7 @@ public record PlanInput(
 
 	/** 입력을 검증하고 시청 단위를 배정 순서로 정렬해 불변으로 보관한다. */
 	public PlanInput {
+		// 1. 필수 값과 범위를 검증한다
 		if (units == null || products == null) {
 			throw new IllegalArgumentException("시청 단위 목록과 상품 목록은 null일 수 없다");
 		}
@@ -31,6 +32,7 @@ public record PlanInput(
 			throw new IllegalArgumentException("월 시청 가능 시간은 1분 이상이어야 한다: monthlyWatchMinutes=" + monthlyWatchMinutes);
 		}
 
+		// 2. 상품 목록에 null·중복 ID가 없는지 검증한다
 		Set<Long> productIds = new HashSet<>();
 		for (OttProduct product : products) {
 			if (product == null) {
@@ -41,6 +43,7 @@ public record PlanInput(
 			}
 		}
 
+		// 3. 시청 단위의 null·ID 중복·시즌 중복·시청 가능 상품 ID를 검증한다
 		Set<Long> watchUnitIds = new HashSet<>();
 		Set<String> seasonKeys = new HashSet<>(); // (titleId, seasonNumber) 중복 검사용
 		for (WatchUnit unit : units) {
@@ -64,6 +67,7 @@ public record PlanInput(
 			}
 		}
 
+		// 4. 배정 순서로 정렬하고 앞 시즌을 끌어올려 불변으로 보관한다
 		// PRD 5.4 배정 규칙 1: 정렬은 여기서 한 번만 한다(D8). 입력 순서와 무관하게 같은 결과가 나오게 하는 전제다.
 		// 평가기는 시청 가능 상품이 없는 단위가 맨 뒤에 모여 있다는 이 정렬 결과(ASSIGNMENT_ORDER ①)에 기대어 그 단위들을 건너뛴다
 		List<WatchUnit> sortedUnits = new ArrayList<>(units);
@@ -81,6 +85,7 @@ public record PlanInput(
 	 */
 	private static List<WatchUnit> pullUpEarlierSeasons(List<WatchUnit> baseOrder, List<OttProduct> products,
 			int monthlyBudget, int monthlyWatchMinutes) {
+		// 1. 시리즈별로 시즌 번호순 단위 목록을 만든다
 		// 시리즈별 시즌 번호순 목록(시즌 번호는 시리즈 안에서 유일함을 위에서 검증했다)
 		Map<Long, TreeMap<Integer, WatchUnit>> seasonsByTitle = new HashMap<>();
 		for (WatchUnit unit : baseOrder) {
@@ -88,31 +93,38 @@ public record PlanInput(
 				seasonsByTitle.computeIfAbsent(unit.titleId(), key -> new TreeMap<>()).put(unit.seasonNumber(), unit);
 			}
 		}
+		// 2. 시즌이 없으면 기본 정렬 그대로 돌려준다
 		if (seasonsByTitle.isEmpty()) {
 			return baseOrder; // 시즌이 없는 입력은 기존 정렬 그대로다
 		}
+		// 3. 정적 불가능 판정에 쓸 상품 조회표를 만든다
 		Map<Long, OttProduct> productsById = new HashMap<>();
 		for (OttProduct product : products) {
 			productsById.put(product.id(), product);
 		}
 
+		// 4. 기본 정렬을 앞에서부터 훑으며 단위를 내보낸다(앞 시즌은 필요하면 끼워 넣는다)
 		List<WatchUnit> ordered = new ArrayList<>(baseOrder.size());
 		Set<Long> emitted = new HashSet<>(); // 이미 내보낸 watchUnitId
 		for (WatchUnit unit : baseOrder) {
+			// 5. 앞서 다른 시즌에 끌려가 이미 나온 단위는 건너뛴다
 			if (emitted.contains(unit.id())) {
 				continue; // 앞서 다른 시즌에 끌려가 이미 나왔다
 			}
 			if (unit.titleId() != null) {
+				// 6. 아직 안 나온 앞 시즌을 시즌 번호순으로 모은다
 				List<WatchUnit> earlier = new ArrayList<>();
 				for (WatchUnit season : seasonsByTitle.get(unit.titleId()).headMap(unit.seasonNumber(), false).values()) {
 					if (!emitted.contains(season.id())) {
 						earlier.add(season);
 					}
 				}
+				// 7. 이 단위와 앞 시즌이 모두 정적으로 가능할 때만 끌어올린다
 				boolean pullable = !earlier.isEmpty() && !isStaticallyImpossible(unit, monthlyBudget, monthlyWatchMinutes, productsById);
 				for (int i = 0; pullable && i < earlier.size(); i++) {
 					pullable = !isStaticallyImpossible(earlier.get(i), monthlyBudget, monthlyWatchMinutes, productsById);
 				}
+				// 8. 앞 시즌을 이 단위 바로 앞에 내보낸다
 				if (pullable) {
 					for (WatchUnit season : earlier) {
 						ordered.add(season);
@@ -120,6 +132,7 @@ public record PlanInput(
 					}
 				}
 			}
+			// 9. 이 단위를 내보낸다
 			ordered.add(unit);
 			emitted.add(unit.id());
 		}

@@ -7,17 +7,17 @@
 
 | 항목 | 내용 |
 |---|---|
-| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 6/30, 합계 42/105 (PR #60 병합 후 기준) |
-| 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계 |
-| 열린 PR | #60 `feature/b3-layer-rename`(패키지 구조 정리, Task 043 ROADMAP 기록, 이 문서). CI·리뷰 결과는 사용자가 알려 준다 |
-| 다음 Task | **044** 수집 Job 상세·시즌·판정 Step → 045 수집 실행·복구·이력 API → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
-| 쉬림프 | 완료 33개, 대기 1개(044). 착수 때 `execute_task`, 끝나면 `verify_task`(점수 90 안팎). 앞으로 Task는 착수할 때 등록한다 |
-| 워크트리 | `ottnavi`(메인, `develop`), `ottnavi-backend`(백엔드 작업, 현재 `feature/b3-layer-rename`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
+| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 7/30, 합계 43/105 (Task 044 구현 완료, PR #61 병합 전) |
+| 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계, 044 상세·시즌·판정 Step |
+| 열린 PR | #61 `feature/b3-collect-details`(Task 044 상세·시즌·판정 Step, 기존 코드 단계 주석, 규칙·설명 문서). CI 통과, CodeRabbit 지적 4건(문서)은 반영해 푸시했다. 병합은 사용자가 요청할 때 한다 |
+| 다음 Task | **045** 수집 실행·복구·이력 API → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
+| 쉬림프 | 044까지 완료 처리. 앞으로 Task는 착수할 때 등록하고 `execute_task`, 끝나면 `verify_task`(점수 90 안팎) |
+| 워크트리 | `ottnavi`(메인, `develop`), `ottnavi-backend`(백엔드 작업, 현재 `feature/b3-collect-details`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
 
 ## 2. 다음 작업 순서
 
-1. PR #60 리뷰·병합 → 메인 워크트리 `develop` 최신화.
-2. **Task 044**(상세·시즌·판정·이력 Step): 시작 전에 방향을 정한다. 아래 4절의 044 이월 항목이 설계 질문이다. 042의 판정·러닝타임 규칙(`catalog/domain/rule`)을 호출해 `watch_unit`, `availability`, `availability_change`를 저장한다.
+1. PR #61 병합(Squash, 사용자가 요청할 때) → 메인 워크트리 `develop` 최신화.
+2. **Task 045**(수집 실행·복구·이력 관리자 API): 시작 전에 설계 질문(수집 동시 실행 방지 방식, `targetDate`는 KST 날짜로 넘길 것, 실패 시 restart 경로)을 정한다. 4절의 045 이월 항목이 근거다. 구현 방식은 CLAUDE.md "구현 방식(Task 045부터)"를 따른다(opus 계획 → sonnet 구현, 구현 위치는 착수 때 사용자에게 확인).
 3. 045~048(수집 API, 매핑 API, cron, 첫 전체 수집) → 049(공개 API 요청 제한, 언제든 가능) → 050·051(검색·상세 API) → 052(공개 화면 실제 연결).
 4. 인증: 053·054 → 057(프론트 인증 연동, 인증 코드는 사용자 검토). 회원 입력: 055·056 → 058. 요금·관리자: 059·060 → 061. 플랜: 062~066 → 067.
 5. 2단계 화면 목업(068·071·075·081·086·097)은 Task 095(MVP 공개) 이후.
@@ -31,7 +31,7 @@
 
 ## 4. 미결·이월 항목 (한곳에 모음)
 
-**Task 044로**: DTO → `KrProviders`·`EpisodeRuntime`·`CastCandidate` 변환(`flatrate`만, KR 없음은 `noKrData()`, KR만 있고 flatrate 없음은 `of(빈 집합)`), 방영 0회 시즌 저장 여부, `watch_unit.episode_count` 출처(시즌 요약 vs 시즌 상세), 영어 줄거리 추가 호출, `MAPPED` 제공처만 판정 매핑에 넣기, `Availability`의 `in_standard`/`in_ad_tier` 규칙이 DB·엔티티에 없음, 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서, 이력 중복 방지와 낙관적 락(`@Version`, ERD 변경이 필요하니 ERD·TECH 확인 후), `WatchUnit` 갱신 메서드, 인자 12개인 `Title.updateDetail`(record로 묶기 검토), 영화 단위의 `episode_count`는 1이고 작품 종류에 맞는 단위만 만든다(DB가 막지 않음), `collect/step` 파일이 15개 안팎이 되면 `step/candidate`·`step/detail`로 더 나누기, title을 읽는 Reader는 `id` 순으로 읽고 `fetched_at`으로 거르지 않는다(TECH 3절).
+**Task 044는 완료했다**(2026-10-14, 결정과 기록은 ROADMAP Task 044). 이월 질문(DTO 변환, 방영 0회 시즌, `episode_count` 출처, 영어 줄거리, `MAPPED`만 판정, `Availability` 플래그 검사, 이력·낙관적 락, `WatchUnit` 갱신, `collect/step` 분리, Reader 정렬)은 모두 결정·구현됐다. 남은 것은 아래 045·048 항목이다: 날짜가 다른 Job의 동시 실행(상세 Reader 포함), 5xx 실패 시 수동 restart, 실제 TMDB 응답으로 수집, chunk 안 TMDB 호출 동안의 연결 점유 확인.
 
 **Task 045로**: 다른 날짜의 수집 Job이 동시에 돌면 `CandidateReader`의 읽는 위치가 서로 덮어써진다(전체 동시 실행 금지 또는 `@StepScope`). 계약 `tier` enum에 `ALL` 포함. 완료=`JobInstanceAlreadyCompleteException`, 실행 중=`JobExecutionAlreadyRunningException`을 409로 매핑. 비동기 실행은 `TaskExecutor`를 가진 `JobOperator`.
 
@@ -61,4 +61,4 @@
 
 ## 6. 문서 목록(설명용, 근거 아님)
 
-`FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `COLLECT_JOB_FLOW.md`(수집 Job이 무엇인가), `COLLECT_CODE_WALKTHROUGH.md`(수집 코드를 호출 흐름 순서로 읽기), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트), `ENGINE_ALGORITHM.md`(계산 엔진). 새 설명 문서는 짧게 쓰고 PR에 함께 커밋한다.
+설명용 문서는 모두 `docs/guides/` 폴더에 있다: `COLLECT_GUIDE.md`(수집 Job의 Step 6개, 후보와 판정의 차이, 읽는 순서), `SPRING_BATCH_BASICS.md`(Job·Step·chunk·Reader·Processor·Writer), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `PACKAGE_MAP.md`(백엔드 폴더 지도), `ENGINE_ALGORITHM.md`(계산 엔진), `FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트). 새 설명 문서는 짧게 쓰고 `docs/guides/`에 두어 PR에 함께 커밋한다.

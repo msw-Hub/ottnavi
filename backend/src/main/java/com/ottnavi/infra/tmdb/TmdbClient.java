@@ -122,15 +122,18 @@ public class TmdbClient {
     /** 호출을 실행하고 결과를 tmdb.call로 센다. Feign 예외는 TmdbException으로 바꿔 던진다 */
     private <T> T call(String endpoint, Supplier<T> action) {
         try {
+            // 1. 호출을 실행하고 성공 건수를 센다
             T result = action.get();
             count(endpoint, RESULT_SUCCESS);
             return result;
         } catch (TmdbException e) {
+            // 2. 속도 제한 등 이미 변환된 예외는 로컬 한도 실패로 세고 그대로 올린다
             // 호출 전 속도 제한 인터셉터가 던진 예외(로컬 한도 대기 초과 등). 이미 변환된 예외라 그대로 올린다
             count(endpoint, RESULT_LOCAL_LIMIT);
             log.warn("TMDB 호출 전 로컬 한도에서 포기했다: endpoint={}", endpoint);
             throw e;
         } catch (FeignException e) {
+            // 3. Feign 실패는 결과 태그와 예외로 바꿔 세고 로그를 남긴 뒤 던진다
             // 재시도 후에도 실패한 경우와 응답 해석 실패(DecodeException 포함)
             Failure failure = toFailure(e);
             count(endpoint, failure.result());
@@ -141,10 +144,12 @@ public class TmdbClient {
 
     /** FeignException을 결과 태그와 TmdbException 쌍으로 바꾼다. 메시지는 고정 문구, 원인은 cause로 남긴다 */
     private Failure toFailure(FeignException e) {
+        // 1. 상태가 200이어도 응답을 해석하지 못한 경우는 재시도 대상이 아닌 별도 결과다
         if (e instanceof DecodeException) {
             // 상태가 200이어도 JSON을 DTO로 못 바꾼 경우. 재시도 대상이 아니며 TMDB 응답 형식 변화를 의심한다
             return new Failure(RESULT_DECODE_ERROR, new TmdbUnavailableException("TMDB 응답을 해석하지 못했다", e));
         }
+        // 2. 상태 코드로 분류한다(404 없음, 429 한도 초과, 5xx 서버 오류, -1 연결 실패)
         int status = e.status();
         if (status == 404) {
             return new Failure(RESULT_NOT_FOUND, new TmdbNotFoundException("TMDB에 요청한 리소스가 없다", e));
@@ -159,6 +164,7 @@ public class TmdbClient {
             // 연결 실패·읽기 타임아웃·연결 끊김: Feign이 IOException을 상태 -1의 RetryableException으로 감싼다
             return new Failure(RESULT_IO_ERROR, new TmdbUnavailableException("TMDB에 연결하지 못했거나 응답 시간을 넘겼다", e));
         }
+        // 3. 위에 해당하지 않는 4xx는 요청 거절로 본다
         return new Failure(RESULT_CLIENT_ERROR, new TmdbRequestException("TMDB가 요청을 거절했다. 요청 값과 토큰 설정을 확인한다", e));
     }
 

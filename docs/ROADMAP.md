@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 6/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 7/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 42/105 | |
+| 합계 | | 43/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -815,7 +815,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 6/30
+## 7. Phase 3 — 핵심 기능 개발 · 7/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -858,13 +858,13 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 입력 정규화와 `input_hash`(SHA-256) 계산기(정렬된 단위·상품·가격, 예산, 시청 분, `data_as_of`)
   - [x] 두 Solver 점수·비용 차이와 계산 시간(3회 중앙값) 비교 테스트, 최악 입력(단품 7개, 큰 찜) 탐색 시간 측정. 플랜 유형 3종을 모두 푼 시간도 측정한다(절약형·간편형은 동치 제거가 없어 추천형의 약 3배, 필요하면 한 번의 순회로 합치는 최적화 결정)
   - [x] Task 039 이월 성능 최적화 3건을 측정 결과로 판단한다: ① 간편형 `signUpCount`를 비교할 때마다 두 번 다시 계산함, ② 조합마다 `Selection`이 정렬 복사를 함(038 모델), ③ `SolverSelector`가 후보 수를 세려고 후보를 만들고 이어서 Solver가 다시 만듦(후보를 한 번만 만들어 넘기고, 그리디로 갈 때는 동치 제거 전에 `budgetSubsets` 곱을 먼저 확인). 후보 상품 20개 한도의 메모리 위험(수백 MB)도 함께 측정해 한도를 정한다
-  - [x] 측정이 끝나면 **계산 엔진 알고리즘 상세 문서**(예: `docs/ENGINE_ALGORITHM.md`)를 작성한다: 038 평가기·배정 규칙, 039 완전탐색·그리디·플랜 유형 3종·동치 제거·후보 제외, 040 측정 결과. 쉬운 설명, 작은 숫자 예시, 실행 흐름 순서의 클래스·메서드 설명, 테스트 설명 포함(사용자 요청, 2026-10-10)
+  - [x] 측정이 끝나면 **계산 엔진 알고리즘 상세 문서**(예: `docs/guides/ENGINE_ALGORITHM.md`)를 작성한다: 038 평가기·배정 규칙, 039 완전탐색·그리디·플랜 유형 3종·동치 제거·후보 제외, 040 측정 결과. 쉬운 설명, 작은 숫자 예시, 실행 흐름 순서의 클래스·메서드 설명, 테스트 설명 포함(사용자 요청, 2026-10-10)
   - [x] 최악 입력과 후보 상한 근처에서 **힙 사용량**을 함께 기록한다(메모리 예산 측정 지점, 4.6)
   - [x] 비교기 ④ 조기 시청 규칙 변경 반영(문서·`EvaluationComparator`·절약형·간편형 비교기·정답 세트 기대값 재생성·재측정). 사용자 결정 2026-10-10: 추천형 ①꼭 시청 완료 수 ②점수 ③총비용 ④조기 시청 ⑤결제 미루기 ⑥달별 상품 ID, 절약형 ①②점수 하한 ③총비용 ④점수 ⑤조기 시청 ⑥결제 미루기 ⑦ID, 간편형 ①②하한 ③새로 가입하는 횟수 ④총비용 ⑤점수 ⑥조기 시청 ⑦결제 미루기 ⑧ID. 조기 시청은 달 0→1→2 순서로 "그 달까지 시청 완료한 꼭 작품 수, 같으면 점수 합"이 먼저 다른 달에서 큰 쪽(문서는 이 변경 PR에서 먼저 고침). 기대값이 달라지는 기존 테스트: `SolverCases`의 T20·성질 3 케이스(`ExactSolverTest` T20 동치 제거 동점, 완전탐색 대 그리디 케이스), `EvaluationComparatorTest` 결제 미루기 케이스, `PlanObjectiveTest` 결제 미루기·ID 케이스, `BruteForceOracle` 비교 로직. **같은 변경으로 `PlanObjective.recommended/saver/simple`의 첫 인자가 `products`에서 `PlanInput`으로 바뀌었다**(`EvaluationComparator`도 `new EvaluationComparator(planInput)`. 이 시그니처를 쓰는 테스트·호출부를 함께 고친다, `TASK039_GUIDE`(정리로 삭제, Git 이력) 2절)
   - [x] 정답 세트에 **케이스 14**를 넣는다: 꼭 시청 완료 3·점수 5·총비용 20,000원인 조합과 꼭 시청 완료 2·점수 6·총비용 15,000원인 조합에서 **앞쪽(꼭 시청 완료가 많은 쪽)이 이긴다**. 점수와 비용이 더 좋아도 ①이 먼저임을 세 유형 모두에서 고정한다(`TASK039_GUIDE`(정리로 삭제, Git 이력) 5절)
 - 완료 기준
   - V-B: 정답 세트 전체 통과. 비교 결과표(점수 차, 비용 차, 시간)와 R11-30 잠정 상한 근거를 `기록:`에 남겼다. `calc_run` 기록은 Task 065.
-- 기록: 2026-10-10 완료(백엔드 브랜치 `feature/b2-engine-benchmark`, 문서 브랜치 `feature/docs-engine-algorithm`). 상세는 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md)(12절 측정 결과, 13절 한계). 아래 시간·힙 값은 모두 개발 PC(12코어, OpenJDK 17) 기준이며 Cloudtype과 다르다.
+- 기록: 2026-10-10 완료(백엔드 브랜치 `feature/b2-engine-benchmark`, 문서 브랜치 `feature/docs-engine-algorithm`). 상세는 [`docs/guides/ENGINE_ALGORITHM.md`](./guides/ENGINE_ALGORITHM.md)(12절 측정 결과, 13절 한계). 아래 시간·힙 값은 모두 개발 PC(12코어, OpenJDK 17) 기준이며 Cloudtype과 다르다.
   - 정답 세트: 21케이스(`backend/src/main/resources/engine-benchmark/`). 기대값 근거는 `ORACLE` 18건(01~10, 14~21)과 `REGRESSION` 3건(11~13). 시즌 순서 7건(15~21), 케이스 14(꼭 시청 완료 수가 점수보다 먼저). 전체 테스트 370건 통과. 검증: `Evaluator` 대 독립 구현 `OracleAssigner` 차분(입력 400개, 평가 45,282회, 추가 확인 약 138만 회) 불일치 0, 완전탐색(동치 제거 포함) 대 전수 탐색(입력 500개, 조합 58,955개) 반례 0. `input_hash` 정규화는 v2(시즌 번호 포함).
   - 비교 결과표(추천형, 완전탐색 대 그리디): 달라진 케이스는 06(그리디 꼭 0·점수 4·15,000원 대 완전탐색 꼭 1·점수 2·27,000원), 07(점수 2 대 4, 8,000원 대 28,000원), 09(비용 +7,900원), 11(+10,400원), 12(+5,500원), 14(+5,000원), 21(그리디 꼭 0·4,000원 대 완전탐색 꼭 1·22,000원)이고 나머지 14케이스는 점수·비용·꼭이 같다. 같은 점수에서 비용이 늘어난 경우(09·11·12·14)와 꼭 작품을 놓친 경우(06·21)가 있다. 절약형·간편형은 06·07·21에서만 그리디가 다르다. 시간은 케이스 11(상품 7개)만 의미 있다: 완전탐색 추천형 412ms → 154ms, 3종 1.16초 → 0.52초(최적화 후), 그리디 0.6ms.
   - 최악 입력(상품 7개 전부 후보, 단위 30개, 예산 넉넉): 최적화 전 단독 실행 추천 1.28~1.36초·절약 2.1~2.3초·간편 2.5~2.8초·3종 6.0~6.5초, 전체 benchmark 실행은 3종 8.7~9.1초(단독이 약 30% 빠름, JIT 영향 가설은 미검증). 최적화 ② 후 3종 −36%(전체 실행 기준 3종 4.8초, 단독 4.1~4.2초). 큰 찜 3종: 단위 60 12.2~13.6초 → 8.3초, 단위 100 15.8~17.8초 → 13.1초. 후보 상품 수별 3종(그리디 경로 P ≥ 10): P=14 약 0.6~0.7초 → 0.35초, P=17 5.4~5.8초 → 3.2초, P=20 54~61초 → 33초. 완전탐색 시간 추정은 P=10 약 4~5분, P=14 약 17시간, P=17 약 500일이라 그리디 전환이 필요하다.
@@ -880,7 +880,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 정답 테스트: 038 T1~T20이 시즌 번호 없는 단위로 그대로 통과하는지 확인하고, 시즌 순서 케이스(같은 달, 앞 시즌 미완료, 앞 시즌이 찜 목록에 없음, 시즌 1·3만 찜, 서로 다른 시리즈)를 추가한다
   - [x] 039 S7 동치 제거 재검증: "그 달에 볼 수 있게 되는 시청 단위 집합이 같으면 배정·시청 완료 달이 같다"는 전제가 시즌 순서에서도 성립하는지 무차별 대입 오라클(`BruteForceOracleTest`)로 확인하고, 깨지면 동치 제거를 좁힌다
   - 완료 기준: V-B: 위 정답 테스트와 `clean build` 통과. 문서(PRD 5.4, TECH 1절)와 코드가 일치한다.
-  - 기록: 2026-10-10 구현·테스트·정답 세트 완료(Task 040과 같은 브랜치 `feature/b2-engine-benchmark`). 모델(`WatchUnit.titleId`·`seasonNumber`, `PlanInput`의 끌어올림과 `isStaticallyImpossible`), 평가기(`Evaluator`의 `prereqIndexes`·`blockedAlways`, `assign`의 시즌 순서 판정), 독립 `OracleAssigner`, S7 동치 제거 재검증(`ExactSolverOracleExactnessTest`, 전수 탐색 대조 반례 0), 시즌 정답 케이스 7건(15~21)을 마쳤다. 정확성 근거와 동작은 [`docs/ENGINE_ALGORITHM.md`](./ENGINE_ALGORITHM.md) 3.6절·5.3절·11절. 정적 불가능 ① SUBSCRIBED 해석은 확정했다(예산보다 비싼 구독 중 상품을 0번째 달에만 볼 수 있어도 "가능"으로 본다. 2026-10-10 사용자 결정 A안, 코드 유지, ENGINE_ALGORITHM 13.6절과 PRD 5.4에 명시했다. 남은 것 없음). 코드 주석 정리와 PRD·TECH 현행화는 2026-10-10에 완료했다.
+  - 기록: 2026-10-10 구현·테스트·정답 세트 완료(Task 040과 같은 브랜치 `feature/b2-engine-benchmark`). 모델(`WatchUnit.titleId`·`seasonNumber`, `PlanInput`의 끌어올림과 `isStaticallyImpossible`), 평가기(`Evaluator`의 `prereqIndexes`·`blockedAlways`, `assign`의 시즌 순서 판정), 독립 `OracleAssigner`, S7 동치 제거 재검증(`ExactSolverOracleExactnessTest`, 전수 탐색 대조 반례 0), 시즌 정답 케이스 7건(15~21)을 마쳤다. 정확성 근거와 동작은 [`docs/guides/ENGINE_ALGORITHM.md`](./guides/ENGINE_ALGORITHM.md) 3.6절·5.3절·11절. 정적 불가능 ① SUBSCRIBED 해석은 확정했다(예산보다 비싼 구독 중 상품을 0번째 달에만 볼 수 있어도 "가능"으로 본다. 2026-10-10 사용자 결정 A안, 코드 유지, ENGINE_ALGORITHM 13.6절과 PRD 5.4에 명시했다. 남은 것 없음). 코드 주석 정리와 PRD·TECH 현행화는 2026-10-10에 완료했다.
 
 #### Task 041: TMDB Feign 클라이언트 구현으로 외부 데이터 호출 기반 마련 ✅
 - 태그: [B] · PRD: B3, 5.5 · 선행: 024 · 브랜치: `feature/b3-tmdb-client`
@@ -890,7 +890,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] WireMock 테스트, 샘플 JSON `src/test/resources/tmdb/`
 - 완료 기준
   - V-B: 정상, 429 후 재시도, 타임아웃 테스트가 통과한다(실제 TMDB 호출 없음).
-- 기록: 2026-10-12 완료(브랜치 `feature/b3-tmdb-client`, PR #41 develop 병합 9ae78c7). 상세는 구현 안내서(정리로 삭제, `git log -- docs/TASK041_GUIDE.md`)와 [`docs/OPENFEIGN_GUIDE.md`](./OPENFEIGN_GUIDE.md)(OpenFeign 개념과 TMDB 코드 설명).
+- 기록: 2026-10-12 완료(브랜치 `feature/b3-tmdb-client`, PR #41 develop 병합 9ae78c7). 상세는 구현 안내서(정리로 삭제, `git log -- docs/TASK041_GUIDE.md`)와 [`docs/guides/OPENFEIGN_GUIDE.md`](./guides/OPENFEIGN_GUIDE.md)(OpenFeign 개념과 TMDB 코드 설명).
   - 구현: `TmdbApi`(Feign 인터페이스, 호출 10개), 응답 DTO 16개, `TmdbClient`(고정 쿼리 값 채움·오류 번역·`tmdb.call{endpoint,result}` 카운터), `TmdbFeignConfig`(Bearer 인증·속도 제한 인터셉터, `ErrorDecoder`, `Retryer`, `@Configuration` 미부착), `TmdbConfig`(버킷). 버킷은 capacity 10·초당 25·최대 대기 2초(결정 D1), 재시도는 429·5xx 총 3회·타임아웃 총 2회·대기 0.5초부터 두 배씩(상한 4초, ±20%)·`Retry-After` 우선(5초 초과 시 포기, D2). 404는 `TmdbNotFoundException`(D3), 모든 `TmdbException`은 `EXTERNAL_API_ERROR`(502)로 응답하며 TMDB 429를 재시도 후에도 못 풀면 502다(`RATE_LIMIT_EXCEEDED`와 별개). 토큰은 `TMDB_API_KEY`(읽기 액세스 토큰), 기본값을 비워 토큰 없이도 기동한다.
   - 검증: `clean build` 통과(전체 430건 시점), TMDB 관련 테스트 12개 클래스 59건 통과(WireMock 중심, Testcontainers 통합 `TmdbClientIntegrationTest` 1건). 모든 테스트가 `TMDB_API_KEY` 없이 실행돼 실제 TMDB 호출이 없음을 확인했다. CodeRabbit 지적 0건(Docstring coverage 56% 경고는 프로젝트 주석 규칙과 기준이 달라 무시). WireMock 기동은 `wiremock-standalone` 3.13.2가 Boot 4.1.1에서 Jetty 충돌 없이 동작함을 확인해 TECH 6절에 반영했다(PR #39).
   - 구현 중 확인된 것: Bucket4j `asBlocking().tryConsume(1, Duration.ZERO)`는 `IllegalArgumentException`이라 대기 시간 0이면 `tryConsume(1)`로 분기한다(T16-a가 발견). Feign 기본 디코더가 Jackson 3으로 매핑됨, `@Bean Retryer`가 `NEVER_RETRY`를 대체함, `Retryer.clone` 동작, 토큰이 DEBUG 로그에 안 찍힘. `@ConfigurationProperties`의 prefix에 `.*`를 붙이지 않는다(잘못 입력해도 테스트가 통과한 이유는 확인하지 못함).
@@ -906,7 +906,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 시즌 0 제외, 한국어 줄거리 없으면 영어 대체·`overview_lang`, 출연진 상위 10명
 - 완료 기준
   - V-B: discover 오판정(웨이브 구매만), 시즌별 제공처 상이(8.2 랑야방 구조), 추정 표시 케이스가 통과한다.
-- 기록: 2026-10-13 완료(브랜치 `feature/b3-availability-rules`, PR #58). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). `catalog/domain/rule`(새 패키지)에 Spring·DB·TMDB에 의존하지 않는 순수 Java 클래스 14개: `AvailabilityJudge`(판정), `KrProviders`·`ProviderMapping`·`ServiceInfo`(입력 record)·`AvailabilityVerdict`(출력), `AvailabilityChangeDetector`·`StatusChange`(변경 비교), `RuntimeCalculator`·`RuntimeDefaults`·`EpisodeRuntime`·`RuntimeResult`(러닝타임), `TitleDetailRules`·`OverviewPick`·`CastCandidate`(시즌 0 제외·영어 줄거리 대체·출연진 10명·날짜 변환). 새 테스트 37건(판정 11, 변경 비교 5, 러닝타임 12, 소규모 규칙 9), 전체 512건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 규칙 설명은 `docs/AVAILABILITY_RULES.md`.
+- 기록: 2026-10-13 완료(브랜치 `feature/b3-availability-rules`, PR #58). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). `catalog/domain/rule`(새 패키지)에 Spring·DB·TMDB에 의존하지 않는 순수 Java 클래스 14개: `AvailabilityJudge`(판정), `KrProviders`·`ProviderMapping`·`ServiceInfo`(입력 record)·`AvailabilityVerdict`(출력), `AvailabilityChangeDetector`·`StatusChange`(변경 비교), `RuntimeCalculator`·`RuntimeDefaults`·`EpisodeRuntime`·`RuntimeResult`(러닝타임), `TitleDetailRules`·`OverviewPick`·`CastCandidate`(시즌 0 제외·영어 줄거리 대체·출연진 10명·날짜 변환). 새 테스트 37건(판정 11, 변경 비교 5, 러닝타임 12, 소규모 규칙 9), 전체 512건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 규칙 설명은 `docs/guides/AVAILABILITY_RULES.md`.
   - 결정: ① 쿠팡플레이 영화는 KR 데이터와 flatrate 유무에 상관없이 항상 UNKNOWN(`STRUCTURAL_GAP`)이 먼저다(PRD R11-13 "영화는 구조적 공백"의 해석) ② `data_quality`는 판정에 쓰지 않는다(화면 표시용, 쿠팡플레이 드라마는 일반 규칙) ③ 러닝타임 기본값은 `RuntimeDefaults`로 주입하고 설정 키는 `app.collect.runtime-defaults.{movie-minutes 120, episode-minutes 45, animation-episode-minutes 24}`(`application.yml`에 추가, 바인딩 클래스는 043·044) ④ 변경 비교는 status 변화만 이력 대상이다 ⑤ `parseDate`는 형식 오류를 null(미방영)로 처리해 수집이 멈추지 않게 한다. `backend.md` 패키지 구조에 `rule/`을 추가했다.
   - 넘길 내용: Task 044(TMDB 응답 객체 → `KrProviders`·`EpisodeRuntime`·`CastCandidate` 변환, 방영 0회 시즌 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 영어 줄거리를 얻는 추가 호출). 확인하지 못한 것: 장르 id 16(Animation)을 TMDB 공식 문서로 확인(ERD 장르 표가 근거), 실제 TMDB 응답 end-to-end, 시즌 `air_date`가 `""`·null 외 형태로 오는지.
 #### Task 043: 수집 Job 후보 discover Step 구현으로 수집 대상 확보 ✅
@@ -918,22 +918,24 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 작은 chunk, 짧은 Feign 타임아웃, 연결 풀 사용량 지표(T-2)
 - 완료 기준
   - V-B: Testcontainers + WireMock으로 작은 discover 응답을 수집했을 때 후보 `title`·`tmdb_provider` 행이 기대값과 같다.
-- 기록: 2026-10-13 완료(브랜치 `feature/b3-collect-candidates`, PR #59). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). 수집 Job `collectJob`(Step 3개: 제공처 전체 목록을 `tmdb_provider`에 UNMAPPED로 저장 → 영화 후보 → 드라마 후보), chunk 20, Reader는 진행 위치를 저장하지 않고 실패하면 그 Step을 처음부터 다시 읽는다(이미 있는 작품은 건너뛰거나 요약만 갱신해 결과가 같다). 신규 테스트 11건(`CollectJobTest`, Testcontainers + WireMock), 전체 523건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). Job 설명은 `docs/COLLECT_JOB_FLOW.md`, 코드 읽기는 `docs/COLLECT_CODE_WALKTHROUGH.md`.
+- 기록: 2026-10-13 완료(브랜치 `feature/b3-collect-candidates`, PR #59). 사용자가 직접 구현했다(`backend-dev`가 임시 워크트리에서 설계를 검증한 안내서 기준). 수집 Job `collectJob`(Step 3개: 제공처 전체 목록을 `tmdb_provider`에 UNMAPPED로 저장 → 영화 후보 → 드라마 후보), chunk 20, Reader는 진행 위치를 저장하지 않고 실패하면 그 Step을 처음부터 다시 읽는다(이미 있는 작품은 건너뛰거나 요약만 갱신해 결과가 같다). 신규 테스트 11건(`CollectJobTest`, Testcontainers + WireMock), 전체 523건 실패 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). Job 설명과 코드 읽기는 `docs/guides/COLLECT_GUIDE.md`.
   - 결정: ① `title.refresh_tier`용 `RefreshTier`(DAILY/WEEKLY)와 Job 파라미터용 `CollectTier`(DAILY/WEEKLY/ALL)는 공유하지 않고, MVP는 `tier=ALL`만 허용한다(DAILY·WEEKLY는 계층별 갱신 Task 077에서 연다) ② discover 요약 필드(원제·개봉일·포스터·배경·원어·인기도·평점)를 `title`에 저장하고, 이미 있는 작품은 포스터·배경·인기도·평점만 갱신한다(`Title.createFromSummary`·`refreshSummary`, 제목·개봉일은 상세 값이 정답이라 갱신하지 않는다) ③ 같은 작품이 여러 서비스에 나오면 `findByMediaTypeAndTmdbId`로 확인해 한 줄만 둔다 ④ chunk 안 TMDB 호출은 TECH T-2 예외, Batch 6 기본 트랜잭션 매니저가 트랜잭션 없는 것이라 `chunk(20).transactionManager(tm)`을 지정한다.
   - 구조 정리(같은 브랜치 `feature/b3-layer-rename`): `api` → `controller` + `dto`, `application` → `service`, 입력·출력 record는 `service/model`, `collect`는 `job/`·`step/`로 나눴고 `CollectJobConfig`를 Job 조립·Step 조립(`CollectStepConfig`)·TMDB 응답 변환(`CandidateMapper`)으로 쪼갰다. `OttServiceQueryService`가 응답 DTO를 import하던 역방향 의존은 서비스가 엔티티를 반환하고 컨트롤러가 변환하도록 고쳤다. 이동 전후 전체 테스트 523건이 같다. `.claude/rules/backend.md`와 `CLAUDE.md`의 패키지 구조를 갱신했다.
   - 넘길 내용: Task 044(`title`에는 요약 필드까지 있고 줄거리·`overview_lang`·`tv_status`만 비어 있다. 044가 `updateDetail`로 채우고 `fetched_at`을 갱신한다. title을 읽는 Reader는 `id` 순으로 읽고 `fetched_at`으로 거르지 않는다(TECH 3절 페이지 밀림). 이 시점 `collect/step`이 15개 안팎이 되면 `step/candidate`·`step/detail`로 더 나누는 것을 검토), Task 045(`CollectJobParameters.of(targetDate, tier)` 재사용, 비동기는 `TaskExecutor`를 가진 `JobOperator`, 완료=`JobInstanceAlreadyCompleteException`·실행 중=`JobExecutionAlreadyRunningException`을 409로 매핑, 계약 `tier` enum에 `ALL` 포함, 다른 날짜 Job의 Reader 상태 공유는 045 이월 항목). 새 제공처(UNMAPPED)는 관리자 화면에서 정리한다. 확인하지 못한 것: 실제 TMDB 응답으로 수집, `|`(OR) 구분자의 TMDB 공식 문서 확인, 운영 환경 연결 점유, discover 500쪽 상한에 걸리는 서비스 여부, 인기도·평점 UPDATE 부하(첫 실제 수집 Task 048에서 측정).
-#### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
+#### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ✅
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
-  - [ ] Task 042에서 이월: TMDB 응답 객체(DTO)를 `catalog/domain/rule`의 입력 record(`KrProviders`, `EpisodeRuntime`, `CastCandidate`)로 바꾸는 변환(`flatrate`만 넣고, KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없으면 `KrProviders.of(빈 집합)`), 방영된 회차가 0개인 시즌(합계 0분)의 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 한국어 줄거리가 없을 때 영어 줄거리를 얻는 추가 호출, `MAPPED`인 제공처만 판정 매핑에 넣기
-  - [ ] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
-  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
-  - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
-  - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
-  - [ ] TV 시즌 호출량 지표(R11-26 측정용)
+  - [x] Task 042에서 이월: TMDB 응답 객체(DTO)를 `catalog/domain/rule`의 입력 record(`KrProviders`, `EpisodeRuntime`, `CastCandidate`)로 바꾸는 변환(`flatrate`만 넣고, KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없으면 `KrProviders.of(빈 집합)`), 방영된 회차가 0개인 시즌(합계 0분)의 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 한국어 줄거리가 없을 때 영어 줄거리를 얻는 추가 호출, `MAPPED`인 제공처만 판정 매핑에 넣기
+  - [x] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
+  - [x] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
+  - [x] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
+  - [x] `JpaPagingItemReader`는 `id` 순으로 정렬하고 Step이 갱신하는 컬럼(`fetched_at` 등)으로 거르지 않는다(페이지 밀림 방지, TECH 3절). 읽은 위치를 저장해 restart가 이어 읽는다
+  - [x] TV 시즌 호출량 지표(R11-26 측정용)
 - 완료 기준
   - V-B: 작은 후보 세트 전체 Job 실행 후 `title`·`watch_unit`·`availability`·`availability_change`가 기대값과 같다.
-
+- 기록: 2026-10-14 완료(브랜치 `feature/b3-collect-details`). `backend-dev`가 임시 워크트리에서 컴파일·테스트로 검증한 안내서의 코드를 사용자가 직접 반영했다. Step 3개(`movieDetailStep`, `tvDetailStep`, `availabilityStep`, chunk 10)를 수집 Job 뒤에 붙였다. 신규 테스트 23건(`CollectDetailJobTest` 14, `DetailMapperTest` 7, `AvailabilityTest` 2), 전체 546건 실패 0 오류 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 설명은 `docs/guides/COLLECT_GUIDE.md`, 폴더 지도는 `docs/guides/PACKAGE_MAP.md`.
+  - 결정: 1) 방영 회차가 0개인 시즌은 저장하지 않는다. 2) `watch_unit.episode_count`는 시즌 상세의 회차 목록 개수다. 3) 줄거리는 한국어가 비었을 때만 영어로 한 번 더 호출하고, 둘 다 비면 기존 줄거리·언어 표시를 유지한다. 4) `@Version`은 도입하지 않고 이력은 status가 바뀔 때만 쌓는다. 5) 상세 Reader는 읽은 위치를 저장해 restart가 이어 읽는다(25편 중 15번째 실패 후 재시작 테스트로 확인). 6) `collect/step`을 `candidate`·`detail`로 나눴다. 7) `genre` 시드가 없어(V2에 INSERT 없음) 상세 응답의 `{id, 이름}`으로 자동 등록한다. 8) 시즌 하나가 404면 작품 전체를 건너뛰고, 제공처 404는 그 단위만 건너뛰며 기존 상태를 유지하고, 5xx·429(재시도 후)는 Step 실패 후 restart다.
+  - 넘길 내용: Task 045(방영 기준일은 Job 파라미터 `targetDate`이므로 실행 API가 KST 날짜를 넘길 것, 날짜가 다른 Job의 동시 실행은 상세 Reader에도 해당하는 043 이월 항목과 같다, 5xx로 실패하면 수동 restart가 필요), Task 048(작품당 시즌 수 분포 `collect.tv.seasons`와 `tmdb.call`의 endpoint 태그로 호출량 측정, 실제 TMDB 응답 확인, chunk 안 TMDB 호출 동안 연결 2개 점유 확인). 확인하지 못한 것: 실제 TMDB 응답으로 수집, 운영 환경(메모리 1GB, 연결 풀 5)의 연결 점유. 044 main 코드의 삼항·람다·`stream()`은 문법 규칙(backend.md)에 따라 `if`·`for`로 풀어썼다(풀어쓴 뒤 전체 546건 재통과). 테스트 코드와 043 이전 코드는 그대로이며 그 파일을 고칠 때 푼다.
 #### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 ⬜
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항

@@ -23,6 +23,7 @@ public class TmdbRetryer implements Retryer {
 
     @Override
     public void continueOrPropagate(RetryableException e) {
+        // 1. 실패 횟수를 세고 한도에 닿으면 재시도를 포기한다
         attempt++;   // 방금 실패한 시도 번호(1부터)
         int limit = isIoError(e) ? config.ioMaxAttempts() : config.maxAttempts();
         if (attempt >= limit) {
@@ -30,6 +31,7 @@ public class TmdbRetryer implements Retryer {
             throw e;
         }
 
+        // 2. 대기 시간을 정한다(Retry-After가 있으면 그 값, 너무 길면 포기, 없으면 지수 백오프)
         long waitMillis;
         Long retryAfter = e.retryAfter();   // 서버가 알려 준 "다시 해도 되는 시각"(epoch ms). 없으면 null
         if (retryAfter != null) {
@@ -42,6 +44,7 @@ public class TmdbRetryer implements Retryer {
             waitMillis = backoffWithJitterMillis();
         }
 
+        // 3. 대기한 뒤 호출자가 다시 시도하게 한다(인터럽트되면 포기한다)
         log.warn("TMDB 호출을 재시도한다: 상태={}, 시도={}/{}, 대기={}ms", e.status(), attempt, limit, waitMillis);
         try {
             Thread.sleep(waitMillis);

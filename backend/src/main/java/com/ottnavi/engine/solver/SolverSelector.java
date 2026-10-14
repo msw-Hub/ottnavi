@@ -31,11 +31,14 @@ public final class SolverSelector implements PlanSolver {
 
 	@Override
 	public SolveResult solve(PlanInput input, PlanObjective objective) {
+		// 1. 인자를 확인한다
 		if (input == null || objective == null) {
 			throw new IllegalArgumentException("입력과 목적함수는 null일 수 없다");
 		}
+		// 2. 푸는 목적함수 기준으로 후보 조합 수를 센다
 		// S5: 상한보다 크면 그리디, 같거나 작으면 완전탐색. 결과의 solverType은 실제로 푼 쪽이 정한다
 		long candidateCombinations = exactSolver.countCandidateCombinations(input, objective);
+		// 3. 상한을 넘으면 그리디로, 아니면 완전탐색으로 푼다
 		if (candidateCombinations > maxCandidateCombinations) {
 			return greedySolver.solve(input, objective);
 		}

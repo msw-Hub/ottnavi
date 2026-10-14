@@ -34,10 +34,13 @@ public final class ExactSolver implements PlanSolver {
 	@Override
 	public SolveResult solve(PlanInput input, PlanObjective objective) {
 		requireArguments(input, objective);
+		// 1. 평가기와 비교기를 준비한다
 		Evaluator evaluator = new Evaluator(input); // 풀이마다 한 번 만들고 evaluate만 반복한다(038 호출 규칙)
 		Comparator<Evaluation> comparator = objective.comparator();
+		// 2. 달별 후보 부분집합을 만든다(추천형은 동치 제거까지)
 		List<List<Set<Long>>> candidates = candidates(input, evaluator, objective);
 
+		// 3. 3개월 조합을 전부 평가하며 챔피언 한 명만 들고 간다
 		// S3: 후보로 만든 모든 3개월 조합을 평가해 비교기로 가장 좋은 것 하나만 남긴다
 		Evaluation best = null;
 		for (Set<Long> month0 : candidates.get(0)) {
@@ -50,6 +53,7 @@ public final class ExactSolver implements PlanSolver {
 				}
 			}
 		}
+		// 4. 남은 챔피언을 플랜 유형·완전탐색 표시와 함께 돌려준다
 		// 달마다 빈 집합이 늘 후보라(S2) 조합이 하나도 없는 경우는 없다
 		return new SolveResult(best, objective.planType(), SolverType.EXACT);
 	}

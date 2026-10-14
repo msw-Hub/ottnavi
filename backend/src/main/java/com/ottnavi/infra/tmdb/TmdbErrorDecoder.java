@@ -16,10 +16,12 @@ public class TmdbErrorDecoder implements ErrorDecoder {
 
     @Override
     public Exception decode(String methodKey, Response response) {
+        // 1. 기본 디코더로 먼저 변환해 Retry-After 해석을 재사용한다
         Exception base = fallback.decode(methodKey, response);   // FeignException, 또는 Retry-After가 있으면 그것을 감싼 RetryableException
         int status = response.status();
         boolean transientStatus = status == 429 || status >= 500;
 
+        // 2. 재시도하지 않을 4xx는 원래 FeignException으로 돌려준다
         if (!transientStatus) {
             // 4xx는 Retry-After가 붙어 있어도 재시도하지 않는다. Default가 감싼 RetryableException을 원래 FeignException으로 풀어 준다
             // (감쌀 때 원인(cause)으로 원래 예외를 넣는다. 응답 본문을 다시 읽을 수 없으므로 errorStatus를 또 부르지 않는다)
@@ -29,9 +31,11 @@ public class TmdbErrorDecoder implements ErrorDecoder {
             return base;
         }
 
+        // 3. Retry-After가 있는 429·5xx는 그대로 재시도 대상이다
         if (base instanceof RetryableException) {
             return base;   // Retry-After가 있는 429·5xx: 값이 이미 담겨 있다
         }
+        // 4. Retry-After가 없는 429·5xx는 RetryableException으로 감싸 재시도 대상으로 만든다
         Long retryAfter = null;   // Retry-After가 없다. 대기 시간은 Retryer의 지수 백오프가 정한다 (Long 변수로 둬서 Date 생성자와의 모호함을 피한다)
         return new RetryableException(
                 status,

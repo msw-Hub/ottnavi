@@ -43,15 +43,18 @@ public final class InputHasher {
 		if (input == null || dataAsOf == null) {
 			throw new IllegalArgumentException("입력과 데이터 기준일은 null일 수 없다");
 		}
+		// 1. 시청 단위를 id 순으로 정렬해 문자열로 잇는다
 		// PlanInput.units()는 배정 순서로 정렬돼 있어 해시용으로 id 순으로 다시 정렬한다
 		String units = input.units().stream()
 				.sorted(Comparator.comparingLong(WatchUnit::id))
 				.map(InputHasher::canonicalize)
 				.collect(Collectors.joining(";"));
+		// 2. 상품을 id 순으로 정렬해 문자열로 잇는다
 		String products = input.products().stream()
 				.sorted(Comparator.comparingLong(OttProduct::id))
 				.map(product -> product.id() + ":" + product.monthlyPrice() + ":" + product.condition().name())
 				.collect(Collectors.joining(";"));
+		// 3. 버전·예산·시청 시간·기준일·상품·단위를 구분자로 이어 붙인다
 		return FORMAT_VERSION
 				+ "|budget=" + input.monthlyBudget()
 				+ "|minutes=" + input.monthlyWatchMinutes()

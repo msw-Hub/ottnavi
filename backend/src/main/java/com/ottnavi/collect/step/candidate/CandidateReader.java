@@ -1,6 +1,7 @@
-package com.ottnavi.collect.step;
+package com.ottnavi.collect.step.candidate;
 
 import com.ottnavi.catalog.service.model.CandidateTitle;
+import com.ottnavi.collect.step.CollectPoolMonitor;
 import com.ottnavi.provider.service.ProviderCollectService;
 import com.ottnavi.provider.service.model.DiscoverTarget;
 import java.util.ArrayDeque;
@@ -86,14 +87,19 @@ public class CandidateReader implements ItemStreamReader<CandidateTitle> {
 
     /** 다음 쪽을 가져와 buffer에 채운다. 읽을 쪽이 더 없으면 false */
     private boolean fetchNextPage() {
+        // 1. 읽을 서비스가 남았는지 확인한다
         if (targetIndex >= targets.size()) {
             return false;
         }
+        // 2. 현재 서비스의 다음 쪽을 TMDB에서 가져온다
         DiscoverTarget target = targets.get(targetIndex);
         CandidatePage page = pageSource.fetch(target.withWatchProviders(), nextPage); // chunk 트랜잭션 안의 TMDB 호출(T-2 예외)
+        // 3. 호출 통계(쪽 수, 연결 풀 사용량)를 기록한다
         pageCount++;
         maxActive = Math.max(maxActive, poolMonitor.activeConnections());
+        // 4. 가져온 작품을 buffer에 채운다
         buffer.addAll(page.items());
+        // 5. 마지막 쪽이면 다음 서비스로, 아니면 다음 쪽으로 옮긴다
         if (nextPage >= Math.min(page.totalPages(), MAX_PAGE)) {
             log.info("{} {} discover 끝: {}쪽", label, target.serviceCode(), nextPage);
             targetIndex++;

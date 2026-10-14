@@ -44,6 +44,14 @@ public class TitleCast extends BaseTimeEntity {
     @Column(length = 200)
     private String profilePath;
 
+    /** 같은 출연 순서 자리의 인물 정보를 바꾼다. 수집이 재실행될 때 지우고 다시 넣지 않고 제자리에서 갱신하려고 쓴다 */
+    public void updatePerson(Integer personTmdbId, String name, String characterName, String profilePath) {
+        this.personTmdbId = personTmdbId;
+        this.name = name;
+        this.characterName = characterName;
+        this.profilePath = profilePath;
+    }
+
     /** 출연진 한 명을 만든다 */
     public static TitleCast create(Title title, int castOrder, Integer personTmdbId, String name,
                                    String characterName, String profilePath) {

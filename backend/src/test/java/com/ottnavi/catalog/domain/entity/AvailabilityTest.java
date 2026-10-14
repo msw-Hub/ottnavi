@@ -28,6 +28,24 @@ class AvailabilityTest {
     }
 
     @Test
+    void 있음인데_두_tier_플래그가_모두_false이면_거부한다() {
+        assertThatThrownBy(() -> Availability.create(
+                null, null, AvailabilityStatus.AVAILABLE, null, false, false, NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 있음으로_바꿀_때_플래그가_모두_false이면_거부하고_기존_상태를_유지한다() {
+        Availability availability = Availability.create(
+                null, null, AvailabilityStatus.NOT_AVAILABLE, null, false, false, NOW);
+
+        assertThatThrownBy(() -> availability.changeState(AvailabilityStatus.AVAILABLE, null, false, false, NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(availability.getStatus()).isEqualTo(AvailabilityStatus.NOT_AVAILABLE);
+    }
+
+    @Test
     void 상태를_바꾸면_이유와_플래그가_함께_바뀐다() {
         Availability availability = Availability.create(
                 null, null, AvailabilityStatus.UNKNOWN, UnknownReason.NO_KR_DATA, false, false, NOW);
