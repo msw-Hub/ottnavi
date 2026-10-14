@@ -1,6 +1,7 @@
-package com.ottnavi.collect.step;
+package com.ottnavi.collect.step.candidate;
 
 import com.ottnavi.catalog.service.model.CandidateTitle;
+import com.ottnavi.collect.step.CollectPoolMonitor;
 import com.ottnavi.infra.tmdb.TmdbClient;
 import com.ottnavi.provider.service.ProviderCollectService;
 import org.springframework.batch.core.repository.JobRepository;
@@ -12,7 +13,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /** 수집 Step 조립: 제공처 목록(Tasklet) + 영화·드라마 후보(chunk). Job 순서는 CollectJobConfig가 정한다 */
 @Configuration
-public class CollectStepConfig {
+public class CandidateStepConfig {
 
     private static final int CHUNK_SIZE = 20; // discover 한 쪽이 20건이라 한 쪽을 한 번에 커밋한다
 

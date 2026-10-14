@@ -1,9 +1,9 @@
-package com.ottnavi.collect.step;
+package com.ottnavi.collect.step.candidate;
 
 import com.ottnavi.catalog.domain.enums.MediaType;
 import com.ottnavi.catalog.domain.rule.TitleDetailRules;
 import com.ottnavi.catalog.service.model.CandidateTitle;
-import com.ottnavi.collect.step.CandidateReader.CandidatePage;
+import com.ottnavi.collect.step.candidate.CandidateReader.CandidatePage;
 import com.ottnavi.infra.tmdb.dto.TmdbMovieSummary;
 import com.ottnavi.infra.tmdb.dto.TmdbPage;
 import com.ottnavi.infra.tmdb.dto.TmdbTvSummary;

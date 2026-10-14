@@ -1,4 +1,4 @@
-package com.ottnavi.collect.step;
+package com.ottnavi.collect.step.candidate;
 
 import com.ottnavi.catalog.service.TitleCollectService;
 import com.ottnavi.catalog.service.model.CandidateTitle;

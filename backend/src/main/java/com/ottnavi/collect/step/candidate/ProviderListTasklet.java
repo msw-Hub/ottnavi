@@ -1,4 +1,4 @@
-package com.ottnavi.collect.step;
+package com.ottnavi.collect.step.candidate;
 
 import com.ottnavi.infra.tmdb.TmdbClient;
 import com.ottnavi.infra.tmdb.TmdbMediaType;
