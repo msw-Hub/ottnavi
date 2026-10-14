@@ -217,13 +217,19 @@ export function buildMockAdminProviders(today: string): AdminProvider[] {
 /* ===== 수집 (SCR-16) ===== */
 
 /**
- * 수집 실행 이력을 만든다(최근 시작한 순). 상태 4종이 모두 있다.
- * - 5번 RUNNING: 오늘 날짜, 8분 전에 시작(끝난 시각 없음)
+ * 수집 실행 이력을 만든다(최근 시작한 순). 성공·중단됨·실패가 있고, 실행 중은 화면에서 접수한 실행으로 생긴다.
+ * - 5번 COMPLETED: 오늘 날짜, 40분 전에 시작해 8분 전에 끝남, 변경 0건
  * - 4번 COMPLETED: 어제 기준, 24분 걸림, 변경 6건
- * - 3번 STOPPED: 서버가 갑자기 멈춰 기록만 "실행 중"으로 남은 것을 서버가 중단됨으로 판정한 실행 → [복구] 대상
- * - 2번 FAILED: 외부(TMDB) 응답 지연으로 실패 → [다시 실행] 대상
+ * - 3번 STOPPED: 서버가 갑자기 멈춰 기록만 "실행 중"으로 남은 것을 서버가 중단됨으로 판정한 실행 → [복구] 대상(canRecover)
+ * - 2번 FAILED: 외부(TMDB) 응답 지연으로 실패 → [다시 실행] 대상(canRestart, 같은 날짜·범위의 최신 실패이고 실행 중인 수집이 없다)
  * - 1번 COMPLETED: 4일 전 기준, 1시간 5분 걸림, 변경 3건
- * RUNNING의 시작 시각만 "지금"에서 빼서 만든다(그 외는 날짜 + 새벽 3시). 지금 시각을 쓰므로 호출 시점마다 조금씩 달라진다.
+ * 5번의 시각만 "지금"에서 빼서 만든다(그 외는 날짜 + 새벽 3시). 지금 시각을 쓰므로 호출 시점마다 조금씩 달라진다.
+ *
+ * 기본 이력에 "실행 중"을 두지 않는 이유(Task 045 결정 12): 수집은 전체에서 동시에 하나만 돌아, 계속 실행 중인 행이 있으면
+ * 어떤 날짜의 실행도, [다시 실행]도 모두 막힌다(canRestart가 전부 거짓). 그래서 예전 5번(오늘 실행 중)을 오늘 성공으로 바꿨다.
+ * 실행 중 모습과 BATCH_ALREADY_RUNNING은 [수집 실행]으로 접수한 뒤 다른 날짜를 한 번 더 실행하면 볼 수 있다.
+ * canRecover·canRestart는 서버 규칙(collectRules의 computeCanRecover·computeCanRestart)과 같은 값을 미리 적어 둔 것이고,
+ * 목업 핸들러는 응답할 때마다 지금 상태로 다시 계산한다(복구·재실행 뒤에도 값이 맞도록).
  */
 export function buildMockCollectExecutions(
   today: string,
@@ -234,16 +240,30 @@ export function buildMockCollectExecutions(
   const d3 = addDays(today, -3)
   const d4 = addDays(today, -4)
   return [
+    // 예전 값(Task 029~044): 오늘 실행 중으로 계속 남는 행이었다. 위 주석의 이유로 성공으로 바꿨다
+    // {
+    //   executionId: 5,
+    //   targetDate: today,
+    //   tier: 'ALL',
+    //   status: 'RUNNING',
+    //   startedAt: new Date(now.getTime() - 8 * 60_000).toISOString(),
+    //   endedAt: null,
+    //   processedCount: 1240,
+    //   changedCount: 12,
+    //   failureReason: null,
+    // },
     {
       executionId: 5,
       targetDate: today,
       tier: 'ALL',
-      status: 'RUNNING',
-      startedAt: new Date(now.getTime() - 8 * 60_000).toISOString(),
-      endedAt: null,
-      processedCount: 1240,
-      changedCount: 12,
+      status: 'COMPLETED',
+      startedAt: new Date(now.getTime() - 40 * 60_000).toISOString(),
+      endedAt: new Date(now.getTime() - 8 * 60_000).toISOString(),
+      processedCount: 3205,
+      changedCount: 0,
       failureReason: null,
+      canRecover: false,
+      canRestart: false,
     },
     {
       executionId: 4,
@@ -255,6 +275,8 @@ export function buildMockCollectExecutions(
       processedCount: 3180,
       changedCount: MOCK_CHANGES_EXEC_4.length,
       failureReason: null,
+      canRecover: false,
+      canRestart: false,
     },
     {
       executionId: 3,
@@ -266,6 +288,8 @@ export function buildMockCollectExecutions(
       processedCount: 740,
       changedCount: 5,
       failureReason: null,
+      canRecover: true, // 중단됨이라 복구할 수 있다
+      canRestart: false,
     },
     {
       executionId: 2,
@@ -277,6 +301,8 @@ export function buildMockCollectExecutions(
       processedCount: 310,
       changedCount: 2,
       failureReason: 'TMDB 응답 지연(연속 3회 시간 초과)으로 중단했습니다.',
+      canRecover: false,
+      canRestart: true, // 같은 날짜·범위의 최신 실패이고 실행 중인 수집이 없다
     },
     {
       executionId: 1,
@@ -288,6 +314,8 @@ export function buildMockCollectExecutions(
       processedCount: 3150,
       changedCount: MOCK_CHANGES_EXEC_1.length,
       failureReason: null,
+      canRecover: false,
+      canRestart: false,
     },
   ]
 }
@@ -323,7 +351,7 @@ const MOCK_CHANGES_EXEC_1: CollectExecutionChange[] = [
 ]
 
 /**
- * 실행별 변경된 작품 목록을 만든다. 성공한 두 실행(4번·1번)에만 목록이 있다.
+ * 실행별 변경된 작품 목록을 만든다. 성공한 실행 중 4번·1번에만 목록이 있다(5번은 변경 0건이라 빈 목록).
  * 실행 중·중단됨·실패 실행이나 없는 실행 ID는 빈 목록이다(중간까지의 변경은 이 목업에서 보여 주지 않는다).
  */
 export function buildMockCollectChanges(executionId: number): CollectExecutionChange[] {

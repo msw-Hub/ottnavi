@@ -56,3 +56,4 @@ app:
       movie-minutes: 120              # 영화
       episode-minutes: 45             # 드라마 회차
       animation-episode-minutes: 24   # 애니메이션 회차
+    allow-target-date-override: false   # 수집 기준일(targetDate) 직접 지정 허용. 운영은 항상 오늘(KST)만, local에서만 true

@@ -21,6 +21,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -127,6 +129,98 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void 본문의_날짜_형식이_틀리면_VALIDATION_FAILED와_해당_필드를_준다() throws Exception {
+		// given
+		String content = "{\"targetDate\":\"2026-13-45\",\"tier\":\"ALL\"}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("targetDate"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("형식이 올바르지 않습니다."));
+	}
+
+	@Test
+	void 본문의_enum에_모르는_값이_오면_해당_필드_오류를_준다() throws Exception {
+		// given
+		String content = "{\"targetDate\":\"2026-10-01\",\"tier\":\"UNKNOWN\"}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("tier"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("형식이 올바르지 않습니다."));
+	}
+
+	@Test
+	void 깨진_JSON은_필드_오류_없이_INVALID_REQUEST다() throws Exception {
+		// given
+		String content = "{\"targetDate\":";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "INVALID_REQUEST")
+				.andExpect(jsonPath("$.fieldErrors").doesNotExist());
+	}
+
+	@Test
+	void 중첩_객체와_배열_경로는_점과_대괄호_표기로_필드명이_된다() throws Exception {
+		// given
+		String content = "{\"items\":[{\"targetDate\":\"2026-10-01\"},{\"targetDate\":\"2026-13-45\"}]}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/nested-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("items[1].targetDate"));
+	}
+
+	@Test
+	void 본문_전체가_객체가_아니어서_경로가_비면_INVALID_REQUEST다() throws Exception {
+		// given
+		String content = "[1, 2]";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "INVALID_REQUEST")
+				.andExpect(jsonPath("$.fieldErrors").doesNotExist());
+	}
+
+	@Test
+	void FieldValidationException은_지정한_필드와_메시지로_400을_준다() throws Exception {
+		// when
+		ResultActions result = mockMvc.perform(get(BASE + "/field-validation"));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.detail").value(ErrorCode.VALIDATION_FAILED.getMessage()))
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("targetDate"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("미래 날짜는 쓸 수 없습니다."));
+	}
+
+	@Test
 	void 없는_경로는_RESOURCE_NOT_FOUND다() throws Exception {
 		expectProblem(mockMvc.perform(get("/api/does-not-exist")), 404, "RESOURCE_NOT_FOUND")
 				.andExpect(jsonPath("$.instance").value("/api/does-not-exist"));
@@ -178,6 +272,19 @@ class GlobalExceptionHandlerTest {
 	record TestResponse(String name) {
 	}
 
+	enum SampleEnum {
+		ALL
+	}
+
+	record DateBody(LocalDate targetDate, SampleEnum tier) {
+	}
+
+	record NestedItem(LocalDate targetDate) {
+	}
+
+	record NestedBody(List<NestedItem> items) {
+	}
+
 	static class TestTitleNotFoundException extends BusinessException {
 
 		TestTitleNotFoundException(String message) {
@@ -217,6 +324,21 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/items/{itemId}")
 		CommonResponse<Long> item(@PathVariable Long itemId) {
 			return CommonResponse.success(itemId);
+		}
+
+		@PostMapping("/date-body")
+		CommonResponse<TestResponse> dateBody(@RequestBody DateBody request) {
+			return CommonResponse.success(new TestResponse(String.valueOf(request.targetDate())));
+		}
+
+		@PostMapping("/nested-body")
+		CommonResponse<TestResponse> nestedBody(@RequestBody NestedBody request) {
+			return CommonResponse.success(new TestResponse("ok"));
+		}
+
+		@GetMapping("/field-validation")
+		CommonResponse<TestResponse> fieldValidation() {
+			throw new FieldValidationException("targetDate", "미래 날짜는 쓸 수 없습니다.");
 		}
 
 		@GetMapping("/runtime")

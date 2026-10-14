@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 1개(`listOttServices`)이고, 나머지 30개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -12,7 +12,11 @@
 
 /**
  * 수집 실행 상태. RUNNING 실행 중 / COMPLETED 완료 / FAILED 실패 / STOPPED 중단됨(서버가 멈춰 기록만 실행 중으로 남은 실행을 서버가 판정).
- * Spring Batch `BatchStatus`를 그대로 내보내지 않는다. 이 `STOPPED`는 Batch의 STOPPED(정상 정지)와 뜻이 다르며, 메타데이터는 STARTED인데 지금 JVM에서 돌고 있지 않은 실행이다. Batch 상태와의 대응은 수집 관리자 API 구현 Task(045)에서 정한다.
+ * Spring Batch `BatchStatus`를 그대로 내보내지 않는다. 이 `STOPPED`는 Batch의 STOPPED(정상 정지)와 뜻이 다르며, 메타데이터는 실행 중인데 지금 서버에서 돌고 있지 않은 실행이다. Batch 상태와의 대응은 다음과 같다.
+ * - RUNNING: Batch 상태가 STARTING·STARTED·STOPPING이고 이번 서버 기동 뒤에 만들어진 실행
+ * - STOPPED: 같은 상태(STARTING·STARTED·STOPPING)인데 이번 서버 기동 전에 만들어진 실행. 저장하지 않고 조회할 때마다 서버 기동 시각과 비교해 판정한다
+ * - FAILED: Batch의 FAILED(복구한 실행 포함)와 그 밖의 상태(Batch의 STOPPED·ABANDONED 등)
+ * - COMPLETED: Batch의 COMPLETED
  */
 export type CollectExecutionStatus = typeof CollectExecutionStatus[keyof typeof CollectExecutionStatus];
 

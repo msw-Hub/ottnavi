@@ -23,12 +23,14 @@ const COMMON_ERROR_MESSAGES = {
   EXTERNAL_API_ERROR: '외부 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
 } as const
 
-// TECH 신규 코드(error-codes.md "TECH 신규 코드" 표). 문서상 "(제안)" 상태이며 해당 기능 구현 Task에서 확정된다.
+// TECH 신규 코드(error-codes.md "TECH 신규 코드" 표). 대부분 문서상 "(제안)" 상태이며 해당 기능 구현 Task에서 확정된다.
+// BATCH_* 4개는 Task 045(수집 관리자 API 구현)에서 확정됐다.
 // Task 031에서 관리자 월 구독요금 규칙·수집 복구·찜 상한·요금 대상 코드를 문서에 올리면서 이 표로 옮겼다
 const TECH_ERROR_MESSAGES = {
   PLAN_DRAFT_STALE: '데이터가 갱신되어 플랜을 다시 계산하고 있습니다.',
   PLAN_DRAFT_NOT_FOUND: '계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요.',
-  BATCH_ALREADY_RUNNING: '같은 날짜의 수집이 이미 실행 중입니다.',
+  // Task 045: 수집은 전체에서 동시에 하나만 돌아 다른 날짜가 실행 중이어도 이 코드다. 그래서 "같은 날짜" 문구를 뺐다
+  BATCH_ALREADY_RUNNING: '수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요.',
   BATCH_ALREADY_COMPLETED: '해당 날짜의 수집은 이미 완료되었습니다.',
   BATCH_RECOVERY_REQUIRED:
     '중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요.',

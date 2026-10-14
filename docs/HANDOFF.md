@@ -3,21 +3,21 @@
 > 2026-10-13 작성. 계정이나 대화 세션이 바뀌어도 작업을 이어가기 위한 문서다. 진행 상황의 기준은 `docs/ROADMAP.md`이고, 이 문서는 ROADMAP에 흩어져 있거나 대화에만 있던 내용을 한곳에 모은 것이다. 오래되면 ROADMAP과 `git log`가 기준이다.
 > 작업 규칙(커밋·PR·에이전트·설명 방식)은 `CLAUDE.md`의 "작업 시 지킬 것"과 "협업 방식"에 있다. 새 세션은 먼저 CLAUDE.md, 이 문서, ROADMAP 해당 Task를 읽는다.
 
-## 1. 현재 상태 (2026-10-13 기준)
+## 1. 현재 상태 (2026-10-15 기준)
 
 | 항목 | 내용 |
 |---|---|
-| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 7/30, 합계 43/105 (Task 044 구현 완료, PR #61 병합 전) |
+| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 7/30, 합계 43/105 (Task 044 완료, PR #61 2026-10-14 병합. Task 045는 백엔드 구현 완료이고 프론트 반영·PR이 남아 아직 세지 않았다) |
 | 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계, 044 상세·시즌·판정 Step |
-| 열린 PR | #61 `feature/b3-collect-details`(Task 044 상세·시즌·판정 Step, 기존 코드 단계 주석, 규칙·설명 문서). CI 통과, CodeRabbit 지적 4건(문서)은 반영해 푸시했다. 병합은 사용자가 요청할 때 한다 |
-| 다음 Task | **045** 수집 실행·복구·이력 API → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
+| 열린 PR | 없음(Task 045 PR은 아직 올리지 않았다). 작업 브랜치는 `feature/b3-collect-admin-api`(백엔드 워크트리)이고 변경은 아직 커밋하지 않았다 |
+| 다음 Task | **045 마무리**(같은 PR에서 `frontend-dev`가 프론트 반영: 타입 재생성, `collectRules.ts` 단순화, 목업, SCR-16 버튼, 그 뒤 `contract-checker`로 계약 최종 확인) → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
 | 쉬림프 | 044까지 완료 처리. 앞으로 Task는 착수할 때 등록하고 `execute_task`, 끝나면 `verify_task`(점수 90 안팎) |
-| 워크트리 | `ottnavi`(메인, `develop`), `ottnavi-backend`(백엔드 작업, 현재 `feature/b3-collect-details`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
+| 워크트리 | `ottnavi`(메인, `develop` 유지·최신화, 프론트·문서), `ottnavi-backend`(**백엔드 작업은 항상 여기서 한다**, 2026-10-14 사용자 결정. 현재 `feature/b3-collect-admin-api`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
 
 ## 2. 다음 작업 순서
 
-1. PR #61 병합(Squash, 사용자가 요청할 때) → 메인 워크트리 `develop` 최신화.
-2. **Task 045**(수집 실행·복구·이력 관리자 API): 시작 전에 설계 질문(수집 동시 실행 방지 방식, `targetDate`는 KST 날짜로 넘길 것, 실패 시 restart 경로)을 정한다. 4절의 045 이월 항목이 근거다. 구현 방식은 CLAUDE.md "구현 방식(Task 045부터)"를 따른다(opus 계획 → sonnet 구현, 구현 위치는 착수 때 사용자에게 확인).
+1. (완료) PR #61은 2026-10-14에 Squash 병합했고 메인 워크트리 `develop`을 최신화했다.
+2. **Task 045**(수집 실행·복구·이력 관리자 API): 백엔드 구현은 끝났다(결정과 기록은 ROADMAP Task 045, 설명은 `docs/guides/COLLECT_GUIDE.md` 11절). 남은 것: 같은 PR에 프론트 반영(`frontend-dev`, 계약에 필수 필드 `canRecover`·`canRestart`가 늘어 생성 타입·목업이 맞지 않으면 CI가 깨진다), 계약 최종 확인(`contract-checker`), 사용자의 설명 문서 검토·"깨뜨려 보기", PR.
 3. 045~048(수집 API, 매핑 API, cron, 첫 전체 수집) → 049(공개 API 요청 제한, 언제든 가능) → 050·051(검색·상세 API) → 052(공개 화면 실제 연결).
 4. 인증: 053·054 → 057(프론트 인증 연동, 인증 코드는 사용자 검토). 회원 입력: 055·056 → 058. 요금·관리자: 059·060 → 061. 플랜: 062~066 → 067.
 5. 2단계 화면 목업(068·071·075·081·086·097)은 Task 095(MVP 공개) 이후.
@@ -31,9 +31,11 @@
 
 ## 4. 미결·이월 항목 (한곳에 모음)
 
-**Task 044는 완료했다**(2026-10-14, 결정과 기록은 ROADMAP Task 044). 이월 질문(DTO 변환, 방영 0회 시즌, `episode_count` 출처, 영어 줄거리, `MAPPED`만 판정, `Availability` 플래그 검사, 이력·낙관적 락, `WatchUnit` 갱신, `collect/step` 분리, Reader 정렬)은 모두 결정·구현됐다. 남은 것은 아래 045·048 항목이다: 날짜가 다른 Job의 동시 실행(상세 Reader 포함), 5xx 실패 시 수동 restart, 실제 TMDB 응답으로 수집, chunk 안 TMDB 호출 동안의 연결 점유 확인.
+**Task 044는 완료했다**(2026-10-14, 결정과 기록은 ROADMAP Task 044). 이월 질문(DTO 변환, 방영 0회 시즌, `episode_count` 출처, 영어 줄거리, `MAPPED`만 판정, `Availability` 플래그 검사, 이력·낙관적 락, `WatchUnit` 갱신, `collect/step` 분리, Reader 정렬)은 모두 결정·구현됐다. 남은 것은 아래 048 항목이다: 실제 TMDB 응답으로 수집, chunk 안 TMDB 호출 동안의 연결 점유 확인. 날짜가 다른 Job의 동시 실행(상세 Reader 포함)은 Task 045의 전체 동시 실행 금지로 해결했고, 5xx로 실패하면 관리자 API의 restart(또는 같은 날짜로 다시 시작)로 이어서 한다.
 
-**Task 045로**: 다른 날짜의 수집 Job이 동시에 돌면 `CandidateReader`의 읽는 위치가 서로 덮어써진다(전체 동시 실행 금지 또는 `@StepScope`). 계약 `tier` enum에 `ALL` 포함. 완료=`JobInstanceAlreadyCompleteException`, 실행 중=`JobExecutionAlreadyRunningException`을 409로 매핑. 비동기 실행은 `TaskExecutor`를 가진 `JobOperator`.
+**Task 045로 넘겼던 항목은 해소됐다**(백엔드 구현 완료, 프론트 반영·PR 남음): 다른 날짜의 동시 실행은 전체 동시 실행 금지로, 완료·실행 중 409 매핑과 `tier` enum `ALL`은 구현·계약에 반영, 비동기 실행은 수집 전용 비동기 `JobOperator`로 해결했다.
+
+**배포 전 사용자 확인(Task 045)**: Cloudtype에 `ADMIN_BATCH_TOKEN`이 아직 등록돼 있지 않다. Cloudtype 환경 변수는 **배포할 때만 입력할 수 있어서**, `main` 배포 단계에서 값을 넣어야 한다(값이 없으면 prod가 기동하지 못한다. 이 값은 GitHub Actions 시크릿 `ADMIN_BATCH_TOKEN`과 같아야 한다). 배포 단계에서 사용자에게 알린다. 재배포 때 옛 컨테이너와 새 컨테이너가 겹쳐 도는지도 확인한다(겹치면 "전체 동시 실행 금지"의 서비스 락이 두 서버에 걸치지 않아 수집이 동시에 돌 수 있다. 확인 전까지 알려진 한계).
 
 **Task 048로**: 인기도·평점 UPDATE 부하 측정, TMDB discover 500쪽(1만 건) 상한에 걸리는 서비스 여부, `|`(OR) 구분자의 TMDB 공식 문서 확인, 운영 환경 연결 점유, 약 2분 추정 실측.
 
@@ -61,4 +63,4 @@
 
 ## 6. 문서 목록(설명용, 근거 아님)
 
-설명용 문서는 모두 `docs/guides/` 폴더에 있다: `COLLECT_GUIDE.md`(수집 Job의 Step 6개, 후보와 판정의 차이, 읽는 순서), `SPRING_BATCH_BASICS.md`(Job·Step·chunk·Reader·Processor·Writer), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `PACKAGE_MAP.md`(백엔드 폴더 지도), `ENGINE_ALGORITHM.md`(계산 엔진), `FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트). 새 설명 문서는 짧게 쓰고 `docs/guides/`에 두어 PR에 함께 커밋한다.
+설명용 문서는 모두 `docs/guides/` 폴더에 있다: `COLLECT_GUIDE.md`(수집 Job의 Step 6개, 후보와 판정의 차이, 읽는 순서), `COLLECT_ADMIN_QA.md`(수집 관리자 API 이해 노트: `BATCH_*` 표, 조회 방식, 락과 트랜잭션, 용어), `SPRING_BATCH_BASICS.md`(Job·Step·chunk·Reader·Processor·Writer), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `PACKAGE_MAP.md`(백엔드 폴더 지도), `ENGINE_ALGORITHM.md`(계산 엔진), `FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트). 새 설명 문서는 짧게 쓰고 `docs/guides/`에 두어 PR에 함께 커밋한다.

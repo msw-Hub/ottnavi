@@ -70,7 +70,9 @@ describe('getErrorMessage', () => {
     expect(getErrorMessage('PRICE_START_DATE_DUPLICATE')).toBe(
       '같은 적용 시작일의 월 구독요금이 이미 있습니다.',
     )
-    expect(getErrorMessage('BATCH_ALREADY_RUNNING')).toBe('같은 날짜의 수집이 이미 실행 중입니다.')
+    expect(getErrorMessage('BATCH_ALREADY_RUNNING')).toBe(
+      '수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요.',
+    )
     expect(getErrorMessage('WISHLIST_LIMIT_EXCEEDED')).toBe(
       '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.',
     )

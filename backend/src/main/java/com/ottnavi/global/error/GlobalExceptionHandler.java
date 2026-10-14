@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.exc.MismatchedInputException;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
@@ -11,11 +13,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.Errors;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -47,9 +52,24 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	@ExceptionHandler(BusinessException.class)
 	public ProblemDetail handleBusinessException(BusinessException ex, HttpServletRequest request) {
 		ErrorCode errorCode = ex.getErrorCode();
-		String detail = ex.getMessage() != null ? ex.getMessage() : errorCode.getMessage();
+		String detail = errorCode.getMessage();
+		if (ex.getMessage() != null) {
+			detail = ex.getMessage();
+		}
 		logByStatus(errorCode.getStatus(), errorCode, request.getRequestURI(), ex);
 		return problemDetail(errorCode.getStatus(), errorCode, detail);
+	}
+
+	/** 필드를 지정한 검증 실패를 400 VALIDATION_FAILED와 fieldErrors 한 건으로 응답한다 */
+	@ExceptionHandler(FieldValidationException.class)
+	public ProblemDetail handleFieldValidationException(FieldValidationException ex, HttpServletRequest request) {
+		ErrorCode errorCode = ex.getErrorCode();
+		ProblemDetail problem = problemDetail(errorCode.getStatus(), errorCode, errorCode.getMessage());
+		List<FieldErrorDetail> fieldErrors = new ArrayList<>();
+		fieldErrors.add(new FieldErrorDetail(ex.getField(), ex.getMessage()));
+		problem.setProperty(FIELD_ERRORS, fieldErrors);
+		logByStatus(errorCode.getStatus(), errorCode, request.getRequestURI(), ex);
+		return problem;
 	}
 
 	// 인증·인가 예외 (보안 필터의 엔트리포인트·거부 핸들러도 HandlerExceptionResolver를 거쳐 여기로 온다)
@@ -99,6 +119,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 					|| ex instanceof MissingServletRequestParameterException) {
 				return ErrorCode.VALIDATION_FAILED;
 			}
+			// 본문 값의 형식·타입 불일치(날짜 형식, 모르는 enum 값 등)는 필드를 특정할 수 있어 VALIDATION_FAILED
+			if (ex instanceof HttpMessageNotReadableException && findMismatchedInput(ex) != null) {
+				return ErrorCode.VALIDATION_FAILED;
+			}
 			// 깨진 JSON(HttpMessageNotReadableException) 등 필드를 특정할 수 없는 400.
 			// detail은 ErrorCode 문구로 덮어쓰므로 Jackson 내부 메시지가 응답에 섞이지 않는다
 			return ErrorCode.INVALID_REQUEST;
@@ -122,7 +146,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		if (ex instanceof MethodArgumentNotValidException notValid) {
 			addBindingErrors(notValid.getBindingResult(), fieldErrors);
 		} else if (ex instanceof HandlerMethodValidationException methodValidation) {
-			methodValidation.getParameterValidationResults().forEach(result -> {
+			for (ParameterValidationResult result : methodValidation.getParameterValidationResults()) {
 				if (result instanceof ParameterErrors parameterErrors) {
 					addBindingErrors(parameterErrors, fieldErrors); // @Valid 객체 파라미터는 필드 단위로
 				} else {
@@ -131,23 +155,66 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 						fieldErrors.add(new FieldErrorDetail(parameterName, error.getDefaultMessage()));
 					}
 				}
-			});
+			}
 		} else if (ex instanceof MethodArgumentTypeMismatchException mismatch) {
 			fieldErrors.add(new FieldErrorDetail(mismatch.getName(), TYPE_MISMATCH_MESSAGE));
 		} else if (ex instanceof TypeMismatchException mismatch) {
 			fieldErrors.add(new FieldErrorDetail(mismatch.getPropertyName(), TYPE_MISMATCH_MESSAGE));
 		} else if (ex instanceof MissingServletRequestParameterException missing) {
 			fieldErrors.add(new FieldErrorDetail(missing.getParameterName(), MISSING_PARAMETER_MESSAGE));
+		} else if (ex instanceof HttpMessageNotReadableException) {
+			// 본문 값 형식 불일치: 경로(a.b[0])를 필드명으로 쓴다
+			MismatchedInputException mismatch = findMismatchedInput(ex);
+			if (mismatch != null) {
+				fieldErrors.add(new FieldErrorDetail(buildJsonPath(mismatch), TYPE_MISMATCH_MESSAGE));
+			}
 		}
 		return fieldErrors;
 	}
 
 	/** 검증 결과(BindingResult·ParameterErrors)의 필드 오류와 객체 오류(필드명은 객체명)를 목록에 더한다 */
 	private void addBindingErrors(Errors errors, List<FieldErrorDetail> fieldErrors) {
-		errors.getAllErrors().forEach(error -> {
-			String field = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
+		for (ObjectError error : errors.getAllErrors()) {
+			String field = error.getObjectName();
+			if (error instanceof FieldError fieldError) {
+				field = fieldError.getField();
+			}
 			fieldErrors.add(new FieldErrorDetail(field, error.getDefaultMessage()));
-		});
+		}
+	}
+
+	/**
+	 * 원인 사슬에서 경로가 비어 있지 않은 Jackson MismatchedInputException(InvalidFormatException 포함)을 찾는다.
+	 * 경로가 비면(본문 전체가 객체가 아닌 경우 등) 필드를 특정할 수 없어 null을 반환한다.
+	 */
+	private MismatchedInputException findMismatchedInput(Throwable ex) {
+		Throwable current = ex;
+		while (current != null) {
+			if (current instanceof MismatchedInputException mismatch && !mismatch.getPath().isEmpty()) {
+				return mismatch;
+			}
+			if (current.getCause() == current) {
+				return null;
+			}
+			current = current.getCause();
+		}
+		return null;
+	}
+
+	/** Jackson 경로를 a.b[0] 형태 문자열로 만든다. 필드명은 점으로 잇고 배열 위치는 [n]으로 붙인다 */
+	private String buildJsonPath(JacksonException ex) {
+		StringBuilder path = new StringBuilder();
+		for (JacksonException.Reference reference : ex.getPath()) {
+			if (reference.getPropertyName() != null) {
+				if (!path.isEmpty()) {
+					path.append('.');
+				}
+				path.append(reference.getPropertyName());
+			} else if (reference.getIndex() >= 0) {
+				path.append('[').append(reference.getIndex()).append(']');
+			}
+		}
+		return path.toString();
 	}
 
 	/** 고정 문구로 응답하는 예외를 ProblemDetail로 만든다 */
@@ -173,8 +240,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 	}
 
 	private String requestPath(WebRequest request) {
-		return request instanceof ServletWebRequest servletRequest
-				? servletRequest.getRequest().getRequestURI()
-				: request.getDescription(false);
+		if (request instanceof ServletWebRequest servletRequest) {
+			return servletRequest.getRequest().getRequestURI();
+		}
+		return request.getDescription(false);
 	}
 }

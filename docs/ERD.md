@@ -384,7 +384,7 @@ erDiagram
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
 | notification_outbox | id, user_id FK, type, dedupe_key UK, payload JSONB, status, attempt_count, next_attempt_at, sent_at NULL, last_error NULL | type = SUBSCRIBE_GUIDE / MONTHLY / PLAN_CHANGE. status = PENDING / SENT / FAILED. 인덱스 (status, next_attempt_at), user_id(탈퇴 삭제용). 발송 이력 조회(FR-16)도 이 테이블. dedupe_key 예: `MONTHLY:{userId}:2026-11` |
-| BATCH_* (Spring Batch) | 라이브러리 관리 | 수집 실행 이력. 생성 스크립트만 Flyway에 추가. 관리자 화면(FR-20)이 읽기 전용으로 조회. 수집 실행의 `STOPPED`(중단됨)는 이 테이블에 저장하지 않는 파생 상태다. `STARTED`인데 지금 이 서버가 돌리고 있지 않은 실행을 서버가 판정한다(API `CollectExecutionStatus`) |
+| BATCH_* (Spring Batch) | 라이브러리 관리 | 수집 실행 이력. 생성 스크립트만 Flyway에 추가. 관리자 화면(FR-20)이 읽기 전용으로 조회. 수집 실행의 `STOPPED`(중단됨)는 이 테이블에 저장하지 않는 파생 상태다. `STARTING`·`STARTED`·`STOPPING`인데 이번 서버 기동 전에 만들어진 실행을 서버 기동 시각과 비교해 판정한다(API `CollectExecutionStatus`) |
 | shedlock | 라이브러리 관리 | @Scheduled 작업 락. 생성 스크립트만 Flyway에 추가 |
 
 **DB에 두지 않는 것:**
@@ -441,7 +441,7 @@ erDiagram
 | `PlanAssignment.watchMin·segment*·isContinuation` | `plan_assignment.minutes`, 조각 번호는 윈도우 함수로 계산 |
 | `PlanDraft.dataAsOf`, `SavedPlan.activatedAt` | `plan.data_as_of`(한국 날짜로 변환), `plan.activated_at` |
 | `TitleSearchPage.dataAsOf`, `TitleDetail.dataAsOf`, `WishlistItemList.dataAsOf` | 마지막 COMPLETED 수집 Job의 종료 시각을 한국 날짜로 변환 |
-| `CollectExecution.*` | `BATCH_JOB_EXECUTION`·`BATCH_JOB_EXECUTION_PARAMS` + `STOPPED` 판정. `recover` 응답의 `endedAt`은 null이다(`batch.recovered` 표시를 읽어 내린다) |
+| `CollectExecution.*` | `BATCH_JOB_EXECUTION`·`BATCH_JOB_EXECUTION_PARAMS`(`targetDate`·`tier`)에서 읽는다. `processedCount`는 `BATCH_STEP_EXECUTION`의 `movieDetailStep`·`tvDetailStep` `WRITE_COUNT` 합, `changedCount`는 `availability_change`의 `job_execution_id` 건수다. `STOPPED`는 저장하지 않고 서버 기동 시각 비교로 조회 때마다 판정한다. 복구한 실행은 `EXIT_CODE='RECOVERED'`로 구분하며 `endedAt`은 null, `failureReason`은 고정 문구다. `canRecover`·`canRestart`는 저장하지 않고 서버가 계산한다 |
 | `CollectExecutionChange.*` | `availability_change`를 `job_execution_id`로 걸러 `watch_unit`·`title`과 조인 |
 
 **시각·날짜 규칙.** 업무 날짜(적용 시작일, 대상 날짜)는 `DATE`에 한국 시간대 `Clock`으로 만든다(DB의 `CURRENT_DATE`를 쓰지 않는다). 사건 시각(확인·저장·"다 봤음"·최초 발견·변경)은 `TIMESTAMPTZ`다. 응답의 날짜(`dataAsOf`)는 TIMESTAMPTZ를 한국 날짜로 바꿔 준다. Spring Batch 시각만 시간대 없는 `TIMESTAMP`이며 JVM 기본 시간대로 해석한다.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { withActionFlags } from '@/features/admin/collectRules'
 import { isVerifiedStale } from '@/features/admin/priceRules'
 import {
   buildMockAdminProducts,
@@ -44,13 +45,22 @@ describe('관리자 목업 fixture', () => {
     expect(unmapped.every((p) => p.ottServiceId === null)).toBe(true)
   })
 
-  it('수집 이력에 4가지 상태가 모두 있고 성공 실행의 변경 건수가 목록과 같다', () => {
+  it('수집 이력에 성공·실패·중단됨이 있고(실행 중은 없다) 성공 실행의 변경 건수가 목록과 같다', () => {
     const executions = buildMockCollectExecutions(TODAY)
+    // 실행 중이 있으면 전체 동시 실행 금지 규칙 때문에 모든 실행·다시 실행이 막혀 기본 이력에 두지 않는다(fixture 주석)
     expect(new Set(executions.map((e) => e.status))).toEqual(
-      new Set(['RUNNING', 'COMPLETED', 'FAILED', 'STOPPED']),
+      new Set(['COMPLETED', 'FAILED', 'STOPPED']),
     )
     for (const e of executions.filter((x) => x.status === 'COMPLETED')) {
       expect(buildMockCollectChanges(e.executionId)).toHaveLength(e.changedCount)
     }
+  })
+
+  it('미리 적어 둔 canRecover·canRestart가 서버 규칙으로 계산한 값과 같다', () => {
+    const executions = buildMockCollectExecutions(TODAY)
+    expect(executions).toEqual(withActionFlags(executions))
+    // 중단됨(3번)만 복구, 최신 실패(2번)만 다시 실행
+    expect(executions.filter((e) => e.canRecover).map((e) => e.executionId)).toEqual([3])
+    expect(executions.filter((e) => e.canRestart).map((e) => e.executionId)).toEqual([2])
   })
 })

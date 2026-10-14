@@ -3,7 +3,7 @@
 > API 오류 응답(`application/problem+json`)의 `errorCode` 목록이다. 프론트의 `src/lib/errorMessages.ts`는 이 표와 일치해야 한다.
 > 백엔드 `ErrorCode`(Task 023)도 이 표를 기준으로 만든다. 새 코드는 계약(`openapi.yaml`)과 같은 PR에서 이 표에 추가한다.
 > "(제안)"은 TECH에서 제안만 된 값이며, 해당 기능을 구현하는 Task에서 확정한다.
-> 백엔드 테스트 `ErrorCodeDocumentTest`가 아래 "공통 코드" 표의 코드·HTTP 상태(첫 숫자)와 `ErrorCode` enum이 같은지 검사한다. 표 형식(`| \`코드\` | 상태 | ...`)을 바꾸면 테스트도 함께 고친다.
+> 백엔드 테스트 `ErrorCodeDocumentTest`가 "공통 코드" 표의 모든 코드가 `ErrorCode` enum에 있고, enum의 모든 코드가 "공통 코드" 또는 "TECH 신규 코드" 표에 같은 HTTP 상태(첫 숫자)로 있는지 검사한다(공통 ⊆ enum ⊆ 공통 ∪ TECH). TECH 표에만 있고 enum에 없는 코드는 아직 구현 전이라는 뜻이다. 표 형식(`| \`코드\` | 상태 | ...`)을 바꾸면 테스트도 함께 고친다.
 
 ## 공통 코드
 
@@ -52,10 +52,10 @@
 |---|---|---|---|---|
 | `PLAN_DRAFT_STALE` | 409 | 저장하려는 DRAFT의 데이터 기준일이 최신 수집 완료 시각보다 이름. 프론트가 받으면 자동으로 재계산을 요청한다 | 데이터가 갱신되어 플랜을 다시 계산하고 있습니다. | TECH 2절, PRD 5.4 (제안) |
 | `PLAN_DRAFT_NOT_FOUND` | 404 | 저장하려는 DRAFT가 없거나 본인 것이 아님. 이미 저장돼 DRAFT가 아니게 됐거나 다시 계산해 지워진 경우 포함 | 계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요. | TECH 2절 (제안) |
-| `BATCH_ALREADY_RUNNING` | 409 | 같은 `targetDate`+`tier`의 수집 Job이 이미 실행 중(관리자 API) | 같은 날짜의 수집이 이미 실행 중입니다. | TECH 3절 (도출) |
+| `BATCH_ALREADY_RUNNING` | 409 | 같은 날짜 또는 다른 날짜의 수집이 실행 중(전체 동시 실행 금지, 관리자 API) | 수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요. | TECH 3절 (도출) |
 | `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
-| `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 (제안) |
-| `BATCH_NOT_STOPPED` | 409 | 복구하려는 실행이 중단됨(`STOPPED`)이 아님(복구 API 전용. 재시작 API는 실행 상태에 맞는 `BATCH_ALREADY_*`·`BATCH_RECOVERY_REQUIRED`를 쓴다) | 중단된 실행만 복구할 수 있습니다. | TECH 3절, Task 029·031 (제안) |
+| `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |
+| `BATCH_NOT_STOPPED` | 409 | 복구하려는 실행이 중단됨(`STOPPED`)이 아님(복구 API 전용. 재시작 API는 실행 상태에 맞는 `BATCH_ALREADY_*`·`BATCH_RECOVERY_REQUIRED`를 쓴다) | 중단된 실행만 복구할 수 있습니다. | TECH 3절, Task 029·031 |
 | `PRICE_START_DATE_NOT_AFTER_LAST` | 409 | 추가·수정하려는 월 구독요금 줄의 적용 시작일이 앞 줄의 시작일보다 늦지 않음(관리자 API) | 적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다. | PRD FR-19 "기간이 겹치지 않는다", Task 029·031 (제안) |
 | `PRICE_START_DATE_DUPLICATE` | 409 | 같은 상품에 같은 적용 시작일의 줄이 이미 있음(ERD `UNIQUE(product_id, effective_from)`, 관리자 API) | 같은 적용 시작일의 월 구독요금이 이미 있습니다. | ERD `product_price`, Task 029·031 (제안) |
 | `PRICE_FIRST_START_DATE_IN_FUTURE` | 409 | 상품의 첫(유일한) 월 구독요금 줄의 적용 시작일이 오늘보다 늦음. 첫 줄이 미래면 오늘 적용할 요금이 없다(관리자 API) | 첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다. | Task 029·031 (제안) |
@@ -66,4 +66,4 @@
 | `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031 (제안) |
 | `SERVICE_PRICE_NOT_FOUND` | 404 | 내 월 요금을 고치거나 되돌리려는 상품이 요금을 고칠 수 있는 상품이 아님(없는 상품이거나 판매 종료) | 이 서비스의 요금 정보를 찾을 수 없습니다. | ERD `user_price_override`(상품 단위), Task 031 (제안) |
 
-위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 아직 없고 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
+위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개가 반영돼 있고(Task 045), 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).

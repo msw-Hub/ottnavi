@@ -11,3 +11,6 @@ spring:
 app:
   origin-secret:
     enabled: false                # 로컬은 Vite proxy·직접 호출이라 오리진 비밀 헤더를 검사하지 않는다
+  admin-batch-token: ${ADMIN_BATCH_TOKEN:local-admin-batch-token}   # 수집 실행 API 배치 토큰. 로컬 전용 기본값
+  collect:
+    allow-target-date-override: true   # 로컬은 targetDate를 직접 지정해 같은 날 재수집을 재현할 수 있다(Task 045)

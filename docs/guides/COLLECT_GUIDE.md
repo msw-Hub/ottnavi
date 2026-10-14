@@ -1,6 +1,6 @@
-# 수집 Job 가이드 (Task 043·044)
+# 수집 Job 가이드 (Task 043·044·045)
 
-> 2026-10-14 작성(043 설명 문서 3개를 합치고 044를 반영했다). 수집 Job `collectJob`이 무엇을 하고 코드를 어떤 순서로 읽으면 되는지 설명한다. 근거 문서가 아니고 코드가 기준이다.
+> 2026-10-14 작성(043 설명 문서 3개를 합치고 044를 반영했다), 2026-10-15 045(관리자 실행·복구 API) 절을 11절에 더했다. 수집 Job `collectJob`이 무엇을 하고 코드를 어떤 순서로 읽으면 되는지 설명한다. 근거 문서가 아니고 코드가 기준이다.
 > 규칙의 근거는 PRD FR-02·FR-18·5.4·5.5, TECH 1·3절·T-2, ERD A 영역, `docs/guides/AVAILABILITY_RULES.md`이다. Spring Batch 용어는 `docs/guides/SPRING_BATCH_BASICS.md`를 본다.
 > 코드는 `backend/src/main/java/com/ottnavi/` 아래 `collect/`(`job/`·`step/candidate/`·`step/detail/`), `catalog/service/`, `provider/service/`, 테스트는 `CollectJobTest`(11건)·`CollectDetailJobTest`(14건)·`DetailMapperTest`(7건).
 
@@ -94,6 +94,7 @@ GET /3/discover/movie?with_watch_providers=8|1796&watch_region=KR&with_watch_mon
 | 제공처 조회가 404 | 그 단위만 건너뛴다. 기존 제공 상태·이력을 건드리지 않는다 |
 | 5xx·429·타임아웃(재시도 후) | Step이 실패한다. 실패한 chunk는 롤백되고 앞 chunk는 커밋돼 있다 |
 | 같은 파라미터로 완료된 Job을 다시 실행 | 거부된다(`JobInstanceAlreadyCompleteException`) |
+| 서버가 갑자기 꺼짐 | 실행이 `STARTED`로 남는다. 이번 서버 기동 전에 만들어진 실행이라 화면 상태는 `STOPPED`(중단됨)이다. 복구 API로 실패로 바꾼 뒤 재시작한다(11절) |
 | 후보 Step(2·3) 재시작 | **처음부터** 다시 읽는다. Reader가 위치를 저장하지 않고 이미 저장된 작품은 갱신만 하므로 결과가 같다 |
 | 상세·판정 Step(4~6) 재시작 | **저장된 위치부터** 이어 읽는다(`JpaPagingItemReader`의 `saveState`). 롤백된 chunk만 다시 처리하고 같은 입력의 재처리는 멱등이다 |
 
@@ -150,7 +151,76 @@ GET /3/discover/movie?with_watch_providers=8|1796&watch_region=KR&with_watch_mon
 - 실제 TMDB 응답으로 끝까지 돌려 보지 않았다(WireMock 샘플만 사용). Task 048에서 확인한다.
 - TMDB discover는 500쪽(1만 건)까지만 주므로 한 서비스가 그보다 많으면 뒷부분이 잘린다. 실제 규모는 확인하지 못했다.
 - chunk 안에서 TMDB를 부르는 동안 DB 연결을 쥔다(T-2 예외). 상세·판정 Step은 Reader가 자기 연결을 써서 한 chunk 동안 2개까지 쓰인다(풀 5). 운영 환경 값은 확인하지 못했다.
-- Reader 빈이 읽는 위치를 필드로 가져, 날짜가 다른 Job이 한 프로세스에서 동시에 돌면 서로 덮어쓴다. Task 045의 실행 API에서 동시 실행을 막거나 `@StepScope`로 바꾼다.
+- Reader 빈이 읽는 위치를 필드로 가져, 날짜가 다른 Job이 한 프로세스에서 동시에 돌면 서로 덮어쓴다. 전체 동시 실행 금지로 해결했다(Task 045, 11절). `@StepScope`는 쓰지 않는다.
 - `@Version`(낙관적 락)은 도입하지 않았다. 수집을 한 번에 하나만 돌린다는 가정에 기댄다.
 - 인기도·평점은 날마다 바뀌므로 요약 갱신 UPDATE가 많을 수 있다. 운영 부하는 첫 실제 수집에서 확인한다.
 - TV 출연진은 TMDB가 "가장 최근 시즌" 기준으로 준 값이다.
+
+## 11. 관리자 API로 실행·복구·재시작 (Task 045)
+
+앞에서는 Job이 무엇을 하는지를 봤다. 이 절은 **Job을 사람이나 cron이 어떻게 켜고, 멈춘 Job을 어떻게 되살리는지**를 다룬다. 호출하는 쪽은 관리자 화면(SCR-16)과 GitHub Actions cron(아직 없음)이고, 둘 다 같은 5개 경로를 쓴다. 서버는 Job을 별도 스레드에서 시작하고 바로 202와 `executionId`를 돌려준다. 결과는 이력 조회로 본다.
+
+| 경로 (모두 `Authorization: Bearer <배치 토큰>`, 없거나 틀리면 401) | 하는 일 | 성공 |
+|---|---|---|
+| `POST /api/admin/collect/executions` | 수집 시작. `{"tier":"ALL"}`, `targetDate`는 비우면 오늘(KST) | 202 |
+| `GET /api/admin/collect/executions` | 이력(기준일 내림차순, `page`·`size`) | 200 |
+| `GET …/{executionId}/changes` | 그 실행에서 제공 상태가 바뀐 작품 | 200 |
+| `POST …/{executionId}/recover` | 중단됨 실행을 실패로 복구 | 200 |
+| `POST …/{executionId}/restart` | 실패한 실행을 새 실행으로 재시작 | 202 |
+
+**상태**: Batch 상태 `STARTING`·`STARTED`·`STOPPING`은 이번 서버 기동 뒤에 만든 실행이면 `RUNNING`, 기동 전에 만든 실행(서버가 죽어 기록만 남음)이면 `STOPPED`다. `STOPPED`는 저장하지 않고 조회 때마다 판정한다. `COMPLETED`는 그대로, 나머지는 모두 `FAILED`이며 복구한 실행은 종료 코드 `RECOVERED`로 구분한다(TECH 3절).
+
+**409 판정 순서**: 같은 `targetDate`+`tier`의 가장 최근 실행을 먼저 본다(실행 중 `BATCH_ALREADY_RUNNING`, 중단됨 `BATCH_RECOVERY_REQUIRED`, 완료 `BATCH_ALREADY_COMPLETED`). 거절되지 않았으면 다른 날짜가 실행 중인지 본다(`BATCH_ALREADY_RUNNING`, 전체 동시 실행 금지). 같은 키의 최근 실행이 실패면 시작 요청도 재시작으로 처리된다.
+
+**버튼**: `canRecover` = 상태가 `STOPPED`. `canRestart` = 상태 `FAILED`(Batch `ABANDONED` 제외) ∧ 같은 날짜·범위의 가장 최근 실행 ∧ 날짜 허용(운영은 오늘만) ∧ 다른 수집이 실행 중이 아님. 서버 거절과 같은 `CollectExecutionRules` 판정을 쓰므로 버튼과 거절이 어긋나지 않는다.
+
+**값이 바뀌어 가는 예** (오늘 `2026-10-15`, 실행 ID는 예시)
+
+| 순서 | 일어난 일 | 실행 11 | 실행 12 | 화면 버튼 |
+|---|---|---|---|---|
+| 1 | 11번이 도는 중 서버가 죽었다가 다시 켜짐 | `STOPPED` | | 복구만 켜짐 |
+| 2 | `POST …/11/recover` | `FAILED`, 사유 "중단된 실행을 관리자가 실패로 복구함", `endedAt` null | | 재시작 켜짐 |
+| 3 | `POST …/11/restart` → 202, 새 실행 12 | `FAILED`(최신이 아니라 재시작 꺼짐) | `RUNNING` | |
+| 4 | 12번도 도는 중 서버가 또 죽음 | | `STOPPED` | 12번 복구만 켜짐. 새 시작은 409 `BATCH_RECOVERY_REQUIRED` |
+| 5 | `POST …/12/recover`, 다시 `restart` → 새 실행 13 | | `FAILED` | 13번이 `COMPLETED`면 같은 날짜 시작은 409 `BATCH_ALREADY_COMPLETED` |
+
+두 번째 복구가 되는 것이 핵심이다. 복구 표시를 Batch 실행 컨텍스트에 남기면 재시작이 이전 컨텍스트를 복사해 두 번째 `recover`가 아무 일도 하지 않는다.
+
+**호출 예** (로컬, 배치 토큰 기본값 `local-admin-batch-token`)
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:8080/api/admin/collect/executions -Headers @{Authorization="Bearer local-admin-batch-token"} -ContentType "application/json" -Body '{"tier":"ALL"}'
+Invoke-RestMethod -Uri http://localhost:8080/api/admin/collect/executions -Headers @{Authorization="Bearer local-admin-batch-token"}
+```
+
+**읽는 순서** (줄 수는 빈 줄을 뺀 값)
+
+| 순서 | 파일 | 줄 수 | 읽는 이유 |
+|---|---|---|---|
+| 1 | `collect/job/CollectExecutionRules` | 197 | 상태·409·버튼·실패 사유 규칙이 전부 여기 있다(순수 규칙) |
+| 2 | `collect/job/CollectLaunchConfig` | 42 | 수집 전용 비동기 operator 조립 |
+| 3 | `collect/job/CollectJobLauncher` | 84 | 시작·재시작·복구 창구(`RECOVERED` 저장) |
+| 4 | `admin/service/CollectExecutionService` | 216 | 락 안에서 "검사 → 시작", 날짜 규칙, 409 변환 |
+| 5 | `collect/job/CollectExecutionQuery` | 163 | `BATCH_*` 표를 SQL로 읽는 곳 |
+| 6 | `admin/service/CollectExecutionQueryService` | 179 | 이력 응답 조립, 쿼리 수가 행 수에 비례하지 않게 묶어 조회 |
+| 7 | `admin/controller/AdminCollectController` | 85 | 경로 5개 |
+| 8 | `global/security/AdminBatchTokenFilter` | 81 | 배치 토큰 검사(Security 앞 필터) |
+
+**테스트가 확인하는 것**
+
+| 테스트 | 확인하는 것 / 막으려는 사고 |
+|---|---|
+| `CollectExecutionRulesTest` | 상태 대응, 409 판정 순서, 버튼 규칙, 실패 사유 300자·고정 문구. 규칙이 슬쩍 바뀌는 사고 |
+| `CollectExecutionQueryTest` | SQL이 `BATCH_*`에서 날짜·최신 여부·처리 건수를 맞게 읽는지, 복구가 `RECOVERED`로 저장되는지 |
+| `CollectLaunchConfigTest` | 비동기 operator가 시작 직후 끝나지 않은 실행을 돌려주고, 타입 주입 operator는 기존 동기 것인지 |
+| `AdminCollectCommandApiTest` | 202·401·409(같은 날짜·다른 날짜·완료)·400 필드 오류, 동시 요청 중 하나만 202 |
+| `AdminCollectRecoveryApiTest` | 복구·재시작·복구 반복 흐름과 409 사유 |
+| `AdminCollectHistoryApiTest` | 이력 정렬·페이지·처리 건수·변경 목록과 쿼리 수 |
+| `AdminCollectProdModeApiTest` | 운영 모드에서 오늘이 아닌 날짜 거절 |
+| `AdminBatchTokenFilterTest` | 보호 경로만 검사, 인코딩·세미콜론 우회 방지 |
+
+**깨뜨려 보기** (규칙 한 줄을 바꿔 어떤 테스트가 깨지는지 보며 이해를 점검한다)
+
+1. `CollectExecutionRules.judgeLaunch`에서 `isAnotherRunning` 검사를 같은 키 `COMPLETED` 검사보다 위로 올린다. `CollectExecutionRulesTest`의 `같은_키가_완료면_다른_실행이_돌아도_ALREADY_COMPLETED다`가 깨진다(같은 날짜 완료가 "다른 날짜 실행 중"으로 보이는 사고).
+2. `CollectExecutionRules.canRestart`의 `!isLatest` 검사를 지운다. `CollectExecutionRulesTest`의 `최신이_아닌_실패는_canRestart가_거짓이다`가 깨진다. `AdminCollectRecoveryApiTest`의 `복구_재시작_또_중단_다시_복구가_차례로_동작한다`도 3단계 `canRestart`가 `false`여야 한다는 확인에서 깨질 수 있다.
+3. `CollectJobLauncher.recover`에서 `markRecovered` 호출을 지운다. `CollectExecutionQueryTest`의 `복구하면_중단된_실행은_FAILED와_RECOVERED_종료_코드로_바뀐다`와 `AdminCollectRecoveryApiTest`의 복구 테스트(고정 사유·`endedAt` null)가 깨진다.

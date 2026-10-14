@@ -28,6 +28,10 @@ interface RecoverRunDialogProps {
  * 닫힐 때 포커스는 Trigger가 없어서 Radix가 돌려줄 곳을 모르므로, [복구]를 누른 버튼(openerRef)으로 직접 돌려준다.
  * 복구에 성공하면 그 버튼이 사라지므로(행이 실패로 바뀜), 그때는 화면(CollectScreen)이 [다시 실행]으로 포커스를 옮긴다.
  *
+ * 본문에서 "복구 뒤 [다시 실행]으로 이어서 수집할 수 있다"고 약속하지 않는 이유: 복구 응답의 canRestart가 거짓일 수 있다
+ * (다른 수집이 실행 중이거나, 운영에서 대상 날짜가 오늘이 아님). 그래서 버튼이 보이는지로 판단하라고만 안내한다.
+ * 이전 문구(참고용): "그다음 [다시 실행]으로 같은 날짜·범위를 이어서 수집할 수 있습니다."
+ *
  * 본문에 "아직 실제로 돌고 있는 실행이라면 복구하지 마세요"를 넣은 이유: 중단됨은 서버가 판정한 값이지만 판정이 틀릴 수 있어서다.
  */
 export function RecoverRunDialog({
@@ -53,7 +57,7 @@ export function RecoverRunDialog({
           <AlertDialogTitle>중단된 실행을 복구할까요?</AlertDialogTitle>
           <AlertDialogDescription>
             {execution
-              ? `실행 ${execution.executionId}(${formatIsoDate(execution.targetDate) ?? execution.targetDate} · ${COLLECT_TIER_LABELS[execution.tier]})은 서버가 중간에 멈춰 '실행 중'으로 남아 있습니다. 복구하면 이 실행을 '실패'로 기록합니다. 그다음 [다시 실행]으로 같은 날짜·범위를 이어서 수집할 수 있습니다. 아직 실제로 돌고 있는 실행이라면 복구하지 마세요.`
+              ? `실행 ${execution.executionId}(${formatIsoDate(execution.targetDate) ?? execution.targetDate} · ${COLLECT_TIER_LABELS[execution.tier]})은 서버가 중간에 멈춰 '실행 중'으로 남아 있습니다. 복구하면 이 실행을 '실패'로 기록합니다. 이어서 실행할 수 있는지는 복구 뒤 [다시 실행] 버튼이 보이는지로 알 수 있습니다. 아직 실제로 돌고 있는 실행이라면 복구하지 마세요.`
               : ''}
           </AlertDialogDescription>
         </AlertDialogHeader>

@@ -28,6 +28,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 @EnableConfigurationProperties(CollectProperties.class)
 public class DetailStepConfig {
 
+    public static final String MOVIE_DETAIL_STEP = "movieDetailStep"; // 실행 이력의 처리 건수 집계가 참조한다
+    public static final String TV_DETAIL_STEP = "tvDetailStep";
+
     private static final int CHUNK_SIZE = 10; // 작품·단위 하나가 TMDB 호출 여러 번이라 chunk를 작게 둔다(TECH T-2)
 
     private static final String TITLE_QUERY = "select new com.ottnavi.collect.step.detail.DetailTarget("
@@ -69,7 +72,7 @@ public class DetailStepConfig {
     public Step movieDetailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                 JpaPagingItemReader<DetailTarget> movieTitleReader, TmdbClient tmdbClient,
                                 RuntimeDefaults runtimeDefaults, DetailWriter writer) {
-        return new StepBuilder("movieDetailStep", jobRepository)
+        return new StepBuilder(MOVIE_DETAIL_STEP, jobRepository)
                 .<DetailTarget, TitleDetail>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager) // 지정하지 않으면 Batch 6 기본값이 트랜잭션 없는 매니저다
                 .reader(movieTitleReader)
@@ -83,7 +86,7 @@ public class DetailStepConfig {
                              JpaPagingItemReader<DetailTarget> tvTitleReader, TmdbClient tmdbClient,
                              RuntimeDefaults runtimeDefaults, MeterRegistry meterRegistry, DetailWriter writer) {
         TvDetailProcessor processor = new TvDetailProcessor(tmdbClient, runtimeDefaults, meterRegistry);
-        return new StepBuilder("tvDetailStep", jobRepository)
+        return new StepBuilder(TV_DETAIL_STEP, jobRepository)
                 .<DetailTarget, TitleDetail>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager)
                 .reader(tvTitleReader)
