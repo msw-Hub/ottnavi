@@ -7,12 +7,12 @@
 
 | 항목 | 내용 |
 |---|---|
-| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 6/30, 합계 42/105 (PR #60 병합 후 기준) |
-| 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계 |
-| 열린 PR | #60 `feature/b3-layer-rename`(패키지 구조 정리, Task 043 ROADMAP 기록, 이 문서). CI·리뷰 결과는 사용자가 알려 준다 |
-| 다음 Task | **044** 수집 Job 상세·시즌·판정 Step → 045 수집 실행·복구·이력 API → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
-| 쉬림프 | 완료 33개, 대기 1개(044). 착수 때 `execute_task`, 끝나면 `verify_task`(점수 90 안팎). 앞으로 Task는 착수할 때 등록한다 |
-| 워크트리 | `ottnavi`(메인, `develop`), `ottnavi-backend`(백엔드 작업, 현재 `feature/b3-layer-rename`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
+| 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 7/30, 합계 43/105 (Task 044 구현 완료, PR 전) |
+| 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계, 044 상세·시즌·판정 Step |
+| 열린 PR | 없음. 044는 브랜치 `feature/b3-collect-details`에서 구현·빌드(546건 통과)까지 끝났고 커밋·PR 전이다 |
+| 다음 Task | **045** 수집 실행·복구·이력 API → 046 제공처 매핑 API → 047 cron(비활성) → 048 첫 전체 수집 |
+| 쉬림프 | 044까지 완료 처리. 앞으로 Task는 착수할 때 등록하고 `execute_task`, 끝나면 `verify_task`(점수 90 안팎) |
+| 워크트리 | `ottnavi`(메인, `develop`), `ottnavi-backend`(백엔드 작업, 현재 `feature/b3-collect-details`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
 
 ## 2. 다음 작업 순서
 

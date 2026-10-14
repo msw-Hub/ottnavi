@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 6/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 7/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 42/105 | |
+| 합계 | | 43/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -815,7 +815,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 6/30
+## 7. Phase 3 — 핵심 기능 개발 · 7/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -922,18 +922,20 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 결정: ① `title.refresh_tier`용 `RefreshTier`(DAILY/WEEKLY)와 Job 파라미터용 `CollectTier`(DAILY/WEEKLY/ALL)는 공유하지 않고, MVP는 `tier=ALL`만 허용한다(DAILY·WEEKLY는 계층별 갱신 Task 077에서 연다) ② discover 요약 필드(원제·개봉일·포스터·배경·원어·인기도·평점)를 `title`에 저장하고, 이미 있는 작품은 포스터·배경·인기도·평점만 갱신한다(`Title.createFromSummary`·`refreshSummary`, 제목·개봉일은 상세 값이 정답이라 갱신하지 않는다) ③ 같은 작품이 여러 서비스에 나오면 `findByMediaTypeAndTmdbId`로 확인해 한 줄만 둔다 ④ chunk 안 TMDB 호출은 TECH T-2 예외, Batch 6 기본 트랜잭션 매니저가 트랜잭션 없는 것이라 `chunk(20).transactionManager(tm)`을 지정한다.
   - 구조 정리(같은 브랜치 `feature/b3-layer-rename`): `api` → `controller` + `dto`, `application` → `service`, 입력·출력 record는 `service/model`, `collect`는 `job/`·`step/`로 나눴고 `CollectJobConfig`를 Job 조립·Step 조립(`CollectStepConfig`)·TMDB 응답 변환(`CandidateMapper`)으로 쪼갰다. `OttServiceQueryService`가 응답 DTO를 import하던 역방향 의존은 서비스가 엔티티를 반환하고 컨트롤러가 변환하도록 고쳤다. 이동 전후 전체 테스트 523건이 같다. `.claude/rules/backend.md`와 `CLAUDE.md`의 패키지 구조를 갱신했다.
   - 넘길 내용: Task 044(`title`에는 요약 필드까지 있고 줄거리·`overview_lang`·`tv_status`만 비어 있다. 044가 `updateDetail`로 채우고 `fetched_at`을 갱신한다. title을 읽는 Reader는 `id` 순으로 읽고 `fetched_at`으로 거르지 않는다(TECH 3절 페이지 밀림). 이 시점 `collect/step`이 15개 안팎이 되면 `step/candidate`·`step/detail`로 더 나누는 것을 검토), Task 045(`CollectJobParameters.of(targetDate, tier)` 재사용, 비동기는 `TaskExecutor`를 가진 `JobOperator`, 완료=`JobInstanceAlreadyCompleteException`·실행 중=`JobExecutionAlreadyRunningException`을 409로 매핑, 계약 `tier` enum에 `ALL` 포함, 다른 날짜 Job의 Reader 상태 공유는 045 이월 항목). 새 제공처(UNMAPPED)는 관리자 화면에서 정리한다. 확인하지 못한 것: 실제 TMDB 응답으로 수집, `|`(OR) 구분자의 TMDB 공식 문서 확인, 운영 환경 연결 점유, discover 500쪽 상한에 걸리는 서비스 여부, 인기도·평점 UPDATE 부하(첫 실제 수집 Task 048에서 측정).
-#### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ⬜
+#### Task 044: 수집 Job 상세·시즌·판정 Step 구현으로 제공 상태 저장 완성 ✅
 - 태그: [B] · PRD: B3, FR-18 · 선행: 043 · 브랜치: `feature/b3-collect-details`
 - 구현 사항
-  - [ ] Task 042에서 이월: TMDB 응답 객체(DTO)를 `catalog/domain/rule`의 입력 record(`KrProviders`, `EpisodeRuntime`, `CastCandidate`)로 바꾸는 변환(`flatrate`만 넣고, KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없으면 `KrProviders.of(빈 집합)`), 방영된 회차가 0개인 시즌(합계 0분)의 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 한국어 줄거리가 없을 때 영어 줄거리를 얻는 추가 호출, `MAPPED`인 제공처만 판정 매핑에 넣기
-  - [ ] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
-  - [ ] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
-  - [ ] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
-  - [ ] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
-  - [ ] TV 시즌 호출량 지표(R11-26 측정용)
+  - [x] Task 042에서 이월: TMDB 응답 객체(DTO)를 `catalog/domain/rule`의 입력 record(`KrProviders`, `EpisodeRuntime`, `CastCandidate`)로 바꾸는 변환(`flatrate`만 넣고, KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없으면 `KrProviders.of(빈 집합)`), 방영된 회차가 0개인 시즌(합계 0분)의 저장 여부, `watch_unit.episode_count`를 시즌 요약과 시즌 상세 중 어디서 가져올지, 한국어 줄거리가 없을 때 영어 줄거리를 얻는 추가 호출, `MAPPED`인 제공처만 판정 매핑에 넣기
+  - [x] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
+  - [x] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
+  - [x] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
+  - [x] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
+  - [x] TV 시즌 호출량 지표(R11-26 측정용)
 - 완료 기준
   - V-B: 작은 후보 세트 전체 Job 실행 후 `title`·`watch_unit`·`availability`·`availability_change`가 기대값과 같다.
-
+- 기록: 2026-10-14 완료(브랜치 `feature/b3-collect-details`). `backend-dev`가 임시 워크트리에서 컴파일·테스트로 검증한 안내서의 코드를 사용자가 직접 반영했다. Step 3개(`movieDetailStep`, `tvDetailStep`, `availabilityStep`, chunk 10)를 수집 Job 뒤에 붙였다. 신규 테스트 23건(`CollectDetailJobTest` 14, `DetailMapperTest` 7, `AvailabilityTest` 2), 전체 546건 실패 0 오류 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 설명은 `docs/COLLECT_DETAIL_FLOW.md`, 폴더 지도는 `docs/PACKAGE_MAP.md`.
+  - 결정: 1) 방영 회차가 0개인 시즌은 저장하지 않는다. 2) `watch_unit.episode_count`는 시즌 상세의 회차 목록 개수다. 3) 줄거리는 한국어가 비었을 때만 영어로 한 번 더 호출하고, 둘 다 비면 기존 줄거리·언어 표시를 유지한다. 4) `@Version`은 도입하지 않고 이력은 status가 바뀔 때만 쌓는다. 5) 상세 Reader는 읽은 위치를 저장해 restart가 이어 읽는다(25편 중 15번째 실패 후 재시작 테스트로 확인). 6) `collect/step`을 `candidate`·`detail`로 나눴다. 7) `genre` 시드가 없어(V2에 INSERT 없음) 상세 응답의 `{id, 이름}`으로 자동 등록한다. 8) 시즌 하나가 404면 작품 전체를 건너뛰고, 제공처 404는 그 단위만 건너뛰며 기존 상태를 유지하고, 5xx·429(재시도 후)는 Step 실패 후 restart다.
+  - 넘길 내용: Task 045(방영 기준일은 Job 파라미터 `targetDate`이므로 실행 API가 KST 날짜를 넘길 것, 날짜가 다른 Job의 동시 실행은 상세 Reader에도 해당하는 043 이월 항목과 같다, 5xx로 실패하면 수동 restart가 필요), Task 048(작품당 시즌 수 분포 `collect.tv.seasons`와 `tmdb.call`의 endpoint 태그로 호출량 측정, 실제 TMDB 응답 확인, chunk 안 TMDB 호출 동안 연결 2개 점유 확인). 확인하지 못한 것: 실제 TMDB 응답으로 수집, 운영 환경(메모리 1GB, 연결 풀 5)의 연결 점유. 044 main 코드의 삼항·람다·`stream()`은 문법 규칙(backend.md)에 따라 `if`·`for`로 풀어썼다(풀어쓴 뒤 전체 546건 재통과). 테스트 코드와 043 이전 코드는 그대로이며 그 파일을 고칠 때 푼다.
 #### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 ⬜
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항

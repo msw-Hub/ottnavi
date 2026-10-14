@@ -22,12 +22,12 @@ collectJob (collect/job/CollectJobConfig)           Job: 순서만 정한다
 | 순서 | 파일 | 줄 수 | 읽는 이유 |
 |---|---|---|---|
 | 1 | `collect/job/CollectJobConfig` | 26 | Job이 어떤 Step을 어떤 순서로 부르는지 |
-| 2 | `collect/step/CollectStepConfig` | 57 | Step마다 무엇을 Reader·Writer로 쓰는지, chunk 크기 |
-| 3 | `collect/step/ProviderListTasklet` | 56 | 가장 단순한 Step(한 번 실행) |
+| 2 | `collect/step/candidate/CandidateStepConfig` (044 전 이름 `CollectStepConfig`) | 57 | Step마다 무엇을 Reader·Writer로 쓰는지, chunk 크기 |
+| 3 | `collect/step/candidate/ProviderListTasklet` | 56 | 가장 단순한 Step(한 번 실행) |
 | 4 | `provider/service/ProviderCollectService` | 59 | 제공처 저장, 그리고 "어느 서비스를 discover할지" 계산 |
-| 5 | `collect/step/CandidateReader` | 106 | 이 Job의 핵심. 쪽 단위로 가져와 한 건씩 내준다 |
-| 6 | `collect/step/CandidateMapper` | 67 | TMDB 응답을 우리 값(`CandidateTitle`)으로 바꾼다 |
-| 7 | `collect/step/CandidateWriter` | 27 | chunk를 받아 서비스에 넘기기만 한다 |
+| 5 | `collect/step/candidate/CandidateReader` | 106 | 이 Job의 핵심. 쪽 단위로 가져와 한 건씩 내준다 |
+| 6 | `collect/step/candidate/CandidateMapper` | 67 | TMDB 응답을 우리 값(`CandidateTitle`)으로 바꾼다 |
+| 7 | `collect/step/candidate/CandidateWriter` | 27 | chunk를 받아 서비스에 넘기기만 한다 |
 | 8 | `catalog/service/TitleCollectService` | 43 | 있으면 갱신, 없으면 저장 |
 | 9 | `catalog/domain/entity/Title` (`createFromSummary`, `refreshSummary`) | 162 | 값을 실제로 바꾸는 곳 |
 
@@ -36,7 +36,7 @@ collectJob (collect/job/CollectJobConfig)           Job: 순서만 정한다
 ## 2. 코드를 따라가기
 
 **Config (1·2번).** `CollectJobConfig.collectJob`은 세 줄이 전부다: `.start(providerListStep).next(movieCandidateStep).next(tvCandidateStep)`.
-Step 3개를 파라미터로 받고(이름이 Bean 이름이다), 순서만 정한다. 실제 Step 조립은 `CollectStepConfig`에 있다.
+Step 3개를 파라미터로 받고(이름이 Bean 이름이다), 순서만 정한다. 실제 Step 조립은 `candidate/CandidateStepConfig`(044 전 이름 `CollectStepConfig`)에 있다. 이 설명은 Task 043 시점의 Step 3개 기준이고, 044부터는 뒤에 `movieDetailStep`·`tvDetailStep`·`availabilityStep`이 이어진다(`docs/COLLECT_DETAIL_FLOW.md`, 조립은 `detail/DetailStepConfig`).
 `candidateStep`은 `chunk(CHUNK_SIZE)`(20) + `reader` + `writer`를 붙여 만든 Step이다. 영화와 드라마는 Reader에 넘기는 "한 쪽을 가져오는 함수"만 다르다
 (`tmdbClient.discoverMovies` / `discoverTvs`).
 
@@ -84,7 +84,7 @@ TMDB 호출을 먼저 끝내고 DB 반영만 서비스(트랜잭션)에 맡긴�
 ### 왜 `CandidateReader`를 `new`로 만드는가
 
 Reader는 `targets`, `targetIndex`, `nextPage`, `buffer` 같은 **읽는 위치 상태**를 필드로 가진다. 영화 Step과 드라마 Step이 한 객체를 같이 쓰면 위치가 섞인다.
-그래서 Bean(`@Component`)이 아니라 `CollectStepConfig`에서 Step마다 `new`로 따로 만든다. 반대로 `CandidateWriter`는 상태가 없어 하나를 공유해도 되므로 `@Component`다.
+그래서 Bean(`@Component`)이 아니라 `CandidateStepConfig`(044 전 이름 `CollectStepConfig`)에서 Step마다 `new`로 따로 만든다. 반대로 `CandidateWriter`는 상태가 없어 하나를 공유해도 되므로 `@Component`다.
 
 ## 4. 헷갈리기 쉬운 점
 
