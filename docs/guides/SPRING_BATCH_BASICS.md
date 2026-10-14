@@ -90,7 +90,7 @@ Processor가 TMDB 404를 만나 `null`을 돌려주면 그 작품은 2번에서 
 | chunk 안에서 예외 | 그 chunk만 롤백된다. 앞 chunk는 이미 저장돼 있다 |
 | Step 실패 | Job이 `FAILED`로 끝난다. 같은 파라미터로 `restart`하면 실패한 Step을 이어서 한다 |
 | 이어서 읽기 | Reader가 저장해 둔 위치(예: "30건 읽음")부터 읽는다. 롤백된 chunk만 다시 처리한다 |
-| JVM이 갑자기 꺼짐 | 실행이 `STARTED`로 남는다. 먼저 `recover`로 실패 상태로 바꾼 뒤 `restart`한다(Task 045 관리자 API) |
+| JVM이 갑자기 꺼짐 | 실행이 `STARTED`로 남는다. 먼저 `recover`로 실패 상태로 바꾼 뒤 `restart`한다(이 복구·재시작 관리자 API는 아직 없고 Task 045에서 만든다) |
 | 같은 파라미터로 완료된 Job을 다시 실행 | 거부된다(완료 409). 날짜를 바꿔야 새 실행이다 |
 
 ## 7. 이 프로젝트에서 자주 보는 조립 코드 읽는 법

@@ -67,14 +67,14 @@ GET /3/discover/movie?with_watch_providers=8|1796&watch_region=KR&with_watch_mon
 
 **Step 5 `tvDetailStep`.** 영화와 같은 뼈대에 시즌 처리가 붙는다. `TvDetailProcessor`가 드라마 상세를 받고, 시즌 0(스페셜)을 뺀 시즌마다 `getTvSeason`을 불러 방영된 회차의 러닝타임을 합산한다. 방영 회차가 0개인 시즌은 단위를 만들지 않는다. 방영 기준일은 Job 파라미터 `targetDate`를 `beforeStep`에서 받는다.
 
-**Step 6 `availabilityStep`.** `AvailabilityProcessor`가 시청 단위마다 제공처를 받고(영화는 영화 제공처, 시즌은 시즌 제공처), `DetailMapper.toKrProviders`가 `KrProviders`로 바꾼다. `AvailabilityCollectService.apply`가 서비스 7곳마다 `AvailabilityJudge`로 판정해 `availability`를 만들거나 갱신하고, 상태가 바뀐 것만 `availability_change`를 쌓는다. 제공 상태 변경과 이력은 한 트랜잭션이다.
+**Step 6 `availabilityStep`.** `AvailabilityProcessor`가 시청 단위마다 제공처를 받고(영화는 영화 제공처, 시즌은 시즌 제공처), `DetailMapper.toKrProviders`가 `KrProviders`로 바꾼다. `AvailabilityCollectService.apply`가 서비스 7곳마다 `AvailabilityJudge`로 판정해 `availability`를 만들거나 갱신하고, 처음 생겼거나 상태가 바뀐 것만 `availability_change`를 쌓는다(처음이면 before가 null). 제공 상태 변경과 이력은 한 트랜잭션이다.
 
 ### 값이 바뀌어 가는 순서 (영화 한 편)
 
 1. TMDB 목록: `{"id": 603, "title": "…"}` → `title` 한 행(요약 값만)
 2. TMDB 상세: `{"runtime": 118, "genres": [...], "credits": {...}}` → `TitleDetail`(러닝타임 118, 장르, 출연진 상위 10명)
 3. TMDB 제공처: KR flatrate `[8, 1883]` → `KrProviders.of({8, 1883})` → `AvailabilityJudge`
-4. 결과: `availability` 7행(넷플릭스·티빙 AVAILABLE, 나머지 NOT_AVAILABLE), 신규라서 `availability_change` 7줄(before null)
+4. 결과: `availability` 7행(넷플릭스·티빙 AVAILABLE 2, 쿠팡플레이 UNKNOWN 1(영화는 항상 모름, STRUCTURAL_GAP), 나머지 NOT_AVAILABLE 4), 신규라서 `availability_change` 7줄(before null)
 
 ## 5. 규칙과 결정
 
@@ -83,7 +83,7 @@ GET /3/discover/movie?with_watch_providers=8|1796&watch_region=KR&with_watch_mon
 - 한국어 줄거리가 비면 영어로 대체하고, 둘 다 비면 기존 줄거리·언어 표시를 유지한다.
 - 장르는 `genre` 표에 시드가 없어 상세 응답의 `{id, 이름(ko)}`로 등록한다. 기존 장르 이름은 덮어쓰지 않는다.
 - 장르·출연진·시청 단위는 지우고 다시 넣지 않고 기존 행과 비교해 차이만 반영한다(같은 유니크 키를 지웠다 넣으면 INSERT가 먼저 나가 위반, TECH 6절). 응답에 없는 기존 시청 단위는 건드리지 않는다.
-- 이력은 `status`가 바뀔 때만 쌓는다(`AvailabilityChangeDetector`). `Availability`는 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나가 true여야 한다(엔티티가 검사).
+- 이력은 행이 처음 생기거나 `status`가 바뀔 때만 쌓는다(`AvailabilityChangeDetector`, 이유·요금제 플래그만 바뀌면 남기지 않는다). `Availability`는 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나가 true여야 한다(엔티티가 검사).
 - 쿠팡플레이 영화는 항상 모름(STRUCTURAL_GAP), `tier`는 `ALL`만 허용한다.
 
 ## 6. 실패와 재시작
