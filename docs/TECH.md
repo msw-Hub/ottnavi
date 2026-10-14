@@ -84,7 +84,19 @@ stateDiagram-v2
 - **TMDB는 언제 호출하나(요청 제한 버킷을 두 개로 나눈 이유 — 기록).** 평소 사용자 요청은 **우리 DB를 읽을 뿐 TMDB를 호출하지 않는다.** TMDB 호출은 두 경우뿐이다. ① **수집 배치**(서버가 정한 시간에 자동, 속도를 서버가 조절) ② **단건 수집**(사용자가 검색했는데 DB에 없는 작품이면 그 순간 TMDB에서 가져와 저장, FR-01). ②는 익명 사용자가 일으킬 수 있는 TMDB 호출이라 TMDB 한도(초당 약 40회)를 배치와 나눠 쓰는 문제가 생기므로, 공개 요청 제한에 **단건 수집 검색 버킷을 일반 버킷보다 낮게** 따로 둔다(R11-12 확정: 일반 IP당 분당 60회, 단건 수집 IP당 분당 10회). 일반 버킷은 서버·Redis를 보호하는 용도다. 한 번 저장된 작품은 이후 DB에서 바로 나오므로 다시 단건 수집하지 않는다.
 - GitHub Actions 워크플로는 202·409를 성공으로, 그 외를 실패로 처리한다(도출).
 
-**중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(`POST /api/admin/collect/executions/{executionId}/recover`, 계약 `recoverCollectExecution`. 재시작은 `POST …/{executionId}/restart`로 새 실행을 만든다). `recover`는 `END_TIME`을 복구 시각으로 채우고 STOPPED 여부를 확인하지 않으므로(Spring Batch 6.0.5 소스), API가 먼저 STOPPED 판정을 하고 응답 `endedAt`은 계약대로 null로 내린다(구현 때 실행 컨텍스트의 `batch.recovered`를 읽어 판별, Task 032 안내서 4.11).
+**중단 Job 복구.** 무료 플랜 매일 1회 중지(R11-4)나 재배포로 JVM이 갑자기 끝나면 실행이 `STARTED`로 남아 restart가 거부된다. `JobOperator.recover(...)`로 실패 상태로 바꾼 뒤 `restart(...)`한다(c7 Batch 6). 관리자 API에 복구 동작을 둔다(`POST /api/admin/collect/executions/{executionId}/recover`, 계약 `recoverCollectExecution`. 재시작은 `POST …/{executionId}/restart`로 새 실행을 만든다). `recover`는 `END_TIME`을 복구 시각으로 채우고 STOPPED 여부를 확인하지 않으므로(Spring Batch 6.0.5 소스), API가 먼저 STOPPED 판정을 하고 응답 `endedAt`은 계약대로 null로 내린다. 구현(Task 045, `collect/job/CollectJobLauncher`)은 다음과 같다.
+- **중단됨 판정은 서버 기동 시각 비교다.** DB 상태가 `STARTING`·`STARTED`·`STOPPING`이고 `CREATE_TIME`이 이번 서버 기동 시각(`ServerBootTime`)보다 이르면 `STOPPED`로 본다. 요청 때마다 계산하고 저장하지 않는다.
+- **복구한 실행은 종료 코드 `RECOVERED`로 구분한다.** `operator.recover` 뒤 `setExitStatus(RECOVERED)`를 `jobRepository.update`로 저장한다(버전 충돌이면 다시 읽어 한 번 더 시도). 응답은 `endedAt` null, `failureReason`은 고정 문구 "중단된 실행을 관리자가 실패로 복구함"이다.
+- **`batch.recovered` 컨텍스트 표시는 쓰지 않는다.** `recover`는 이 표시를 메모리의 실행 컨텍스트에만 넣고, `update`는 컨텍스트를 저장하지 않는다. 억지로 컨텍스트까지 저장하면 재시작이 이전 실행의 컨텍스트를 복사해 두 번째 `recover`가 아무 일도 하지 않게 된다(Spring Batch 6.0.5 소스 확인).
+
+**전체 동시 실행 금지(Task 045).** 수집 Job은 전체에서 한 번에 하나만 돈다. `CandidateReader` 같은 Step 단위 빈이 읽는 위치를 필드로 들고 있어 날짜가 다른 두 Job이 동시에 돌면 서로의 상태를 덮어쓰기 때문이다(Task 043 이월). `@StepScope`로 실행마다 새로 만드는 대신 동시 실행 자체를 막는다.
+- 판정 순서: 같은 `targetDate`+`tier`의 최신 실행 상태를 먼저 본다(실행 중 `BATCH_ALREADY_RUNNING`, 중단됨 `BATCH_RECOVERY_REQUIRED`, 완료 `BATCH_ALREADY_COMPLETED`). 그 뒤 다른 날짜·범위가 실행 중이면 `BATCH_ALREADY_RUNNING`(상세 메시지에 실행 중인 날짜)이다.
+- `CollectExecutionService`가 락 안에서 "사전 검사 → 시작"을 직렬화한다(서버 한 대 전제). 수집 전용 비동기 실행기의 동시 한도 1은 보조 장치다.
+- **실행·복구 서비스에는 `@Transactional`을 붙이지 않는다.** `JobRepository`는 이미 열린 트랜잭션 안에서 실행 기록을 만드는 것을 거부하고, 바깥 트랜잭션이 커밋되기 전에는 비동기 스레드가 방금 만든 실행 행을 읽지 못한다.
+
+**수집 전용 비동기 `JobOperator`(Task 045).** `CollectLaunchConfig`가 `@Bean(defaultCandidate = false)`로 등록한다. `SimpleAsyncTaskExecutor`(동시 한도 1)와 수집 Job만 담은 `MapJobRegistry`를 `JobOperatorFactoryBean`에 넣은 것이다. Boot가 만드는 기본 동기 `JobOperator`는 그대로 두어 기존 수집 테스트가 타입으로 주입받는다. 비동기 operator를 쓰는 곳은 `@Qualifier("collectJobOperator")`로 이름을 지정한다.
+
+**수집 기준일 규칙(Task 045).** 운영은 시작·재시작 모두 오늘(KST)만 받는다(오늘이 아니면 400 `VALIDATION_FAILED`, `fieldErrors.targetDate`). 설정 키 `app.collect.allow-target-date-override`가 true인 환경(local만)에서는 미래 날짜만 거절하고 과거 날짜를 받는다.
 
 **Reader 페이지 밀림.** `JpaPagingItemReader`로 읽는 중 같은 Step이 갱신하는 컬럼(예: `fetched_at`)으로 필터하면 행을 건너뛴다. 필터는 Job 파라미터의 고정 기준 시각을 쓰고 정렬은 `id` 순으로 한다(도출).
 
@@ -98,7 +110,7 @@ stateDiagram-v2
 **무료 기간과 Hobby 전환 이후(도출).**
 - 무료 기간(B1 ~ MVP 배포 전): Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다(사용자 실사용 확인). 그래서 GitHub Actions cron은 끈다. `main` 병합은 배포 때만 하므로 MVP 배포 전 Cloudtype에는 수집 코드가 없고, 첫 전체 수집과 성능 실측은 로컬 환경에서 하며 운영 DB 적재는 MVP 배포 때 한다. Supabase가 1주 비활성으로 일시정지되면 대시보드에서 재개한다.
 - 수집 → 재계산 → 월초 알림 생성의 연결(도출): GitHub Actions는 수집 시작만 호출하고(202), 백엔드가 수집 Job 완료 시점(Spring Batch Job 리스너)에 재계산을 이어 붙이고 월초 알림 생성은 재계산 완료 뒤에 이어 붙인다. 워크플로가 비동기 수집의 완료 시점을 알 필요가 없다.
-- 로컬 프로필(`local`)에서만 수집 실행 API의 `targetDate`를 직접 지정할 수 있다(같은 날 재실행 409를 피해 재계산 흐름을 재현하는 용도). 운영 프로필에서는 허용하지 않는다.
+- 로컬 프로필(`local`)에서만 수집 실행 API의 `targetDate`를 직접 지정할 수 있다(같은 날 재실행 409를 피해 재계산 흐름을 재현하는 용도). 설정 키는 `app.collect.allow-target-date-override`이고 local만 `true`다. 운영 프로필에서는 허용하지 않는다.
 - Hobby 전환 이후: cron을 켠다. 매일 수집이 Supabase 1주 비활성 일시정지를 막는 효과는 이 시기부터만 있다.
 - Actions는 수집 → 재계산 → 월초 알림 **생성**만 트리거하고 발송은 앱 스케줄러가 한다(R11-5).
 - **cron은 Vercel을 거치지 않고 Cloudtype 주소로 직접 호출한다(도출).** 백엔드가 Vercel 경유 요청만 받도록 오리진 비밀 헤더를 검사하므로(T-8), 워크플로가 `x-origin-secret`(저장소 시크릿 `ORIGIN_SECRET`)과 `Authorization: Bearer`(`ADMIN_BATCH_TOKEN`)를 함께 보낸다. 그래서 Vercel의 응답 시간 제한이나 캐시와 무관하다.
@@ -129,7 +141,7 @@ sequenceDiagram
 - **쿠키 기반 인가 요청 저장소.** 기본 `HttpSessionOAuth2AuthorizationRequestRepository`는 세션에 저장한다(c7). API가 `STATELESS`이므로 쿠키 기반 `AuthorizationRequestRepository`를 구현해 `oauth2Login.authorizationEndpoint`에 등록한다(도출: 재시작·매일 중지에도 진행 중 로그인이 깨지지 않게).
 - **RT 서버 측 저장(R11-21 확정, 2026-10-09)**: **Redis(TTL)에 해시로 저장**하고 재발급 때 **회전**(새 RT 발급, 이전 RT 폐기), 이미 쓴 RT가 다시 쓰이면(**재사용 감지**) 해당 계열을 무효화한다. 서명 검증만 하는 방식은 한 번 발급한 RT를 만료 전에 무효화할 수 없고 회전의 재사용 감지도 못 하므로 택하지 않았다(Auth0 등 refresh token rotation 문서, 2차 자료). `RefreshTokenStore` 인터페이스는 유지해 저장소를 교체할 수 있게 둔다(예: PostgreSQL 구현). **알려진 한계**: ① Redis Cloud 무료는 영속성이 없다. 메모리가 차서 `allkeys-lru`가 키를 지우면 **그 키의 사용자만** 다시 로그인하고, 14일 동안 접속이 없어 DB가 삭제되거나 Redis가 통째로 사라지면(Task 003·020 기록) **모든 사용자**가 다시 로그인해야 한다. ② 무료 플랜은 TLS를 쓸 수 없어(Task 003 기록, 2026-10-06 사용자 확인) Cloudtype → Redis Cloud 구간이 **평문**이다. 그래서 RT 상태가 평문 구간을 지나는데, 저장하는 값은 RT의 **해시**라 중간에서 엿봐도 쿠키로 재생할 수 없고 RT 원문은 이 구간을 지나지 않는다(원문은 브라우저 쿠키와 서버 메모리에서만 다룸). TLS는 TLS를 지원하는 유료 플랜으로 옮기거나 PostgreSQL 구현으로 교체할 때 해결한다(유료 전환 시점에 결정). 규모가 작아 수용하고, 사용자가 늘어 불편해지면 PostgreSQL 구현으로 바꾼다. AT 30분·RT 14일, RT는 재발급 때 회전한다(T-7 확정). 값은 `app.jwt.access-ttl`·`app.jwt.refresh-ttl`에 둔다.
 - 쿠키를 쓰는 `/api/auth/refresh`·`/api/auth/logout`만 `SameSite=Lax` + `Origin`이 `APP_FRONTEND_ORIGIN`과 같은지 검사해 CSRF를 막는다(도출).
-- 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출).
+- 관리자 배치 토큰(`ADMIN_BATCH_TOKEN`)은 별도 필터가 상수 시간 비교로 검사하고, 배치 실행 경로(`/api/admin/collect/**`, `/api/admin/plans/monthly/**`)에만 유효하다(도출). 구현(Task 045): `AdminBatchTokenFilter`는 Security 체인 앞의 서블릿 필터(order `HIGHEST_PRECEDENCE + 30`, 오리진 비밀 헤더 필터 +20 다음)이고, 토큰이 없거나 틀리면 401 `UNAUTHORIZED` ProblemDetail로 거부한다. Task 054에서 Security 체인 안으로 옮겨 ADMIN JWT와 OR로 합친다(그 전까지 이 경로는 토큰만 검사한다). 설정은 `app.admin-batch-token`이며 local은 `${ADMIN_BATCH_TOKEN:local-admin-batch-token}`, prod는 기본값 없이 값이 없으면 기동이 실패한다.
 
 **IP 헤더 신뢰 문제.**
 - `server.forward-headers-strategy=framework`를 쓴다. Cloudtype은 Boot가 인식하는 클라우드가 아니라 기본값이 `NONE`이다(c7). `native`는 컨테이너가 신뢰 프록시를 판정해 Vercel 같은 공인 IP 프록시 헤더를 무시할 수 있어 기각했다(도출, 배포 스모크로 확인).
@@ -211,6 +223,10 @@ sequenceDiagram
 | `NUMERIC` 컬럼을 `Double`로 매핑하면 `validate`가 `found [numeric], but expecting [float(53)]`로 기동에 실패한다 | `BigDecimal`로 매핑한다 | Task 035 실측 |
 | 복합 키 엔티티의 `create`에 저장 전 부모(id가 null)를 넘기면 `null value in column "name"` 같은 헷갈리는 NOT NULL 오류가 난다 | 부모를 먼저 저장한 뒤 넘긴다 | Task 035 실측 |
 | `Instant`에 `@JdbcTypeCode(TIMESTAMP_WITH_TIMEZONE)`가 없어도 `validate`가 통과한다(Hibernate 7, PostgreSQL 17.6). `BaseTimeEntity` 주석("기본 매핑은 TIMESTAMP")과 다르다 | 어노테이션은 일관성을 위해 유지하고, 주석 정정은 별도로 확인한다 | Task 035 실측(`backend-dev` 검증) |
+| Jackson 3에서 본문 변환 실패(`MismatchedInputException`)의 필드 경로는 `tools.jackson.core.JacksonException#getPath()`가 주는 `JacksonException.Reference` 목록(`getPropertyName()`·`getIndex()`)으로 읽는다. 경로가 비면 필드를 특정할 수 없다 | `GlobalExceptionHandler`가 원인 사슬에서 경로가 있는 `MismatchedInputException`을 찾아 `fieldErrors`로 낸다. 없으면(깨진 JSON) `INVALID_REQUEST`다 | 실측(Task 045) |
+| `JobRepository`는 이미 열린 트랜잭션 안에서 실행 기록을 만드는 것을 거부한다 | 실행·복구를 부르는 서비스와 `CollectJobLauncher`에 `@Transactional`을 붙이지 않는다 | 실측(Task 045) |
+| `@Bean(defaultCandidate = false)`로 둔 두 번째 `JobOperator`가 Boot의 Batch 자동 구성과 충돌하지 않는다. Boot 기본 동기 operator도 그대로 주입된다 | 비동기 operator는 `@Qualifier("collectJobOperator")`로만 받는다 | 실측(Task 045) |
+| `BATCH_JOB_EXECUTION_PARAMS`의 `LocalDate` 파라미터는 `PARAMETER_VALUE`에 ISO 문자열(`2026-10-15`)로 저장된다 | 날짜 조회는 문자열 비교·`CAST(... AS DATE)`로 한다(`CollectExecutionQuery`) | 실측(Task 045) |
 
 ---
 
