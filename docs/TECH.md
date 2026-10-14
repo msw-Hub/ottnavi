@@ -278,6 +278,7 @@ T-1~T-8은 확정(2026-10-03), T-9는 결정 필요다. PRD 11절 항목은 PRD�
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`(운영) | Redis Cloud 데이터베이스 | **Cloudtype 환경 변수만** | 로컬 `.env`에는 넣지 않는다 |
 | `JWT_SECRET` | 직접 생성(아래 명령) | 로컬 `.env`(개발용), Cloudtype(운영용) | 256비트 이상, 두 값은 서로 다르게 |
 | `ADMIN_BATCH_TOKEN` | 직접 생성 | **GitHub Actions secrets**, Cloudtype, 로컬 `.env`(개발용) | cron이 `Authorization: Bearer`로 보냄. GitHub·Cloudtype 값은 같아야 함 |
+| `BACKEND_BASE_URL` | Cloudtype 공개 주소(`https://`로 시작, 끝에 `/` 없이) | **GitHub Actions secrets** | `collect.yml`이 Vercel을 거치지 않고 직접 호출할 주소(Task 047). 비밀은 아니지만 워크플로가 읽도록 시크릿으로 둔다 |
 | `ORIGIN_SECRET` | 직접 생성 | **GitHub Actions secrets**, **Vercel(Production·Preview 둘 다)**, Cloudtype | 세 곳의 값이 같아야 한다. 로컬에서는 오리진 검사를 끈다(`app.origin-secret.enabled=false`)라서 `.env`에 불필요 |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | Gmail 앱 비밀번호 | 로컬 `.env`, 일회성 Cloudtype 서비스(Task 022), 운영 Cloudtype(Task 092) | 일반 로그인 비밀번호가 아니라 앱 비밀번호 16자리 |
 | Cloudtype 배포 토큰, 백엔드 주소 | Cloudtype(Task 020) | GitHub Actions secrets | 이름은 R-12 결정으로 정한다 |

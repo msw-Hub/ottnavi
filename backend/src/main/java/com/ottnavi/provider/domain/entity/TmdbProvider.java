@@ -73,6 +73,24 @@ public class TmdbProvider extends BaseTimeEntity {
         this.tier = tier;
     }
 
+    /**
+     * 관리자 화면에서 고른 매핑 상태로 바꾼다.
+     * MAPPED면 서비스와 tier를 그대로 저장하고, UNMAPPED·IGNORED면 서비스 연결을 끊고 tier를 STANDARD로 돌린다(계약 updateAdminProvider).
+     * 서비스 없는 MAPPED는 DB CHECK 제약 위반이라 여기서 먼저 막는다.
+     */
+    public void changeMapping(MappingState mappingState, OttService ottService, ProviderTier tier) {
+        if (mappingState == MappingState.MAPPED) {
+            mapTo(ottService, tier);
+            return;
+        }
+        if (ottService != null) {
+            throw new IllegalArgumentException("MAPPED가 아니면 서비스를 연결할 수 없다");
+        }
+        this.mappingState = mappingState;
+        this.ottService = null;
+        this.tier = ProviderTier.STANDARD;
+    }
+
     /** 관련 없는 제공처로 표시한다. 서비스 연결은 끊고 tier는 STANDARD로 돌린다 */
     public void ignore() {
         this.mappingState = MappingState.IGNORED;
