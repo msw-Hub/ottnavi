@@ -18,3 +18,4 @@ springdoc:
 app:
   origin-secret:
     value: ${ORIGIN_SECRET}       # 기본값 없음. 누락 시 기동이 실패한다(Vercel 주입 값과 같아야 함)
+  admin-batch-token: ${ADMIN_BATCH_TOKEN}   # 기본값 없음. 누락 시 기동이 실패한다(GitHub Actions cron 시크릿과 같아야 함)
