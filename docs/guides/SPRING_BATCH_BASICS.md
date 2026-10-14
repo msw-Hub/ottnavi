@@ -114,7 +114,5 @@ Processor가 TMDB 404를 만나 `null`을 돌려주면 그 작품은 2번에서 
 
 | 문서 | 내용 |
 |---|---|
-| `docs/COLLECT_JOB_FLOW.md` | 후보를 모으는 Step 3개의 흐름(043) |
-| `docs/COLLECT_DETAIL_FLOW.md` | 상세·시즌·판정 Step 3개의 흐름(044) |
-| `docs/COLLECT_CODE_WALKTHROUGH.md` | 후보 수집 코드를 호출 순서대로 읽기 |
-| `docs/PACKAGE_MAP.md` | 폴더 지도 |
+| `docs/guides/COLLECT_GUIDE.md` | 수집 Job의 Step 6개 흐름(후보 수집 043, 상세·시즌·판정 044), 후보와 판정의 차이, 코드 읽는 순서 |
+| `docs/guides/PACKAGE_MAP.md` | 폴더 지도 |

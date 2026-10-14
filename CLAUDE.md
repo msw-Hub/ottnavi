@@ -22,14 +22,10 @@ PRD 11절 확정 → PRD 본문 → ERD → rules. 문서끼리 어긋나면 임
 | `docs/PRD.md` | 요구사항·계산 규칙(5.4)·개발 단계·결정 현황(11절, `R11-N`)의 단일 기준 |
 | `docs/ERD.md` | 스키마·상태값·삭제 정책 |
 | `docs/TECH.md` | rules에 없는 설계 결정과 함정(`T-N`, 계산 엔진·플랜 저장·배치·인증·outbox·호환성) |
-| `docs/ENGINE_ALGORITHM.md` | 계산 엔진 알고리즘 상세 설명(평가기·완전탐색·그리디·플랜 유형 3종·시즌 순서·측정 결과). 쉬운 설명과 작은 예시. 규칙의 근거는 PRD 5.4·TECH 1절이고 이 문서는 구현을 설명한다 |
 | `docs/ROADMAP.md` | Phase/Task 진행표, 검증 절차(V-F, V-B, V-API, V-FS, V-DEPLOY, V-H) |
 | `docs/TASK003_POLICY_PRICING.md` | Task 003 조사 기록: TMDB 약관, 서비스 해지 정책(R11-27), Cloudtype·Supabase·Redis Cloud 무료 플랜 한도와 요금. 출처·확인 수준 표시 |
-| `docs/SPRING_BATCH_BASICS.md` | 수집 Job을 읽기 위한 Spring Batch 최소 개념(Job·Step·chunk·Reader·Processor·Writer·restart)과 코드 위치. 근거 문서가 아니다 |
-| `docs/PACKAGE_MAP.md` | 백엔드 패키지(폴더) 지도와 보조 설명. 패키지를 만들거나 옮기거나 지우는 PR에서 같이 갱신한다. 근거 문서가 아니고 코드가 기준 |
 | `docs/HANDOFF.md` | 세션·계정이 바뀌어도 이어가기 위한 문서: 현재 상태, 다음 작업 순서, 미결·이월 항목, 사용자 직접 할 일, 환경 함정. 근거 문서가 아니고 오래되면 ROADMAP이 기준 |
-| `docs/FLYWAY_GUIDE.md`, `docs/JPA_COMPOSITE_KEY_GUIDE.md`, `docs/OPENFEIGN_GUIDE.md` | 학습용 설명 문서: Flyway(엔티티로 테이블 만들던 방식과의 차이 포함), JPA 복합 기본키, OpenFeign(TMDB 클라이언트). 근거 문서가 아니다 |
-| `docs/AVAILABILITY_RULES.md`, `docs/COLLECT_JOB_FLOW.md`, `docs/COLLECT_CODE_WALKTHROUGH.md` | 수집 데이터 손질 설명: 제공 상태 판정·러닝타임 규칙(Task 042), 수집 Job이 무엇인가(Task 043), 수집 코드를 호출 흐름 순서로 읽는 안내. 근거 문서가 아니다 |
+| `docs/guides/` | **사용자가 요청해 만든 설명·학습 문서 폴더. 근거 문서가 아니고 코드가 기준이다**(규칙의 근거는 PRD·ERD·TECH). `ENGINE_ALGORITHM`(계산 엔진), `COLLECT_GUIDE`(수집 Job의 Step 6개, 후보와 판정의 차이, 읽는 순서), `SPRING_BATCH_BASICS`(Spring Batch 기본 개념), `AVAILABILITY_RULES`(제공 상태 판정·러닝타임), `PACKAGE_MAP`(백엔드 패키지 지도, 패키지를 만들거나 옮기거나 지우는 PR에서 같이 갱신), `FLYWAY_GUIDE`, `JPA_COMPOSITE_KEY_GUIDE`, `OPENFEIGN_GUIDE`. 새 설명 문서는 이 폴더에 둔다 |
 | `docs/proposal_v6.md` | 요약본. 근거로 쓰지 않는다 |
 | `docs/PROJECT_STORY.md` | 프로젝트를 만든 이유(포트폴리오·README·자기소개서·면접용 문구). 사용자가 직접 겪은 경험만 담고 용도별(문단·두 문장·구두)로 다듬어 둠. 근거 문서가 아니다 |
 | `docs/api/openapi.yaml`, `docs/api/error-codes.md` | API 계약과 오류 코드표. operation 31개(구현됨 1 + `x-planned: true` 30). 변경 절차는 api-contract.md |
@@ -90,7 +86,7 @@ cd frontend; npm run api:generate                                      # openapi
 - **외부 호출(TMDB·메일·LLM)은 트랜잭션 밖**에서 한다(수집 배치만 예외, TECH T-2).
 - **버전 함정**: Spring Boot 4.1은 Jackson 3(`tools.jackson.*`), `@MockitoBean`, `spring-boot-starter-flyway`·`spring-boot-starter-batch-jdbc` 필요, orval은 `httpClient: 'axios'` 명시 필요, msw 3은 `onUnhandledRequest`가 아니라 `onUnhandledFrame`, TypeScript 6은 `baseUrl` 없이 `paths`만 쓴다. 전체 목록은 TECH 6절.
 - **설정 파일은 YAML로 통일**한다(`application.yml`, `-local.yml`, `-prod.yml`). `.properties`와 섞지 않는다.
-- **패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 변경은 `docs/PACKAGE_MAP.md`를 같은 PR에서 갱신한다.** 구현 PR을 올리기 전에 지도가 실제 폴더와 맞는지 확인한다(2026-10-14 사용자 결정).
+- **패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 변경은 `docs/guides/PACKAGE_MAP.md`를 같은 PR에서 갱신한다.** 구현 PR을 올리기 전에 지도가 실제 폴더와 맞는지 확인한다(2026-10-14 사용자 결정).
 - **화면 표시**: 제공 상태는 있음/없음/모름 3가지를 색만으로 구분하지 않고, 제공처 화면엔 JustWatch 출처, About엔 TMDB 로고·고지문을 반드시 넣는다. 결과는 "확정"이 아닌 "확인된 범위"로 표현하고 데이터 기준일을 보여준다.
 
 ## 협업 방식

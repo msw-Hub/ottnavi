@@ -208,4 +208,4 @@ com.ottnavi
 - 외부 API/LLM 호출 책임은 `infra`에 두고, 도메인 서비스는 `infra`의 클라이언트를 호출해 결과를 도메인 모델로 변환한다. 프롬프트 조립은 `infra/llm` 안에서 `XxxPromptService`로 분리한다.
 - `plan`은 `engine`을 호출하는 유일한 도메인이다. `engine`은 다른 패키지를 참조하지 않는다.
 - 공통 응답/예외/보안/요청 제한은 전부 `global`에 모아 도메인 간 중복을 없앤다.
-- 패키지를 만들거나 옮기거나 지우거나 역할이 바뀌면 `docs/PACKAGE_MAP.md`를 같은 PR에서 고친다(폴더 지도와 보조 설명).
+- 패키지를 만들거나 옮기거나 지우거나 역할이 바뀌면 `docs/guides/PACKAGE_MAP.md`를 같은 PR에서 고친다(폴더 지도와 보조 설명).

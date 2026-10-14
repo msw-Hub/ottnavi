@@ -61,4 +61,4 @@
 
 ## 6. 문서 목록(설명용, 근거 아님)
 
-`FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `COLLECT_JOB_FLOW.md`(수집 Job이 무엇인가), `COLLECT_CODE_WALKTHROUGH.md`(수집 코드를 호출 흐름 순서로 읽기), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트), `ENGINE_ALGORITHM.md`(계산 엔진). 새 설명 문서는 짧게 쓰고 PR에 함께 커밋한다.
+설명용 문서는 모두 `docs/guides/` 폴더에 있다: `COLLECT_GUIDE.md`(수집 Job의 Step 6개, 후보와 판정의 차이, 읽는 순서), `SPRING_BATCH_BASICS.md`(Job·Step·chunk·Reader·Processor·Writer), `AVAILABILITY_RULES.md`(제공 상태 판정·러닝타임), `PACKAGE_MAP.md`(백엔드 폴더 지도), `ENGINE_ALGORITHM.md`(계산 엔진), `FLYWAY_GUIDE.md`(Flyway와 엔티티로 테이블 만들던 방식의 차이), `JPA_COMPOSITE_KEY_GUIDE.md`(복합 기본키), `OPENFEIGN_GUIDE.md`(TMDB 클라이언트). 새 설명 문서는 짧게 쓰고 `docs/guides/`에 두어 PR에 함께 커밋한다.
