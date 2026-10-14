@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 7/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 10/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 43/105 | |
+| 합계 | | 46/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -816,7 +816,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 7/30
+## 7. Phase 3 — 핵심 기능 개발 · 10/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -971,17 +971,19 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 단계별 요약: 1) 오류 코드 `BATCH_*` 4개(`BATCH_ALREADY_RUNNING`·`BATCH_ALREADY_COMPLETED`·`BATCH_RECOVERY_REQUIRED`·`BATCH_NOT_STOPPED`, 예외 클래스는 `admin/exception`)와 `FieldValidationException`·`ResourceNotFoundException`, `GlobalExceptionHandler`의 본문 변환 실패 `fieldErrors` 처리, 계약 갱신. 2) 상태·날짜·409·버튼·실패 사유 규칙(`CollectExecutionRules`)과 `BATCH_*` 표를 SQL로 읽는 `CollectExecutionQuery`·`CollectExecutionRecord`. 3) 수집 전용 비동기 `JobOperator`(`CollectLaunchConfig`), 시작·재시작·복구 창구(`CollectJobLauncher`), 서버 기동 시각(`ServerBootTime`). 4) 시작·재시작·복구 서비스(`CollectExecutionService`)와 컨트롤러(`AdminCollectController`), 관리자 배치 토큰 필터(`AdminBatchTokenFilter`). 5) 이력·실행별 변경 조회(`CollectExecutionQueryService`, `catalog/service`의 `AvailabilityChangeQueryService`, `global/common/PageResponse`). 6) 문서 갱신, 계약 문구 정리, 테스트 정리(통합 테스트 초기화를 FK 순서로 통일, 공통 틀 `AdminCollectApiTestSupport`).
   - 이월 해소: Task 043에서 넘어온 "날짜가 다른 Job의 동시 실행(Reader 상태 공유)"은 전체 동시 실행 금지로, Task 044에서 넘어온 같은 항목과 "완료·실행 중 409 매핑", "`TaskExecutor`를 가진 `JobOperator`"는 구현으로 해소했다.
   - 남은 것: 프론트 반영(`frontend-dev`), 계약 최종 확인(`contract-checker`), 사용자 설명 문서 검토, PR. 실제 Cloudtype 배포 때 `ADMIN_BATCH_TOKEN` 입력. 확인하지 못한 것: 실제 TMDB 응답으로 수집·복구(WireMock만 사용), 운영 환경(옛·새 컨테이너가 겹치는 재배포) 동작.
+  - 최종: 2026-10-15 PR #62(`e1aba03`) Squash 병합. 프론트 반영(생성 타입·`collectRules.ts` 단순화·목업·SCR-16·V-F)과 `contract-checker` 확인까지 같은 PR에 담았고 CodeRabbit 지적 없음. 프론트 465건·백엔드 646건 통과.
 
-#### Task 046: 제공처 매핑 관리 API 구현으로 매핑 운영 수단 마련 ⬜
-- 태그: [B] · PRD: B3, FR-18(R11-23 흡수안), SCR-15 · 선행: 035, 031 · 브랜치: `feature/b3-provider-mapping-api`
+#### Task 046: 제공처 매핑 관리 API 구현으로 매핑 운영 수단 마련 ✅
+- 태그: [B] · PRD: B3, FR-18(R11-23 흡수안), SCR-15 · 선행: 035, 031 · 브랜치: `feature/b3-mapping-api-cron`(047과 한 PR)
 - 구현 사항
   - [ ] `GET /api/admin/providers`(`listAdminProviders`: `mappingState`, `first_seen_at`), `PATCH /api/admin/providers/{providerId}`(`updateAdminProvider`: `mappingState`·`ottServiceId`·`tier`)
   - [ ] 매핑 변경은 다음 수집부터 반영됨을 응답 설명에 적는다
 - 완료 기준
   - V-API: 미매핑 제공처 매핑 후 재조회에 반영된다. 이 API는 Task 054 전까지 보호되지 않는 상태(local 전용)이고, USER 403 확인은 Task 054 완료 기준이다.
+- 기록: 2026-10-15 완료(브랜치 `feature/b3-mapping-api-cron`, 047과 한 PR). 컨트롤러·dto는 `admin`(`AdminProviderController`, 요청·응답 dto 3개), 서비스는 `provider`(`AdminProviderService`, 입출력은 `AdminProviderView`)에 뒀다(backend.md: admin은 각 도메인 서비스를 호출). 목록은 미매핑(UNMAPPED)을 먼저, 그다음 `providerId` 순이다. 저장 규칙: MAPPED면 `ottServiceId` 필수(없거나 존재하지 않는 서비스는 400 `VALIDATION_FAILED`의 `fieldErrors.ottServiceId`), UNMAPPED·IGNORED면 `ottServiceId`는 null이어야 하고 저장 시 서비스 연결을 끊고 tier를 STANDARD로 되돌린다, 없는 `providerId`는 404 `RESOURCE_NOT_FOUND`, 검증은 본문 조합 검사 → 제공처 조회 순이다. 계약 operation 8개 구현·23개 `x-planned`. 전체 `./gradlew.bat test` 654건 실패 0·오류 0·건너뜀 1(기존), 신규 8건(`AdminProviderServiceTest` 5, `AdminProviderApiTest` 3). 이 경로는 Task 054 전까지 보호되지 않는다(USER 403은 054 완료 기준).
 
-#### Task 047: 수집 cron 워크플로를 비활성 상태로 작성해 Hobby 전환 후 자동 실행 준비 ⬜
-- 태그: [B] · PRD: B3, FR-18, R11-4 · 선행: 045, 015 · 브랜치: `feature/b3-collect-cron`
+#### Task 047: 수집 cron 워크플로를 비활성 상태로 작성해 Hobby 전환 후 자동 실행 준비 ✅
+- 태그: [B] · PRD: B3, FR-18, R11-4 · 선행: 045, 015 · 브랜치: `feature/b3-mapping-api-cron`(046과 한 PR)
 - 관련: TECH 3절(cron 제약, Cloudtype 직접 호출)
 - 구현 사항
   - [ ] `.github/workflows/collect.yml`: `workflow_dispatch`만, `schedule`은 주석(활성화 값 예: `17 18 * * *` = KST 03:17)
@@ -990,6 +992,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 공개 저장소 60일 무활동 시 예약 워크플로가 꺼진다는 주석
 - 완료 기준
   - 워크플로의 호출 명령과 같은 요청을 PowerShell로 로컬 백엔드에 보내 202, 재호출 409를 확인했고 YAML 문법이 유효하다. GitHub Actions 실행 확인은 `main` 병합 후 Task 095.
+- 기록: 2026-10-15 완료(브랜치 `feature/b3-mapping-api-cron`, 046과 한 PR). `.github/workflows/collect.yml`을 작성했다: `workflow_dispatch`만 켜 두고 `schedule`(`17 18 * * *`)은 주석, Cloudtype 주소(저장소 시크릿 `BACKEND_BASE_URL`)로 직접 호출하며 `x-origin-secret`(`ORIGIN_SECRET`)과 `Authorization: Bearer`(`ADMIN_BATCH_TOKEN`)를 보낸다. 202·409는 성공, 그 외 실패. 수집 시작만 호출한다(R-21). YAML 문법을 확인했고, 로컬 백엔드(local 프로필)에 같은 요청을 보내 202 → 즉시 재호출 409(`BATCH_ALREADY_RUNNING`), 토큰 없음 401을 확인했다. **GitHub 저장소 시크릿 `BACKEND_BASE_URL`·`ORIGIN_SECRET`·`ADMIN_BATCH_TOKEN` 등록은 사용자가 Task 093(cron 활성화) 때 한다.**
 
 #### Task 048: 첫 전체 수집 실행과 측정으로 용량·러닝타임 근거 확보 ⬜
 - 태그: [H] · PRD: B3, R11-25, R11-26 · 선행: 045, 044 · 기한: 2026-10-21

@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-15 (Task 045 반영 기준)
+> 마지막 갱신: 2026-10-15 (Task 046 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -27,17 +27,18 @@ com.ottnavi
 │       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
-│   ├── dto/response/      프론트에 내보내는 JSON 틀
-│   ├── service/           ProviderCollectService 등 + model/ (MappedProvider …)
+│   ├── dto/
+│   │   └── response/        OttServiceResponse
+│   ├── service/           ProviderCollectService, AdminProviderService(매핑 조회·변경) 등 + model/ (MappedProvider, AdminProviderView …)
 │   └── domain/            entity · enums · repository
 ├── product/             구독 상품·가격 (엔티티·리포지토리만 있음)
-├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045). 보호는 배치 토큰 필터
-│   ├── controller/        AdminCollectController (/api/admin/collect/executions)
+├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 배치 토큰 필터(제공처 매핑은 Task 054 전까지 미보호)
+│   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
 │   ├── service/           CollectExecutionService(시작·재시작·복구), CollectExecutionQueryService(이력·변경 조회)
 │   │   └── model/           CollectViewContext(요청 한 번의 판정 맥락)
 │   ├── dto/
-│   │   ├── request/         CreateCollectExecutionRequest
-│   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse
+│   │   ├── request/         CreateCollectExecutionRequest, UpdateAdminProviderRequest
+│   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse, AdminProviderResponse, AdminProviderListResponse
 │   └── exception/         409 예외 4종(BatchAlreadyRunning·BatchAlreadyCompleted·BatchRecoveryRequired·BatchNotStopped)
 ├── collect/             TMDB에서 데이터를 모으는 배치(수집 Job)
 │   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime)
