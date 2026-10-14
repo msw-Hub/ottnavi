@@ -929,7 +929,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 쓰기 설계 확정(Task 035에서 이월): ① `Availability`가 AVAILABLE이면 `in_standard`·`in_ad_tier` 중 하나는 true여야 한다는 규칙이 DB와 엔티티에 없으니 판정 Step에서 지킨다 ② 제공 상태 변경과 `availability_change` 기록을 한 트랜잭션에서 한다 ③ 이력 중복 방지와 낙관적 락(`@Version`)이 필요한지 정한다(`@Version`은 ERD에 열을 늘리므로 ERD·TECH 확인 후) ④ `WatchUnit` 갱신 메서드를 추가하고, 인자가 12개인 `Title.updateDetail`은 호출처가 늘면 record로 묶는 것을 고려한다
   - [x] `watch_unit`은 작품 종류에 맞는 단위만 만든다: 영화 작품은 MOVIE 단위 1개(`episode_count`는 1), 드라마 작품은 SEASON 단위(DB는 `title.media_type`과 `unit_type`의 일치를 검사하지 않는다, Task 033 CodeRabbit #51 결정). 회차 수 컬럼(`episode_count` 등)은 0 이상만 DB가 검사하므로 방영 회차가 전체 회차보다 커도 저장된다
   - [x] 상세·시즌 수집 Step(`watch_unit`, 장르, 출연진), 제공 상태 판정·이력 Step(`availability`, `availability_change`)
-  - [x] `JpaPagingItemReader`는 Job 파라미터의 고정 기준 시각으로 필터하고 `id` 순 정렬(페이지 밀림 방지)
+  - [x] `JpaPagingItemReader`는 `id` 순으로 정렬하고 Step이 갱신하는 컬럼(`fetched_at` 등)으로 거르지 않는다(페이지 밀림 방지, TECH 3절). 읽은 위치를 저장해 restart가 이어 읽는다
   - [x] TV 시즌 호출량 지표(R11-26 측정용)
 - 완료 기준
   - V-B: 작은 후보 세트 전체 Job 실행 후 `title`·`watch_unit`·`availability`·`availability_change`가 기대값과 같다.
