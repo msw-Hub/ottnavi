@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -40,6 +40,6 @@ export interface CollectExecution {
   failureReason: string | null;
   /** 복구 버튼을 켤 수 있는지. 중단됨(`STOPPED`)이면 true */
   canRecover: boolean;
-  /** 재시작 버튼을 켤 수 있는지. 실패(`FAILED`)이고 같은 날짜·범위의 가장 최근 실행이며, 운영에서는 대상 날짜가 오늘이고 다른 수집이 실행 중이 아닐 때 true. 서버가 시작·재시작 거절 규칙과 같은 코드로 계산한다 */
+  /** 재시작 버튼을 켤 수 있는지. 실패(`FAILED`)이고 같은 날짜·범위의 가장 최근 실행이며, 운영에서는 대상 날짜가 오늘이고 다른 수집이 실행 중이 아닐 때 true. Batch가 포기(`ABANDONED`)한 실행은 화면 상태가 `FAILED`여도 false다(이 서비스는 그 상태를 만들지 않는다). 서버가 시작·재시작 거절 규칙과 같은 코드로 계산한다 */
   canRestart: boolean;
 }

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 6개(`listOttServices`와 수집 관리자 API 5개)이고, 나머지 25개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -590,9 +590,10 @@ export const useVerifyAdminProductPrice = <TError = ErrorType<BadRequestResponse
       return useMutation(getVerifyAdminProductPriceMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 수집 중 발견한 TMDB 제공처 전체(미매핑·관련 없음 포함)를 돌려준다. 미매핑을 위로 올리는 정렬은 화면 몫이다.
+ * 수집 중 발견한 TMDB 제공처 전체(미매핑·관련 없음 포함)를 돌려준다. 미매핑을 먼저, 그다음 제공처 번호 순으로 정렬해 내려준다. 매핑 변경은 다음 수집부터 반영된다.
+ * Task 054 전까지는 보호되지 않는다(local 전용).
  * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
- * @summary TMDB 제공처 매핑 목록 조회 (제안)
+ * @summary TMDB 제공처 매핑 목록 조회
  */
 export const listAdminProviders = (
 
@@ -663,7 +664,7 @@ export function useListAdminProviders<TData = Awaited<ReturnType<typeof listAdmi
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary TMDB 제공처 매핑 목록 조회 (제안)
+ * @summary TMDB 제공처 매핑 목록 조회
  */
 
 export function useListAdminProviders<TData = Awaited<ReturnType<typeof listAdminProviders>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
@@ -684,9 +685,9 @@ export function useListAdminProviders<TData = Awaited<ReturnType<typeof listAdmi
 
 
 /**
- * **제안(Task 031, 미구현).** 매핑 상태·연결 서비스·등급을 저장한다. `MAPPED`면 `ottServiceId`가 필수이고, `UNMAPPED`·`IGNORED`면 `ottServiceId`는 `null`이며 등급은 `STANDARD`로 저장된다.
- * 오류: `VALIDATION_FAILED`(400, MAPPED인데 서비스 없음·없는 서비스 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 제공처), `INTERNAL_ERROR`(500).
- * @summary 제공처 매핑 변경 (제안)
+ * 매핑 상태·연결 서비스·등급을 저장한다. 변경은 다음 수집부터 반영되며 이미 저장된 제공 상태는 바뀌지 않는다. `MAPPED`면 `ottServiceId`가 필수이고, `UNMAPPED`·`IGNORED`면 `ottServiceId`는 `null`이며 등급은 `STANDARD`로 저장된다.
+ * 오류: `VALIDATION_FAILED`(400, MAPPED인데 서비스 없음·없는 서비스·providerId가 1 미만 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 제공처), `INTERNAL_ERROR`(500).
+ * @summary 제공처 매핑 변경
  */
 export const updateAdminProvider = (
     providerId: number,
@@ -741,7 +742,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateAdminProviderMutationVariables = {providerId: number;data: BodyType<UpdateAdminProviderRequest>}
 
     /**
- * @summary 제공처 매핑 변경 (제안)
+ * @summary 제공처 매핑 변경
  */
 export const useUpdateAdminProvider = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,UpdateAdminProviderMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -756,7 +757,7 @@ export const useUpdateAdminProvider = <TError = ErrorType<BadRequestResponse | U
     /**
  * 수집 실행 이력을 대상 날짜 내림차순, 같으면 실행 ID 내림차순으로 돌려준다(Task 029 화면 정렬). 서버가 멈춰 기록만 "실행 중"으로 남은 실행은 서버가 `STOPPED`로 판정해 내려준다(저장하지 않고 조회할 때마다 판정한다).
  * 페이지네이션 응답이다. 수집은 매일 1회 이상 돌고 Spring Batch 메타데이터는 지우지 않으므로 이력이 계속 늘어난다.
- * 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절).
+ * 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절). Task 054 전까지는 배치 토큰만 검사한다(ADMIN Access Token은 Task 054에서 합친다).
  * 오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401, 배치 토큰이 없거나 틀림), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
  * @summary 수집 실행 이력 조회
  */
