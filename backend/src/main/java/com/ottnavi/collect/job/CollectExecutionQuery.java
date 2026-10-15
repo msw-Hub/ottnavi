@@ -3,8 +3,10 @@ package com.ottnavi.collect.job;
 import com.ottnavi.collect.step.detail.DetailStepConfig;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +57,21 @@ public class CollectExecutionQuery {
             return 0;
         }
         return count;
+    }
+
+    /**
+     * 수집 Job의 마지막 COMPLETED 실행의 종료 시각. 완료된 실행이 없으면 비어 있다.
+     * Batch 시각은 시간대 없는 값이라 JVM 기본 시간대로 해석해 Instant로 바꾼다(CollectExecutionRules.toKstOffset과 같은 방식).
+     */
+    public Optional<Instant> findLatestCompletedEndTime() {
+        List<LocalDateTime> found = jdbcTemplate.query(
+                "SELECT MAX(e.END_TIME) AS end_time FROM BATCH_JOB_EXECUTION e JOIN BATCH_JOB_INSTANCE i "
+                        + "ON i.JOB_INSTANCE_ID = e.JOB_INSTANCE_ID WHERE i.JOB_NAME = ? AND e.STATUS = 'COMPLETED'",
+                (rs, rowNum) -> rs.getObject("end_time", LocalDateTime.class), CollectJobConfig.JOB_NAME);
+        if (found.isEmpty() || found.get(0) == null) {
+            return Optional.empty();
+        }
+        return Optional.of(found.get(0).atZone(ZoneId.systemDefault()).toInstant());
     }
 
     /** 수집 기준일 내림차순, 같은 날짜는 최근 실행이 먼저. page는 0부터 */

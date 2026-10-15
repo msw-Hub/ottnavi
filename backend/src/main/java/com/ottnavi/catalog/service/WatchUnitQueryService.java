@@ -117,6 +117,7 @@ public class WatchUnitQueryService {
         }
         return new WatchUnitSummary(
                 unit.getId(),
+                unit.getTitle().getId(),
                 unit.getTitle().getMediaType(),
                 unit.getTitle().getTmdbId(),
                 unit.getTitle().getTitle(),

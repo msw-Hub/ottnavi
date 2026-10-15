@@ -13,6 +13,9 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItem, Long
 	/** 사용자의 찜 전부를 최근에 찜한 순으로 조회한다(같은 시각이면 ID가 큰 것이 먼저) */
 	List<WishlistItem> findAllByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
+	/** "다 봤음"이 아닌 찜만 ID 순으로 조회한다(플랜 계산 입력) */
+	List<WishlistItem> findAllByUserIdAndWatchedAtIsNullOrderByIdAsc(Long userId);
+
 	/** 사용자가 이미 찜한 시청 단위인지 찾는다(중복 추가 판정) */
 	Optional<WishlistItem> findByUserIdAndWatchUnitId(Long userId, Long watchUnitId);
 

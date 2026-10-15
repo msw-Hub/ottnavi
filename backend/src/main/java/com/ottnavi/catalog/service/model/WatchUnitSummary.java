@@ -9,6 +9,7 @@ import java.util.List;
  */
 public record WatchUnitSummary(
         long watchUnitId,
+        long titleId,               // 소속 작품(title) ID. 같은 시리즈의 시즌을 묶는 식별자로 쓴다
         MediaType mediaType,
         int tmdbId,
         String title,
