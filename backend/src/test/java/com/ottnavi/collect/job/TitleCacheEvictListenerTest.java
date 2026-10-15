@@ -1,7 +1,6 @@
 package com.ottnavi.collect.job;
 
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -34,8 +33,9 @@ class TitleCacheEvictListenerTest {
     }
 
     @Test
-    void 실패한_실행이면_캐시를_비우지_않는다() {
+    void 실패한_실행이어도_작품_상세_캐시를_비운다() {
         // given
+        when(cacheManager.getCache(RedisConfig.TITLE_DETAIL)).thenReturn(cache);
         JobExecution execution = mock(JobExecution.class);
         when(execution.getStatus()).thenReturn(BatchStatus.FAILED);
 
@@ -43,7 +43,7 @@ class TitleCacheEvictListenerTest {
         listener.afterJob(execution);
 
         // then
-        verify(cacheManager, never()).getCache(RedisConfig.TITLE_DETAIL);
+        verify(cache).clear();
     }
 
     @Test

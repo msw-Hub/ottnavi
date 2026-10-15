@@ -94,6 +94,7 @@ public class TitleSearchService {
                 unitRows.add(availabilities.rowsOf(unit.getId()));
                 checkedAts.addAll(availabilities.checkedAtOf(unit.getId()));
             }
+            // 서비스별로 시즌 상태를 합친다: 시즌 중 하나라도 있음이면 있음, 아니면 모름이 있으면 모름, 전부 없음이면 없음
             Map<Long, AvailabilityStatus> merged = AvailabilityAggregation.mergeByService(serviceIds, unitRows);
             content.add(new TitleSearchItemView(
                     title.getMediaType(),

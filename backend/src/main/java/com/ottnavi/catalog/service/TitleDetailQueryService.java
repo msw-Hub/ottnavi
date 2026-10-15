@@ -96,6 +96,7 @@ public class TitleDetailQueryService {
                 seasons.add(toSeason(unit, toServiceStatuses(AvailabilityAggregation.statusByService(serviceIds, rows))));
             }
         }
+        // 작품 전체 상태: 서비스별로 시즌 중 하나라도 있음이면 있음, 아니면 모름이 있으면 모름, 전부 없음이면 없음
         List<ServiceStatus> titleStatuses =
                 toServiceStatuses(AvailabilityAggregation.mergeByService(serviceIds, unitRows));
 
