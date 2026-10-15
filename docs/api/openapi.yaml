@@ -624,7 +624,7 @@ paths:
         - bearerAuth: []
       summary: 마지막 월 구독요금 이력 수정
       description: |
-        가장 최근 요금 이력(가장 최근 요금 이력)만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
+        가장 최근 요금 이력만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
         시작일 규칙은 추가와 같다(바로 앞 요금 이력보다 늦어야 함). 요금 이력이 하나뿐이면 첫 요금 이력 규칙(시작일 오늘 이하)을 따른다.
         오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_NOT_LATEST`(409, 가장 최근 요금 이력이 아님), `PRICE_START_DATE_DUPLICATE`(409), `PRICE_START_DATE_NOT_AFTER_LAST`(409), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
       parameters:
@@ -663,7 +663,7 @@ paths:
         - bearerAuth: []
       summary: 마지막 월 구독요금 이력 삭제
       description: |
-        가장 최근 요금 이력(가장 최근 요금 이력)만 지울 수 있고, 요금 이력이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
+        가장 최근 요금 이력만 지울 수 있고, 요금 이력이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
         오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_LAST_ROW_CANNOT_DELETE`(409), `PRICE_NOT_LATEST`(409), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
@@ -2823,7 +2823,7 @@ components:
           description: false면 판매 종료(삭제하지 않고 남긴다)
         prices:
           type: array
-          description: 월 구독요금 이력. 적용 시작일이 빠른 순(가장 최근 요금 이력이 가장 최근)
+          description: 월 구독요금 이력. 적용 시작일이 빠른 순(마지막 항목이 가장 최근 요금 이력)
           items:
             $ref: '#/components/schemas/AdminProductPrice'
     AdminProductList:
@@ -3108,7 +3108,7 @@ components:
           type: string
           nullable: true
           description: >-
-            실패 사유. 실패가 아니면 null. 예외가 원인이면 첫 요금 이력 "예외명: 메시지"를 300자까지 담고,
+            실패 사유. 실패가 아니면 null. 예외가 원인이면 예외 메시지의 첫 줄 "예외명: 메시지"를 300자까지 담고,
             중단을 관리자가 복구한 실행은 "중단된 실행을 관리자가 실패로 복구함"이다
         canRecover:
           type: boolean
