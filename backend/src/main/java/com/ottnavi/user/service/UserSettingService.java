@@ -144,7 +144,9 @@ public class UserSettingService {
 					billingDay = DEFAULT_BILLING_DAY;
 				}
 			} else if (planName != null || billingDay != null) {
-				throw new FieldValidationException(prefix + "planName", "구독 중이 아니면 요금제 이름과 결제일은 비워야 합니다.");
+				// 요금제 이름이 있으면 그 칸을, 결제일만 있으면 결제일 칸을 오류 위치로 알린다
+				String field = planName != null ? "planName" : "billingDay";
+				throw new FieldValidationException(prefix + field, "구독 중이 아니면 요금제 이름과 결제일은 비워야 합니다.");
 			}
 			result.put(item.ottServiceId(), new SubscriptionState(item.ottServiceId(), item.status(), planName, billingDay));
 		}

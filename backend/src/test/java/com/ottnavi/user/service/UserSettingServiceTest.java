@@ -172,8 +172,13 @@ class UserSettingServiceTest {
 
 		// when & then
 		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, withPlan))
-				.isInstanceOf(FieldValidationException.class);
+				.isInstanceOf(FieldValidationException.class)
+				.extracting(e -> ((FieldValidationException) e).getField())
+				.isEqualTo("subscriptions[0].planName");
+		// 결제일만 보낸 경우에는 오류 위치가 결제일 칸이다
 		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, withDay))
-				.isInstanceOf(FieldValidationException.class);
+				.isInstanceOf(FieldValidationException.class)
+				.extracting(e -> ((FieldValidationException) e).getField())
+				.isEqualTo("subscriptions[0].billingDay");
 	}
 }
