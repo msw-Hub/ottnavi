@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 16/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 18/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 52/105 | |
+| 합계 | | 54/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -817,7 +817,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 16/30
+## 7. Phase 3 — 핵심 기능 개발 · 18/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -1092,24 +1092,26 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-API: refresh·logout 호출을 확인했다.
 - 기록(053·054, 2026-10-16, 한 브랜치 `feature/b5-auth`, PR 전): 구현 완료. 결정 요약: 로그인 실패는 오류 코드가 아니라 `/auth/callback?error=login_failed` 리다이렉트, 인가 요청은 HMAC 서명 쿠키 `oauth2_auth_request`(180초, 콜백에서 즉시 삭제), Google 토큰은 저장하지 않음(STATELESS), AT 30분은 프론트 메모리에만·RT는 `{familyId}.{secret}` 불투명 토큰의 SHA-256 해시를 Redis에 저장(`Path=/api/auth`, SameSite=Lax), 회전마다 TTL 14일 갱신·직전 토큰 10초 유예·재사용이면 계열 삭제(Lua 원자 판정), 로그아웃은 현재 기기 계열만 폐기, 재발급·로그아웃은 `Origin` 검사(불일치 403), Redis 장애는 재발급 500(401 아님), 재발급 응답에 `role` 포함(역할 변경은 다음 재발급에 반영), 오류 코드 세분화는 보류, 이메일 미검증(`email_verified`≠true) 계정은 로그인 거부(D1), 관리자 지정은 DB 직접 수정(R-5), 배치 토큰은 Security 체인 안 `BatchTokenAuthenticationFilter`로 옮겨 `hasAnyRole(ADMIN,BATCH)`(JWT와 OR). 테스트: 전체 `.\gradlew.bat build --rerun-tasks` 752건 실패 0·오류 0·건너뜀 1(기존), 계약 대조 `OpenApiContractTest` 통과. 계약은 operation 12개 구현·19개 `x-planned`. **사용자 확인 대기**: 완료 기준의 브라우저 항목(Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착·RT 쿠키 생성)은 사용자가 2026-10-16에 확인했다(`rt` 쿠키 HttpOnly·Secure·SameSite=Lax·Path=/api/auth, 재발급 연속 3회 200, 로그아웃 204 후 401). 단 프론트 `/auth/callback` 화면은 Task 057 전이라 목업이 아닌 환경에서 항상 "로그인 실패"로 보인다. 이월: Redis Cloud 무료 플랜 Lua 실호출 확인(배포 스모크), 운영 환경 변수·Google 운영 리디렉션 URI(Task 092), 프론트 057 연동 항목(`api:generate`, 콜백·401 재시도·single-flight·500 처리·AT 폐기·`credentials`), Lettuce 예외 메시지의 키 노출 확인, `AuthUser.role`(enum)이 `global.security`→`user` 참조인 점의 계층 결정(상세는 HANDOFF 4절).
 
-#### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ⬜
+#### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ✅
 - 태그: [B] · PRD: B5, FR-08, 10, SCR-07, R11-18 · 선행: 053, 031 · 브랜치: `feature/b5-user-settings`
 - 구현 사항
-  - [ ] `UserSetting`, `UserSubscription` 엔티티
-  - [ ] `GET/PUT /api/me/settings`: 예산·시청 분 필수(없으면 400 `VALIDATION_FAILED`), `watchPreset`(프리셋 값은 설정 키), 환산 입력은 R11-18 결정대로. **월 시청 분은 120 이상**(미만이면 400 `VALIDATION_FAILED`, 2026-10-09 사용자 결정: 긴 시즌 한 달 최소 120분 규칙 때문에 120 미만이면 긴 시즌이 하나도 배정되지 않는다. PRD 11절 34번, Task 038 `MIN_LONG_SEASON_SEGMENT_MINUTES`와 같은 값을 쓴다)
-  - [ ] 구독 상태는 `/api/me/settings`에 통합(별도 `/me/subscriptions` 없음): `subscriptions[]`의 `status`(SUBSCRIBED/FREE/NOT_SUBSCRIBED/UNKNOWN), `planName`(30자, 구독 중일 때만), `billingDay`(구독 중일 때만, 비면 1), `productId` 없음. NOT_SUBSCRIBED는 행을 저장하지 않고 조회 때 서버가 채운다(전체 교체 저장)
+  - [x] `UserSetting`, `UserSubscription` 엔티티
+  - [x] `GET/PUT /api/me/settings`: 예산·시청 분 필수(없으면 400 `VALIDATION_FAILED`), `watchPreset`(프리셋 값은 설정 키), 환산 입력은 R11-18 결정대로. **월 시청 분은 120 이상**(미만이면 400 `VALIDATION_FAILED`, 2026-10-09 사용자 결정: 긴 시즌 한 달 최소 120분 규칙 때문에 120 미만이면 긴 시즌이 하나도 배정되지 않는다. PRD 11절 34번, Task 038 `MIN_LONG_SEASON_SEGMENT_MINUTES`와 같은 값을 쓴다)
+  - [x] 구독 상태는 `/api/me/settings`에 통합(별도 `/me/subscriptions` 없음): `subscriptions[]`의 `status`(SUBSCRIBED/FREE/NOT_SUBSCRIBED/UNKNOWN), `planName`(30자, 구독 중일 때만), `billingDay`(구독 중일 때만, 비면 1), `productId` 없음. NOT_SUBSCRIBED는 행을 저장하지 않고 조회 때 서버가 채운다(전체 교체 저장)
   - [x] 온보딩 완료 판정 기준: `user_setting` 행이 있으면 `isOnboardingDone: true`(계약에 명시됨, Task 032 안내서 4.6)
 - 완료 기준
   - V-B: 사용자 격리, 필수값 400, 비로그인 401 테스트가 통과한다. V-API: 저장 후 조회가 일치한다.
+- 결과(2026-10-16, PR 전): `user` 패키지에 `UserSetting`·`UserSubscription`과 설정 API 2개를 구현했다. PUT은 검증·정규화 → 사용자 행 잠금 → 구독 벌크 삭제 → 설정 upsert → 구독 INSERT 순서의 전체 교체이고, 같은 사용자의 이중 PUT은 잠금으로 직렬화한다(첫 설정 저장 경합 해소). 구독 중이 아닌데 요금제 이름·결제일을 보내면 400이다(계약 설명에 반영, 프론트 목업은 Task 058에서 맞춘다).
 
-#### Task 056: 찜·우선순위·시청 체크 API 구현으로 계산 대상 관리 ⬜
+#### Task 056: 찜·우선순위·시청 체크 API 구현으로 계산 대상 관리 ✅
 - 태그: [B] · PRD: B5, FR-09, R11-19 · 선행: 055, 051 · 찜 상한 20개 확정(2026-10-10, PRD 11절 36번. 2026-10-09의 잠정값 30을 대체) · 브랜치: `feature/b5-wishlist`
 - 구현 사항
-  - [ ] `/api/me/wishlist-items`(`listWishlistItems`·`addWishlistItem`)·`/api/me/wishlist-items/{wishlistItemId}`(`updateWishlistItem` PATCH·`removeWishlistItem`) 추가·삭제·목록, 우선순위 변경, "다 봤음"(`watched_at`) 토글. 중복 추가 무시, 드라마는 R11-19 결정 단위
-  - [ ] 목록: 필요 시간·추정, 서비스별 상태, "이미 시청 가능"
-  - [ ] 찜 상한(**20개 확정**, 2026-10-10 사용자 결정, PRD 11절 36번. 찜 항목 단위로 세어 영화 1편·드라마 시즌 1개가 각각 1개이고 "다 봤음"으로 옮긴 항목은 세지 않는다. 설정 키로 두되 DB 제약은 두지 않는 애플리케이션 규칙이다, ERD) 21번째 추가는 막고 `WISHLIST_LIMIT_EXCEEDED`(제안, 코드는 R-9 절차와 Task 031로 등록)로 응답한다. 이미 있는 항목의 중복 추가는 상한과 무관하게 기존대로 무시한다. 같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화(예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다))로 검사·저장하며 방식은 이 Task 구현에서 정한다. 엔진의 `MAX_PRODUCT_COUNT = 20`은 별개의 값(후보 상품 수)이라 바꾸지 않는다. `refresh_tier` 갱신은 Task 077에서 한다
+  - [x] `/api/me/wishlist-items`(`listWishlistItems`·`addWishlistItem`)·`/api/me/wishlist-items/{wishlistItemId}`(`updateWishlistItem` PATCH·`removeWishlistItem`) 추가·삭제·목록, 우선순위 변경, "다 봤음"(`watched_at`) 토글. 중복 추가 무시, 드라마는 R11-19 결정 단위
+  - [x] 목록: 필요 시간·추정, 서비스별 상태, "이미 시청 가능"
+  - [x] 찜 상한(**20개 확정**, 2026-10-10 사용자 결정, PRD 11절 36번. 찜 항목 단위로 세어 영화 1편·드라마 시즌 1개가 각각 1개이고 "다 봤음"으로 옮긴 항목은 세지 않는다. 설정 키로 두되 DB 제약은 두지 않는 애플리케이션 규칙이다, ERD) 21번째 추가는 막고 `WISHLIST_LIMIT_EXCEEDED`(제안, 코드는 R-9 절차와 Task 031로 등록)로 응답한다. 이미 있는 항목의 중복 추가는 상한과 무관하게 기존대로 무시한다. 같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화(예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다))로 검사·저장하며 방식은 이 Task 구현에서 정한다. 엔진의 `MAX_PRODUCT_COUNT = 20`은 별개의 값(후보 상품 수)이라 바꾸지 않는다. `refresh_tier` 갱신은 Task 077에서 한다
 - 완료 기준
   - V-B: 다른 사용자 찜 차단, 중복 무시, 상한 테스트. V-API: 시즌 찜과 다 봤음 토글.
+- 결과(2026-10-16, PR 전): 찜 API 4개를 `wishlist` 패키지로 구현했다. 상한 20은 `WishlistService.MAX_ACTIVE_ITEM_COUNT`에 두고, 새 찜 추가와 "다 봤음" 되돌리기는 사용자 행 `FOR UPDATE`(`UserQueryService.lockUser`, MANDATORY)로 직렬화한 뒤 개수를 판정한다(동시 추가 테스트 포함). 목록은 시청 단위·제공 상태를 일괄 조회한다. 목업(`handlers.ts`)과 서버의 차이(PATCH 빈 요청 400, 경로 ID 형식 오류 400)는 Task 058 연결 때 맞춘다. 설명은 `docs/guides/USER_SETTINGS_WISHLIST_GUIDE.md`.
 
 #### Task 057: 인증 연동(토큰 메모리 보관·재발급·라우트 가드) 구현으로 프론트 로그인 완성 ⬜
 - 태그: [F] · PRD: F4, FR-06, 17 · 선행: 054, 031 · 브랜치: `feature/f4-auth`

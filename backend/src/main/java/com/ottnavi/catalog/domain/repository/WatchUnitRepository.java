@@ -1,8 +1,10 @@
 package com.ottnavi.catalog.domain.repository;
 
 import com.ottnavi.catalog.domain.entity.WatchUnit;
+import com.ottnavi.catalog.domain.enums.MediaType;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,4 +17,19 @@ public interface WatchUnitRepository extends JpaRepository<WatchUnit, Long> {
     @Query("select u from WatchUnit u join fetch u.title "
             + "where u.title.id in :titleIds order by u.title.id asc, u.seasonNumber asc")
     List<WatchUnit> findByTitleIdIn(@Param("titleIds") Collection<Long> titleIds);
+
+    /** 영화의 시청 단위 ID를 찾는다(영화는 시즌 번호가 없는 단위 하나다). 찜 추가가 쓴다 */
+    @Query("select u.id from WatchUnit u "
+            + "where u.title.mediaType = :mediaType and u.title.tmdbId = :tmdbId and u.seasonNumber is null")
+    Optional<Long> findMovieUnitId(@Param("mediaType") MediaType mediaType, @Param("tmdbId") Integer tmdbId);
+
+    /** 드라마 시즌의 시청 단위 ID를 찾는다. 찜 추가가 쓴다 */
+    @Query("select u.id from WatchUnit u "
+            + "where u.title.mediaType = :mediaType and u.title.tmdbId = :tmdbId and u.seasonNumber = :seasonNumber")
+    Optional<Long> findSeasonUnitId(@Param("mediaType") MediaType mediaType, @Param("tmdbId") Integer tmdbId,
+            @Param("seasonNumber") Integer seasonNumber);
+
+    /** 시청 단위 ID 여러 개를 소속 작품과 함께 한 번에 조회한다. 찜 목록처럼 단위마다 쿼리하지 않으려고 쓴다 */
+    @Query("select u from WatchUnit u join fetch u.title where u.id in :unitIds")
+    List<WatchUnit> findWithTitleByIdIn(@Param("unitIds") Collection<Long> unitIds);
 }

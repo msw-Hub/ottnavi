@@ -2,8 +2,12 @@ package com.ottnavi.user.domain.repository;
 
 import com.ottnavi.user.domain.entity.User;
 import com.ottnavi.user.domain.enums.OAuthProvider;
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
@@ -12,4 +16,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	/** 이메일을 쓰는 사용자가 있는지 확인한다(이메일 유니크 충돌을 미리 피하려는 용도) */
 	boolean existsByEmail(String email);
+
+	/**
+	 * 사용자 행을 SELECT ... FOR UPDATE로 잠그고 읽는다. 같은 사용자의 쓰기 요청을 직렬화하는 용도다
+	 * (설정 전체 교체 Task 055, 찜 최대 20개 검사 Task 056). 트랜잭션 안에서 쓰기 전에 가장 먼저 호출한다.
+	 */
+	@Lock(LockModeType.PESSIMISTIC_WRITE)
+	@Query("select u from User u where u.id = :id")
+	Optional<User> findByIdForUpdate(@Param("id") Long id);
 }

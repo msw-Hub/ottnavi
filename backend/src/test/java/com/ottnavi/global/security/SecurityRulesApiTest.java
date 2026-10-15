@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * 경로 3분류 인가 규칙을 실제 보안 체인으로 확인한다(Task 053·054, Docker 필요).
- * USER 토큰으로 /api/me/** 를 부르면 아직 컨트롤러가 없어 404가 나오는데, 401이 아니라는 것이 인증을 통과했다는 뜻이다.
+ * USER 토큰으로 /api/me/settings 를 부르면 실제 API(Task 055)가 200을 돌려주고, 토큰 없이는 401이다.
  */
 @AutoConfigureMockMvc
 class SecurityRulesApiTest extends IntegrationTestSupport {
@@ -41,7 +41,7 @@ class SecurityRulesApiTest extends IntegrationTestSupport {
 	@Test
 	void USER_토큰이면_로그인_경로의_인증을_통과한다() throws Exception {
 		mockMvc.perform(get("/api/me/settings").header(HttpHeaders.AUTHORIZATION, tokens().userBearer()))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isOk());
 	}
 
 	@Test

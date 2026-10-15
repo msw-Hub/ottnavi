@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-16 (Task 053·054 반영 기준)
+> 마지막 갱신: 2026-10-16 (Task 056 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -31,7 +31,7 @@ com.ottnavi
 │   │   ├── enums/
 │   │   ├── repository/      DB 조회·저장 인터페이스
 │   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator, AvailabilityAggregation …)
-│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회)
+│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용)
 │       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange, TitleDetailView …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
@@ -39,12 +39,21 @@ com.ottnavi
 │   │   └── response/        OttServiceResponse
 │   ├── service/           ProviderCollectService, AdminProviderService(매핑 조회·변경) 등 + model/ (MappedProvider, AdminProviderView …)
 │   └── domain/            entity · enums · repository
-├── user/                회원·로그인
-│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout)
+├── user/                회원·로그인·내 설정
+│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout), UserSettingController (GET·PUT /api/me/settings)
 │   ├── dto/
-│   │   └── response/        AccessTokenResponse
-│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사) + model/ (GoogleProfile, LoginUser, TokenIssue)
-│   └── domain/            entity(User) · enums(OAuthProvider, UserRole) · repository(UserRepository)
+│   │   ├── request/         UpdateMySettingsRequest, UserSubscriptionRequest
+│   │   └── response/        AccessTokenResponse, UserSettingsResponse, UserSubscriptionResponse
+│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사), UserSettingService(내 설정 조회·전체 교체, users 행 잠금), UserQueryService(다른 도메인용 사용자 행 잠금·이용 가능 서비스 조회) + model/ (GoogleProfile, LoginUser, TokenIssue, SubscriptionState, UserSettingsState)
+│   └── domain/            entity(User, UserSetting, UserSubscription) · enums(OAuthProvider, UserRole, WatchPreset, SubscriptionStatus, ServiceSubscriptionStatus) · repository(UserRepository, UserSettingRepository, UserSubscriptionRepository)
+├── wishlist/            찜·우선순위·"다 봤음" (Task 056)
+│   ├── controller/        WishlistController (GET·POST /api/me/wishlist-items, PATCH·DELETE /api/me/wishlist-items/{id})
+│   ├── dto/
+│   │   ├── request/         AddWishlistItemRequest, UpdateWishlistItemRequest
+│   │   └── response/        WishlistItemListResponse, WishlistItemResponse, AddWishlistItemResultResponse, UpdatedWishlistItemResponse
+│   ├── exception/         WishlistLimitExceededException(409), WishlistItemNotFoundException(404)
+│   ├── service/           WishlistService(목록·추가·변경·삭제, 상한 20 판정과 사용자 행 잠금 직렬화) + model/ (WishlistView, WishlistItemView, AddWishlistResult, UpdatedWishlistItemView)
+│   └── domain/            entity(WishlistItem) · enums(WishlistPriority) · repository(WishlistItemRepository). 사용자·시청 단위는 ID만 들고 catalog·user 서비스를 통해 읽는다
 ├── product/             구독 상품·가격 (엔티티·리포지토리만 있음)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
@@ -66,7 +75,7 @@ com.ottnavi
     └── solver/            완전탐색·그리디 풀이
 ```
 
-아직 폴더가 없는 영역: `wishlist`, `plan`, `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
+아직 폴더가 없는 영역: `plan`, `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
 
 ## 보조 설명
 

@@ -26,6 +26,10 @@ public enum ErrorCode {
 	// 작품
 	TITLE_NOT_FOUND(HttpStatus.NOT_FOUND, "작품을 찾을 수 없습니다."),
 
+	// 찜
+	WISHLIST_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "찜은 20개까지 담을 수 있습니다."), // "다 봤음"이 아닌 찜 기준
+	WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 항목을 찾을 수 없습니다."),
+
 	// 수집(관리자)
 	BATCH_ALREADY_RUNNING(HttpStatus.CONFLICT, "수집이 이미 실행 중입니다."),
 	BATCH_ALREADY_COMPLETED(HttpStatus.CONFLICT, "해당 날짜의 수집은 이미 완료되었습니다."),

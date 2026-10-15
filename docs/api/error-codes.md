@@ -62,8 +62,8 @@
 | `PRICE_NOT_CURRENT` | 409 | [요금 확인함]을 오늘 적용 중인 줄이 아닌 줄(지난 줄·예정 줄)에 요청함(관리자 API) | 지금 적용 중인 월 구독요금만 확인할 수 있습니다. | PRD 11절 41번, Task 029·031 (제안) |
 | `PRICE_NOT_LATEST` | 409 | 가장 최근(마지막) 줄이 아닌 월 구독요금 줄을 수정·삭제하려 함(관리자 API) | 가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다. | Task 029·031 (제안) |
 | `PRICE_LAST_ROW_CANNOT_DELETE` | 409 | 상품의 월 구독요금 줄이 하나뿐이라 삭제할 수 없음(관리자 API) | 월 구독요금이 하나뿐이라 삭제할 수 없습니다. | Task 029·031 (제안) |
-| `WISHLIST_LIMIT_EXCEEDED` | 409 | "다 봤음"이 아닌 찜이 이미 20개라 새로 추가하거나 "다 봤음"을 되돌릴 수 없음. 이미 찜한 작품(시즌)의 중복 추가는 이 오류가 아니라 200이다 | 찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요. | PRD 11절 36번, FR-09, SCR-08 토스트 문구 (제안) |
-| `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031 (제안) |
+| `WISHLIST_LIMIT_EXCEEDED` | 409 | "다 봤음"이 아닌 찜이 이미 20개라 새로 추가하거나 "다 봤음"을 되돌릴 수 없음. 이미 찜한 작품(시즌)의 중복 추가는 이 오류가 아니라 200이다 | 찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요. | PRD 11절 36번, FR-09, SCR-08 토스트 문구 |
+| `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031·056 |
 | `SERVICE_PRICE_NOT_FOUND` | 404 | 내 월 요금을 고치거나 되돌리려는 상품이 요금을 고칠 수 있는 상품이 아님(없는 상품이거나 판매 종료) | 이 서비스의 요금 정보를 찾을 수 없습니다. | ERD `user_price_override`(상품 단위), Task 031 (제안) |
 
-위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개가 반영돼 있고(Task 045), 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
+위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045)와 `WISHLIST_*` 2개(Task 056)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
