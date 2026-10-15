@@ -10,7 +10,7 @@
 com.ottnavi
 ├── global/              공통: 어느 기능에서나 쓰는 것
 │   ├── common/            CommonResponse(성공 응답 틀), PageResponse(목록 응답 틀), BaseTimeEntity(생성·수정 시각)
-│   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정
+│   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정, 시계(ClockConfig, KST 기준 Clock 빈)
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
 │   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter), Redis 버킷 창구, 설정
 │   └── security/          보안 설정(SecurityConfig), 오리진 비밀 헤더 필터, 배치 토큰 인증 필터(BatchTokenAuthenticationFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리, AuthUser(인증 주체)
@@ -54,7 +54,14 @@ com.ottnavi
 │   ├── exception/         WishlistLimitExceededException(409), WishlistItemNotFoundException(404)
 │   ├── service/           WishlistService(목록·추가·변경·삭제, 상한 20 판정과 사용자 행 잠금 직렬화) + model/ (WishlistView, WishlistItemView, AddWishlistResult, UpdatedWishlistItemView)
 │   └── domain/            entity(WishlistItem) · enums(WishlistPriority) · repository(WishlistItemRepository). 사용자·시청 단위는 ID만 들고 catalog·user 서비스를 통해 읽는다
-├── product/             구독 상품·가격 (엔티티·리포지토리만 있음)
+├── product/             구독 상품·월 구독요금
+│   ├── controller/        AdminProductController (/api/admin/products, 상품 등록·수정과 요금 줄 추가·수정·삭제·확인함, Task 059)
+│   ├── dto/
+│   │   ├── request/         CreateAdminProductRequest, UpdateAdminProductRequest, AdminProductPriceRequest
+│   │   └── response/        AdminProductResponse, AdminProductPriceResponse, AdminProductListResponse
+│   ├── service/           AdminProductService(관리자 상품·요금 관리), ProductPriceQueryService(기준일 유효 요금 조회, 계산·내 요금이 재사용) + model/ (AdminProductView, ProductPriceView)
+│   ├── exception/         ProductPriceConflictException (PRICE_* 409 6종을 코드로 구분)
+│   └── domain/            entity · enums · repository · rule(ProductPriceRules: 요금 줄 추가·수정·삭제 허용 판정과 기준일 선택)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
 │   ├── service/           CollectExecutionService(시작·재시작·복구), CollectExecutionQueryService(이력·변경 조회)

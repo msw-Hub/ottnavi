@@ -56,14 +56,14 @@
 | `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
 | `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |
 | `BATCH_NOT_STOPPED` | 409 | 복구하려는 실행이 중단됨(`STOPPED`)이 아님(복구 API 전용. 재시작 API는 실행 상태에 맞는 `BATCH_ALREADY_*`·`BATCH_RECOVERY_REQUIRED`를 쓴다) | 중단된 실행만 복구할 수 있습니다. | TECH 3절, Task 029·031 |
-| `PRICE_START_DATE_NOT_AFTER_LAST` | 409 | 추가·수정하려는 월 구독요금 줄의 적용 시작일이 앞 줄의 시작일보다 늦지 않음(관리자 API) | 적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다. | PRD FR-19 "기간이 겹치지 않는다", Task 029·031 (제안) |
-| `PRICE_START_DATE_DUPLICATE` | 409 | 같은 상품에 같은 적용 시작일의 줄이 이미 있음(ERD `UNIQUE(product_id, effective_from)`, 관리자 API) | 같은 적용 시작일의 월 구독요금이 이미 있습니다. | ERD `product_price`, Task 029·031 (제안) |
-| `PRICE_FIRST_START_DATE_IN_FUTURE` | 409 | 상품의 첫(유일한) 월 구독요금 줄의 적용 시작일이 오늘보다 늦음. 첫 줄이 미래면 오늘 적용할 요금이 없다(관리자 API) | 첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다. | Task 029·031 (제안) |
-| `PRICE_NOT_CURRENT` | 409 | [요금 확인함]을 오늘 적용 중인 줄이 아닌 줄(지난 줄·예정 줄)에 요청함(관리자 API) | 지금 적용 중인 월 구독요금만 확인할 수 있습니다. | PRD 11절 41번, Task 029·031 (제안) |
-| `PRICE_NOT_LATEST` | 409 | 가장 최근(마지막) 줄이 아닌 월 구독요금 줄을 수정·삭제하려 함(관리자 API) | 가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다. | Task 029·031 (제안) |
-| `PRICE_LAST_ROW_CANNOT_DELETE` | 409 | 상품의 월 구독요금 줄이 하나뿐이라 삭제할 수 없음(관리자 API) | 월 구독요금이 하나뿐이라 삭제할 수 없습니다. | Task 029·031 (제안) |
+| `PRICE_START_DATE_NOT_AFTER_LAST` | 409 | 추가·수정하려는 월 구독요금 줄의 적용 시작일이 앞 줄의 시작일보다 늦지 않음(관리자 API) | 적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다. | PRD FR-19 "기간이 겹치지 않는다", Task 029·031 |
+| `PRICE_START_DATE_DUPLICATE` | 409 | 같은 상품에 같은 적용 시작일의 줄이 이미 있음(ERD `UNIQUE(product_id, effective_from)`, 관리자 API) | 같은 적용 시작일의 월 구독요금이 이미 있습니다. | ERD `product_price`, Task 029·031 |
+| `PRICE_FIRST_START_DATE_IN_FUTURE` | 409 | 상품의 첫(유일한) 월 구독요금 줄의 적용 시작일이 오늘보다 늦음. 첫 줄이 미래면 오늘 적용할 요금이 없다(관리자 API) | 첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다. | Task 029·031 |
+| `PRICE_NOT_CURRENT` | 409 | [요금 확인함]을 오늘 적용 중인 줄이 아닌 줄(지난 줄·예정 줄)에 요청함(관리자 API) | 지금 적용 중인 월 구독요금만 확인할 수 있습니다. | PRD 11절 41번, Task 029·031 |
+| `PRICE_NOT_LATEST` | 409 | 가장 최근(마지막) 줄이 아닌 월 구독요금 줄을 수정·삭제하려 함(관리자 API) | 가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다. | Task 029·031 |
+| `PRICE_LAST_ROW_CANNOT_DELETE` | 409 | 상품의 월 구독요금 줄이 하나뿐이라 삭제할 수 없음(관리자 API) | 월 구독요금이 하나뿐이라 삭제할 수 없습니다. | Task 029·031 |
 | `WISHLIST_LIMIT_EXCEEDED` | 409 | "다 봤음"이 아닌 찜이 이미 20개라 새로 추가하거나 "다 봤음"을 되돌릴 수 없음. 이미 찜한 작품(시즌)의 중복 추가는 이 오류가 아니라 200이다 | 찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요. | PRD 11절 36번, FR-09, SCR-08 토스트 문구 |
 | `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031·056 |
 | `SERVICE_PRICE_NOT_FOUND` | 404 | 내 월 요금을 고치거나 되돌리려는 상품이 요금을 고칠 수 있는 상품이 아님(없는 상품이거나 판매 종료) | 이 서비스의 요금 정보를 찾을 수 없습니다. | ERD `user_price_override`(상품 단위), Task 031 (제안) |
 
-위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045)와 `WISHLIST_*` 2개(Task 056)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
+위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045), `WISHLIST_*` 2개(Task 056), `PRICE_*` 6개(Task 059)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).

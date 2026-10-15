@@ -491,12 +491,11 @@ paths:
       operationId: listAdminProducts
       security:
         - bearerAuth: []
-      summary: OTT 구독상품·월 구독요금 이력 조회 (제안)
+      summary: OTT 구독상품·월 구독요금 이력 조회
       description: |
-        **제안(Task 031, 미구현).** 판매 종료 상품을 포함한 OTT 구독상품 전체와 각 상품의 월 구독요금 이력(적용 시작일이 빠른 순)을 돌려준다.
+        판매 종료 상품을 포함한 OTT 구독상품 전체와 각 상품의 월 구독요금 이력(적용 시작일이 빠른 순)을 돌려준다.
         적용 종료일은 저장하지 않는다. 화면이 "다음 줄 시작일의 전날"로 계산하고 마지막 줄은 "계속"이다.
         오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
-      x-planned: true
       responses:
         '200':
           description: OTT 구독상품 목록
@@ -516,12 +515,11 @@ paths:
       operationId: createAdminProduct
       security:
         - bearerAuth: []
-      summary: OTT 구독상품 등록 (제안)
+      summary: OTT 구독상품 등록
       description: |
-        **제안(Task 031, 미구현).** OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 줄의 마지막 확인일은 오늘이다.
+        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 줄의 마지막 확인일은 오늘이다.
         첫 줄의 적용 시작일은 오늘 이하여야 한다.
         오류: `VALIDATION_FAILED`(400, 이름 비어 있음·SINGLE 아님·없는 서비스·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
       requestBody:
         required: true
         content:
@@ -552,11 +550,10 @@ paths:
       operationId: updateAdminProduct
       security:
         - bearerAuth: []
-      summary: OTT 구독상품 이름·판매 여부 수정 (제안)
+      summary: OTT 구독상품 이름·판매 여부 수정
       description: |
-        **제안(Task 031, 미구현).** 보낸 필드만 바꾼다(하나 이상 필요). `isActive: false`는 판매 종료, `true`는 판매 재개다. 상품은 삭제하지 않는다(ERD).
+        보낸 필드만 바꾼다(하나 이상 필요). `isActive: false`는 판매 종료, `true`는 판매 재개다. 상품은 삭제하지 않는다(ERD).
         오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
@@ -589,12 +586,11 @@ paths:
       operationId: addAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 월 구독요금 줄 추가 (제안)
+      summary: 월 구독요금 줄 추가
       description: |
-        **제안(Task 031, 미구현).** 월 구독요금 줄을 맨 뒤에 추가한다. 적용 시작일은 마지막 줄의 시작일보다 늦어야 한다(지난 날짜는 허용하고 화면이 안내만 한다). 새 줄의 마지막 확인일은 오늘이다.
+        월 구독요금 줄을 맨 뒤에 추가한다. 적용 시작일은 마지막 줄의 시작일보다 늦어야 한다(지난 날짜는 허용하고 화면이 안내만 한다). 새 줄의 마지막 확인일은 오늘이다.
         응답은 바뀐 OTT 구독상품 전체다(화면이 목록 캐시를 바로 고칠 수 있게).
         오류: `VALIDATION_FAILED`(400, 금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `PRICE_START_DATE_DUPLICATE`(409, 같은 시작일의 줄이 이미 있음), `PRICE_START_DATE_NOT_AFTER_LAST`(409, 마지막 줄 시작일보다 이르다), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
@@ -629,12 +625,11 @@ paths:
       operationId: updateAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 마지막 월 구독요금 줄 수정 (제안)
+      summary: 마지막 월 구독요금 줄 수정
       description: |
-        **제안(Task 031, 미구현).** 가장 최근 줄(마지막 줄)만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
+        가장 최근 줄(마지막 줄)만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
         시작일 규칙은 추가와 같다(앞 줄보다 늦어야 함). 줄이 하나뿐이면 첫 줄 규칙(시작일 오늘 이하)을 따른다.
         오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_NOT_LATEST`(409, 마지막 줄이 아님), `PRICE_START_DATE_DUPLICATE`(409), `PRICE_START_DATE_NOT_AFTER_LAST`(409), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'
@@ -669,11 +664,10 @@ paths:
       operationId: deleteAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 마지막 월 구독요금 줄 삭제 (제안)
+      summary: 마지막 월 구독요금 줄 삭제
       description: |
-        **제안(Task 031, 미구현).** 가장 최근 줄(마지막 줄)만 지울 수 있고, 줄이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
+        가장 최근 줄(마지막 줄)만 지울 수 있고, 줄이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
         오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_LAST_ROW_CANNOT_DELETE`(409), `PRICE_NOT_LATEST`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'
@@ -699,11 +693,10 @@ paths:
       operationId: verifyAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 월 구독요금 확인함 (제안)
+      summary: 월 구독요금 확인함
       description: |
-        **제안(Task 031, 미구현).** [요금 확인함] 동작이다. 금액은 그대로 두고 마지막 확인일만 오늘로 바꾼다. 요청 본문은 없다. 지금 적용 중인 줄만 확인할 수 있다(지난 줄·예정 줄은 불가).
+        [요금 확인함] 동작이다. 금액은 그대로 두고 마지막 확인일만 오늘로 바꾼다. 요청 본문은 없다. 지금 적용 중인 줄만 확인할 수 있다(지난 줄·예정 줄은 불가).
         오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_NOT_CURRENT`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'

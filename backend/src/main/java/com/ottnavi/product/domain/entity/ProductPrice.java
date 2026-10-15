@@ -56,4 +56,19 @@ public class ProductPrice extends BaseTimeEntity {
         price.lastVerifiedAt = lastVerifiedAt;
         return price;
     }
+
+    /** 금액과 적용 시작일을 고친다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인 일시도 함께 바꾼다 */
+    public void change(int monthlyPrice, LocalDate effectiveFrom, Instant verifiedAt) {
+        if (monthlyPrice < 0) {
+            throw new IllegalArgumentException("월 요금은 0 이상이어야 한다: " + monthlyPrice);
+        }
+        this.monthlyPrice = monthlyPrice;
+        this.effectiveFrom = effectiveFrom;
+        this.lastVerifiedAt = verifiedAt;
+    }
+
+    /** 금액은 그대로 두고 마지막 확인 일시만 바꾼다([요금 확인함]) */
+    public void verify(Instant verifiedAt) {
+        this.lastVerifiedAt = verifiedAt;
+    }
 }
