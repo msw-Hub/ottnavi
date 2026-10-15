@@ -1,5 +1,6 @@
 package com.ottnavi.global.config;
 
+import com.ottnavi.catalog.service.model.TitleDetailView;
 import org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer; // Boot 4 위치(3.2 참고)
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -8,6 +9,7 @@ import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer; // Jackson 3용(tools.jackson)
+import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer; // 값 타입을 지정하는 Jackson 3 직렬화기
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
 import org.springframework.data.redis.serializer.RedisSerializer;
 
@@ -36,8 +38,12 @@ public class RedisConfig {
     /** 캐시별 TTL. 기본 설정을 바탕으로 TTL만 바꾼다. */
     @Bean
     public RedisCacheManagerBuilderCustomizer cacheTtlCustomizer(RedisCacheConfiguration base) {
+        // 작품 상세는 값 타입(TitleDetailView) 전용 직렬화기를 쓴다. 다른 캐시는 기본(범용) 직렬화기를 그대로 둔다
+        RedisCacheConfiguration titleDetailConfig = base.entryTtl(Duration.ofHours(24))
+                .serializeValuesWith(SerializationPair.fromSerializer(
+                        new JacksonJsonRedisSerializer<>(TitleDetailView.class)));
         return builder -> builder
-                .withCacheConfiguration(TITLE_DETAIL, base.entryTtl(Duration.ofHours(24)))
+                .withCacheConfiguration(TITLE_DETAIL, titleDetailConfig)
                 .withCacheConfiguration(PLAN_CALC, base.entryTtl(Duration.ofHours(24)))
                 .withCacheConfiguration(EXCLUSIVE_TITLES, base.entryTtl(Duration.ofHours(24)));
     }

@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-15 (Task 046 반영 기준)
+> 마지막 갱신: 2026-10-15 (Task 050·051 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -10,7 +10,7 @@
 com.ottnavi
 ├── global/              공통: 어느 기능에서나 쓰는 것
 │   ├── common/            CommonResponse(성공 응답 틀), PageResponse(목록 응답 틀), BaseTimeEntity(생성·수정 시각)
-│   ├── config/            Redis, Feign(외부 호출) 설정
+│   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
 │   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter), Redis 버킷 창구, 설정
 │   └── security/          보안 설정, 오리진 비밀 헤더 필터, 관리자 배치 토큰 필터(AdminBatchTokenFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리
@@ -19,13 +19,17 @@ com.ottnavi
 │       ├── dto/             TMDB가 주는 JSON 틀 (안에서만 쓰고 밖으로 내보내지 않음)
 │       └── exception/
 ├── catalog/             작품·시즌·제공 상태 (핵심 데이터)
+│   ├── controller/        TitleController (작품 검색·상세, 공개 API /api/public/titles)
+│   ├── dto/
+│   │   └── response/        TitleSearchPageResponse, TitleDetailResponse, TitleSeasonResponse …
+│   ├── exception/         TitleNotFoundException (404 TITLE_NOT_FOUND)
 │   ├── domain/
 │   │   ├── entity/          DB 테이블과 1:1 (Title, WatchUnit, Availability, AvailabilityChange …)
 │   │   ├── enums/
 │   │   ├── repository/      DB 조회·저장 인터페이스
-│   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator …)
-│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회)
-│       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange …)
+│   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator, AvailabilityAggregation …)
+│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회)
+│       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange, TitleDetailView …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
 │   ├── dto/
@@ -42,7 +46,7 @@ com.ottnavi
 │   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse, AdminProviderResponse, AdminProviderListResponse
 │   └── exception/         409 예외 4종(BatchAlreadyRunning·BatchAlreadyCompleted·BatchRecoveryRequired·BatchNotStopped)
 ├── collect/             TMDB에서 데이터를 모으는 배치(수집 Job)
-│   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime)
+│   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime), 완료 시 작품 상세 캐시 비우기(TitleCacheEvictListener)
 │   └── step/
 │       ├── CollectPoolMonitor  DB 연결 사용량을 로그로 남기는 보조 도구(두 Step 묶음이 같이 씀)
 │       ├── candidate/       후보 수집 Step: Reader · Writer · Mapper · Tasklet
