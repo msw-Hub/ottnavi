@@ -997,11 +997,21 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 048: 첫 전체 수집 실행과 측정으로 용량·러닝타임 근거 확보 ⬜
 - 태그: [H] · PRD: B3, R11-25, R11-26 · 선행: 045, 044 · 기한: 2026-10-21
 - 구현 사항
-  - [ ] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
+  - [x] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
   - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`, Supabase 무료 한도 500MB와 비교, 인덱스·WAL 포함), Redis ops 측정(R11-26). 수집 사이클의 **최대 힙·메모리 사용량**도 기록한다(메모리 예산 측정 지점, 4.6)
   - [ ] 실측 러닝타임 중앙값으로 기본값 보정안(R11-25). 중단되면 Task 045 복구 API로 이어서 실행
+- 측정 기록(2026-10-15 수집, targetDate=2026-10-15, tier=ALL, 로컬 PC·로컬 Docker DB, 실행 이력 executionId 2(실패)→5(완료))
+  - 소요 시간(실작업 합계 약 6시간 17분): providerList 1초 → movieCandidate 8분 03초(33,638건) → tvCandidate 4분 13초(19,591건) → movieDetail 1시간 21분 56초(19,776건, 초당 약 4건) → tvDetail 2시간 08분 17초(12,890건에서 네트워크 끊김으로 FAILED) + 이어서 3분 12초(338건, 합계 13,228편) → availability 2시간 30분 56초(39,833개, 분당 약 264건). 실행 3·4는 DNS 오답으로 각 6초 만에 실패했다.
+  - 처리·변경: 작품 33,004편(영화 19,776, 드라마 13,228), 시청 단위 39,833(영화 19,776 + 시즌 20,057), 제공 상태 278,831건(NOT_AVAILABLE 174,474 / AVAILABLE 55,160 / UNKNOWN 49,197), `changedCount` 278,831.
+  - 실패: 작품 단위 건너뜀(skip) 0건, 단계 실패 1회(`UnknownHostException api.themoviedb.org`, PC 네트워크 끊김). 같은 날짜 재시작으로 끝난 단계를 건너뛰고 12,890번째부터 이어졌다.
+  - TV 시즌 호출량: 시즌 조회 약 20,057회(시즌 수와 같음), 드라마 상세 13,228회. TMDB 호출 합계는 후보 약 2,660쪽(33,638+19,591건을 쪽당 20건) + 상세 33,004 + 시즌 20,057 + 제공처 조회 39,833 = 약 9.6만 회(추정).
+  - DB 용량: `pg_database_size` 167MB(Supabase 무료 한도 500MB의 약 33%). 큰 테이블: `title_cast` 42MB(241,461행), `availability` 42MB(278,831행), `availability_change` 36MB(278,831행), `title` 25MB, `watch_unit` 7MB. WAL은 포함하지 않았고 Supabase가 한도에 어떻게 세는지는 미확인.
+  - Redis: 컨테이너 가동 약 17.4시간 동안 처리 명령 12,479개(평균 초당 0.2). 수집 중 Redis 부하는 무시할 수준(TMDB 속도 제한이 로컬 버킷이라 Redis를 쓰지 않는다, TECH 3절).
+  - 러닝타임(R11-25 입력): 영화 실측 중앙값 98분(실측 19,477건, 추정 299건=1.5%, 현재 기본값 120분), 드라마 회차당 실측 중앙값 약 42.7분(시즌 16,306개, 추정 시즌 3,751개=18.7%, 현재 기본값 45분).
+  - **미측정**: 수집 사이클 최대 힙·메모리 사용량(수집 중 측정 지점을 두지 않았다). 운영 메모리 1GB 판단은 이 값 없이 하지 않는다.
+  - 약점(고치지 않음): TMDB 연결 오류가 나면 재시도 2회 뒤 단계 전체가 실패한다. 운영 cron에서는 같은 지점에서 매번 멈출 수 있어, 연결 오류 건너뛰기(skip)나 더 긴 재시도를 넣을지 결정이 필요하다(R11-26 결정과 함께).
 - 완료 기준
-  - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다.
+  - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다. (측정값 기록은 위에서 끝났고, **R11-25 기본값 보정과 R11-26 용량 판단을 사용자에게 올리는 일과 최대 힙 측정이 남았다**)
 
 #### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ⬜
 - 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · R11-12 확정(2026-10-09) · 브랜치: `feature/b4-rate-limit`
@@ -1016,7 +1026,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 값: 일반 용량 20·분당 60, 단건 수집 용량 3·분당 10(`app.rate-limit.general`, `app.rate-limit.single-fetch`). 429 응답에 `Retry-After`(초, 올림). 거부 카운터 `ratelimit.rejected{bucket=public|single_fetch}`(IP 태그 없음).
   - 일반 버킷은 fail-open, 저장소 오류 뒤 5초간 Redis를 부르지 않고 통과(경고 로그도 5초에 한 번). 단건 수집 버킷은 fail-closed이며 같은 `RATE_LIMIT_EXCEEDED`(429, `Retry-After` 5초)로 거부한다(새 오류 코드를 만들지 않았다. 한도 초과와 장애를 응답으로 구분하지 못하므로 구분이 필요해지면 `SERVICE_UNAVAILABLE`(503)을 검토).
   - `RequestIpLoggingFilter`는 `debug` 레벨에 `method`·`uri`·`remoteAddr`만 남기도록 정리했다. 반복 남용자 차단(블랙리스트·DB 저장)은 만들지 않았다(사용자 결정, 남용이 관측되면 별도 Task).
-  - **미확인(남음)**: Bucket4j 8.21(Lettuce 6.1.8 기준) 모듈과 프로젝트의 Lettuce 7.5.2의 실제 Redis 동작, 요청 1건당 Redis 연산 수 측정. Docker가 켜진 뒤 `PublicRateLimitRedisIntegrationTest`(4개)를 처음 돌려 확인하고 ops를 기록한다.
+  - **실제 Redis 확인(2026-10-15)**: `PublicRateLimitRedisIntegrationTest` 4개 통과(Bucket4j 8.21 × Lettuce 7.5.2 호환, 한도 초과 429와 `Retry-After`, IP별 분리, `rl:public:`·`rl:fetch:` 키, TTL 부여). 전체 `./gradlew build` 675개 중 실패 0·에러 0·skipped 1. **요청 1건당 Redis 명령은 약 4개**(EVAL 1, GET 약 2, PSETEX 1)로 측정했다(GET 2회가 Bucket4j 자체인지 다른 Redis 사용인지는 분리하지 못했다). Redis Cloud 무료 초당 100 ops 기준으로 공개 요청 제한만으로 지속 약 25건/초가 한계이므로, 트래픽이 늘면 캐시와 나눠 쓰는 점을 다시 본다.
   - Task 050에 넘길 것: 검색 서비스가 DB를 조회한 뒤 TMDB를 불러야 하는 지점에서만 `SingleFetchRateLimiter.check(clientIp)`를 부른다. 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 내려야 한다.
 
 #### Task 050: 작품 검색 API 구현으로 공개 검색 제공 ⬜

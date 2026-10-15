@@ -63,7 +63,7 @@ app:
       max-retry-after: 5s      # 서버가 이보다 오래 기다리라고 하면 기다리지 않고 포기한다
   collect:
     runtime-defaults:          # TMDB runtime이 비었을 때 쓰는 추정 기본값(분, PRD 11절 25번). 바인딩은 Task 043·044에서 한다
-      movie-minutes: 120              # 영화
-      episode-minutes: 45             # 드라마 회차
+      movie-minutes: 100              # 영화(첫 전체 수집 실측 중앙값 98분, 2026-10-15 보정. 이전 120)
+      episode-minutes: 43             # 드라마 회차(실측 중앙값 약 42.7분, 2026-10-15 보정. 이전 45)
       animation-episode-minutes: 24   # 애니메이션 회차
     allow-target-date-override: false   # 수집 기준일(targetDate) 직접 지정 허용. 운영은 항상 오늘(KST)만, local에서만 true

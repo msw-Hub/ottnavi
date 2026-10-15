@@ -2,8 +2,8 @@ package com.ottnavi.catalog.domain.rule;
 
 /** runtime이 비었을 때 쓰는 추정 기본값(분). 설정 app.collect.runtime-defaults.*에서 받아 넣는다(PRD 11절 25번) */
 public record RuntimeDefaults(
-        int movieMinutes, // 영화 120
-        int episodeMinutes, // 회차 45
+        int movieMinutes, // 영화 100(2026-10-15 실측 보정)
+        int episodeMinutes, // 회차 43(2026-10-15 실측 보정)
         int animationEpisodeMinutes) { // 애니메이션 회차 24
 
     public RuntimeDefaults {

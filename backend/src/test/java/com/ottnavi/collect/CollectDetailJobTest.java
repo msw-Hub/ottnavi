@@ -210,7 +210,7 @@ class CollectDetailJobTest extends IntegrationTestSupport {
 
         start(nextParameters());
 
-        assertThat(row("SELECT * FROM watch_unit")).containsEntry("total_runtime_min", 120)
+        assertThat(row("SELECT * FROM watch_unit")).containsEntry("total_runtime_min", 100)
                 .containsEntry("runtime_missing_count", 1).containsEntry("runtime_estimated", true);
     }
 
@@ -223,7 +223,7 @@ class CollectDetailJobTest extends IntegrationTestSupport {
                 [{"id":810000,"season_number":0,"name":"스페셜","air_date":"2022-12-25","episode_count":2},
                  {"id":810001,"season_number":1,"name":"시즌 1","air_date":"2023-03-01","episode_count":12,"poster_path":"/s1.jpg"},
                  {"id":810002,"season_number":2,"name":"시즌 2","air_date":"2027-03-01","episode_count":12}]""");
-        // 시즌 1: 4회 중 3회 방영(날짜 없는 4회는 미방영), runtime은 62·58·빈 값 → 62+58+45(기본값)
+        // 시즌 1: 4회 중 3회 방영(날짜 없는 4회는 미방영), runtime은 62·58·빈 값 → 62+58+43(기본값)
         stubSeason(800001, 1, "시즌 1", "2023-03-01", """
                 [{"episode_number":1,"air_date":"2023-03-01","runtime":62},
                  {"episode_number":2,"air_date":"2023-03-02","runtime":58},
@@ -246,7 +246,7 @@ class CollectDetailJobTest extends IntegrationTestSupport {
         assertThat(unit.get("name")).isEqualTo("시즌 1");
         assertThat(unit.get("episode_count")).isEqualTo(4);   // 시즌 요약의 12가 아니라 시즌 상세의 회차 목록 개수
         assertThat(unit.get("aired_episode_count")).isEqualTo(3);
-        assertThat(unit.get("total_runtime_min")).isEqualTo(165);
+        assertThat(unit.get("total_runtime_min")).isEqualTo(163);
         assertThat(unit.get("runtime_missing_count")).isEqualTo(1);
         assertThat(unit.get("runtime_estimated")).isEqualTo(true);
         long unitId = ((Number) unit.get("id")).longValue();
