@@ -13,6 +13,7 @@ import com.ottnavi.wishlist.domain.enums.WishlistPriority;
 import com.ottnavi.wishlist.domain.repository.WishlistItemRepository;
 import com.ottnavi.wishlist.exception.WishlistItemNotFoundException;
 import com.ottnavi.wishlist.exception.WishlistLimitExceededException;
+import com.ottnavi.wishlist.service.model.ActiveWishlistEntry;
 import com.ottnavi.wishlist.service.model.AddWishlistResult;
 import com.ottnavi.wishlist.service.model.UpdatedWishlistItemView;
 import com.ottnavi.wishlist.service.model.WishlistItemView;
@@ -83,6 +84,15 @@ public class WishlistService {
 			views.add(toView(item, summary, usableServiceIds));
 		}
 		return new WishlistView(views, activeItemCount, MAX_ACTIVE_ITEM_COUNT, summaries.dataAsOf());
+	}
+
+	/** 플랜 계산 입력용으로 "다 봤음"이 아닌 찜을 ID 순으로 돌려준다. 다른 도메인이 찜 리포지토리를 직접 쓰지 않게 하는 창구다 */
+	public List<ActiveWishlistEntry> listActiveEntries(Long userId) {
+		List<ActiveWishlistEntry> result = new ArrayList<>();
+		for (WishlistItem item : wishlistItemRepository.findAllByUserIdAndWatchedAtIsNullOrderByIdAsc(userId)) {
+			result.add(new ActiveWishlistEntry(item.getId(), item.getWatchUnitId(), item.getPriority()));
+		}
+		return result;
 	}
 
 	/**

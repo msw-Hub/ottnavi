@@ -62,6 +62,9 @@ com.ottnavi
 │   ├── service/           AdminProductService(관리자 상품·요금 관리), ProductPriceQueryService(기준일 유효 요금 조회, 계산·내 요금이 재사용), MyServicePriceService(내 요금 조회·수정·되돌리기, 사용자 행 잠금 직렬화) + model/ (AdminProductView, ProductPriceView, MyServicePriceView)
 │   ├── exception/         ProductPriceConflictException (PRICE_* 409 6종을 코드로 구분), ServicePriceNotFoundException(404)
 │   └── domain/            entity(…, UserPriceOverride: 사용자·상품은 ID만 보관) · enums(ProductType, PriceSource) · repository(…, UserPriceOverrideRepository) · rule(ProductPriceRules: 요금 이력 추가·수정·삭제 허용 판정과 기준일 선택)
+├── plan/                3개월 플랜 저장·계산 기록 (Task 062 엔티티·리포지토리, Task 063 계산 입력 조립. 계산 실행·API는 064 이후)
+│   ├── service/           PlanInputService(설정·찜·제공 상태·요금·구독 상태 → 엔진 입력, 읽기 전용), AllSubscribeCostCalculator(전체 구독 비용, 순수 계산) + model/ (PlanInputBundle, ProductPriceInfo)
+│   └── domain/            entity(Plan, PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun: 사용자·상품·시청 단위·서비스는 ID만 보관, 하위 행 삭제는 DB FK CASCADE) · enums(PlanStatus, PlanItemOutcome. 플랜 유형·알고리즘·우선순위·이유 코드는 engine.model, 가격 출처는 product PriceSource 재사용) · repository(PlanRepository: DRAFT 벌크 삭제·ACTIVE 잠금 조회 …)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
 │   ├── service/           CollectExecutionService(시작·재시작·복구), CollectExecutionQueryService(이력·변경 조회)
@@ -72,6 +75,7 @@ com.ottnavi
 │   └── exception/         409 예외 4종(BatchAlreadyRunning·BatchAlreadyCompleted·BatchRecoveryRequired·BatchNotStopped)
 ├── collect/             TMDB에서 데이터를 모으는 배치(수집 Job)
 │   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime), 완료 시 작품 상세 캐시 비우기(TitleCacheEvictListener)
+│   ├── service/           CollectDataVersionService(마지막 COMPLETED 수집 종료 시각 = 데이터 기준 시각, 플랜 계산 입력이 사용)
 │   └── step/
 │       ├── CollectPoolMonitor  DB 연결 사용량을 로그로 남기는 보조 도구(두 Step 묶음이 같이 씀)
 │       ├── candidate/       후보 수집 Step: Reader · Writer · Mapper · Tasklet
@@ -82,7 +86,7 @@ com.ottnavi
     └── solver/            완전탐색·그리디 풀이
 ```
 
-아직 폴더가 없는 영역: `plan`, `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
+아직 폴더가 없는 영역: `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
 
 ## 보조 설명
 
