@@ -105,6 +105,7 @@ class RedisRefreshTokenStoreTest extends IntegrationTestSupport {
 		String key = "rt:fam:" + token.substring(0, token.indexOf('.'));
 		Long issuedTtl = redis.getExpire(key, TimeUnit.SECONDS);
 		redis.expire(key, java.time.Duration.ofSeconds(100)); // 줄여 둔 뒤 교체하면 다시 늘어나는지 본다
+		redis.expire("rt:user:105", java.time.Duration.ofSeconds(100)); // 사용자 계열 목록도 함께 늘어나는지 본다
 
 		// when
 		store.rotate(token);
@@ -112,6 +113,7 @@ class RedisRefreshTokenStoreTest extends IntegrationTestSupport {
 		// then
 		assertThat(issuedTtl).isGreaterThan(13L * 24 * 3600);
 		assertThat(redis.getExpire(key, TimeUnit.SECONDS)).isGreaterThan(13L * 24 * 3600);
+		assertThat(redis.getExpire("rt:user:105", TimeUnit.SECONDS)).isGreaterThan(13L * 24 * 3600);
 	}
 
 	@Test

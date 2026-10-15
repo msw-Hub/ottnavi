@@ -43,7 +43,10 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 			""";
 
 	/**
-	 * 교체 판정. KEYS[1]=계열 키. ARGV: 받은 해시, 새 해시, 유예(ms), TTL(ms).
+	 * 교체 판정. KEYS[1]=계열 키. ARGV: 받은 해시, 새 해시, 유예(ms), TTL(ms), 사용자 계열 목록 키 접두사.
+	 * 교체할 때 계열 키와 함께 사용자 계열 목록 키(접두사 + userId)의 TTL도 늘린다. 안 늘리면 계속 쓰는 사용자의 목록이
+	 * 발급 후 14일에 먼저 사라져 사용자 전체 폐기가 살아 있는 계열을 못 찾는다. userId는 계열에서 읽어야 알 수 있어
+	 * KEYS로 미리 선언할 수 없으므로 접두사를 ARGV로 받아 조립한다(단일 노드 기준).
 	 * 반환: {결과, userId}. 현재 해시면 교체, 직전 해시가 유예 안이면 GRACE, 그 밖이면 재사용으로 보고 계열을 지운다.
 	 */
 	private static final String ROTATE_SCRIPT = """
@@ -56,6 +59,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 			if ARGV[1] == vals[2] then
 			  redis.call('HSET', KEYS[1], 'currentHash', ARGV[2], 'previousHash', vals[2], 'rotatedAt', nowMs)
 			  redis.call('PEXPIRE', KEYS[1], ARGV[4])
+			  redis.call('PEXPIRE', ARGV[5] .. vals[1], ARGV[4])
 			  return {'ROTATED', vals[1]}
 			end
 			if vals[3] and ARGV[1] == vals[3] then
@@ -119,7 +123,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 		String newSecret = randomUrlSafe(SECRET_BYTES);
 		List<Object> reply = redis.execute(rotateScript, List.of(FAMILY_PREFIX + familyId),
 				hash(matcher.group(2)), hash(newSecret),
-				String.valueOf(properties.refreshReuseGrace().toMillis()), String.valueOf(ttlMillis()));
+				String.valueOf(properties.refreshReuseGrace().toMillis()), String.valueOf(ttlMillis()), USER_PREFIX);
 		// 3. 판정 결과를 값으로 바꾼다
 		String status = String.valueOf(reply.get(0));
 		if ("NOT_FOUND".equals(status)) {
