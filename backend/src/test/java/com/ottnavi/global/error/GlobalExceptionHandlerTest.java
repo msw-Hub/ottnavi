@@ -248,6 +248,13 @@ class GlobalExceptionHandlerTest {
 				.andExpect(content().string(not(containsString("내부 비밀"))));
 	}
 
+	@Test
+	void 요청_제한_초과는_429_RATE_LIMIT_EXCEEDED와_Retry_After_헤더를_준다() throws Exception {
+		expectProblem(mockMvc.perform(get(BASE + "/rate-limit")), 429, "RATE_LIMIT_EXCEEDED")
+				.andExpect(header().string("Retry-After", "7"))
+				.andExpect(jsonPath("$.detail").value(ErrorCode.RATE_LIMIT_EXCEEDED.getMessage()));
+	}
+
 	/** 공통 ProblemDetail 형식(상태, problem+json, errorCode)을 검사한다 */
 	private ResultActions expectProblem(ResultActions result, int status, String errorCode) throws Exception {
 		return result
@@ -309,6 +316,11 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/business")
 		CommonResponse<TestResponse> business() {
 			throw new TestTitleNotFoundException("작품을 찾을 수 없습니다: movie/999");
+		}
+
+		@GetMapping("/rate-limit")
+		CommonResponse<TestResponse> rateLimit() {
+			throw new RateLimitExceededException("요청 제한 초과", 7);
 		}
 
 		@PostMapping("/body")

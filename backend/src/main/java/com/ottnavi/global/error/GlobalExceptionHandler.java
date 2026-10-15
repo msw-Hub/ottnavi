@@ -60,6 +60,22 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return problemDetail(errorCode.getStatus(), errorCode, detail);
 	}
 
+	/**
+	 * 요청 제한 초과를 429 RATE_LIMIT_EXCEEDED로 응답하고 Retry-After(초) 헤더를 붙인다.
+	 * 필터가 HandlerExceptionResolver로 넘긴 예외도 여기서 받는다. 거부된 요청마다 warn을 남기면
+	 * 공격 중에 로그가 쌓이므로 debug로만 남긴다.
+	 */
+	@ExceptionHandler(RateLimitExceededException.class)
+	public ResponseEntity<ProblemDetail> handleRateLimitExceeded(RateLimitExceededException ex, HttpServletRequest request) {
+		ErrorCode errorCode = ex.getErrorCode();
+		log.debug("요청 제한 초과: status={}, path={}, retryAfterSeconds={}",
+				errorCode.getStatus().value(), request.getRequestURI(), ex.getRetryAfterSeconds());
+		ProblemDetail problem = problemDetail(errorCode.getStatus(), errorCode, errorCode.getMessage());
+		return ResponseEntity.status(errorCode.getStatus())
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+				.body(problem);
+	}
+
 	/** 필드를 지정한 검증 실패를 400 VALIDATION_FAILED와 fieldErrors 한 건으로 응답한다 */
 	@ExceptionHandler(FieldValidationException.class)
 	public ProblemDetail handleFieldValidationException(FieldValidationException ex, HttpServletRequest request) {

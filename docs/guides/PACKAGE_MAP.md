@@ -12,7 +12,8 @@ com.ottnavi
 │   ├── common/            CommonResponse(성공 응답 틀), PageResponse(목록 응답 틀), BaseTimeEntity(생성·수정 시각)
 │   ├── config/            Redis, Feign(외부 호출) 설정
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
-│   └── security/          보안 설정, 오리진 비밀 헤더 필터, 관리자 배치 토큰 필터(AdminBatchTokenFilter), 진입 IP 로그 필터, 401·403 응답 처리
+│   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter), Redis 버킷 창구, 설정
+│   └── security/          보안 설정, 오리진 비밀 헤더 필터, 관리자 배치 토큰 필터(AdminBatchTokenFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리
 ├── infra/               외부 시스템과 통신
 │   └── tmdb/              TmdbClient(호출 창구), 재시도·속도 제한
 │       ├── dto/             TMDB가 주는 JSON 틀 (안에서만 쓰고 밖으로 내보내지 않음)

@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * /api 진입 요청의 IP 관련 값을 로그로 남긴다(TECH 4절). 배포 후 Vercel이 실제로 보내는 값을 확인하려는 임시 로그이며
- * IP는 개인정보 성격이 있으므로 Task 049에서 레벨·항목을 정리한다.
- * Boot의 ForwardedHeaderFilter(order MIN)가 먼저 돌며 X-Forwarded-* 원본을 요청에서 숨기므로,
- * x-forwarded-for는 반영된 remoteAddr(첫 값), x-forwarded-host는 반영된 serverName으로 남긴다. x-real-ip는 숨김 대상이 아니라 원본이다.
+ * /api 진입 요청의 방문자 IP(remoteAddr)를 debug 로그로 남긴다(TECH 4절). IP는 개인정보 성격이 있어
+ * 기본 로그 레벨(info)에서는 남기지 않고, 프록시 설정을 점검할 때만 logging.level로 debug를 켠다.
+ * Boot의 ForwardedHeaderFilter(order MIN)가 먼저 돌아 X-Forwarded-For 첫 값이 remoteAddr에 반영된다.
+ * x-real-ip는 Vercel의 IP라 방문자 IP가 아니므로 남기지 않는다(TECH 4절 Task 021 실측).
  */
 @Slf4j
 @Component
@@ -28,13 +28,12 @@ public class RequestIpLoggingFilter extends OncePerRequestFilter {
 		return !ApiRequestPath.isApi(request);
 	}
 
-	/** 요청 IP 관련 값을 기록하고 다음 필터로 넘긴다 */
+	/** 방문자 IP를 기록하고 다음 필터로 넘긴다 */
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		log.info("진입 요청: method={}, uri={}, x-real-ip={}, remoteAddr={}, serverName={}",
-				request.getMethod(), request.getRequestURI(), request.getHeader("x-real-ip"),
-				request.getRemoteAddr(), request.getServerName());
+		log.debug("진입 요청: method={}, uri={}, remoteAddr={}",
+				request.getMethod(), request.getRequestURI(), request.getRemoteAddr());
 		filterChain.doFilter(request, response);
 	}
 }

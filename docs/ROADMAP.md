@@ -1006,20 +1006,28 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ⬜
 - 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · R11-12 확정(2026-10-09) · 브랜치: `feature/b4-rate-limit`
 - 구현 사항
-  - [ ] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
-  - [ ] 일반 공개 버킷(fail-open, 인증 경로 `/api/auth/**`·`/api/oauth2/**`·`/api/login/**`도 적용, backend.md), 단건 수집 검색 버킷(fail-closed, 더 낮은 한도)
-  - [ ] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키(`app.rate-limit.*`), **R11-12 확정값: 일반 버킷 IP당 분당 60회, 단건 수집 검색 버킷 IP당 분당 10회**(순간 몰림 허용량은 한도의 약 1/3). 단건 수집 검색 버킷이 더 낮은 이유는 TECH 3절 "TMDB는 언제 호출하나". 요청 1건이 쓰는 Redis 연산 수는 구현 후 측정한다(Redis Cloud 무료 초당 100 ops를 캐시와 나눠 씀)
+  - [x] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
+  - [x] 일반 공개 버킷(fail-open, 인증 경로 `/api/auth/**`·`/api/oauth2/**`·`/api/login/**`도 적용, backend.md), 단건 수집 검색 버킷(fail-closed, 더 낮은 한도)
+  - [x] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키(`app.rate-limit.*`), **R11-12 확정값: 일반 버킷 IP당 분당 60회, 단건 수집 검색 버킷 IP당 분당 10회**(순간 몰림 허용량은 한도의 약 1/3). 단건 수집 검색 버킷이 더 낮은 이유는 TECH 3절 "TMDB는 언제 호출하나". 요청 1건이 쓰는 Redis 연산 수는 구현 후 측정한다(Redis Cloud 무료 초당 100 ops를 캐시와 나눠 씀)
 - 완료 기준
   - V-B: 한도 초과·IP 헤더 우선순위·fail-open/closed 테스트가 통과한다. V-API: 반복 호출 시 429와 `errorCode`.
+- 구현 기록(2026-10-15)
+  - 필터 `PublicRateLimitFilter`(`@Order(HIGHEST_PRECEDENCE + 25)`, 오리진 필터 뒤·관리자 배치 토큰 필터 앞)가 `/api/public/**`와 인증 경로 3종만 검사한다. 버킷은 Bucket4j `LettuceBasedProxyManager`, 키 `rl:public:{remoteAddr}`·`rl:fetch:{remoteAddr}`, 키 만료는 버킷이 가득 찬 뒤 10초. 직접 `INCR`/`EXPIRE`로 만들지 않았다(설명은 `docs/guides/RATE_LIMIT_GUIDE.md`).
+  - 값: 일반 용량 20·분당 60, 단건 수집 용량 3·분당 10(`app.rate-limit.general`, `app.rate-limit.single-fetch`). 429 응답에 `Retry-After`(초, 올림). 거부 카운터 `ratelimit.rejected{bucket=public|single_fetch}`(IP 태그 없음).
+  - 일반 버킷은 fail-open, 저장소 오류 뒤 5초간 Redis를 부르지 않고 통과(경고 로그도 5초에 한 번). 단건 수집 버킷은 fail-closed이며 같은 `RATE_LIMIT_EXCEEDED`(429, `Retry-After` 5초)로 거부한다(새 오류 코드를 만들지 않았다. 한도 초과와 장애를 응답으로 구분하지 못하므로 구분이 필요해지면 `SERVICE_UNAVAILABLE`(503)을 검토).
+  - `RequestIpLoggingFilter`는 `debug` 레벨에 `method`·`uri`·`remoteAddr`만 남기도록 정리했다. 반복 남용자 차단(블랙리스트·DB 저장)은 만들지 않았다(사용자 결정, 남용이 관측되면 별도 Task).
+  - **미확인(남음)**: Bucket4j 8.21(Lettuce 6.1.8 기준) 모듈과 프로젝트의 Lettuce 7.5.2의 실제 Redis 동작, 요청 1건당 Redis 연산 수 측정. Docker가 켜진 뒤 `PublicRateLimitRedisIntegrationTest`(4개)를 처음 돌려 확인하고 ops를 기록한다.
+  - Task 050에 넘길 것: 검색 서비스가 DB를 조회한 뒤 TMDB를 불러야 하는 지점에서만 `SingleFetchRateLimiter.check(clientIp)`를 부른다. 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 내려야 한다.
 
 #### Task 050: 작품 검색 API 구현으로 공개 검색 제공 ⬜
 - 태그: [B] · PRD: B4, FR-01, 02, SCR-01 · 선행: 044, 049, 031 · 브랜치: `feature/b4-title-search`
 - 구현 사항
   - [ ] `searchTitles`: DB 제목 검색, 영화·드라마 구분, 7개 서비스 상태 요약, 페이지네이션
-  - [ ] DB에 없으면 TMDB 검색으로 단건 수집·저장(단건 수집 버킷 통과, 외부 호출은 트랜잭션 밖)
+  - [ ] DB에 없으면 TMDB 검색으로 단건 수집·저장(단건 수집 버킷 통과, 외부 호출은 트랜잭션 밖). **Task 049가 만든 `SingleFetchRateLimiter.check(clientIp)`를 TMDB를 부르기 직전에만 호출한다**(DB 결과만으로 응답하면 소모하지 않는다). 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 넘긴다
   - [ ] TMDB 실패 시 DB 결과만 반환하고 외부 수집 실패 여부를 응답에 표시
 - 완료 기준
   - V-B: WireMock으로 정상, 단건 수집, TMDB 실패 대체 테스트 통과. V-API: 동명 영화·드라마가 구분돼 반환된다.
+  - V-B(요청 제한 연결): DB에 없는 작품을 같은 IP로 반복 검색하면 단건 수집 버킷(IP당 분당 10회)이 소모돼 한도 초과 시 429 `RATE_LIMIT_EXCEEDED`와 `Retry-After`가 나가고 그때 TMDB를 호출하지 않는다. DB에 있는 작품 검색은 단건 수집 버킷을 소모하지 않는다. (`SingleFetchRateLimiter.check`는 Task 049에서 만들어 두었고 호출 지점은 050이다. 설명은 `docs/guides/RATE_LIMIT_GUIDE.md`)
 
 #### Task 051: 작품 상세 API 구현으로 공개 상세 제공 ⬜
 - 태그: [B] · PRD: B4, FR-02, 03, SCR-02 · 선행: 035, 024, 031 · 브랜치: `feature/b4-title-detail`

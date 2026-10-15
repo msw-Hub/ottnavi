@@ -103,7 +103,7 @@ stateDiagram-v2
 **TMDB 호출 제한.**
 - Bucket4j **로컬(인메모리) 버킷** 하나를 TMDB 클라이언트 앞에 두고, 한도는 TMDB 안내 "초당 약 40회 범위"(web) 아래로 `app.tmdb.rate-limit.*`에 둔다. Redis 분산 버킷을 쓰지 않는 이유: 단일 인스턴스이고, TMDB 호출마다 Redis 연산을 쓰면 Redis Cloud 무료 초당 100 ops(2차 자료)를 수집이 다 써 버린다(도출). 다중 인스턴스가 되면 Redis 버킷으로 바꾼다.
 - 429·5xx는 Feign `ErrorDecoder`에서 재시도 가능 예외로 바꾸고 `Retryer`로 지수 백오프하며, `Retry-After`가 있으면 우선한다(도출). 타임아웃은 `spring.cloud.openfeign.client.config.tmdb.*`로 클라이언트별 설정한다(c7).
-- 공개 검색의 TMDB 단건 수집도 같은 버킷을 지나므로, 공개 요청 제한의 단건 수집 버킷(R FR-05, 한도 R11-12)이 먼저 걸리게 둔다. 이 버킷은 Redis 장애 시 fail-closed, 일반 공개 버킷은 fail-open이다(도출).
+- 공개 검색의 TMDB 단건 수집도 같은 버킷을 지나므로, 공개 요청 제한의 단건 수집 버킷(R FR-05, 한도 R11-12)이 먼저 걸리게 둔다. 이 버킷은 Redis 장애 시 fail-closed, 일반 공개 버킷은 fail-open이다(도출). 구현(Task 049): 일반 버킷 용량 20·분당 60, 단건 수집 버킷 용량 3·분당 10, Bucket4j `LettuceBasedProxyManager`(키 `rl:public:{ip}`·`rl:fetch:{ip}`), 저장소 오류 뒤 5초간 Redis 호출을 건너뛴다. fail-closed 거부도 기존 `RATE_LIMIT_EXCEEDED`(429)로 낸다.
 
 **GitHub Actions cron 제약(web).** cron은 UTC 기준, 최소 간격 5분, 매시 정각에는 지연될 수 있고, 공개 저장소는 60일 무활동 시 예약 워크플로가 꺼진다. 대응: 정각을 피한 분(예: `17 18 * * *` = KST 03:17, 도출), KST로 환산한 월초 cron, `workflow_dispatch` 수동 실행 병행.
 
