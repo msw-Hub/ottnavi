@@ -1,0 +1,48 @@
+package com.ottnavi.user.service;
+
+import com.ottnavi.global.error.UnauthorizedException;
+import com.ottnavi.user.domain.entity.UserSubscription;
+import com.ottnavi.user.domain.enums.SubscriptionStatus;
+import com.ottnavi.user.domain.repository.UserRepository;
+import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
+import java.util.HashSet;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+/** 다른 도메인(찜 등)이 사용자 데이터를 읽거나 잠글 때 쓰는 창구. 다른 도메인이 user 리포지토리를 직접 쓰지 않게 한다 */
+@Service
+@Transactional(readOnly = true)
+@RequiredArgsConstructor
+public class UserQueryService {
+
+	private final UserRepository userRepository;
+	private final UserSubscriptionRepository userSubscriptionRepository;
+
+	/**
+	 * 사용자 행을 FOR UPDATE로 잠가 같은 사용자의 쓰기 요청을 한 줄로 세운다. 호출하는 쪽의 쓰기 트랜잭션 안에서만 쓴다
+	 * (트랜잭션이 없으면 잠금이 바로 풀려 의미가 없으므로 MANDATORY로 막는다). 잠금은 그 트랜잭션이 끝날 때 풀린다.
+	 */
+	@Transactional(propagation = Propagation.MANDATORY)
+	public void lockUser(Long userId) {
+		if (userRepository.findByIdForUpdate(userId).isEmpty()) {
+			throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+		}
+	}
+
+	/**
+	 * 지금 이용할 수 있는 서비스 ID 집합을 돌려준다. 구독 중(SUBSCRIBED)과 무료 이용(FREE)만 포함하고,
+	 * 잘 모르겠음(UNKNOWN)과 미구독은 뺀다.
+	 */
+	public Set<Long> listUsableServiceIds(Long userId) {
+		Set<Long> result = new HashSet<>();
+		for (UserSubscription row : userSubscriptionRepository.findAllByUserId(userId)) {
+			if (row.getStatus() == SubscriptionStatus.SUBSCRIBED || row.getStatus() == SubscriptionStatus.FREE) {
+				result.add(row.getOttService().getId());
+			}
+		}
+		return result;
+	}
+}

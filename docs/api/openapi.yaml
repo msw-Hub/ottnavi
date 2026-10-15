@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 31개다. 구현된 것은 12개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개)이고, 나머지 19개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+    - operation은 31개다. 구현된 것은 18개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개)이고, 나머지 13개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -131,13 +131,12 @@ paths:
       operationId: listWishlistItems
       security:
         - bearerAuth: []
-      summary: 내 찜 목록 조회 (제안)
+      summary: 내 찜 목록 조회
       description: |
-        **제안(Task 031, 미구현).** 내 찜을 최근에 찜한 순으로 전부 돌려준다. 드라마는 시즌 단위로 한 줄씩이다(R11-19).
+        내 찜을 최근에 찜한 순으로 전부 돌려준다. 드라마는 시즌 단위로 한 줄씩이다(R11-19).
         "다 봤음" 항목(`watchedAt`이 있음)도 목록에 포함하되 `activeItemCount`에는 세지 않는다(PRD 11절 36번).
         페이지네이션은 두지 않는다. 계산 대상 찜은 20개로 막히고, "다 봤음" 항목은 상한이 없지만 사용자가 직접 체크해야 늘어나 증가가 느리다. 많아져 문제가 되면 "다 봤음"만 따로 나눠 조회하는 API를 추가한다.
         오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
-      x-planned: true
       responses:
         '200':
           description: 찜 목록과 현재 개수·상한
@@ -155,13 +154,12 @@ paths:
       operationId: addWishlistItem
       security:
         - bearerAuth: []
-      summary: 찜 추가 (제안)
+      summary: 찜 추가
       description: |
-        **제안(Task 031, 미구현).** 작품(드라마는 시즌)을 찜한다. 새로 만들면 201, 같은 작품(시즌)이 이미 찜돼 있으면 새로 만들지 않고 기존 항목 ID와 함께 200을 준다(PRD FR-09 "중복 추가는 무시"). 중복이면 기존 우선순위·"다 봤음" 상태를 바꾸지 않는다(우선순위 변경은 PATCH).
+        작품(드라마는 시즌)을 찜한다. 새로 만들면 201, 같은 작품(시즌)이 이미 찜돼 있으면 새로 만들지 않고 기존 항목 ID와 함께 200을 준다(PRD FR-09 "중복 추가는 무시"). 중복이면 기존 우선순위·"다 봤음" 상태를 바꾸지 않는다(우선순위 변경은 PATCH).
         드라마(`tv`)는 `seasonNumber`가 필수이고 영화(`movie`)는 `null`이어야 한다. 작품은 검색·상세 조회로 이미 저장된 것이어야 한다(찜 추가는 TMDB를 호출하지 않는다).
         "다 봤음"이 아닌 찜이 이미 20개면 새로 추가할 수 없다(PRD 11절 36번). 이미 20개여도 중복 추가는 409가 아니라 200이다(PRD FR-09).
         오류: `VALIDATION_FAILED`(400, 필드 누락·영화/드라마와 seasonNumber 불일치), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `TITLE_NOT_FOUND`(404, 작품 또는 시즌 없음), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
       requestBody:
         required: true
         content:
@@ -198,12 +196,11 @@ paths:
       operationId: updateWishlistItem
       security:
         - bearerAuth: []
-      summary: 찜 우선순위·"다 봤음" 변경 (제안)
+      summary: 찜 우선순위·"다 봤음" 변경
       description: |
-        **제안(Task 031, 미구현).** 보낸 필드만 바꾼다(하나 이상 필요). `isWatched: true`면 "다 봤음"으로 표시해 `watchedAt`을 기록하고 계산에서 뺀다. `false`면 되돌린다. 이미 같은 상태면 그대로 둔다(이미 "다 봤음"인 항목에 `true`를 보내도 `watchedAt`은 처음 값 유지).
+        보낸 필드만 바꾼다(하나 이상 필요). `isWatched: true`면 "다 봤음"으로 표시해 `watchedAt`을 기록하고 계산에서 뺀다. `false`면 되돌린다. 이미 같은 상태면 그대로 둔다(이미 "다 봤음"인 항목에 `true`를 보내도 `watchedAt`은 처음 값 유지).
         되돌릴 때 "다 봤음"이 아닌 찜이 이미 20개면 되돌릴 수 없다(PRD 11절 36번).
-        오류: `VALIDATION_FAILED`(400, 빈 요청·잘못된 값), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `WISHLIST_ITEM_NOT_FOUND`(404, 없거나 본인 찜이 아님), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
-      x-planned: true
+        오류: `VALIDATION_FAILED`(400, 빈 요청·잘못된 값·경로 ID 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `WISHLIST_ITEM_NOT_FOUND`(404, 없거나 본인 찜이 아님), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/WishlistItemIdPath'
       requestBody:
@@ -235,11 +232,10 @@ paths:
       operationId: removeWishlistItem
       security:
         - bearerAuth: []
-      summary: 찜 삭제 (제안)
+      summary: 찜 삭제
       description: |
-        **제안(Task 031, 미구현).** 찜을 삭제한다. 이미 없는 항목(또는 본인 것이 아닌 항목)도 오류 없이 204다(여러 번 해도 결과가 같다).
+        찜을 삭제한다. 이미 없는 항목(또는 본인 것이 아닌 항목)도 오류 없이 204다(여러 번 해도 결과가 같다).
         오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
-      x-planned: true
       parameters:
         - $ref: '#/components/parameters/WishlistItemIdPath'
       responses:
@@ -260,13 +256,12 @@ paths:
       operationId: getMySettings
       security:
         - bearerAuth: []
-      summary: 내 설정 조회 (제안)
+      summary: 내 설정 조회
       description: |
-        **제안(Task 031, 미구현).** 서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
+        서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
         온보딩 뒤에는 `subscriptions`에 서비스 7개가 모두 온다. 미구독은 저장 행이 없으므로(PRD FR-08) 서버가 `NOT_SUBSCRIBED`로 채운다.
         요금 화면(SCR-09)의 예산·시청 시간 요약도 이 API로 가져온다.
         오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
-      x-planned: true
       responses:
         '200':
           description: 내 설정
@@ -284,13 +279,12 @@ paths:
       operationId: updateMySettings
       security:
         - bearerAuth: []
-      summary: 내 설정 저장 (제안)
+      summary: 내 설정 저장
       description: |
-        **제안(Task 031, 미구현).** 설정 전체를 저장한다. 처음 저장하면 온보딩이 끝난 것으로 본다(`isOnboardingDone: true`).
+        설정 전체를 저장한다. 처음 저장하면 온보딩이 끝난 것으로 본다(`isOnboardingDone: true`).
         시청 시간은 분 단위 결과(`monthlyWatchMinutes`)와 고른 방식(`watchPreset`)만 저장한다. "주 N회 × 회당 M시간" 환산 입력값은 저장하지 않는다(R11-18 A안).
         `subscriptions`에 없는 서비스는 미구독으로 본다. `SUBSCRIBED`인데 `billingDay`가 `null`이면 1일로 저장한다(PRD FR-08 결제일 기본값 1일).
-        오류: `VALIDATION_FAILED`(400, 예산 음수·시청 시간 범위 밖·구독 중인데 요금제 이름 없음·없는 서비스·같은 서비스 중복 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
-      x-planned: true
+        오류: `VALIDATION_FAILED`(400, 예산 음수·시청 시간 범위 밖·구독 중인데 요금제 이름 없음·구독 중이 아닌데 요금제 이름이나 결제일을 보냄·없는 서비스·같은 서비스 중복 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
       requestBody:
         required: true
         content:
