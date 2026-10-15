@@ -61,9 +61,9 @@ TMDB는 "이 영화가 한국에서 어디서 제공되나"를 TMDB 자기 번�
 
 결과 `RuntimeResult`는 `episode_count`, `aired_episode_count`, `total_runtime_min`, `runtime_missing_count`, `runtime_estimated`에 그대로 대응한다.
 
-예(시즌, 기준일 2023-03-10): 회차 runtime = 62, 58, 비어 있음(방영됨), 비어 있음(미방영) → 방영 3회, 62+58+45 = **165분**, 누락 1, 추정 true.
+예(시즌, 기준일 2023-03-10): 회차 runtime = 62, 58, 비어 있음(방영됨), 비어 있음(미방영) → 방영 3회, 62+58+43 = **163분**, 누락 1, 추정 true.
 
-기본값은 코드에 박지 않고 `RuntimeDefaults`로 받는다. 설정은 `application.yml`의 `app.collect.runtime-defaults`(`movie-minutes: 120`, `episode-minutes: 45`, `animation-episode-minutes: 24`)이고, 바인딩 클래스는 Task 043·044에서 만든다. 기준일은 `LocalDate.now()`가 아니라 호출자가 넘긴다(테스트가 날짜에 흔들리지 않게, 수집 기준일 `targetDate` 사용).
+기본값은 코드에 박지 않고 `RuntimeDefaults`로 받는다. 설정은 `application.yml`의 `app.collect.runtime-defaults`(`movie-minutes: 100`, `episode-minutes: 43`, `animation-episode-minutes: 24`. 2026-10-15 첫 전체 수집의 실측 중앙값으로 보정, PRD 11절 25번)이고, 바인딩 클래스는 Task 043·044에서 만든다. 기준일은 `LocalDate.now()`가 아니라 호출자가 넘긴다(테스트가 날짜에 흔들리지 않게, 수집 기준일 `targetDate` 사용).
 
 ## 6. 소규모 규칙 (`TitleDetailRules`)
 

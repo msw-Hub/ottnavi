@@ -37,6 +37,16 @@ springdoc:
 app:
   origin-secret:
     enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
+  rate-limit:                           # 공개 API 요청 제한(Task 049, PRD R11-12). 키는 방문자 IP(remoteAddr), 버킷은 Redis에 둔다
+    enabled: true                       # 테스트에서만 끈다(IntegrationTestSupport). local 포함 기본 켜짐
+    general:                            # /api/public/**, /api/auth/**, /api/oauth2/**, /api/login/** 에 IP별로 건다
+      capacity: 20                      # 통 크기: 순간에 몰아 보낼 수 있는 최대 요청 수(한도의 약 1/3)
+      refill-tokens: 60                 # refill-period마다 채워지는 토큰 수 (→ IP당 분당 60회)
+      refill-period: 1m
+    single-fetch:                       # 단건 수집(DB에 없어 TMDB를 부르는 검색)에만 거는 한도. Task 050이 쓴다. Redis 오류면 거부(fail-closed)
+      capacity: 3                       # 순간에 몰아 보낼 수 있는 최대 요청 수(한도의 약 1/3)
+      refill-tokens: 10                 # refill-period마다 채워지는 토큰 수 (→ IP당 분당 10회)
+      refill-period: 1m
   tmdb:
     base-url: https://api.themoviedb.org/3
     api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
@@ -53,7 +63,7 @@ app:
       max-retry-after: 5s      # 서버가 이보다 오래 기다리라고 하면 기다리지 않고 포기한다
   collect:
     runtime-defaults:          # TMDB runtime이 비었을 때 쓰는 추정 기본값(분, PRD 11절 25번). 바인딩은 Task 043·044에서 한다
-      movie-minutes: 120              # 영화
-      episode-minutes: 45             # 드라마 회차
+      movie-minutes: 100              # 영화(첫 전체 수집 실측 중앙값 98분, 2026-10-15 보정. 이전 120)
+      episode-minutes: 43             # 드라마 회차(실측 중앙값 약 42.7분, 2026-10-15 보정. 이전 45)
       animation-episode-minutes: 24   # 애니메이션 회차
     allow-target-date-override: false   # 수집 기준일(targetDate) 직접 지정 허용. 운영은 항상 오늘(KST)만, local에서만 true

@@ -31,7 +31,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @ExtendWith(OutputCaptureExtension.class)
 @TestPropertySource(properties = {
 		"app.origin-secret.enabled=true",
-		"app.origin-secret.value=" + OttServiceApiTest.SECRET})
+		"app.origin-secret.value=" + OttServiceApiTest.SECRET,
+		"logging.level.com.ottnavi.global.security.RequestIpLoggingFilter=DEBUG"}) // IP 로그가 debug라 이 테스트에서만 켠다
 class OttServiceApiTest extends IntegrationTestSupport {
 
 	static final String SECRET = "test-origin-secret";
@@ -106,18 +107,17 @@ class OttServiceApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 진입_요청의_IP_헤더를_로그로_남긴다(CapturedOutput output) throws Exception {
+	void 진입_요청의_방문자_IP만_debug_로그로_남긴다(CapturedOutput output) throws Exception {
 		mockMvc.perform(get(URL)
 						.header(OriginSecretFilter.HEADER_NAME, SECRET)
 						.header("x-real-ip", "1.2.3.4")
-						.header("x-forwarded-for", "5.6.7.8, 9.9.9.9")
-						.header("x-forwarded-host", "ottnavi.example"))
+						.header("x-forwarded-for", "5.6.7.8, 9.9.9.9"))
 				.andExpect(status().isOk());
 
-		// x-real-ip는 원본, x-forwarded-for·host는 ForwardedHeaderFilter가 반영한 remoteAddr(첫 값)·serverName으로 남는다
+		// x-forwarded-for는 ForwardedHeaderFilter가 remoteAddr(첫 값)로 반영한다. x-real-ip는 Vercel IP라 남기지 않는다
 		assertThat(output.getOut())
-				.contains("x-real-ip=1.2.3.4")
 				.contains("remoteAddr=5.6.7.8")
-				.contains("serverName=ottnavi.example");
+				.doesNotContain("x-real-ip")
+				.doesNotContain("serverName");
 	}
 }

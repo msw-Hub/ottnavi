@@ -1145,7 +1145,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
     TooManyRequests:
-      description: 요청 제한 초과(비로그인 공개 API). `errorCode`는 `RATE_LIMIT_EXCEEDED`
+      description: 요청 제한 초과(비로그인 공개 API). `errorCode`는 `RATE_LIMIT_EXCEEDED`. `Retry-After` 헤더에 다시 시도할 수 있을 때까지의 초가 담긴다
       content:
         application/problem+json:
           schema:

@@ -201,7 +201,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - **V-DEPLOY (배포 스모크)**. 배포 환경 응답 헤더 확인은 이 절차 한 곳에서 정의한다.
   - 인증: 배포 URL에서 로그인 → 새로고침(`/api/auth/refresh` 200, AT 재발급) → 로그아웃(RT 쿠키 삭제) → AT 만료 후 401 → 재발급 1회 → 원요청 재시도.
   - 기능: 검색, 상세, 계산·저장(git.md 스모크 항목).
-  - 헤더·경로: `/api/**` 응답에 `Cache-Control: no-store`가 있고 Vercel 캐시 적중이 없다(`x-vercel-cache`가 HIT 아님, T-8 ②). `x-origin-secret` 없이 Cloudtype 주소를 직접 호출하면 거부된다(T-8 ①). 백엔드 로그에 실제 방문자 IP(`x-real-ip`·`x-forwarded-for`)가 찍힌다.
+  - 헤더·경로: `/api/**` 응답에 `Cache-Control: no-store`가 있고 Vercel 캐시 적중이 없다(`x-vercel-cache`가 HIT 아님, T-8 ②). `x-origin-secret` 없이 Cloudtype 주소를 직접 호출하면 거부된다(T-8 ①). 진입 IP 로그(`RequestIpLoggingFilter`)는 Task 049에서 `debug`로 내리고 `remoteAddr`만 남기도록 바뀌었으므로, 방문자 IP 확인은 아래 "요청 제한 키"로 한다(로그가 필요하면 `logging.level.com.ottnavi.global.security.RequestIpLoggingFilter=DEBUG`로 잠시 켠다).
+  - 요청 제한 키(Task 049): Vercel 경유 요청 두 개를 서로 다른 기기·네트워크에서 보내면 Redis에 서로 다른 `rl:public:{방문자 IP}` 키가 생긴다(모든 방문자가 Vercel IP 한 키로 묶이지 않는다). 한도(일반 용량 20·분당 60)를 넘기면 429 `RATE_LIMIT_EXCEEDED`와 `Retry-After`가 나가고 다른 기기는 영향이 없다. Cloudtype 주소를 직접 호출하며 `X-Forwarded-For`를 위조해도 `x-origin-secret`이 없으면 403이라 버킷에 닿지 못한다(T-8 ①). 이 키 확인은 Redis 접근 가능한 사용자가 한다.
   - 인증 단계가 없는 배포(Task 021)는 "헤더·경로"만 수행한다.
   - 환경 변수 입력 주의: Cloudtype 환경 변수는 배포할 때만 입력할 수 있다. `main` 배포 때 `ADMIN_BATCH_TOKEN`을 넣어야 prod가 기동한다(값이 없으면 기동 실패, 사용자 직접).
 - **V-H (사람 확인)**: 무엇을 어디서 확인했는지, 날짜와 결과를 Task 아래 `기록:`에 남긴다. 비밀 값 자체는 적지 않는다.
@@ -997,29 +998,47 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 048: 첫 전체 수집 실행과 측정으로 용량·러닝타임 근거 확보 ⬜
 - 태그: [H] · PRD: B3, R11-25, R11-26 · 선행: 045, 044 · 기한: 2026-10-21
 - 구현 사항
-  - [ ] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
+  - [x] 로컬 ①에서 실행·측정한다(R-14 확정). 운영 DB 적재는 MVP 배포 Task 095에서 한다
   - [ ] TV 시즌 호출량, 소요 시간, 실패 건수, DB 용량(`pg_database_size`, Supabase 무료 한도 500MB와 비교, 인덱스·WAL 포함), Redis ops 측정(R11-26). 수집 사이클의 **최대 힙·메모리 사용량**도 기록한다(메모리 예산 측정 지점, 4.6)
   - [ ] 실측 러닝타임 중앙값으로 기본값 보정안(R11-25). 중단되면 Task 045 복구 API로 이어서 실행
+- 측정 기록(2026-10-15 수집, targetDate=2026-10-15, tier=ALL, 로컬 PC·로컬 Docker DB, 실행 이력 executionId 2(실패)→5(완료))
+  - 소요 시간(실작업 합계 약 6시간 17분): providerList 1초 → movieCandidate 8분 03초(33,638건) → tvCandidate 4분 13초(19,591건) → movieDetail 1시간 21분 56초(19,776건, 초당 약 4건) → tvDetail 2시간 08분 17초(12,890건에서 네트워크 끊김으로 FAILED) + 이어서 3분 12초(338건, 합계 13,228편) → availability 2시간 30분 56초(39,833개, 분당 약 264건). 실행 3·4는 DNS 오답으로 각 6초 만에 실패했다.
+  - 처리·변경: 작품 33,004편(영화 19,776, 드라마 13,228), 시청 단위 39,833(영화 19,776 + 시즌 20,057), 제공 상태 278,831건(NOT_AVAILABLE 174,474 / AVAILABLE 55,160 / UNKNOWN 49,197), `changedCount` 278,831.
+  - 실패: 작품 단위 건너뜀(skip) 0건, 단계 실패 1회(`UnknownHostException api.themoviedb.org`, PC 네트워크 끊김). 같은 날짜 재시작으로 끝난 단계를 건너뛰고 12,890번째부터 이어졌다.
+  - TV 시즌 호출량: 시즌 조회 약 20,057회(시즌 수와 같음), 드라마 상세 13,228회. TMDB 호출 합계는 후보 약 2,660쪽(33,638+19,591건을 쪽당 20건) + 상세 33,004 + 시즌 20,057 + 제공처 조회 39,833 = 약 9.6만 회(추정).
+  - DB 용량: `pg_database_size` 167MB(Supabase 무료 한도 500MB의 약 33%). 큰 테이블: `title_cast` 42MB(241,461행), `availability` 42MB(278,831행), `availability_change` 36MB(278,831행), `title` 25MB, `watch_unit` 7MB. WAL은 포함하지 않았고 Supabase가 한도에 어떻게 세는지는 미확인.
+  - Redis: 컨테이너 가동 약 17.4시간 동안 처리 명령 12,479개(평균 초당 0.2). 수집 중 Redis 부하는 무시할 수준(TMDB 속도 제한이 로컬 버킷이라 Redis를 쓰지 않는다, TECH 3절).
+  - 러닝타임(R11-25 입력): 영화 실측 중앙값 98분(실측 19,477건, 추정 299건=1.5%, 현재 기본값 120분), 드라마 회차당 실측 중앙값 약 42.7분(시즌 16,306개, 추정 시즌 3,751개=18.7%, 현재 기본값 45분).
+  - **최대 힙 부분 측정(2026-10-15)**: 첫 수집(6시간)에는 측정 지점이 없어서 별도로 `-Xmx512m -Xlog:gc`로 같은 로컬 DB에 갱신 수집(targetDate 2026-10-14, executionId 6)을 돌려 후보 수집(영화·드라마)과 영화 상세 약 19분(4,580편)을 측정했다. GC 93회, **Full GC 0회, OutOfMemory 0회, 청소 후 남는 양 최대 67MB**(한도 512MB의 13%), 청소 직전 최대 306MB(서버 기동 직후 1회, 이후 248MB 이내), 추세는 평평해 누수 징후가 없다. 스트리밍(chunk 10건·후보 20건) 구조의 기대와 같다. **측정하지 못한 구간**: 영화 상세 후반, 드라마 상세·시즌(응답이 커서 다를 수 있다), 제공 상태 판정. 이 구간의 최대 힙은 Task 095(운영 배포) 첫 수집 때 같은 방식으로 재확인하고, 운영 메모리 1GB 판단은 그 값으로 한다. 힙 한도 512MB는 컨테이너 1GB와 같지 않다(스레드·클래스·네이티브 영역이 따로 든다).
+  - 약점(고치지 않음): TMDB 연결 오류가 나면 재시도 2회 뒤 단계 전체가 실패한다. 운영 cron에서는 같은 지점에서 매번 멈출 수 있어, 연결 오류 건너뛰기(skip)나 더 긴 재시도를 넣을지 결정이 필요하다(R11-26 결정과 함께).
 - 완료 기준
-  - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다.
+  - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다. (측정값 기록은 위에서 끝났고, **R11-25 기본값 보정과 R11-26 용량 판단을 사용자에게 올리는 일과 최대 힙 측정이 남았다**)
 
 #### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ⬜
 - 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · R11-12 확정(2026-10-09) · 브랜치: `feature/b4-rate-limit`
 - 구현 사항
-  - [ ] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
-  - [ ] 일반 공개 버킷(fail-open, 인증 경로 `/api/auth/**`·`/api/oauth2/**`·`/api/login/**`도 적용, backend.md), 단건 수집 검색 버킷(fail-closed, 더 낮은 한도)
-  - [ ] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키(`app.rate-limit.*`), **R11-12 확정값: 일반 버킷 IP당 분당 60회, 단건 수집 검색 버킷 IP당 분당 10회**(순간 몰림 허용량은 한도의 약 1/3). 단건 수집 검색 버킷이 더 낮은 이유는 TECH 3절 "TMDB는 언제 호출하나". 요청 1건이 쓰는 Redis 연산 수는 구현 후 측정한다(Redis Cloud 무료 초당 100 ops를 캐시와 나눠 씀)
+  - [x] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
+  - [x] 일반 공개 버킷(fail-open, 인증 경로 `/api/auth/**`·`/api/oauth2/**`·`/api/login/**`도 적용, backend.md), 단건 수집 검색 버킷(fail-closed, 더 낮은 한도)
+  - [x] 초과 시 429 `RATE_LIMIT_EXCEEDED`. 한도는 설정 키(`app.rate-limit.*`), **R11-12 확정값: 일반 버킷 IP당 분당 60회, 단건 수집 검색 버킷 IP당 분당 10회**(순간 몰림 허용량은 한도의 약 1/3). 단건 수집 검색 버킷이 더 낮은 이유는 TECH 3절 "TMDB는 언제 호출하나". 요청 1건이 쓰는 Redis 연산 수는 구현 후 측정한다(Redis Cloud 무료 초당 100 ops를 캐시와 나눠 씀)
 - 완료 기준
   - V-B: 한도 초과·IP 헤더 우선순위·fail-open/closed 테스트가 통과한다. V-API: 반복 호출 시 429와 `errorCode`.
+- 구현 기록(2026-10-15)
+  - 필터 `PublicRateLimitFilter`(`@Order(HIGHEST_PRECEDENCE + 25)`, 오리진 필터 뒤·관리자 배치 토큰 필터 앞)가 `/api/public/**`와 인증 경로 3종만 검사한다. 버킷은 Bucket4j `LettuceBasedProxyManager`, 키 `rl:public:{remoteAddr}`·`rl:fetch:{remoteAddr}`, 키 만료는 버킷이 가득 찬 뒤 10초. 직접 `INCR`/`EXPIRE`로 만들지 않았다(설명은 `docs/guides/RATE_LIMIT_GUIDE.md`).
+  - 값: 일반 용량 20·분당 60, 단건 수집 용량 3·분당 10(`app.rate-limit.general`, `app.rate-limit.single-fetch`). 429 응답에 `Retry-After`(초, 올림). 거부 카운터 `ratelimit.rejected{bucket=public|single_fetch}`(IP 태그 없음).
+  - 일반 버킷은 fail-open, 저장소 오류 뒤 5초간 Redis를 부르지 않고 통과(경고 로그도 5초에 한 번). 단건 수집 버킷은 fail-closed이며 같은 `RATE_LIMIT_EXCEEDED`(429, `Retry-After` 5초)로 거부한다(새 오류 코드를 만들지 않았다. 한도 초과와 장애를 응답으로 구분하지 못하므로 구분이 필요해지면 `SERVICE_UNAVAILABLE`(503)을 검토).
+  - `RequestIpLoggingFilter`는 `debug` 레벨에 `method`·`uri`·`remoteAddr`만 남기도록 정리했다. 반복 남용자 차단(블랙리스트·DB 저장)은 만들지 않았다(사용자 결정, 남용이 관측되면 별도 Task).
+  - **실제 Redis 확인(2026-10-15)**: `PublicRateLimitRedisIntegrationTest` 4개 통과(Bucket4j 8.21 × Lettuce 7.5.2 호환, 한도 초과 429와 `Retry-After`, IP별 분리, `rl:public:`·`rl:fetch:` 키, TTL 부여). 전체 `./gradlew build` 675개 중 실패 0·에러 0·skipped 1. **요청 1건당 Redis 명령은 약 4개**(EVAL 1, GET 약 2, PSETEX 1)로 측정했다(GET 2회가 Bucket4j 자체인지 다른 Redis 사용인지는 분리하지 못했다). Redis Cloud 무료 초당 100 ops 기준으로 공개 요청 제한만으로 지속 약 25건/초가 한계이므로, 트래픽이 늘면 캐시와 나눠 쓰는 점을 다시 본다.
+  - Task 050에 넘길 것: 검색 서비스가 DB를 조회한 뒤 TMDB를 불러야 하는 지점에서만 `SingleFetchRateLimiter.check(clientIp)`를 부른다. 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 내려야 한다.
 
 #### Task 050: 작품 검색 API 구현으로 공개 검색 제공 ⬜
 - 태그: [B] · PRD: B4, FR-01, 02, SCR-01 · 선행: 044, 049, 031 · 브랜치: `feature/b4-title-search`
 - 구현 사항
   - [ ] `searchTitles`: DB 제목 검색, 영화·드라마 구분, 7개 서비스 상태 요약, 페이지네이션
-  - [ ] DB에 없으면 TMDB 검색으로 단건 수집·저장(단건 수집 버킷 통과, 외부 호출은 트랜잭션 밖)
+  - [ ] DB에 없으면 TMDB 검색으로 단건 수집·저장(단건 수집 버킷 통과, 외부 호출은 트랜잭션 밖). **Task 049가 만든 `SingleFetchRateLimiter.check(clientIp)`를 TMDB를 부르기 직전에만 호출한다**(DB 결과만으로 응답하면 소모하지 않는다). 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 넘긴다
   - [ ] TMDB 실패 시 DB 결과만 반환하고 외부 수집 실패 여부를 응답에 표시
 - 완료 기준
   - V-B: WireMock으로 정상, 단건 수집, TMDB 실패 대체 테스트 통과. V-API: 동명 영화·드라마가 구분돼 반환된다.
+  - V-B(요청 제한 연결): DB에 없는 작품을 같은 IP로 반복 검색하면 단건 수집 버킷(IP당 분당 10회)이 소모돼 한도 초과 시 429 `RATE_LIMIT_EXCEEDED`와 `Retry-After`가 나가고 그때 TMDB를 호출하지 않는다. DB에 있는 작품 검색은 단건 수집 버킷을 소모하지 않는다. (`SingleFetchRateLimiter.check`는 Task 049에서 만들어 두었고 호출 지점은 050이다. 설명은 `docs/guides/RATE_LIMIT_GUIDE.md`)
 
 #### Task 051: 작품 상세 API 구현으로 공개 상세 제공 ⬜
 - 태그: [B] · PRD: B4, FR-02, 03, SCR-02 · 선행: 035, 024, 031 · 브랜치: `feature/b4-title-detail`
