@@ -184,10 +184,15 @@ public abstract class AdminCollectApiTestSupport extends IntegrationTestSupport 
 		throw new IllegalStateException("실행 중인 수집이 30초 안에 끝나지 않았다");
 	}
 
-	/** JVM이 죽어 STARTED로 남은 실행을 흉내 낸다: 실행과 마지막 Step을 실행 중 상태로 되돌리고 생성 시각을 과거로 둔다 */
+	/**
+	 * JVM이 죽어 STARTED로 남은 실행을 흉내 낸다: 실행과 마지막 Step을 실행 중 상태로 되돌리고 생성 시각을 과거로 둔다.
+	 * VERSION을 올려 두는 이유: Job 스레드가 종료 리스너(afterJob) 뒤에 하는 마지막 갱신은 낙관적 락(VERSION 비교)으로
+	 * 실행하므로, 버전이 달라지면 그 갱신이 실패해 여기서 바꾼 값을 덮어쓰지 못한다(시간 경쟁 방지).
+	 */
 	protected void markAsCrashed(long executionId) {
 		jdbcTemplate.update("UPDATE BATCH_JOB_EXECUTION SET STATUS = 'STARTED', END_TIME = NULL, "
-				+ "EXIT_CODE = 'UNKNOWN', CREATE_TIME = '2000-01-01' WHERE JOB_EXECUTION_ID = ?", executionId);
+				+ "EXIT_CODE = 'UNKNOWN', CREATE_TIME = '2000-01-01', VERSION = VERSION + 1 "
+				+ "WHERE JOB_EXECUTION_ID = ?", executionId);
 		jdbcTemplate.update("UPDATE BATCH_STEP_EXECUTION SET STATUS = 'STARTED', END_TIME = NULL, "
 				+ "EXIT_CODE = 'UNKNOWN' WHERE STEP_EXECUTION_ID = (SELECT MAX(STEP_EXECUTION_ID) "
 				+ "FROM BATCH_STEP_EXECUTION WHERE JOB_EXECUTION_ID = ?)", executionId);

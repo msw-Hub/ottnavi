@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.ottnavi.global.common.CommonResponse;
 import com.ottnavi.global.error.GlobalExceptionHandler;
+import com.ottnavi.support.OAuth2LoginTestConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -26,10 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 보안 필터의 401·403이 ProblemDetail + errorCode로 오는지 검증한다.
- * 운영 체인은 아직 permitAll(Task 053 전)이라, 같은 엔트리포인트·거부 핸들러를 건 테스트 전용 체인을 /test/security/** 에만 적용한다.
+ * 운영 체인의 경로 규칙과 별개로, 같은 엔트리포인트·거부 핸들러를 건 테스트 전용 체인을 /test/security/** 에만 적용해 401·403 형식을 본다.
  */
 @WebMvcTest(controllers = SecurityErrorHandlerTest.SecuredTestController.class)
 @Import({SecurityConfig.class, ProblemDetailAuthenticationEntryPoint.class, ProblemDetailAccessDeniedHandler.class,
+		OAuth2LoginTestConfig.class,
 		GlobalExceptionHandler.class, SecurityErrorHandlerTest.TestSecurityChain.class,
 		SecurityErrorHandlerTest.SecuredTestController.class})
 class SecurityErrorHandlerTest {

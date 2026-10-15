@@ -17,10 +17,10 @@ import org.springframework.web.util.UrlPathHelper;
  * 인증 경로를 포함하는 이유는 로그인 시도·재발급을 반복해 서버를 괴롭히는 것을 막기 위해서다(backend.md 컨트롤러 규칙).
  * 로그인해야 하는 /api/**, 관리자 /api/admin/**, /api 밖(/actuator 등)은 검사하지 않는다.
  *
- * Security 체인 앞의 서블릿 필터라 Task 053의 SecurityConfig 교체에 영향을 받지 않는다.
+ * Security 체인 앞의 서블릿 필터라 SecurityConfig와 별개로 동작한다.
  * 빈은 RateLimitConfig가 만든다(@Component로 두면 @WebMvcTest 슬라이스가 이 필터를 끌어와 의존 빈이 없어 실패한다).
  */
-@Order(Ordered.HIGHEST_PRECEDENCE + 25) // OriginSecretFilter(+20) → 이 필터 → AdminBatchTokenFilter(+30) → Security(-100)
+@Order(Ordered.HIGHEST_PRECEDENCE + 25) // OriginSecretFilter(+20) → 이 필터 → Security(-100, 안에서 배치 토큰·JWT 필터)
 public class PublicRateLimitFilter extends OncePerRequestFilter {
 
 	// 검사 대상 경로 접두사. 마지막 / 없이 두고 "정확히 같거나 / 아래"만 대상으로 본다(/api/publicity 같은 경로 제외)
@@ -39,7 +39,7 @@ public class PublicRateLimitFilter extends OncePerRequestFilter {
 	protected boolean shouldNotFilter(HttpServletRequest request) {
 		// 경로 판정은 global.security.ApiRequestPath와 같은 방식(MVC와 같은 디코딩·정규화)을 쓴다.
 		// 그 클래스는 security 패키지 전용(package-private)이라 가져다 쓰지 않고, 같은 한 줄을 여기에 둔다
-		// (AdminBatchTokenFilter도 같은 방식). 원본 URI로 비교하면 /%61pi/public/... 으로 우회할 수 있다(CWE-647)
+		// (BatchTokenAuthenticationFilter도 같은 방식). 원본 URI로 비교하면 /%61pi/public/... 으로 우회할 수 있다(CWE-647)
 		String path = UrlPathHelper.defaultInstance.getPathWithinApplication(request);
 		for (String targetPath : TARGET_PATHS) {
 			if (path.equals(targetPath) || path.startsWith(targetPath + "/")) {
