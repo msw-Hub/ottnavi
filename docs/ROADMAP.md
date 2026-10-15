@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 10/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 13/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 46/105 | |
+| 합계 | | 49/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -817,7 +817,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 10/30
+## 7. Phase 3 — 핵심 기능 개발 · 13/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -938,7 +938,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 기록: 2026-10-14 완료(브랜치 `feature/b3-collect-details`). `backend-dev`가 임시 워크트리에서 컴파일·테스트로 검증한 안내서의 코드를 사용자가 직접 반영했다. Step 3개(`movieDetailStep`, `tvDetailStep`, `availabilityStep`, chunk 10)를 수집 Job 뒤에 붙였다. 신규 테스트 23건(`CollectDetailJobTest` 14, `DetailMapperTest` 7, `AvailabilityTest` 2), 전체 546건 실패 0 오류 0(건너뜀 1건은 기존 `EngineBenchmarkGenerator`). 설명은 `docs/guides/COLLECT_GUIDE.md`, 폴더 지도는 `docs/guides/PACKAGE_MAP.md`.
   - 결정: 1) 방영 회차가 0개인 시즌은 저장하지 않는다. 2) `watch_unit.episode_count`는 시즌 상세의 회차 목록 개수다. 3) 줄거리는 한국어가 비었을 때만 영어로 한 번 더 호출하고, 둘 다 비면 기존 줄거리·언어 표시를 유지한다. 4) `@Version`은 도입하지 않고 이력은 status가 바뀔 때만 쌓는다. 5) 상세 Reader는 읽은 위치를 저장해 restart가 이어 읽는다(25편 중 15번째 실패 후 재시작 테스트로 확인). 6) `collect/step`을 `candidate`·`detail`로 나눴다. 7) `genre` 시드가 없어(V2에 INSERT 없음) 상세 응답의 `{id, 이름}`으로 자동 등록한다. 8) 시즌 하나가 404면 작품 전체를 건너뛰고, 제공처 404는 그 단위만 건너뛰며 기존 상태를 유지하고, 5xx·429(재시도 후)는 Step 실패 후 restart다.
   - 넘길 내용: Task 045(방영 기준일은 Job 파라미터 `targetDate`이므로 실행 API가 KST 날짜를 넘길 것, 날짜가 다른 Job의 동시 실행은 상세 Reader에도 해당하는 043 이월 항목과 같다, 5xx로 실패하면 수동 restart가 필요), Task 048(작품당 시즌 수 분포 `collect.tv.seasons`와 `tmdb.call`의 endpoint 태그로 호출량 측정, 실제 TMDB 응답 확인, chunk 안 TMDB 호출 동안 연결 2개 점유 확인). 확인하지 못한 것: 실제 TMDB 응답으로 수집, 운영 환경(메모리 1GB, 연결 풀 5)의 연결 점유. 044 main 코드의 삼항·람다·`stream()`은 문법 규칙(backend.md)에 따라 `if`·`for`로 풀어썼다(풀어쓴 뒤 전체 546건 재통과). 테스트 코드와 043 이전 코드는 그대로이며 그 파일을 고칠 때 푼다. → Task 045로 넘긴 항목은 2026-10-15 Task 045에서 해소했다(`targetDate`는 KST 오늘 기준, 날짜가 다른 Job의 동시 실행은 전체 동시 실행 금지, 5xx 실패는 관리자 restart API).
-#### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 🔄
+#### Task 045: 수집 실행·복구·이력 관리자 API 구현으로 수동·cron 실행 경로 마련 ✅
 - 태그: [B] · PRD: B3, FR-18, FR-20 · 선행: 044, 031 · 브랜치: `feature/b3-collect-admin-api`
 - 구현 사항
   - [x] Task 043에서 이월: `CandidateReader`는 읽는 위치(`targets`, 쪽 번호, 버퍼)를 필드로 가지는 Step 단위 빈이라, **날짜가 다른 두 Job이 한 프로세스에서 동시에 돌면 서로의 상태를 덮어쓴다**(같은 `targetDate`+`tier`는 Spring Batch가 막지만 다른 날짜끼리는 막는 장치가 없다). 실행 API·cron을 만들 때 수집 Job을 한 번에 하나만 돌게 하거나(전체 동시 실행 금지) Reader를 `@StepScope`(실행마다 새로 만듦)로 바꾼다
@@ -1014,7 +1014,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-H: 측정값을 기록했고 R11-25·26 결정을 사용자에게 올렸다. (측정값 기록은 위에서 끝났고, **R11-25 기본값 보정과 R11-26 용량 판단을 사용자에게 올리는 일과 최대 힙 측정이 남았다**)
 
-#### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ⬜
+#### Task 049: 공개 API 요청 제한 구현으로 비로그인 남용 방지 ✅
 - 태그: [B] · PRD: B4, FR-05 · 선행: 024, 019 · R11-12 확정(2026-10-09) · 브랜치: `feature/b4-rate-limit`
 - 구현 사항
   - [x] `global/ratelimit/`: Bucket4j Redis 버킷, 키는 방문자 IP인 `remoteAddr`(`server.forward-headers-strategy: framework`가 `X-Forwarded-For` 첫 값을 반영, Task 021 실측: Vercel 경유에서 `x-real-ip`는 Vercel의 IP라 키로 쓰면 모든 방문자가 한 버킷에 묶인다). 2026-10-09 정정
@@ -1028,25 +1028,36 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 일반 버킷은 fail-open, 저장소 오류 뒤 5초간 Redis를 부르지 않고 통과(경고 로그도 5초에 한 번). 단건 수집 버킷은 fail-closed이며 같은 `RATE_LIMIT_EXCEEDED`(429, `Retry-After` 5초)로 거부한다(새 오류 코드를 만들지 않았다. 한도 초과와 장애를 응답으로 구분하지 못하므로 구분이 필요해지면 `SERVICE_UNAVAILABLE`(503)을 검토).
   - `RequestIpLoggingFilter`는 `debug` 레벨에 `method`·`uri`·`remoteAddr`만 남기도록 정리했다. 반복 남용자 차단(블랙리스트·DB 저장)은 만들지 않았다(사용자 결정, 남용이 관측되면 별도 Task).
   - **실제 Redis 확인(2026-10-15)**: `PublicRateLimitRedisIntegrationTest` 4개 통과(Bucket4j 8.21 × Lettuce 7.5.2 호환, 한도 초과 429와 `Retry-After`, IP별 분리, `rl:public:`·`rl:fetch:` 키, TTL 부여). 전체 `./gradlew build` 675개 중 실패 0·에러 0·skipped 1. **요청 1건당 Redis 명령은 약 4개**(EVAL 1, GET 약 2, PSETEX 1)로 측정했다(GET 2회가 Bucket4j 자체인지 다른 Redis 사용인지는 분리하지 못했다). Redis Cloud 무료 초당 100 ops 기준으로 공개 요청 제한만으로 지속 약 25건/초가 한계이므로, 트래픽이 늘면 캐시와 나눠 쓰는 점을 다시 본다.
-  - Task 050에 넘길 것: 검색 서비스가 DB를 조회한 뒤 TMDB를 불러야 하는 지점에서만 `SingleFetchRateLimiter.check(clientIp)`를 부른다. 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 내려야 한다.
+  - Task 050에 넘길 것: 검색 서비스가 DB를 조회한 뒤 TMDB를 불러야 하는 지점에서만 `SingleFetchRateLimiter.check(clientIp)`를 부른다. 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 내려야 한다. **(2026-10-15 정정: MVP는 단건 수집을 만들지 않아 호출 지점이 생기지 않았다. 후속 Task로 이월, Task 050 기록 참고)**
 
-#### Task 050: 작품 검색 API 구현으로 공개 검색 제공 ⬜
-- 태그: [B] · PRD: B4, FR-01, 02, SCR-01 · 선행: 044, 049, 031 · 브랜치: `feature/b4-title-search`
+#### Task 050: 작품 검색 API 구현으로 공개 검색 제공 ✅
+- 태그: [B] · PRD: B4, FR-01, 02, SCR-01 · 선행: 044, 049, 031 · 브랜치: `feature/b4-title-search-detail`(051과 한 PR)
 - 구현 사항
-  - [ ] `searchTitles`: DB 제목 검색, 영화·드라마 구분, 7개 서비스 상태 요약, 페이지네이션
-  - [ ] DB에 없으면 TMDB 검색으로 단건 수집·저장(단건 수집 버킷 통과, 외부 호출은 트랜잭션 밖). **Task 049가 만든 `SingleFetchRateLimiter.check(clientIp)`를 TMDB를 부르기 직전에만 호출한다**(DB 결과만으로 응답하면 소모하지 않는다). 컨트롤러가 `request.getRemoteAddr()`를 서비스 인자로 넘긴다
-  - [ ] TMDB 실패 시 DB 결과만 반환하고 외부 수집 실패 여부를 응답에 표시
+  - [x] `searchTitles`: DB 제목·원제 부분 일치(ILIKE) 검색, 인기도 내림차순(동률은 id), 영화·드라마 구분, 7개 서비스 상태 요약(드라마는 시즌 중 하나라도 있으면 AVAILABLE), 페이지네이션
+  - [ ] ~~DB에 없으면 TMDB 검색으로 단건 수집·저장~~ → **이월**(2026-10-15 사용자 결정): MVP는 DB 조회만 한다. 후속 Task(실사용에서 "작품 없음" 불만이 보이면)에서 `SingleFetchRateLimiter.check(clientIp)`를 TMDB 호출 직전에만 부르는 방식으로 만든다. 그때까지 `SingleFetchRateLimiter`는 호출하지 않고 그대로 둔다
+  - [ ] ~~TMDB 실패 시 DB 결과만 반환하고 외부 수집 실패 여부를 응답에 표시~~ → **이월**: 필드 `isExternalCollectFailed`는 호환을 위해 두고 항상 `false`로 응답한다
 - 완료 기준
-  - V-B: WireMock으로 정상, 단건 수집, TMDB 실패 대체 테스트 통과. V-API: 동명 영화·드라마가 구분돼 반환된다.
-  - V-B(요청 제한 연결): DB에 없는 작품을 같은 IP로 반복 검색하면 단건 수집 버킷(IP당 분당 10회)이 소모돼 한도 초과 시 429 `RATE_LIMIT_EXCEEDED`와 `Retry-After`가 나가고 그때 TMDB를 호출하지 않는다. DB에 있는 작품 검색은 단건 수집 버킷을 소모하지 않는다. (`SingleFetchRateLimiter.check`는 Task 049에서 만들어 두었고 호출 지점은 050이다. 설명은 `docs/guides/RATE_LIMIT_GUIDE.md`)
+  - V-API: 동명 영화·드라마가 구분돼 반환되고(`TitleApiTest`), 빈 검색어·크기 범위 밖은 400 `VALIDATION_FAILED`다. 계약 대조(`OpenApiContractTest`) 통과.
+  - 이월: WireMock 단건 수집·TMDB 실패 대체 테스트, 요청 제한 연결 테스트(단건 수집 버킷 소모)는 단건 수집을 만드는 후속 Task에서 한다.
+- 구현 기록(2026-10-15)
+  - 컨트롤러 `catalog/controller/TitleController`(검색·상세 한 클래스), 서비스 `TitleSearchService`·`TitleAvailabilityLoader`, 합치기 규칙 `catalog/domain/rule/AvailabilityAggregation`(순수 정적 함수), 응답 `catalog/dto/response/*`, 서비스 내부 값 `catalog/service/model/*View`. 마이그레이션·인덱스는 만들지 않았다(`title ilike`는 순차 조회라 작품 수가 커지면 `pg_trgm` 인덱스 검토, 현재 규모는 수만 건).
+  - 쿼리 수는 작품 수와 무관하다: 작품 한 페이지(+count) → 시청 단위 IN 1회 → 판정 IN 1회 → 서비스 목록 1회. 서비스 상태는 서비스 ID 순 7개를 모두 담고 판정 행이 없으면 UNKNOWN이다. `dataAsOf`는 이 페이지 판정 `checkedAt` 중 가장 오래된 것의 KST 날짜, 판정이 없거나 결과가 비면 전체 판정의 최신 `checkedAt`, 그것도 없으면 오늘(KST)이다.
+  - 검색어는 앞뒤 공백을 빼고 `\`·`%`·`_`를 이스케이프한다(`escape` 문자는 쿼리 파라미터로 넘김). 인기도가 NULL인 작품은 뒤로 보낸다(`nulls last`).
 
-#### Task 051: 작품 상세 API 구현으로 공개 상세 제공 ⬜
-- 태그: [B] · PRD: B4, FR-02, 03, SCR-02 · 선행: 035, 024, 031 · 브랜치: `feature/b4-title-detail`
+#### Task 051: 작품 상세 API 구현으로 공개 상세 제공 ✅
+- 태그: [B] · PRD: B4, FR-02, 03, SCR-02 · 선행: 035, 024, 031 · 브랜치: `feature/b4-title-search-detail`(050과 한 PR)
 - 구현 사항
-  - [ ] `GET /api/public/titles/{mediaType}/{tmdbId}`(`getTitleDetail`): 포스터, 원제, 줄거리·`overviewLang`, 장르, 날짜, 러닝타임·추정, 출연진 10명, 서비스별 상태·`unknownReason`, 시즌별 제공처·총 시간, 기준일
-  - [ ] Redis `titleDetail` 캐시, 없으면 404 `TITLE_NOT_FOUND`
+  - [x] `GET /api/public/titles/{mediaType}/{tmdbId}`(`getTitleDetail`): 포스터, 원제, 줄거리·`overviewLang`, 장르, 날짜, 러닝타임·추정, 출연진 10명, 서비스별 상태, 시즌별 총 시간·회차·방영 연도·시즌별 상태, 기준일. 계약의 `TitleDetail` 그대로(필드 변경 없음)
+  - [x] Redis `titleDetail` 캐시(TTL 24시간, 키 `{mediaType}:{tmdbId}`, 값은 `TitleDetailView` 전용 `JacksonJsonRedisSerializer`), 없으면 404 `TITLE_NOT_FOUND`
+  - [x] Redis 오류는 캐시를 무시하고 DB로 응답(`CachingConfigurer`의 `CacheErrorHandler`, get·put·evict·clear 실패는 warn 로그만)
+  - [x] 수집 Job이 COMPLETED로 끝나면 `titleDetail` 캐시를 비운다(`TitleCacheEvictListener`, `JobExecutionListener`를 `collectJob`에 등록. 실패한 실행은 비우지 않는다)
 - 완료 기준
-  - V-API: 영화·드라마 상세가 `CommonResponse`, 없는 작품은 404 ProblemDetail. V-B: 캐시 적중 테스트.
+  - V-API: 영화·드라마 상세가 `CommonResponse`, 없는 작품은 404 ProblemDetail, 잘못된 `mediaType`·`tmdbId`는 400. V-B: 캐시 적중 테스트(DB를 바꿔도 두 번째 응답은 캐시 값, 캐시를 비우면 반영), 캐시 오류 시 DB 폴백 단위 테스트.
+- 구현 기록(2026-10-15)
+  - `getDetail(mediaType, tmdbId)`가 작품·시청 단위·판정·출연진·장르를 각각 한 번씩 조회해 조립하고 `@Cacheable`로 감싼다. `mediaType` 경로 값은 소문자 `movie`/`tv`만 받는다(그 밖은 400 `VALIDATION_FAILED`, `fieldErrors`에 `mediaType`).
+  - 캐시 값 필드를 바꾸면 Redis에 남은 옛 값이 맞지 않을 수 있다(TTL 24시간 또는 수동 비우기, 배포 때 유의). `unless = "#result == null"`은 없는 작품이 예외로 처리돼 null 반환이 없어서 붙이지 않았다.
+  - 검증: 전체 `./gradlew.bat build` 703개 중 실패 0·오류 0·건너뜀 1(기존). 새 테스트 28개(`AvailabilityAggregationTest` 9, `TitleSearchServiceTest` 2, `CacheErrorHandlingConfigTest` 2, `TitleCacheEvictListenerTest` 3, `TitleApiTest` 12)와 `OpenApiContractTest`(두 operation 포함) 통과.
+  - 확인하지 못한 것: 운영 Redis Cloud에서의 직렬화·TTL 동작(로컬 Testcontainers Redis만 확인).
 
 #### Task 052: 공개 화면 실제 API 연결과 출처 표기 완성으로 비로그인 기능 제공 ⬜
 - 태그: [F] · PRD: F3, FR-01~03, 05, MVP 완료 기준 ② · 선행: 031, 050, 051, 003 · 브랜치: `feature/f3-public-api`

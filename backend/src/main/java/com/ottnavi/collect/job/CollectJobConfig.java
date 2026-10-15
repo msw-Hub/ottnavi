@@ -18,10 +18,12 @@ public class CollectJobConfig {
 
     @Bean
     public Job collectJob(JobRepository jobRepository, Step providerListStep, Step movieCandidateStep,
-                          Step tvCandidateStep, Step movieDetailStep, Step tvDetailStep, Step availabilityStep) {
+                          Step tvCandidateStep, Step movieDetailStep, Step tvDetailStep, Step availabilityStep,
+                          TitleCacheEvictListener titleCacheEvictListener) {
         // 후보 Step이 모두 끝난 뒤에 상세 Step이 시작하므로 상세 Step이 읽는 title 목록은 그 시점에 고정이다
         return new JobBuilder(JOB_NAME, jobRepository)
                 .validator(new CollectJobParameters())
+                .listener(titleCacheEvictListener) // 완료 시 작품 상세 캐시를 비운다(Task 051)
                 .start(providerListStep)
                 .next(movieCandidateStep)
                 .next(tvCandidateStep)

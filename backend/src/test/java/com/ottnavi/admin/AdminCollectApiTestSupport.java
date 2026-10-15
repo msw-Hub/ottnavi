@@ -151,14 +151,16 @@ public abstract class AdminCollectApiTestSupport extends IntegrationTestSupport 
 		return id.longValue();
 	}
 
-	/** 수집이 끝날 때까지 기다린다(100ms 간격, 최대 30초) */
+	/** 수집이 끝날 때까지 기다린다(100ms 간격, 최대 30초). 종료 시각까지 기록된 뒤에 돌아온다 */
 	protected void awaitFinished(long executionId) throws Exception {
 		long deadline = System.currentTimeMillis() + 30_000;
 		while (System.currentTimeMillis() < deadline) {
 			Optional<CollectExecutionRecord> found = collectExecutionQuery.findById(executionId);
 			if (found.isPresent()) {
 				String status = found.get().batchStatus().name();
-				if (!"STARTING".equals(status) && !"STARTED".equals(status) && !"STOPPING".equals(status)) {
+				// endTime이 있어야 Job 종료 리스너(afterJob) 뒤의 마지막 갱신까지 끝난 것이다. 그 전에 DB를 고치면 덮어쓰인다
+				boolean isRunning = "STARTING".equals(status) || "STARTED".equals(status) || "STOPPING".equals(status);
+				if (!isRunning && found.get().endTime() != null) {
 					return;
 				}
 			}
