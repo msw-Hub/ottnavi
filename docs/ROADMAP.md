@@ -1068,27 +1068,28 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: 비로그인으로 검색 → 상세가 실제 데이터로 동작하고 상태 배지가 DB 값과 같다.
 
-#### Task 053: Google OAuth2 로그인·JWT 발급·AT 검증 구현으로 회원 인증 확보 ⬜
+#### Task 053: Google OAuth2 로그인·JWT 발급·AT 검증 구현으로 회원 인증 확보 ✅
 - 태그: [B] · PRD: B5, FR-06, TECH 4절, T-7 · 선행: 034, 023 · 브랜치: `feature/b5-oauth-login`
 - 구현 사항
-  - [ ] `user/domain/entity/User` 엔티티와 `user/domain/repository` 리포지토리(`UNIQUE(oauth_provider, oauth_subject)`로 조회·생성)
-  - [ ] Task 016 임시 설정을 실제 `SecurityConfig`로 교체: STATELESS, `permitAll`은 `/api/public/**`와 인증 경로(`/api/auth/**`, `/api/oauth2/**`, `/api/login/**`), 그 외 `/api/**`는 인증 필요
-  - [ ] OAuth 경로를 `/api` 아래로(`authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`), 쿠키 기반 `AuthorizationRequestRepository`
-  - [ ] 성공 핸들러: RT 쿠키(HttpOnly, Secure, SameSite=Lax, Path=`/api/auth`) + 302 `/auth/callback`, URL에 토큰 없음. AT 30분(`app.jwt.access-ttl`), `jjwt-jackson` runtime
-  - [ ] AT 검증 필터(`global/security`, Bearer → 인증 객체)
+  - [x] `user/domain/entity/User` 엔티티와 `user/domain/repository` 리포지토리(`UNIQUE(oauth_provider, oauth_subject)`로 조회·생성)
+  - [x] Task 016 임시 설정을 실제 `SecurityConfig`로 교체: STATELESS, `permitAll`은 `/api/public/**`와 인증 경로(`/api/auth/**`, `/api/oauth2/**`, `/api/login/**`), 그 외 `/api/**`는 인증 필요
+  - [x] OAuth 경로를 `/api` 아래로(`authorizationEndpoint.baseUri("/api/oauth2/authorization")`, `redirectionEndpoint.baseUri("/api/login/oauth2/code/*")`), 쿠키 기반 `AuthorizationRequestRepository`
+  - [x] 성공 핸들러: RT 쿠키(HttpOnly, Secure, SameSite=Lax, Path=`/api/auth`) + 302 `/auth/callback`, URL에 토큰 없음. AT 30분(`app.jwt.access-ttl`), `jjwt-jackson` runtime
+  - [x] AT 검증 필터(`global/security`, Bearer → 인증 객체)
 - 완료 기준
   - V-B: 아직 구현되지 않은 회원 경로(예: `/api/me/settings`)에 토큰 없이 요청하면 401 ProblemDetail, 유효 AT면 401이 아님(핸들러가 없어 404), 공개 API는 200. 회원 API가 생기는 Task 055에서 같은 검사를 실제 API로 다시 실행한다.
   - 로컬에서 Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착 → RT 쿠키 생성을 브라우저로 확인했다.
 
-#### Task 054: 토큰 재발급·로그아웃과 관리자 권한 분리 구현으로 인증 수명주기 완성 ⬜
+#### Task 054: 토큰 재발급·로그아웃과 관리자 권한 분리 구현으로 인증 수명주기 완성 ✅
 - 태그: [B] · PRD: B5, FR-06, 17 · 선행: 053 · R11-21 확정(2026-10-09) · 브랜치: `feature/b5-token-refresh`
 - 구현 사항
-  - [ ] `POST /api/auth/refresh`(RT 검증 → 새 AT, RT 회전 14일), `POST /api/auth/logout`(폐기·쿠키 삭제). 두 경로에 `Origin` = `APP_FRONTEND_ORIGIN` 검사
-  - [ ] `RefreshTokenStore` 인터페이스와 **Redis TTL 구현**(R11-21 확정: RT는 해시로 저장, 재발급 때 회전, 이미 쓴 RT가 다시 쓰이면 해당 계열 무효화). 서명 검증만 하는 구현은 만들지 않는다. 알려진 한계(Redis가 비워지면 모든 사용자가 다시 로그인)는 TECH 4절
-  - [ ] `/api/admin/**`는 ADMIN 역할 필요, 배치 토큰 경로는 토큰 또는 ADMIN. 로컬·테스트에서는 DB에서 `users.role`을 직접 바꿔 ADMIN을 만든다. 운영 지정 방법은 R-5(2026-10-09 **DB 직접 수정으로 확정**, 이 Task에 구현이 늘지 않는다. 절차는 Task 095 ②)
+  - [x] `POST /api/auth/refresh`(RT 검증 → 새 AT, RT 회전 14일), `POST /api/auth/logout`(폐기·쿠키 삭제). 두 경로에 `Origin` = `APP_FRONTEND_ORIGIN` 검사
+  - [x] `RefreshTokenStore` 인터페이스와 **Redis TTL 구현**(R11-21 확정: RT는 해시로 저장, 재발급 때 회전, 이미 쓴 RT가 다시 쓰이면 해당 계열 무효화). 서명 검증만 하는 구현은 만들지 않는다. 알려진 한계(Redis가 비워지면 모든 사용자가 다시 로그인)는 TECH 4절
+  - [x] `/api/admin/**`는 ADMIN 역할 필요, 배치 토큰 경로는 토큰 또는 ADMIN. 로컬·테스트에서는 DB에서 `users.role`을 직접 바꿔 ADMIN을 만든다. 운영 지정 방법은 R-5(2026-10-09 **DB 직접 수정으로 확정**, 이 Task에 구현이 늘지 않는다. 절차는 Task 095 ②)
 - 완료 기준
   - V-B: RT 회전(이전 RT 거부, 이미 쓴 RT 재사용 시 계열 무효화), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/executions` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
   - V-API: refresh·logout 호출을 확인했다.
+- 기록(053·054, 2026-10-16, 한 브랜치 `feature/b5-auth`, 커밋 전): 구현 완료. 결정 요약: 로그인 실패는 오류 코드가 아니라 `/auth/callback?error=login_failed` 리다이렉트, 인가 요청은 HMAC 서명 쿠키 `oauth2_auth_request`(180초, 콜백에서 즉시 삭제), Google 토큰은 저장하지 않음(STATELESS), AT 30분은 프론트 메모리에만·RT는 `{familyId}.{secret}` 불투명 토큰의 SHA-256 해시를 Redis에 저장(`Path=/api/auth`, SameSite=Lax), 회전마다 TTL 14일 갱신·직전 토큰 10초 유예·재사용이면 계열 삭제(Lua 원자 판정), 로그아웃은 현재 기기 계열만 폐기, 재발급·로그아웃은 `Origin` 검사(불일치 403), Redis 장애는 재발급 500(401 아님), 재발급 응답에 `role` 포함(역할 변경은 다음 재발급에 반영), 오류 코드 세분화는 보류, 이메일 미검증(`email_verified`≠true) 계정은 로그인 거부(D1), 관리자 지정은 DB 직접 수정(R-5), 배치 토큰은 Security 체인 안 `BatchTokenAuthenticationFilter`로 옮겨 `hasAnyRole(ADMIN,BATCH)`(JWT와 OR). 테스트: 전체 `.\gradlew.bat build --rerun-tasks` 752건 실패 0·오류 0·건너뜀 1(기존), 계약 대조 `OpenApiContractTest` 통과. 계약은 operation 12개 구현·19개 `x-planned`. **사용자 확인 대기**: 완료 기준의 브라우저 항목(Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착·RT 쿠키 생성)은 사용자가 확인한 뒤 체크한다. 이월: Redis Cloud 무료 플랜 Lua 실호출 확인(배포 스모크), 운영 환경 변수·Google 운영 리디렉션 URI(Task 092), 프론트 057 연동 항목(`api:generate`, 콜백·401 재시도·single-flight·500 처리·AT 폐기·`credentials`), Lettuce 예외 메시지의 키 노출 확인, `AuthUser.role`(enum)이 `global.security`→`user` 참조인 점의 계층 결정(상세는 HANDOFF 4절).
 
 #### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ⬜
 - 태그: [B] · PRD: B5, FR-08, 10, SCR-07, R11-18 · 선행: 053, 031 · 브랜치: `feature/b5-user-settings`

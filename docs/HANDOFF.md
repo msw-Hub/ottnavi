@@ -10,7 +10,7 @@
 | 진행 | Phase 1 22/23, Phase 2 14/14 ✅, Phase 3 13/30, 합계 49/105 (045~047 병합, 049 병합(PR #64), 050·051은 구현·검증을 마쳤고 PR 전이라 병합 때 확정. 048은 측정 기록만 있고 R11-25·26 결정·최대 힙 재측정이 남아 완료로 세지 않았다) |
 | 완료한 최근 Task | 031 계약, 032~035 스키마·엔티티, 036~037 디자인, 038~040 엔진, 041 TMDB 클라이언트, 042 판정·러닝타임 규칙, 043 수집 Job 후보 단계, 044 상세·시즌·판정 Step, 045 수집 관리자 API, 046 제공처 매핑 API, 047 수집 cron(비활성), 049 공개 API 요청 제한, 050 작품 검색 API, 051 작품 상세 API(050·051은 DB 조회만, 단건 수집은 이월) |
 | 열린 PR | 없음(050+051 PR은 아직 올리지 않았다). 작업 브랜치는 `feature/b4-title-search-detail`(백엔드 워크트리)이고 변경은 아직 커밋하지 않았다 |
-| 다음 Task | 050+051 PR 병합 → **048 결정 마무리**(R11-25·26, 사용자) → 052 공개 화면 실제 API 연결(프론트, `npm run api:generate` 먼저) → 053·054 인증 |
+| 다음 Task | 053·054 인증은 구현·테스트를 마쳤다(2026-10-16, 커밋 전, 사용자 브라우저 로그인 확인 대기). 다음은 **055·056**(내 설정·찜 API) → 이후 백엔드 API를 이어서 만들고, 프론트 실제 연결(052·057·058·061·067)은 묶어서 한다 |
 | 쉬림프 | 045까지 완료 처리, 046·047 등록됨(PR 병합 후 `verify_task`). 앞으로 Task는 착수할 때 등록하고 `execute_task`, 끝나면 `verify_task`(점수 90 안팎) |
 | 워크트리 | `ottnavi`(메인, `develop` 유지·최신화, 프론트·문서), `ottnavi-backend`(**백엔드 작업은 항상 여기서 한다**, 2026-10-14 사용자 결정. 현재 `feature/b3-collect-admin-api`), `ottnavi-docs`(문서 작업, 옛 브랜치), `ottnavi-backend-test`(옛 브랜치). 같은 브랜치를 두 워크트리에서 동시에 열 수 없다 |
 
@@ -19,7 +19,7 @@
 1. (완료) PR #61은 2026-10-14에 Squash 병합했고 메인 워크트리 `develop`을 최신화했다.
 2. (완료) **Task 045**(수집 실행·복구·이력 관리자 API)는 PR #62로 2026-10-15 병합했다(결정과 기록은 ROADMAP Task 045, 설명은 `docs/guides/COLLECT_GUIDE.md` 11절, `COLLECT_ADMIN_QA.md`). **Task 046+047**(제공처 매핑 API, 수집 cron 워크플로 비활성)은 PR #63, **Task 048+049**(첫 전체 수집 측정 기록, 공개 API 요청 제한)는 PR #64로 병합했다. **Task 050+051**(검색·상세 API)은 `feature/b4-title-search-detail`에서 구현·검증을 끝냈고 PR이 남았다(DB 조회만 하며 단건 수집은 후속 Task로 이월, ROADMAP Task 050 기록).
 3. 048 결정 마무리(R11-25 기본 러닝타임 보정, R11-26 용량 판단, 최대 힙 재측정은 Task 095) → 052(공개 화면 실제 연결).
-4. 인증: 053·054 → 057(프론트 인증 연동, 인증 코드는 사용자 검토). 회원 입력: 055·056 → 058. 요금·관리자: 059·060 → 061. 플랜: 062~066 → 067.
+4. 인증: 053·054(구현 완료) → 057(프론트 인증 연동, 인증 코드는 사용자 검토). 회원 입력: 055·056 → 058. 요금·관리자: 059·060 → 061. 플랜: 062~066 → 067.
 5. 2단계 화면 목업(068·071·075·081·086·097)은 Task 095(MVP 공개) 이후.
 6. 프론트에는 지금 독립 작업이 없다. 프론트 Task(052, 057, 058, 061, 067)는 모두 백엔드 API가 먼저 필요하다.
 
@@ -38,6 +38,10 @@
 **배포 게이트(Task 046)**: 제공처 매핑 변경 API(`PATCH /api/admin/providers/{providerId}`)는 Task 054 전까지 인증이 없다(local 전용). **Task 054 완료 전에는 `main`에 병합·배포하지 않는다**(ROADMAP 순서상 MVP 배포 092 이후라 문제없다. 먼저 배포해야 하면 이 컨트롤러를 막는 조건을 추가한다).
 
 **배포 전 사용자 확인(Task 045·047)**: GitHub 저장소 시크릿 `BACKEND_BASE_URL`·`ORIGIN_SECRET`·`ADMIN_BATCH_TOKEN`은 Task 093(cron 활성화) 때 등록한다(수집 워크플로 `collect.yml`이 읽는다). Cloudtype에 `ADMIN_BATCH_TOKEN`이 아직 등록돼 있지 않다. Cloudtype 환경 변수는 **배포할 때만 입력할 수 있어서**, `main` 배포 단계에서 값을 넣어야 한다(값이 없으면 prod가 기동하지 못한다. 이 값은 GitHub Actions 시크릿 `ADMIN_BATCH_TOKEN`과 같아야 한다). 배포 단계에서 사용자에게 알린다. 재배포 때 옛 컨테이너와 새 컨테이너가 겹쳐 도는지도 확인한다(겹치면 "전체 동시 실행 금지"의 서비스 락이 두 서버에 걸치지 않아 수집이 동시에 돌 수 있다. 확인 전까지 알려진 한계).
+
+**인증(Task 053·054) 이월·확인 항목**: ① Redis Cloud 무료 플랜에서 Lua(`EVAL`) 실호출을 확인한다(문서상 Redis Cloud Standard는 EVAL·EVALSHA·SCRIPT LOAD를 지원하므로 배포 스모크에서 로그인·재발급으로 확인). ② 운영 배포 전 Cloudtype 환경 변수 `JWT_SECRET`·`GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`·`APP_FRONTEND_ORIGIN`·`OAUTH2_REDIRECT_BASE_URL`을 입력한다(배포 때만 입력 가능). ③ Google 콘솔에 운영 리디렉션 URI `https://ottnavi.vercel.app/api/login/oauth2/code/google`를 추가한다(Task 092). ④ 057(프론트)로 넘길 것: `npm run api:generate`(`AccessToken.role`), `/auth/callback`에서 refresh 호출과 `?error=login_failed` 처리, 401이면 재발급 한 번 뒤 원요청 재시도, 재발급 호출 합치기(single-flight), 재발급이 500이면 로그인 화면으로 보내지 않기, 로그아웃 때 메모리 AT 폐기, 요청의 `credentials` 설정. ⑤ Lettuce 예외 메시지에 키(familyId)가 로그에 남는지 확인한다. ⑥ `AuthUser.role`이 `UserRole` enum이라 `global.security`가 `user` 패키지를 참조한다(계층 허용을 결정하거나 문자열로 바꾼다). ⑦ 로그인 브라우저 확인(Task 053 완료 기준)은 사용자가 한다.
+
+**인증 브라우저 확인 결과(2026-10-16, 사용자)**: 서버 쪽 로그인·재발급(연속 3회 200)·로그아웃(204 후 401)·`/api/me/settings` 404/401·관리자 API 403·`users` 계정당 1행·신규 가입은 USER로 확인했다. 인가 요청 쿠키 수명은 180초 그대로 두기로 했다(사용자 결정). **주의**: 프론트 `AuthCallbackScreen`은 아직 목업 전용이라 목업이 아닌 환경에서는 서버 결과와 상관없이 항상 "로그인에 실패했습니다"를 보인다(Task 057에서 실제 `POST /api/auth/refresh` 연동으로 교체). 그래서 실제 로그인 직후 "로그인 실패" 화면이 떠도 서버 로그인은 성공한 것이다. 로컬 ADMIN 지정은 DB에서 `UPDATE users SET role='ADMIN' WHERE email=...`로 하고 다음 재발급 때 반영된다(운영 지정은 Task 095 ②).
 
 **Task 048로**: 인기도·평점 UPDATE 부하 측정, TMDB discover 500쪽(1만 건) 상한에 걸리는 서비스 여부, `|`(OR) 구분자의 TMDB 공식 문서 확인, 운영 환경 연결 점유, 약 2분 추정 실측.
 

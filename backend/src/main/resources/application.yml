@@ -11,6 +11,12 @@ spring:
     open-in-view: false           # 권장(로드맵 목록에는 없음)
     hibernate:
       ddl-auto: validate
+  security:
+    oauth2:
+      client:
+        registration:
+          google:   # client-id·secret·redirect-uri는 프로필 파일에서 정한다(local은 더미 기본값, prod는 기본값 없음)
+            scope: openid,email,profile   # 이메일·이름을 받는다(구글 기본 scope와 같지만 명시)
   batch:
     jdbc:
       initialize-schema: never    # BATCH_* 테이블은 Flyway V4(Task 033)가 만든다
@@ -35,6 +41,11 @@ springdoc:
     version: openapi_3_0                # 계약(openapi.yaml 3.0.3)과 nullable 표기를 맞춘다. 기본값은 3.1(TECH 6절)
   default-produces-media-type: application/json   # 미지정 시 응답 media type이 */*로 나와 계약과 어긋난다
 app:
+  auth:
+    cookie-secure: true              # Refresh Token·인가 요청 쿠키의 Secure 속성. localhost는 브라우저가 보안 컨텍스트로 보므로 true로 둔다
+  jwt:
+    refresh-ttl: 14d                 # Refresh Token 수명. 교체할 때마다 다시 이만큼(TECH T-7)
+    refresh-reuse-grace: 10s         # 직전 Refresh Token을 재사용으로 보지 않는 유예(동시 요청·응답 유실 대비)
   origin-secret:
     enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
   rate-limit:                           # 공개 API 요청 제한(Task 049, PRD R11-12). 키는 방문자 IP(remoteAddr), 버킷은 Redis에 둔다

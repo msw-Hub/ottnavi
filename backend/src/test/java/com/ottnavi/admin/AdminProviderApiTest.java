@@ -6,12 +6,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ottnavi.global.security.jwt.JwtTokenProvider;
 import com.ottnavi.support.IntegrationTestSupport;
+import com.ottnavi.support.TestTokens;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +30,14 @@ class AdminProviderApiTest extends IntegrationTestSupport {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private JwtTokenProvider jwtTokenProvider;
+
+	/** 관리자 API는 ADMIN Access Token이 필요하다(Task 053) */
+	private String adminBearer() {
+		return new TestTokens(jwtTokenProvider).adminBearer();
+	}
 
 	@BeforeEach
 	void 시험_전에_시드만_남긴다() {
@@ -53,7 +64,7 @@ class AdminProviderApiTest extends IntegrationTestSupport {
 
 		// when
 		// then
-		mockMvc.perform(get(URL))
+		mockMvc.perform(get(URL).header(HttpHeaders.AUTHORIZATION, adminBearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.success").value(true))
 				.andExpect(jsonPath("$.data.providers[0].providerId").value(990001))
@@ -61,14 +72,14 @@ class AdminProviderApiTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.data.providers[0].ottServiceId").doesNotExist());
 
 		Long ottServiceId = jdbcTemplate.queryForObject("SELECT min(id) FROM ott_service", Long.class);
-		mockMvc.perform(patch(URL + "/990001").contentType(MediaType.APPLICATION_JSON)
+		mockMvc.perform(patch(URL + "/990001").header(HttpHeaders.AUTHORIZATION, adminBearer()).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"mappingState\":\"MAPPED\",\"ottServiceId\":" + ottServiceId + ",\"tier\":\"AD\"}"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.mappingState").value("MAPPED"))
 				.andExpect(jsonPath("$.data.ottServiceId").value(ottServiceId))
 				.andExpect(jsonPath("$.data.tier").value("AD"));
 
-		mockMvc.perform(get(URL))
+		mockMvc.perform(get(URL).header(HttpHeaders.AUTHORIZATION, adminBearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.providers[?(@.providerId == 990001)].mappingState").value("MAPPED"))
 				.andExpect(jsonPath("$.data.providers[?(@.providerId == 990001)].ottServiceId").value(ottServiceId.intValue()))
@@ -82,7 +93,7 @@ class AdminProviderApiTest extends IntegrationTestSupport {
 
 		// when
 		// then
-		mockMvc.perform(patch(URL + "/990001").contentType(MediaType.APPLICATION_JSON)
+		mockMvc.perform(patch(URL + "/990001").header(HttpHeaders.AUTHORIZATION, adminBearer()).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"mappingState\":\"MAPPED\",\"ottServiceId\":null,\"tier\":\"STANDARD\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
@@ -95,7 +106,7 @@ class AdminProviderApiTest extends IntegrationTestSupport {
 		// given
 		// when
 		// then
-		mockMvc.perform(patch(URL + "/990009").contentType(MediaType.APPLICATION_JSON)
+		mockMvc.perform(patch(URL + "/990009").header(HttpHeaders.AUTHORIZATION, adminBearer()).contentType(MediaType.APPLICATION_JSON)
 						.content("{\"mappingState\":\"IGNORED\",\"ottServiceId\":null,\"tier\":\"STANDARD\"}"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));

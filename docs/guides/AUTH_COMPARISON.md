@@ -142,6 +142,83 @@
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| 1 | 사용자 엔티티, AT 발급·검증, Security 설정, 배치 토큰 이관 | 구현 중(2026-10-16) |
-| 2 | Google 로그인, RT 발급·회전·재사용 탐지, 재발급·로그아웃, Origin 검사 | 예정 |
-| 3 | TECH·오류 코드·`.env.example`·PACKAGE_MAP 갱신, 이 문서의 파일 경로 확정 | 예정 |
+| 1 | 사용자 엔티티, AT 발급·검증, Security 설정, 배치 토큰 이관 | 구현 완료(2026-10-16) |
+| 2 | Google 로그인, RT 발급·회전·재사용 탐지, 재발급·로그아웃, Origin 검사 | 구현 완료(2026-10-16) |
+| 3 | TECH·오류 코드·PACKAGE_MAP 갱신, 이 문서의 파일 경로 확정 | 완료(2026-10-16). 브라우저 로그인 확인은 사용자 확인 대기 |
+
+## 8. 요청 흐름별 동작과 알고리즘
+
+> 코드 기준(2026-10-16, Task 053·054). 클래스 이름을 함께 적었으니 코드를 읽을 때 같이 보면 된다.
+
+### 8.1 로그인 (`GET /api/oauth2/authorization/google` → 콜백)
+
+| 순서 | 누가 | 일어나는 일 |
+|---|---|---|
+| 1 | 브라우저 → 서버 | 로그인 시작 주소를 연다. |
+| 2 | Spring Security의 리다이렉트 필터 | Google로 보낼 인가 요청(state 등)을 만든다. `CookieOAuth2AuthorizationRequestRepository.saveAuthorizationRequest`가 호출되어 **서명한 쿠키**(`oauth2_auth_request`, 180초)에 저장하고, 응답은 Google로 302 이동이다. |
+| 3 | 사용자 ↔ Google | 로그인·동의를 한다. |
+| 4 | Google → 브라우저 → 서버 | `/api/login/oauth2/code/google?code=...&state=...`로 돌아온다. |
+| 5 | Spring Security의 로그인 필터 | `removeAuthorizationRequest`가 쿠키를 읽어 **서명을 검증**하고 쿠키를 **즉시 삭제**한다(번호표는 한 번만 쓴다). state가 맞는지 확인하고, Google과 `code`를 교환한다(외부 호출). |
+| 6 | `OAuth2LoginSuccessHandler` | `UserLoginService.login`으로 사용자를 조회·생성하고, `RedisRefreshTokenStore.issue`로 새 계열을 만들어 `rt` 쿠키를 심은 뒤 `/auth/callback`으로 302 이동한다(URL에 토큰 없음). |
+| 7 | 실패 시 | 어느 단계든 실패하면 `OAuth2LoginFailureHandler`가 `/auth/callback?error=login_failed`로 보낸다. Google 프로필의 `email_verified`가 `true`가 아니면(없거나 false) 6번에서 사용자·RT를 만들지 않고 같은 경로로 보낸다. |
+
+### 8.2 일반 API 요청 (`Authorization: Bearer <AT>`)
+
+```
+1. BatchTokenAuthenticationFilter  : 배치 경로에서 배치 토큰이 맞으면 ROLE_BATCH 인증을 붙인다. 아니면 그냥 통과.
+2. JwtAuthenticationFilter         : Bearer가 유효하면 (userId, role)로 인증을 붙인다.
+                                     없음·만료·위조면 아무것도 붙이지 않고 통과(익명).
+3. SecurityConfig의 경로 규칙      : 필요한 신분이 있는데 인증이 없으면 401, 권한이 부족하면 403.
+4. 컨트롤러                        : @AuthenticationPrincipal AuthUser로 userId·role을 받는다.
+```
+
+### 8.3 AT가 만료됐을 때 (요청이 실패하는 경우)
+
+| 상황 | 서버 응답 | 프론트(Task 057)가 할 일 |
+|---|---|---|
+| AT 만료(30분)로 회원 API 호출 | `401 UNAUTHORIZED` | 재발급을 **한 번** 호출하고 새 AT로 원래 요청을 **한 번 재시도** |
+| 재발급 성공 | `200` + `accessToken`·`role` + 새 `rt` 쿠키 | AT를 메모리에 저장하고 요청을 재시도 |
+| RT 만료(14일)·쿠키 없음·형식 오류 | 재발급 `401` + 쿠키 삭제 | 로그인 화면으로 이동 |
+| 이미 쓴 RT가 다시 옴(유예 10초 경과) | 재발급 `401` + 계열 폐기 + 쿠키 삭제 | 로그인 화면으로 이동 |
+| 로그아웃 후 옛 쿠키로 재발급 | `401` | 로그인 화면으로 이동 |
+| Origin이 허용 주소와 다름 | `403 FORBIDDEN` | 오류 안내(정상 사용에서는 없음) |
+| Redis 장애 | `500 INTERNAL_ERROR` | 오류 안내. **로그인 화면으로 보내지 않는다** |
+| 공개 API(`/api/public/**`)에 만료된 AT를 실어 보냄 | 정상 `200` | 변화 없음(익명으로 통과) |
+
+> 프론트 규칙: 재시도는 **한 번만**, 동시에 401이 여러 개 와도 재발급 호출은 **하나로 합친다(single-flight)**. 로그아웃 때는 메모리의 AT도 같이 버린다. AT를 메모리에 보관하고 재시도하는 일은 서버가 아니라 프론트(Task 057)가 한다.
+
+### 8.4 재발급 (`POST /api/auth/refresh`) 알고리즘
+
+`AuthController.refresh` → `AuthTokenService.refresh` → `RedisRefreshTokenStore.rotate`(Lua 한 번, Redis 안에서 원자적으로 실행)
+
+```
+1. Origin 헤더가 app.frontend-origin과 정확히 같은가?   아니면 403 (여기서 끝, RT는 건드리지 않음)
+2. rt 쿠키가 있고 {familyId}.{secret} 형식인가?          아니면 401 + 쿠키 삭제
+3. Redis에서 계열(rt:fam:{familyId})을 읽는다.            없으면 NOT_FOUND → 401 + 쿠키 삭제
+4. 받은 secret의 SHA-256 해시를 비교한다.
+   ├ 현재 해시와 같다            → ROTATED : 새 secret으로 교체(옛 해시는 '직전'으로 밀림), TTL을 다시 14일로
+   ├ 직전 해시와 같고 10초 이내  → GRACE   : 아무것도 바꾸지 않고 AT만 발급(탭 두 개가 동시에 요청한 경우)
+   └ 그 밖(직전 해시인데 10초 경과, 오래된 해시, 엉뚱한 값)
+                                  → REUSED  : 계열 삭제(rt:user의 목록 항목도 정리) → 401 + 쿠키 삭제
+5. ROTATED / GRACE이면 DB에서 role을 다시 읽는다.          사용자가 없으면 그 사용자의 계열을 모두 폐기하고 401
+6. AT(30분)를 발급한다. ROTATED일 때만 새 rt 쿠키를 함께 내린다.  200 {accessToken, role}
+```
+
+**왜 "직전 해시 10초 유예"인가**: 탭 두 개가 같은 교환권으로 거의 동시에 재발급을 요청하면, 한쪽이 먼저 교체하고 다른 쪽은 "이미 쓴 교환권"으로 보입니다. 유예가 없으면 정상 사용자가 도난으로 오인되어 로그아웃됩니다. 유예 안에서는 AT만 주고 계열은 유지합니다.
+
+### 8.5 로그아웃 (`POST /api/auth/logout`)
+
+```
+1. Origin 검사 (아니면 403)
+2. rt 쿠키가 있으면 현재(또는 직전) 해시가 맞을 때만 그 계열을 Redis에서 삭제
+3. 쿠키 삭제(Max-Age=0)  → 204
+   (쿠키가 없거나 무효여도 204. 로그아웃은 항상 성공으로 응답한다)
+```
+
+### 8.6 값마다 보는 세 가지 (수명, 사용 횟수, 지우는 주체)
+
+| 값 | 저장 위치 | 수명 | 쓸 수 있는 횟수 | 지우는 주체 |
+|---|---|---|---|---|
+| 인가 요청 쿠키 | 브라우저 쿠키 | 180초 | **한 번** | 콜백에서 읽는 즉시 서버가 삭제 |
+| Access Token | 프론트 메모리 | 30분 | 만료 전까지 여러 번 | 만료되거나 프론트가 로그아웃 때 버림 |
+| Refresh Token | 쿠키 `rt` + Redis(해시) | 14일(교체할 때마다 갱신) | **한 번**(쓰면 새것으로 교체) | 교체·로그아웃·재사용 탐지 시 서버가 삭제, 나머지는 TTL |

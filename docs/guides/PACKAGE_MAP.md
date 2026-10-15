@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-15 (Task 050·051 반영 기준)
+> 마지막 갱신: 2026-10-16 (Task 053·054 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -13,7 +13,10 @@ com.ottnavi
 │   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
 │   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter), Redis 버킷 창구, 설정
-│   └── security/          보안 설정, 오리진 비밀 헤더 필터, 관리자 배치 토큰 필터(AdminBatchTokenFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리
+│   └── security/          보안 설정(SecurityConfig), 오리진 비밀 헤더 필터, 배치 토큰 인증 필터(BatchTokenAuthenticationFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리, AuthUser(인증 주체)
+│       ├── jwt/             Access Token 발급·검증(JwtTokenProvider), Bearer 인증 필터(JwtAuthenticationFilter), 설정(JwtProperties)
+│       ├── oauth/           구글 로그인: 인가 요청 쿠키 저장소, 성공·실패 핸들러, Google 토큰 미저장(NoOpOAuth2AuthorizedClientRepository)
+│       └── token/           Refresh Token: RefreshTokenStore 인터페이스, Redis 구현(RedisRefreshTokenStore, Lua), RT 쿠키(RefreshTokenCookies), 회전 결과(RefreshRotation)
 ├── infra/               외부 시스템과 통신
 │   └── tmdb/              TmdbClient(호출 창구), 재시도·속도 제한
 │       ├── dto/             TMDB가 주는 JSON 틀 (안에서만 쓰고 밖으로 내보내지 않음)
@@ -36,8 +39,14 @@ com.ottnavi
 │   │   └── response/        OttServiceResponse
 │   ├── service/           ProviderCollectService, AdminProviderService(매핑 조회·변경) 등 + model/ (MappedProvider, AdminProviderView …)
 │   └── domain/            entity · enums · repository
+├── user/                회원·로그인
+│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout)
+│   ├── dto/
+│   │   └── response/        AccessTokenResponse
+│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사) + model/ (GoogleProfile, LoginUser, TokenIssue)
+│   └── domain/            entity(User) · enums(OAuthProvider, UserRole) · repository(UserRepository)
 ├── product/             구독 상품·가격 (엔티티·리포지토리만 있음)
-├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 배치 토큰 필터(제공처 매핑은 Task 054 전까지 미보호)
+├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
 │   ├── service/           CollectExecutionService(시작·재시작·복구), CollectExecutionQueryService(이력·변경 조회)
 │   │   └── model/           CollectViewContext(요청 한 번의 판정 맥락)
@@ -57,7 +66,7 @@ com.ottnavi
     └── solver/            완전탐색·그리디 풀이
 ```
 
-아직 폴더가 없는 영역: `user`, `wishlist`, `plan`, `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
+아직 폴더가 없는 영역: `wishlist`, `plan`, `notification`. 호출 방향은 `controller → service → domain` 한쪽이다(규칙은 `.claude/rules/backend.md`).
 
 ## 보조 설명
 

@@ -15,6 +15,7 @@ import com.ottnavi.global.common.CommonResponse;
 import com.ottnavi.global.security.ProblemDetailAccessDeniedHandler;
 import com.ottnavi.global.security.ProblemDetailAuthenticationEntryPoint;
 import com.ottnavi.global.security.SecurityConfig;
+import com.ottnavi.support.OAuth2LoginTestConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -26,7 +27,13 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -44,7 +51,8 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ErrorTestController.class)
 @Import({SecurityConfig.class, ProblemDetailAuthenticationEntryPoint.class, ProblemDetailAccessDeniedHandler.class,
-		GlobalExceptionHandlerTest.ErrorTestController.class})
+		OAuth2LoginTestConfig.class,
+		GlobalExceptionHandlerTest.ErrorTestController.class, GlobalExceptionHandlerTest.TestSecurityChain.class})
 class GlobalExceptionHandlerTest {
 
 	private static final String BASE = "/test/errors";
@@ -221,6 +229,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@WithMockUser // /api/**는 로그인이 필요해 인증된 사용자로 호출해야 404까지 간다
 	void 없는_경로는_RESOURCE_NOT_FOUND다() throws Exception {
 		expectProblem(mockMvc.perform(get("/api/does-not-exist")), 404, "RESOURCE_NOT_FOUND")
 				.andExpect(jsonPath("$.instance").value("/api/does-not-exist"));
@@ -290,6 +299,20 @@ class GlobalExceptionHandlerTest {
 	}
 
 	record NestedBody(List<NestedItem> items) {
+	}
+
+	/** 예외 변환 시험 경로(/test/errors/**)는 인가 규칙이 아니라 핸들러를 보려는 것이라 운영 체인보다 먼저 전부 허용한다 */
+	@TestConfiguration
+	static class TestSecurityChain {
+
+		@Bean
+		@Order(0)
+		SecurityFilterChain testErrorsChain(HttpSecurity http) throws Exception {
+			http.securityMatcher(BASE + "/**")
+					.csrf(csrf -> csrf.disable())
+					.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+			return http.build();
+		}
 	}
 
 	static class TestTitleNotFoundException extends BusinessException {

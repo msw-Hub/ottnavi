@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 수집 실행 관리자 API(실행·재시작·복구, 이력·변경 조회).
- * 보호는 AdminBatchTokenFilter(관리자 배치 토큰)가 맡는다.
+ * 보호는 BatchTokenAuthenticationFilter(관리자 배치 토큰)가 맡는다.
  */
 @Slf4j
 @Tag(name = "admin")

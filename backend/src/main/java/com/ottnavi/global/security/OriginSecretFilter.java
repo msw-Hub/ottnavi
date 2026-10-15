@@ -20,11 +20,11 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 /**
  * Vercel을 거친 /api 요청만 받도록 오리진 비밀 헤더(x-origin-secret)를 검사한다(TECH T-8 ①).
  * Cloudtype 주소로 직접 들어와 X-Forwarded-For를 위조하는 요청을 막는 것이 목적이다(TECH 4절).
- * Security 체인 밖의 서블릿 필터라 Task 053에서 SecurityConfig를 교체해도 영향을 받지 않는다.
+ * Security 체인 밖의 서블릿 필터라 SecurityConfig와 별개로 동작한다.
  * /actuator/**(Cloudtype 헬스체크), /v3/api-docs, swagger-ui는 /api 밖이라 검사하지 않는다.
  */
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 20) // ForwardedHeaderFilter(MIN) → RequestIpLoggingFilter(+10) → 이 필터 → Security(-100)
+@Order(Ordered.HIGHEST_PRECEDENCE + 20) // ForwardedHeaderFilter(MIN) → RequestIpLoggingFilter(+10) → 이 필터 → PublicRateLimitFilter(+25) → Security(-100)
 public class OriginSecretFilter extends OncePerRequestFilter {
 
 	public static final String HEADER_NAME = "x-origin-secret";

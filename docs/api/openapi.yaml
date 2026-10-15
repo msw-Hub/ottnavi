@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 31개다. 구현된 것은 10개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 21개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+    - operation은 31개다. 구현된 것은 12개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개)이고, 나머지 19개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -744,7 +744,7 @@ paths:
       summary: TMDB 제공처 매핑 목록 조회
       description: |
         수집 중 발견한 TMDB 제공처 전체(미매핑·관련 없음 포함)를 돌려준다. 미매핑을 먼저, 그다음 제공처 번호 순으로 정렬해 내려준다. 매핑 변경은 다음 수집부터 반영된다.
-        Task 054 전까지는 보호되지 않는다(local 전용).
+        관리자(ADMIN) Access Token으로만 호출할 수 있다.
         오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
       responses:
         '200':
@@ -809,8 +809,7 @@ paths:
       description: |
         수집 실행 이력을 대상 날짜 내림차순, 같으면 실행 ID 내림차순으로 돌려준다(Task 029 화면 정렬). 서버가 멈춰 기록만 "실행 중"으로 남은 실행은 서버가 `STOPPED`로 판정해 내려준다(저장하지 않고 조회할 때마다 판정한다).
         페이지네이션 응답이다. 수집은 매일 1회 이상 돌고 Spring Batch 메타데이터는 지우지 않으므로 이력이 계속 늘어난다.
-        관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절). Task 054 전까지는 배치 토큰만 검사한다(ADMIN Access Token은 Task 054에서 합친다).
-        오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401, 배치 토큰이 없거나 틀림), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+        관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절).        오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401, 배치 토큰이 없거나 틀림), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
@@ -977,12 +976,12 @@ paths:
         - auth
       operationId: refreshAccessToken
       security: []
-      summary: Access Token 재발급 (제안)
+      summary: Access Token 재발급
       description: |
-        **제안(Task 031, 미구현).** Refresh Token(HttpOnly 쿠키 사용)으로 새 Access Token을 발급한다. 요청 본문은 없다. Refresh Token은 재발급 때 회전하며(새 쿠키), 응답 본문에는 담지 않는다(TECH 4절).
-        CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다. 인증 경로도 공개 API와 같은 요청 제한을 받는다(`.claude/rules/backend.md`).
-        오류: `UNAUTHORIZED`(401, 쿠키 없음·만료·무효·재사용 감지), `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
-      x-planned: true
+        Refresh Token(HttpOnly 쿠키 `rt`)으로 새 Access Token과 사용자 권한(`role`)을 발급한다. 요청 본문은 없다. Refresh Token은 재발급 때 회전하며(새 쿠키, 수명은 그때부터 다시 14일), 응답 본문에는 담지 않는다(TECH 4절).
+        직전 Refresh Token이 10초 안에 다시 오면(동시 요청·응답 유실) 회전 없이 Access Token만 발급한다(새 쿠키를 내리지 않는다). 유예가 지난 직전 토큰을 재사용하면 해당 계열을 무효화하고 401이다. 실패한 401 응답은 쿠키를 지운다.
+        CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다(회전 전에 검사). 인증 경로도 공개 API와 같은 요청 제한을 받는다(`.claude/rules/backend.md`).
+        오류: `UNAUTHORIZED`(401, 쿠키 없음·만료·무효·재사용 감지), `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500, Redis 장애 포함).
       responses:
         '200':
           description: 새 Access Token
@@ -1004,13 +1003,12 @@ paths:
         - auth
       operationId: logout
       security: []
-      summary: 로그아웃 (제안)
+      summary: 로그아웃
       description: |
-        **제안(Task 031, 미구현).** Refresh Token(HttpOnly 쿠키 사용)을 서버에서 폐기하고 쿠키를 지운다. 요청 본문은 없다. 쿠키가 없거나 이미 무효여도 204다.
+        Refresh Token(HttpOnly 쿠키 `rt`)의 계열을 서버에서 폐기하고(현재 기기만) 쿠키를 지운다. 요청 본문은 없다. 쿠키가 없거나 이미 무효여도 204다.
         Access Token은 요구하지 않는다. 폐기 대상은 쿠키의 Refresh Token이고, Access Token이 만료된 뒤에도 재발급 없이 로그아웃할 수 있어야 하기 때문이다. Access Token은 서버에 저장하지 않으므로 수명(30분)이 끝날 때까지 유효하고, 프론트가 메모리에서 지운다(TECH 4절).
         CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다. 인증 경로도 공개 API와 같은 요청 제한을 받는다.
         오류: `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
-      x-planned: true
       responses:
         '204':
           description: 로그아웃됨(본문 없음)
@@ -1031,7 +1029,7 @@ components:
       type: http
       scheme: bearer
       description: |
-        관리자 배치 토큰(`ADMIN_BATCH_TOKEN`, JWT 아님). GitHub Actions cron이 `Authorization: Bearer`로 보낸다. 별도 필터가 상수 시간 비교로 검사하고 `/admin/collect/**`(와 2단계 `/admin/plans/monthly/**`)에서만 유효하다(TECH 4절). Task 054 전까지는 이 토큰만 검사한다(관리자 JWT는 아직 받지 않는다).
+        관리자 배치 토큰(`ADMIN_BATCH_TOKEN`, JWT 아님). GitHub Actions cron이 `Authorization: Bearer`로 보낸다. 별도 필터가 상수 시간 비교로 검사하고 `/admin/collect/**`(와 2단계 `/admin/plans/monthly/**`)에서만 유효하다(TECH 4절). 관리자 Access Token(JWT)과는 OR 관계다(둘 중 하나만 맞으면 통과한다).
         cron은 Vercel을 거치지 않고 백엔드에 직접 호출하므로 오리진 비밀 헤더(`x-origin-secret`)도 함께 보낸다(TECH 3절). 이 헤더는 인프라 경계 검사라 operation 파라미터로 적지 않는다.
   parameters:
     PageParam:
@@ -3329,10 +3327,17 @@ components:
       description: 새 Access Token. Refresh Token은 HttpOnly 쿠키로만 오가며 본문에 담지 않는다
       required:
         - accessToken
+        - role
       properties:
         accessToken:
           type: string
           description: Access Token(JWT, 수명 30분). 프론트는 메모리에만 둔다
+        role:
+          type: string
+          enum:
+            - USER
+            - ADMIN
+          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다
     CommonResponseAccessToken:
       type: object
       required:
@@ -3347,3 +3352,4 @@ components:
         success: true
         data:
           accessToken: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.example-signature
+          role: USER

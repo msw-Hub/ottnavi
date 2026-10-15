@@ -11,8 +11,8 @@
 |---|---|---|---|
 | `VALIDATION_FAILED` | 400 | 요청 값 검증 실패(본문 필드 검증, 쿼리·경로 파라미터 제약 위반·형식 오류·누락). 응답의 `fieldErrors`에 필드별 오류 목록 포함 | 입력한 내용을 다시 확인해 주세요. |
 | `INVALID_REQUEST` | 400 (406·415 등 기타 4xx는 원래 상태 유지) | 필드를 특정할 수 없는 요청 오류(깨진 JSON 본문, 지원하지 않는 Content-Type 등). `fieldErrors` 없음 | 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요. |
-| `UNAUTHORIZED` | 401 | 인증 필요 또는 Access Token 만료·무효 | 로그인이 필요합니다. |
-| `FORBIDDEN` | 403 | 권한 없음(관리자 전용 API 등), 또는 Vercel을 거치지 않은 직접 호출(오리진 비밀 헤더 불일치, Task 019) | 접근 권한이 없습니다. |
+| `UNAUTHORIZED` | 401 | 인증 필요 또는 Access Token 만료·무효. `POST /api/auth/refresh`에서는 `rt` 쿠키 없음·형식 오류·만료·재사용 감지(계열 폐기) | 로그인이 필요합니다. |
+| `FORBIDDEN` | 403 | 권한 없음(관리자 전용 API 등), 또는 Vercel을 거치지 않은 직접 호출(오리진 비밀 헤더 불일치, Task 019), 또는 `POST /api/auth/refresh`·`/api/auth/logout`의 `Origin` 헤더가 `APP_FRONTEND_ORIGIN`과 다름(Task 054) | 접근 권한이 없습니다. |
 | `RESOURCE_NOT_FOUND` | 404 | 요청한 경로(API)가 없음. 특정 데이터가 없는 경우는 `TITLE_NOT_FOUND`처럼 도메인 코드를 쓴다. 예외로 관리자 API(`/api/admin/**`)의 없는 데이터(상품·요금 줄·제공처·수집 실행)는 이 코드를 쓴다(Task 031, 아래 설명) | 요청한 페이지를 찾을 수 없습니다. |
 | `METHOD_NOT_ALLOWED` | 405 | 경로는 있지만 HTTP 메서드를 지원하지 않음. `Allow` 헤더 포함 | 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요. |
 | `TITLE_NOT_FOUND` | 404 | 요청한 작품(TMDB ID)을 찾을 수 없음 | 작품을 찾을 수 없습니다. |
