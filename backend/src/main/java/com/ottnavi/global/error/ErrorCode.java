@@ -34,7 +34,18 @@ public enum ErrorCode {
 	BATCH_ALREADY_RUNNING(HttpStatus.CONFLICT, "수집이 이미 실행 중입니다."),
 	BATCH_ALREADY_COMPLETED(HttpStatus.CONFLICT, "해당 날짜의 수집은 이미 완료되었습니다."),
 	BATCH_RECOVERY_REQUIRED(HttpStatus.CONFLICT, "중단된 실행이 있어 먼저 복구해야 합니다."),
-	BATCH_NOT_STOPPED(HttpStatus.CONFLICT, "중단된 실행만 복구할 수 있습니다.");
+	BATCH_NOT_STOPPED(HttpStatus.CONFLICT, "중단된 실행만 복구할 수 있습니다."),
+
+	// 월 구독요금(관리자)
+	PRICE_START_DATE_NOT_AFTER_LAST(HttpStatus.CONFLICT, "적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다."),
+	PRICE_START_DATE_DUPLICATE(HttpStatus.CONFLICT, "같은 적용 시작일의 월 구독요금이 이미 있습니다."),
+	PRICE_FIRST_START_DATE_IN_FUTURE(HttpStatus.CONFLICT, "첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다."),
+	PRICE_NOT_CURRENT(HttpStatus.CONFLICT, "지금 적용 중인 월 구독요금만 확인할 수 있습니다."),
+	PRICE_NOT_LATEST(HttpStatus.CONFLICT, "가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다."),
+	PRICE_LAST_ROW_CANNOT_DELETE(HttpStatus.CONFLICT, "월 구독요금이 하나뿐이라 삭제할 수 없습니다."),
+
+		// 내 서비스 요금
+		SERVICE_PRICE_NOT_FOUND(HttpStatus.NOT_FOUND, "이 서비스의 요금 정보를 찾을 수 없습니다."); // 없는 상품 또는 판매 종료 상품
 
 	private final HttpStatus status; // 기본 HTTP 상태
 	private final String message;    // detail 기본 문구

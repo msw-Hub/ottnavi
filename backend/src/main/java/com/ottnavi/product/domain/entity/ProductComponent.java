@@ -41,7 +41,7 @@ public class ProductComponent extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private ProviderTier tier; // STANDARD / AD. MVP는 STANDARD만 쓴다
 
-    /** 상품 구성 한 줄을 만든다. 상품과 서비스는 이미 저장돼 id가 있어야 한다 */
+    /** 상품 구성 한 건을 만든다. 상품과 서비스는 이미 저장돼 id가 있어야 한다 */
     public static ProductComponent create(SubscriptionProduct product, OttService ottService, ProviderTier tier) {
         ProductComponent component = new ProductComponent();
         component.id = new ProductComponentId(product.getId(), ottService.getId());

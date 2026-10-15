@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 18/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 20/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 54/105 | |
+| 합계 | | 56/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -817,7 +817,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 18/30
+## 7. Phase 3 — 핵심 기능 개발 · 20/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -1134,22 +1134,24 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: 신규 로그인 → 온보딩 저장 → 시즌 찜 → 우선순위 변경·다 봤음까지 실제 값이 반영되고 새로고침 후 유지된다.
 
-#### Task 059: 관리자 상품·가격 API(단품) 구현으로 요금표 관리 ⬜
+#### Task 059: 관리자 상품·가격 API(단품) 구현으로 요금표 관리 ✅
 - 태그: [B] · PRD: B6, FR-19(단품), SCR-14 · 선행: 035, 054 · 브랜치: `feature/b6-admin-products`
 - 구현 사항
-  - [ ] `/api/admin/products` 목록·등록·수정·비활성(`active = false`), MVP는 STANDARD 단품
-  - [ ] `/api/admin/products/{productId}/prices` 줄 추가·마지막 줄 수정·삭제와 `…/{priceId}/verify`([요금 확인함]). 종료일은 저장하지 않고 시작일이 마지막 줄보다 늦어야 한다(`PRICE_START_DATE_NOT_AFTER_LAST`·`PRICE_START_DATE_DUPLICATE`·`PRICE_NOT_LATEST` 등, error-codes.md)
-  - [ ] 기준일 유효 가격 선택 서비스 메서드(계산·요금 확인 공용)
+  - [x] `/api/admin/products` 목록·등록·수정·비활성(`active = false`), MVP는 STANDARD 단품
+  - [x] `/api/admin/products/{productId}/prices` 요금 이력 추가·가장 최근 요금 이력 수정·삭제와 `…/{priceId}/verify`([요금 확인함]). 종료일은 저장하지 않고 시작일이 가장 최근 요금 이력보다 늦어야 한다(`PRICE_START_DATE_NOT_AFTER_LAST`·`PRICE_START_DATE_DUPLICATE`·`PRICE_NOT_LATEST` 등, error-codes.md)
+  - [x] 기준일 유효 가격 선택 서비스 메서드(계산·요금 확인 공용)
 - 완료 기준
   - V-B: 겹침 거부·기준일별 선택 테스트. V-API: ADMIN 성공, USER 403.
+- 결과(2026-10-16, PR 전): 관리자 상품·월 구독요금 API 7개를 `product`에 구현했다. 요금 이력 규칙은 순수 클래스 `ProductPriceRules`로 분리했고(추가=가장 최근 요금 이력보다 늦게, 수정·삭제=가장 최근 요금 이력만, 첫 요금 이력은 오늘 이하), 기준일 유효 가격 선택은 `ProductPriceQueryService.priceOn`으로 제공해 060·063이 재사용한다. 주입 가능한 KST `Clock`(`ClockConfig`)을 추가했고 `PRICE_*` 오류 코드 6개를 등록했다. 한 서비스에 판매 중 단품 여러 개는 막지 않는다(2026-10-16 결정, ERD 기록).
 
-#### Task 060: 사용자 금액 수정과 적용 가격 결정 구현으로 실제 지불 금액 반영 ⬜
+#### Task 060: 사용자 금액 수정과 적용 가격 결정 구현으로 실제 지불 금액 반영 ✅
 - 태그: [B] · PRD: B6, FR-11, SCR-09 · 선행: 059, 055, 031 · 브랜치: `feature/b6-price-override`
 - 구현 사항
-  - [ ] `GET /api/me/service-prices`(`listMyServicePrices`: 관리자 요금표, 사용자 금액, 적용 시작일·마지막 확인일), `PUT·DELETE /api/me/service-prices/{productId}`(`setMyServicePrice`·`resetMyServicePrice`, `UNIQUE(user_id, product_id)`)
-  - [ ] 적용 가격: `USER_OVERRIDE` / `ADMIN` / `ALREADY_PAID`(SUBSCRIBED 이번 달) / `FREE`
+  - [x] `GET /api/me/service-prices`(`listMyServicePrices`: 관리자 요금표, 사용자 금액, 적용 시작일·마지막 확인일), `PUT·DELETE /api/me/service-prices/{productId}`(`setMyServicePrice`·`resetMyServicePrice`, `UNIQUE(user_id, product_id)`)
+  - [x] 적용 가격: `USER_OVERRIDE` / `ADMIN` / `ALREADY_PAID`(SUBSCRIBED 이번 달) / `FREE`
 - 완료 기준
   - V-B: 가격 출처 4종 테스트. V-API: 수정 후 조회에 반영되고 관리자 가격은 그대로다.
+- 결과(2026-10-16, PR 전): 내 서비스 요금 API 3개를 구현했다. 응답의 가격 출처는 ADMIN·USER_OVERRIDE만 만들고 ALREADY_PAID·FREE 결정은 Task 063에서 한다. 현재 적용 중인 요금이 없는 판매 중 상품은 목록에서 빠지고 PUT·DELETE는 404 `SERVICE_PRICE_NOT_FOUND`다. 같은 사용자의 동시 PUT은 사용자 행 잠금으로 직렬화한다. 실측으로 정수 필드에 소수(9900.5)가 버림 통과하는 것을 발견해 `spring.jackson.deserialization.accept-float-as-int: false`를 전역으로 적용했다(소수는 400 `VALIDATION_FAILED`). 프론트 목업과 서버의 차이(오류 우선순위·문구·소수 400)는 Task 061 연결 때 맞춘다.
 
 #### Task 061: 관리자 화면(MVP) 실제 API 연결로 운영 화면 완성 ⬜
 - 태그: [F] · PRD: F6, FR-18~20 · 선행: 045, 046, 059, 057 · 기한 전제: R11-23, R11-24(2026-10-22) · 브랜치: `feature/f6-admin-screens`

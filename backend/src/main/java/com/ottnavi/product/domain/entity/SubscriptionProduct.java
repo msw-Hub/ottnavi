@@ -48,4 +48,14 @@ public class SubscriptionProduct extends BaseTimeEntity {
     public void deactivate() {
         this.active = false;
     }
+
+    /** 판매를 다시 시작한다 */
+    public void activate() {
+        this.active = true;
+    }
+
+    /** 이름을 바꾼다. 공백 제거와 길이 검증은 호출하는 서비스가 한다 */
+    public void rename(String name) {
+        this.name = name;
+    }
 }

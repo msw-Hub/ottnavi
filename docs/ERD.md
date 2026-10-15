@@ -236,9 +236,9 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| subscription_product | id, name, product_type, active | 관리자가 등록. 판매 종료 상품은 active=false (삭제하지 않음). API에서는 `isActive`. 회원 요금 API는 판매 중(`active = true`) 상품만 다룬다 |
+| subscription_product | id, name, product_type, active | 관리자가 등록. 판매 종료 상품은 active=false (삭제하지 않음). API에서는 `isActive`. 회원 요금 API는 판매 중(`active = true`) 상품만 다룬다. 한 서비스에 판매 중 상품이 여러 개일 수 있고 서버는 서비스당 1개로 강제하지 않는다(관리자 등록 규칙, 광고형·번들은 2단계, 2026-10-16 결정) |
 | product_component | PK(product_id, ott_service_id), tier | 상품에 포함된 서비스와 tier. tier=AD면 해당 서비스 작품 중 in_ad_tier만 시청 가능으로 본다. MVP는 STANDARD 단품만 다루고, AD tier는 2단계(O3)에서 번들과 함께 추가한다(스키마는 미리 준비) |
-| product_price | id, product_id FK, monthly_price, effective_from, last_verified_at | `UNIQUE(product_id, effective_from)`. **종료일은 저장하지 않는다**: 다음 줄 시작일의 전날까지 적용되고 마지막 줄은 계속 적용된다. 줄은 맨 뒤에 시작일이 더 늦은 줄로만 추가하고 수정·삭제는 마지막 줄만 허용하므로 기간이 겹치거나 비는 일이 구조상 없다(FR-19). 가격 조회는 기준 날짜(오늘 또는 사용자 결제일, 한국 날짜) 이하의 시작일 중 가장 늦은 줄. last_verified_at(TIMESTAMPTZ)은 관리자가 마지막으로 확인한 일시이며 상품 등록·줄 추가·수정·[요금 확인함]이 현재 시각으로 바꾼다(PRD 11절 41번). 90일 판정은 화면이 한국 날짜 기준으로 한다 |
+| product_price | id, product_id FK, monthly_price, effective_from, last_verified_at | `UNIQUE(product_id, effective_from)`. **종료일은 저장하지 않는다**: 다음 요금 이력 시작일의 전날까지 적용되고 마지막 요금 이력은 계속 적용된다. 요금 이력은 맨 뒤에 시작일이 더 늦은 요금 이력으로만 추가하고 수정·삭제는 가장 최근 요금 이력만 허용하므로 기간이 겹치거나 비는 일이 구조상 없다(FR-19). 가격 조회는 기준 날짜(오늘 또는 사용자 결제일, 한국 날짜) 이하의 시작일 중 가장 늦은 요금 이력. last_verified_at(TIMESTAMPTZ)은 관리자가 마지막으로 확인한 일시이며 상품 등록·요금 이력 추가·수정·[요금 확인함]이 현재 시각으로 바꾼다(PRD 11절 41번). 90일 판정은 화면이 한국 날짜 기준으로 한다 |
 
 ---
 
@@ -431,8 +431,8 @@ erDiagram
 
 | API 필드 | 출처 |
 |---|---|
-| `AdminProduct.ottServiceId` | `product_component.ott_service_id`(단품은 1행). 상품 등록은 `subscription_product` + `product_component`(STANDARD) + `product_price`(첫 줄)를 한 트랜잭션으로 만든다 |
-| `ServicePrice.adminPrice·effectiveFrom·lastVerifiedAt` | `product_price`의 기준 날짜 적용 줄 |
+| `AdminProduct.ottServiceId` | `product_component.ott_service_id`(단품은 1행). 상품 등록은 `subscription_product` + `product_component`(STANDARD) + `product_price`(첫 요금 이력)를 한 트랜잭션으로 만든다 |
+| `ServicePrice.adminPrice·effectiveFrom·lastVerifiedAt` | `product_price`의 기준 날짜 적용 요금 이력 |
 | `ServicePrice.userPrice` | `user_price_override.monthly_price`(없으면 null) |
 | `ServicePrice.subscriptionStatus` | `user_subscription.status`, 행이 없으면 `NOT_SUBSCRIBED` |
 | `UserSettings.isOnboardingDone` | `user_setting` 행 존재 |
