@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 31개다. 구현된 것은 18개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개)이고, 나머지 13개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+    - operation은 31개다. 구현된 것은 28개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개)이고, 나머지 3개(플랜)는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -313,15 +313,14 @@ paths:
       operationId: listMyServicePrices
       security:
         - bearerAuth: []
-      summary: 내 서비스별 월 요금 조회 (제안)
+      summary: 내 서비스별 월 요금 조회
       description: |
-        **제안(Task 031, 미구현).** 서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
-        판매 중인 상품만 주며, 줄마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다.
-        기본 월 요금은 오늘 적용 중인 월 구독요금 줄이다. 계산은 달마다 사용자 결제일에 적용 중인 줄을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
+        서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
+        판매 중인 상품만 주며, 항목마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다. 판매 중이어도 현재 적용 중인 요금이 없는 상품(첫 요금 이력이 미래 등)은 목록에서 빠지며, 그 상품의 수정·삭제는 404 `SERVICE_PRICE_NOT_FOUND`다.
+        기본 월 요금은 오늘 적용 중인 월 구독요금 이력이다. 계산은 달마다 사용자 결제일에 적용 중인 요금을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
         내가 고친 금액은 상품 단위로 저장된다(ERD `user_price_override`). 관리자가 상품을 판매 종료하고 새 상품을 등록하면 고친 금액은 새 상품에 이어지지 않는다.
         마지막 확인일이 90일을 넘으면 화면이 "요금이 달라졌을 수 있어요" 안내를 붙인다(PRD 11절 41번).
         오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
-      x-planned: true
       responses:
         '200':
           description: 서비스별 요금
@@ -340,12 +339,11 @@ paths:
       operationId: setMyServicePrice
       security:
         - bearerAuth: []
-      summary: 내 월 요금 설정 (제안)
+      summary: 내 월 요금 설정
       description: |
-        **제안(Task 031, 미구현).** 이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
+        이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
         상품 ID로 대상을 정하므로 한 서비스에 상품이 여러 개 생기는 2단계(광고형·번들)에도 이 주소는 바뀌지 않는다.
-        오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료), `INTERNAL_ERROR`(500).
-      x-planned: true
+        오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
@@ -356,7 +354,7 @@ paths:
               $ref: '#/components/schemas/SetMyServicePriceRequest'
       responses:
         '200':
-          description: 바뀐 서비스 한 줄
+          description: 바뀐 서비스 항목
           content:
             application/json:
               schema:
@@ -375,11 +373,10 @@ paths:
       operationId: resetMyServicePrice
       security:
         - bearerAuth: []
-      summary: 내 월 요금 지우기(기본 요금으로 복귀) (제안)
+      summary: 내 월 요금 지우기(기본 요금으로 복귀)
       description: |
-        **제안(Task 031, 미구현).** 내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
-        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료), `INTERNAL_ERROR`(500).
-      x-planned: true
+        내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       responses:
@@ -494,7 +491,7 @@ paths:
       summary: OTT 구독상품·월 구독요금 이력 조회
       description: |
         판매 종료 상품을 포함한 OTT 구독상품 전체와 각 상품의 월 구독요금 이력(적용 시작일이 빠른 순)을 돌려준다.
-        적용 종료일은 저장하지 않는다. 화면이 "다음 줄 시작일의 전날"로 계산하고 마지막 줄은 "계속"이다.
+        적용 종료일은 저장하지 않는다. 화면이 "다음 요금 이력 시작일의 전날"로 계산하고 가장 최근 요금 이력은 "계속"이다.
         오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
       responses:
         '200':
@@ -517,8 +514,8 @@ paths:
         - bearerAuth: []
       summary: OTT 구독상품 등록
       description: |
-        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 줄의 마지막 확인일은 오늘이다.
-        첫 줄의 적용 시작일은 오늘 이하여야 한다.
+        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 요금 이력의 마지막 확인일은 오늘이다.
+        첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.
         오류: `VALIDATION_FAILED`(400, 이름 비어 있음·SINGLE 아님·없는 서비스·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
       requestBody:
         required: true
@@ -586,11 +583,11 @@ paths:
       operationId: addAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 월 구독요금 줄 추가
+      summary: 월 구독요금 이력 추가
       description: |
-        월 구독요금 줄을 맨 뒤에 추가한다. 적용 시작일은 마지막 줄의 시작일보다 늦어야 한다(지난 날짜는 허용하고 화면이 안내만 한다). 새 줄의 마지막 확인일은 오늘이다.
+        월 구독요금 이력을 맨 뒤에 추가한다. 적용 시작일은 가장 최근 요금 이력의 시작일보다 늦어야 한다(지난 날짜는 허용하고 화면이 안내만 한다). 새 요금 이력의 마지막 확인일은 오늘이다.
         응답은 바뀐 OTT 구독상품 전체다(화면이 목록 캐시를 바로 고칠 수 있게).
-        오류: `VALIDATION_FAILED`(400, 금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `PRICE_START_DATE_DUPLICATE`(409, 같은 시작일의 줄이 이미 있음), `PRICE_START_DATE_NOT_AFTER_LAST`(409, 마지막 줄 시작일보다 이르다), `INTERNAL_ERROR`(500).
+        오류: `VALIDATION_FAILED`(400, 금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `PRICE_START_DATE_DUPLICATE`(409, 같은 시작일의 요금 이력이 이미 있음), `PRICE_START_DATE_NOT_AFTER_LAST`(409, 가장 최근 요금 이력 시작일보다 이르다), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
@@ -601,7 +598,7 @@ paths:
               $ref: '#/components/schemas/AdminProductPriceRequest'
       responses:
         '201':
-          description: 줄이 추가된 OTT 구독상품
+          description: 요금 이력이 추가된 OTT 구독상품
           content:
             application/json:
               schema:
@@ -625,11 +622,11 @@ paths:
       operationId: updateAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 마지막 월 구독요금 줄 수정
+      summary: 마지막 월 구독요금 이력 수정
       description: |
-        가장 최근 줄(마지막 줄)만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
-        시작일 규칙은 추가와 같다(앞 줄보다 늦어야 함). 줄이 하나뿐이면 첫 줄 규칙(시작일 오늘 이하)을 따른다.
-        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_NOT_LATEST`(409, 마지막 줄이 아님), `PRICE_START_DATE_DUPLICATE`(409), `PRICE_START_DATE_NOT_AFTER_LAST`(409), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
+        가장 최근 요금 이력(가장 최근 요금 이력)만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
+        시작일 규칙은 추가와 같다(바로 앞 요금 이력보다 늦어야 함). 요금 이력이 하나뿐이면 첫 요금 이력 규칙(시작일 오늘 이하)을 따른다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_NOT_LATEST`(409, 가장 최근 요금 이력이 아님), `PRICE_START_DATE_DUPLICATE`(409), `PRICE_START_DATE_NOT_AFTER_LAST`(409), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'
@@ -641,7 +638,7 @@ paths:
               $ref: '#/components/schemas/AdminProductPriceRequest'
       responses:
         '200':
-          description: 줄이 수정된 OTT 구독상품
+          description: 요금 이력이 수정된 OTT 구독상품
           content:
             application/json:
               schema:
@@ -664,10 +661,10 @@ paths:
       operationId: deleteAdminProductPrice
       security:
         - bearerAuth: []
-      summary: 마지막 월 구독요금 줄 삭제
+      summary: 마지막 월 구독요금 이력 삭제
       description: |
-        가장 최근 줄(마지막 줄)만 지울 수 있고, 줄이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
-        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_LAST_ROW_CANNOT_DELETE`(409), `PRICE_NOT_LATEST`(409), `INTERNAL_ERROR`(500).
+        가장 최근 요금 이력(가장 최근 요금 이력)만 지울 수 있고, 요금 이력이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_LAST_ROW_CANNOT_DELETE`(409), `PRICE_NOT_LATEST`(409), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'
@@ -695,8 +692,8 @@ paths:
         - bearerAuth: []
       summary: 월 구독요금 확인함
       description: |
-        [요금 확인함] 동작이다. 금액은 그대로 두고 마지막 확인일만 오늘로 바꾼다. 요청 본문은 없다. 지금 적용 중인 줄만 확인할 수 있다(지난 줄·예정 줄은 불가).
-        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·줄), `PRICE_NOT_CURRENT`(409), `INTERNAL_ERROR`(500).
+        [요금 확인함] 동작이다. 금액은 그대로 두고 마지막 확인일만 오늘로 바꾼다. 요청 본문은 없다. 현재 적용 중인 요금만 확인할 수 있다(지난 요금 이력·예정 요금 이력은 불가).
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_NOT_CURRENT`(409), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
         - $ref: '#/components/parameters/PriceIdPath'
@@ -1078,7 +1075,7 @@ components:
     PriceIdPath:
       name: priceId
       in: path
-      description: 월 구독요금 줄 ID
+      description: 월 구독요금 이력 ID
       required: true
       schema:
         type: integer
@@ -2167,7 +2164,7 @@ components:
     # ----- product (내 요금) -----
     ServicePrice:
       type: object
-      description: 서비스 하나의 월 요금 줄(SCR-09)
+      description: 서비스 하나의 월 요금 이력(SCR-09)
       required:
         - ottServiceId
         - productId
@@ -2194,7 +2191,7 @@ components:
         adminPrice:
           type: integer
           format: int32
-          description: 관리자가 등록한 기본 월 요금 중 오늘 적용 중인 줄의 금액(원)
+          description: 관리자가 등록한 기본 월 요금 중 현재 적용 중인 요금의 금액(원)
         userPrice:
           type: integer
           format: int32
@@ -2213,14 +2210,14 @@ components:
         effectiveFrom:
           type: string
           format: date
-          description: adminPrice의 적용 시작일(관리자 월 구독요금 줄)
+          description: adminPrice의 적용 시작일(관리자 월 구독요금 이력)
         lastVerifiedAt:
           type: string
           format: date-time
-          description: adminPrice 줄을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
+          description: adminPrice 요금 이력을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
     ServicePriceList:
       type: object
-      description: 판매 중인 상품이 있는 서비스의 요금(서비스 ID 순, 최대 7개)
+      description: 판매 중인 상품의 요금(서비스 ID 순, 같은 서비스는 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
       required:
         - services
       properties:
@@ -2773,7 +2770,7 @@ components:
     # ----- admin: OTT 구독상품·월 구독요금 -----
     AdminProductPrice:
       type: object
-      description: 월 구독요금 한 줄. 적용 종료일은 저장하지 않는다(다음 줄 시작일의 전날까지, 마지막 줄은 계속)
+      description: 월 구독요금 이력 한 건. 적용 종료일은 저장하지 않는다(다음 요금 이력 시작일의 전날까지, 가장 최근 요금 이력은 계속)
       required:
         - priceId
         - monthlyPrice
@@ -2783,7 +2780,7 @@ components:
         priceId:
           type: integer
           format: int64
-          description: 월 구독요금 줄 ID
+          description: 월 구독요금 이력 ID
         monthlyPrice:
           type: integer
           format: int32
@@ -2795,7 +2792,7 @@ components:
         lastVerifiedAt:
           type: string
           format: date-time
-          description: 마지막 확인 일시. [요금 확인함]과 줄 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
+          description: 마지막 확인 일시. [요금 확인함]과 요금 이력 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
     AdminProduct:
       type: object
       description: OTT 구독상품(단품) 하나와 월 구독요금 이력
@@ -2826,7 +2823,7 @@ components:
           description: false면 판매 종료(삭제하지 않고 남긴다)
         prices:
           type: array
-          description: 월 구독요금 이력. 적용 시작일이 빠른 순(마지막 줄이 가장 최근)
+          description: 월 구독요금 이력. 적용 시작일이 빠른 순(가장 최근 요금 이력이 가장 최근)
           items:
             $ref: '#/components/schemas/AdminProductPrice'
     AdminProductList:
@@ -2919,7 +2916,7 @@ components:
         effectiveFrom:
           type: string
           format: date
-          description: 첫 줄의 적용 시작일(오늘 이하)
+          description: 첫 요금 이력의 적용 시작일(오늘 이하)
       example:
         name: 디즈니+ 프리미엄
         productType: SINGLE
@@ -2943,7 +2940,7 @@ components:
         isActive: false
     AdminProductPriceRequest:
       type: object
-      description: 월 구독요금 줄 추가·수정 요청(같은 모양)
+      description: 월 구독요금 이력 추가·수정 요청(같은 모양)
       required:
         - monthlyPrice
         - effectiveFrom
@@ -2957,7 +2954,7 @@ components:
         effectiveFrom:
           type: string
           format: date
-          description: 적용 시작일. 앞 줄의 시작일보다 늦어야 한다
+          description: 적용 시작일. 바로 앞 요금 이력의 시작일보다 늦어야 한다
       example:
         monthlyPrice: 14500
         effectiveFrom: '2026-11-11'
@@ -3111,7 +3108,7 @@ components:
           type: string
           nullable: true
           description: >-
-            실패 사유. 실패가 아니면 null. 예외가 원인이면 첫 줄 "예외명: 메시지"를 300자까지 담고,
+            실패 사유. 실패가 아니면 null. 예외가 원인이면 첫 요금 이력 "예외명: 메시지"를 300자까지 담고,
             중단을 관리자가 복구한 실행은 "중단된 실행을 관리자가 실패로 복구함"이다
         canRecover:
           type: boolean

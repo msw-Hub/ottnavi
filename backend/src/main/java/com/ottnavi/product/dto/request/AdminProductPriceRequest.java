@@ -7,10 +7,10 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 /**
- * 월 구독요금 줄 추가·수정 요청(계약 AdminProductPriceRequest, 같은 모양).
+ * 월 구독요금 이력 추가·수정 요청(계약 AdminProductPriceRequest, 같은 모양).
  *
  * @param monthlyPrice  월 구독요금(원, 0~1,000,000)
- * @param effectiveFrom 적용 시작일. 앞 줄의 시작일보다 늦어야 한다
+ * @param effectiveFrom 적용 시작일. 바로 앞 요금 이력의 시작일보다 늦어야 한다
  */
 public record AdminProductPriceRequest(
 		@NotNull(message = "월 구독요금은 필수입니다.")

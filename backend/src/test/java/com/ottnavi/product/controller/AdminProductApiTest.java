@@ -101,13 +101,13 @@ class AdminProductApiTest extends IntegrationTestSupport {
 
 		// when
 		// then
-		// 1. 등록: 단품, 서비스 ID, 판매 중, 첫 줄 1개
+		// 1. 등록: 단품, 서비스 ID, 판매 중, 첫 요금 이력 1개
 		mockMvc.perform(get(URL).header(HttpHeaders.AUTHORIZATION, adminBearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.products[?(@.productId == " + productId + ")].productType").value("SINGLE"))
 				.andExpect(jsonPath("$.data.products[?(@.productId == " + productId + ")].isActive").value(true));
 
-		// 2. 줄 추가(미래 시작일 허용): 응답은 상품 전체이고 시작일 오름차순
+		// 2. 요금 이력 추가(미래 시작일 허용): 응답은 상품 전체이고 시작일 오름차순
 		String added = addPrice(productId, 14500, TODAY.plusDays(10))
 				.andExpect(status().isCreated())
 				.andExpect(jsonPath("$.data.prices", hasSize(2)))
@@ -116,19 +116,19 @@ class AdminProductApiTest extends IntegrationTestSupport {
 				.andReturn().getResponse().getContentAsString();
 		long secondPriceId = JsonPath.parse(added).read("$.data.prices[1].priceId", Long.class);
 
-		// 3. 마지막 줄 수정
+		// 3. 가장 최근 요금 이력 수정
 		updatePrice(productId, secondPriceId, 15000, TODAY.plusDays(20))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.prices[1].monthlyPrice").value(15000))
 				.andExpect(jsonPath("$.data.prices[1].effectiveFrom").value(TODAY.plusDays(20).toString()));
 
-		// 4. 오늘 적용 중인 첫 줄 확인함
+		// 4. 오늘 적용 중인 첫 요금 이력 확인함
 		mockMvc.perform(post(URL + "/" + productId + "/prices/" + firstPriceId + "/verify")
 						.header(HttpHeaders.AUTHORIZATION, adminBearer()))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.prices[0].monthlyPrice").value(12000));
 
-		// 5. 마지막 줄 삭제 후 목록에서 한 줄만 남는다
+		// 5. 가장 최근 요금 이력 삭제 후 목록에서 요금 이력 하나만 남는다
 		mockMvc.perform(delete(URL + "/" + productId + "/prices/" + secondPriceId)
 						.header(HttpHeaders.AUTHORIZATION, adminBearer()))
 				.andExpect(status().isNoContent());
@@ -157,7 +157,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 같은_시작일로_줄을_추가하면_409_PRICE_START_DATE_DUPLICATE다() throws Exception {
+	void 같은_시작일로_요금_이력을_추가하면_409_PRICE_START_DATE_DUPLICATE다() throws Exception {
 		// given
 		String created = createAndRead("중복", TODAY.minusDays(5));
 		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
@@ -170,7 +170,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 마지막_줄보다_이른_시작일이면_409_PRICE_START_DATE_NOT_AFTER_LAST다() throws Exception {
+	void 가장_최근_요금_이력보다_이른_시작일이면_409_PRICE_START_DATE_NOT_AFTER_LAST다() throws Exception {
 		// given
 		String created = createAndRead("순서", TODAY.minusDays(5));
 		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
@@ -183,7 +183,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 마지막_줄이_아닌_줄을_수정하면_409_PRICE_NOT_LATEST다() throws Exception {
+	void 가장_최근_요금_이력이_아닌_요금_이력을_수정하면_409_PRICE_NOT_LATEST다() throws Exception {
 		// given
 		String created = createAndRead("최신", TODAY.minusDays(20));
 		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
@@ -198,7 +198,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 하나뿐인_줄을_삭제하면_409_PRICE_LAST_ROW_CANNOT_DELETE다() throws Exception {
+	void 하나뿐인_요금_이력을_삭제하면_409_PRICE_LAST_ROW_CANNOT_DELETE다() throws Exception {
 		// given
 		String created = createAndRead("삭제", TODAY);
 		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
@@ -213,7 +213,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 예정_줄을_확인하면_409_PRICE_NOT_CURRENT다() throws Exception {
+	void 예정_요금_이력을_확인하면_409_PRICE_NOT_CURRENT다() throws Exception {
 		// given
 		String created = createAndRead("예정", TODAY.minusDays(3));
 		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
@@ -229,7 +229,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 첫_줄의_시작일이_미래면_409이고_상품과_구성이_남지_않는다() throws Exception {
+	void 첫_요금_이력의_시작일이_미래면_409이고_상품과_구성이_남지_않는다() throws Exception {
 		// given
 		// when
 		// then
@@ -253,9 +253,13 @@ class AdminProductApiTest extends IntegrationTestSupport {
 		String missingService = createBody(NAME_PREFIX + "서비스", "SINGLE", 999999, 12000, TODAY);
 		String tooExpensive = createBody(NAME_PREFIX + "금액", "SINGLE", ottServiceId(), 1000001, TODAY);
 
+		// 소수 금액은 버림으로 통과하지 않고 거절된다(accept-float-as-int=false)
+		String decimalPrice = createBody(NAME_PREFIX + "소수", "SINGLE", ottServiceId(), 12000, TODAY)
+				.replace("12000", "9900.5");
+
 		// when
 		// then
-		String[] bodies = {blankName, bundle, missingService, tooExpensive};
+		String[] bodies = {blankName, bundle, missingService, tooExpensive, decimalPrice};
 		for (String body : bodies) {
 			mockMvc.perform(post(URL).header(HttpHeaders.AUTHORIZATION, adminBearer())
 							.contentType(MediaType.APPLICATION_JSON).content(body))

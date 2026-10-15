@@ -7,6 +7,9 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+  jackson:
+    deserialization:
+      accept-float-as-int: false  # 정수 필드에 소수(9900.5)가 오면 버림으로 통과시키지 않고 400으로 거절한다
   jpa:
     open-in-view: false           # 권장(로드맵 목록에는 없음)
     hibernate:

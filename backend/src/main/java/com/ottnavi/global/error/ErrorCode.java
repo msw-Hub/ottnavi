@@ -42,7 +42,10 @@ public enum ErrorCode {
 	PRICE_FIRST_START_DATE_IN_FUTURE(HttpStatus.CONFLICT, "첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다."),
 	PRICE_NOT_CURRENT(HttpStatus.CONFLICT, "지금 적용 중인 월 구독요금만 확인할 수 있습니다."),
 	PRICE_NOT_LATEST(HttpStatus.CONFLICT, "가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다."),
-	PRICE_LAST_ROW_CANNOT_DELETE(HttpStatus.CONFLICT, "월 구독요금이 하나뿐이라 삭제할 수 없습니다.");
+	PRICE_LAST_ROW_CANNOT_DELETE(HttpStatus.CONFLICT, "월 구독요금이 하나뿐이라 삭제할 수 없습니다."),
+
+		// 내 서비스 요금
+		SERVICE_PRICE_NOT_FOUND(HttpStatus.NOT_FOUND, "이 서비스의 요금 정보를 찾을 수 없습니다."); // 없는 상품 또는 판매 종료 상품
 
 	private final HttpStatus status; // 기본 HTTP 상태
 	private final String message;    // detail 기본 문구

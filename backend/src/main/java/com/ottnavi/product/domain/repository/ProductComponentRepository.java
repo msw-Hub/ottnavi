@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface ProductComponentRepository extends JpaRepository<ProductComponent, ProductComponentId>  {
 
-	/** 상품들의 구성 줄을 조회한다. 단품은 상품마다 1행이다 */
+	/** 상품들의 구성 행을 조회한다. 단품은 상품마다 1행이다 */
 	@Query("select c from ProductComponent c where c.id.productId in :productIds")
 	List<ProductComponent> findByProductIds(@Param("productIds") Collection<Long> productIds);
 }

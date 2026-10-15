@@ -55,7 +55,7 @@ class AdminProductServiceTest {
 		return price;
 	}
 
-	/** 지난 줄(1), 오늘 적용 중인 줄(2), 미래 줄(3)이 있는 상품을 준비한다 */
+	/** 지난 요금 이력(1), 현재 적용 중인 요금(2), 미래 요금 이력(3)이 있는 상품을 준비한다 */
 	private List<ProductPrice> prepareThreeRows() {
 		List<ProductPrice> prices = new ArrayList<>();
 		prices.add(price(1L, LocalDate.of(2026, 1, 1)));
@@ -67,7 +67,7 @@ class AdminProductServiceTest {
 	}
 
 	@Test
-	void 오늘_적용_중인_줄을_확인하면_확인_일시가_현재_시각으로_바뀐다() {
+	void 현재_적용_중인_요금을_확인하면_확인_일시가_현재_시각으로_바뀐다() {
 		// given
 		List<ProductPrice> prices = prepareThreeRows();
 		ProductComponent component = mock(ProductComponent.class);
@@ -83,7 +83,7 @@ class AdminProductServiceTest {
 	}
 
 	@Test
-	void 지난_줄을_확인하면_PRICE_NOT_CURRENT다() {
+	void 지난_요금_이력을_확인하면_PRICE_NOT_CURRENT다() {
 		// given
 		prepareThreeRows();
 
@@ -95,7 +95,7 @@ class AdminProductServiceTest {
 	}
 
 	@Test
-	void 예정_줄을_확인하면_PRICE_NOT_CURRENT다() {
+	void 예정_요금_이력을_확인하면_PRICE_NOT_CURRENT다() {
 		// given
 		prepareThreeRows();
 
@@ -107,7 +107,7 @@ class AdminProductServiceTest {
 	}
 
 	@Test
-	void 다른_상품의_줄이거나_없는_줄이면_ResourceNotFoundException이다() {
+	void 다른_상품의_요금_이력이거나_없는_요금_이력이면_ResourceNotFoundException이다() {
 		// given
 		prepareThreeRows();
 

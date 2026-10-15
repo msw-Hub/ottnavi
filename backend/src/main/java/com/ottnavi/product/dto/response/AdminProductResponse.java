@@ -15,7 +15,7 @@ import java.util.List;
  * @param productType  상품 종류(MVP는 SINGLE)
  * @param ottServiceId 속한 서비스 ID
  * @param isActive     false면 판매 종료(삭제하지 않고 남긴다)
- * @param prices       월 구독요금 이력. 적용 시작일이 빠른 순(마지막 줄이 가장 최근)
+ * @param prices       월 구독요금 이력. 적용 시작일이 빠른 순(가장 최근 요금 이력이 가장 최근)
  */
 public record AdminProductResponse(
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "101") Long productId,

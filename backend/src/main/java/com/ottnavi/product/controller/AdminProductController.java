@@ -41,7 +41,7 @@ public class AdminProductController {
 
 	/** 판매 종료 상품을 포함한 전체 상품과 월 구독요금 이력을 돌려준다 */
 	@Operation(operationId = "listAdminProducts", summary = "OTT 구독상품·월 구독요금 이력 조회",
-			description = "판매 종료 상품을 포함해 전체를, 요금 줄은 적용 시작일이 빠른 순으로 돌려준다.")
+			description = "판매 종료 상품을 포함해 전체를, 요금 이력은 적용 시작일이 빠른 순으로 돌려준다.")
 	@GetMapping
 	public CommonResponse<AdminProductListResponse> listAdminProducts() {
 		List<AdminProductResponse> products = new ArrayList<>();
@@ -53,7 +53,7 @@ public class AdminProductController {
 
 	/** 단품 상품을 첫 월 구독요금과 함께 등록한다 */
 	@Operation(operationId = "createAdminProduct", summary = "OTT 구독상품 등록",
-			description = "MVP는 단품(SINGLE)만 받는다. 첫 줄의 적용 시작일은 오늘 이하여야 한다.")
+			description = "MVP는 단품(SINGLE)만 받는다. 첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public CommonResponse<AdminProductResponse> createAdminProduct(
@@ -74,9 +74,9 @@ public class AdminProductController {
 		return CommonResponse.success(AdminProductResponse.from(view));
 	}
 
-	/** 월 구독요금 줄을 맨 뒤에 추가한다 */
-	@Operation(operationId = "addAdminProductPrice", summary = "월 구독요금 줄 추가",
-			description = "적용 시작일은 마지막 줄의 시작일보다 늦어야 한다. 응답은 바뀐 상품 전체다.")
+	/** 월 구독요금 이력을 맨 뒤에 추가한다 */
+	@Operation(operationId = "addAdminProductPrice", summary = "월 구독요금 이력 추가",
+			description = "적용 시작일은 가장 최근 요금 이력의 시작일보다 늦어야 한다. 응답은 바뀐 상품 전체다.")
 	@PostMapping("/{productId}/prices")
 	@ResponseStatus(HttpStatus.CREATED)
 	public CommonResponse<AdminProductResponse> addAdminProductPrice(
@@ -86,9 +86,9 @@ public class AdminProductController {
 		return CommonResponse.success(AdminProductResponse.from(view));
 	}
 
-	/** 마지막 월 구독요금 줄을 고친다 */
-	@Operation(operationId = "updateAdminProductPrice", summary = "마지막 월 구독요금 줄 수정",
-			description = "가장 최근 줄만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 바뀐다.")
+	/** 마지막 월 구독요금 이력을 고친다 */
+	@Operation(operationId = "updateAdminProductPrice", summary = "마지막 월 구독요금 이력 수정",
+			description = "가장 최근 요금 이력만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 바뀐다.")
 	@PatchMapping("/{productId}/prices/{priceId}")
 	public CommonResponse<AdminProductResponse> updateAdminProductPrice(
 			@Positive(message = "1 이상이어야 합니다.") @PathVariable Long productId,
@@ -99,9 +99,9 @@ public class AdminProductController {
 		return CommonResponse.success(AdminProductResponse.from(view));
 	}
 
-	/** 마지막 월 구독요금 줄을 삭제한다(본문 없이 204) */
-	@Operation(operationId = "deleteAdminProductPrice", summary = "마지막 월 구독요금 줄 삭제",
-			description = "가장 최근 줄만 지울 수 있고, 줄이 하나뿐이면 지울 수 없다.")
+	/** 마지막 월 구독요금 이력을 삭제한다(본문 없이 204) */
+	@Operation(operationId = "deleteAdminProductPrice", summary = "마지막 월 구독요금 이력 삭제",
+			description = "가장 최근 요금 이력만 지울 수 있고, 요금 이력이 하나뿐이면 지울 수 없다.")
 	@DeleteMapping("/{productId}/prices/{priceId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteAdminProductPrice(
@@ -112,7 +112,7 @@ public class AdminProductController {
 
 	/** [요금 확인함]: 금액은 그대로 두고 마지막 확인일만 현재 시각으로 바꾼다 */
 	@Operation(operationId = "verifyAdminProductPrice", summary = "월 구독요금 확인함",
-			description = "지금 적용 중인 줄만 확인할 수 있다. 요청 본문은 없다.")
+			description = "현재 적용 중인 요금만 확인할 수 있다. 요청 본문은 없다.")
 	@PostMapping("/{productId}/prices/{priceId}/verify")
 	public CommonResponse<AdminProductResponse> verifyAdminProductPrice(
 			@Positive(message = "1 이상이어야 합니다.") @PathVariable Long productId,

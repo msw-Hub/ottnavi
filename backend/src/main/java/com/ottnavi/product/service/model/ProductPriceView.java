@@ -5,9 +5,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * 월 구독요금 한 줄(서버 안에서 주고받는 값).
+ * 월 구독요금 이력 한 건(서버 안에서 주고받는 값).
  *
- * @param priceId        월 구독요금 줄 ID
+ * @param priceId        월 구독요금 이력 ID
  * @param monthlyPrice   월 구독요금(원)
  * @param effectiveFrom  적용 시작일(한국 날짜)
  * @param lastVerifiedAt 마지막 확인 일시

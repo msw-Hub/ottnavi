@@ -16,7 +16,7 @@ import java.time.LocalDate;
  * @param productType   상품 종류. MVP는 SINGLE만 받는다
  * @param ottServiceId  속할 서비스 ID
  * @param monthlyPrice  첫 월 구독요금(원, 0~1,000,000)
- * @param effectiveFrom 첫 줄의 적용 시작일(오늘 이하)
+ * @param effectiveFrom 첫 요금 이력의 적용 시작일(오늘 이하)
  */
 public record CreateAdminProductRequest(
 		@NotBlank(message = "이름은 필수입니다.")

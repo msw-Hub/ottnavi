@@ -8,4 +8,7 @@ public interface SubscriptionProductRepository extends JpaRepository<Subscriptio
 
 	/** 판매 종료 상품을 포함해 전체를 ID 순으로 조회한다 */
 	List<SubscriptionProduct> findAllByOrderByIdAsc();
+
+	/** 판매 중(active=true)인 상품만 ID 순으로 조회한다 */
+	List<SubscriptionProduct> findAllByActiveTrueOrderByIdAsc();
 }

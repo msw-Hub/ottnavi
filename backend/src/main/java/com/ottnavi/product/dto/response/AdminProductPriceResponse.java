@@ -6,9 +6,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * 월 구독요금 한 줄(계약 AdminProductPrice). 종료일은 저장하지 않는다(다음 줄 시작일의 전날까지, 마지막 줄은 계속).
+ * 월 구독요금 이력 한 건(계약 AdminProductPrice). 종료일은 저장하지 않는다(다음 요금 이력 시작일의 전날까지, 가장 최근 요금 이력은 계속).
  *
- * @param priceId        월 구독요금 줄 ID
+ * @param priceId        월 구독요금 이력 ID
  * @param monthlyPrice   월 구독요금(원)
  * @param effectiveFrom  적용 시작일
  * @param lastVerifiedAt 마지막 확인 일시

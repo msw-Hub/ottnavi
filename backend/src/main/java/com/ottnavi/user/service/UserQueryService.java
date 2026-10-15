@@ -2,10 +2,13 @@ package com.ottnavi.user.service;
 
 import com.ottnavi.global.error.UnauthorizedException;
 import com.ottnavi.user.domain.entity.UserSubscription;
+import com.ottnavi.user.domain.enums.ServiceSubscriptionStatus;
 import com.ottnavi.user.domain.enums.SubscriptionStatus;
 import com.ottnavi.user.domain.repository.UserRepository;
 import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +45,19 @@ public class UserQueryService {
 			if (row.getStatus() == SubscriptionStatus.SUBSCRIBED || row.getStatus() == SubscriptionStatus.FREE) {
 				result.add(row.getOttService().getId());
 			}
+		}
+		return result;
+	}
+
+	/**
+	 * 사용자의 서비스별 이용 상태를 서비스 ID로 찾을 수 있게 돌려준다. 행이 없는 서비스(미구독)는 담지 않으므로
+	 * 호출하는 쪽이 NOT_SUBSCRIBED로 채운다.
+	 */
+	public Map<Long, ServiceSubscriptionStatus> mapStatusByServiceId(Long userId) {
+		Map<Long, ServiceSubscriptionStatus> result = new HashMap<>();
+		for (UserSubscription row : userSubscriptionRepository.findAllByUserId(userId)) {
+			// DB 값(SUBSCRIBED/FREE/UNKNOWN)과 API 값은 이름이 같아 그대로 옮긴다
+			result.put(row.getOttService().getId(), ServiceSubscriptionStatus.valueOf(row.getStatus().name()));
 		}
 		return result;
 	}

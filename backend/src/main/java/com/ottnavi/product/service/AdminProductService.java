@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 관리자의 OTT 구독상품·월 구독요금 관리(Task 059, 단품만).
- * 요금 줄의 허용·거부 규칙은 {@link ProductPriceRules}가 판단하고, 이 서비스는 조회·저장·트랜잭션을 맡는다.
+ * 요금 이력의 허용·거부 규칙은 {@link ProductPriceRules}가 판단하고, 이 서비스는 조회·저장·트랜잭션을 맡는다.
  * 날짜는 모두 한국(KST) 기준이며 시계는 {@link Clock}으로 주입한다.
  */
 @Service
@@ -61,7 +61,7 @@ public class AdminProductService {
 			productIds.add(product.getId());
 		}
 
-		// 2. 구성(서비스 ID)과 요금 줄을 상품 ID별로 묶는다(상품마다 조회하지 않고 한 번씩만 읽는다)
+		// 2. 구성(서비스 ID)과 요금 이력을 상품 ID별로 묶는다(상품마다 조회하지 않고 한 번씩만 읽는다)
 		Map<Long, Long> ottServiceIdByProduct = new HashMap<>();
 		for (ProductComponent component : productComponentRepository.findByProductIds(productIds)) {
 			ottServiceIdByProduct.put(component.getId().getProductId(), component.getId().getOttServiceId());
@@ -90,8 +90,8 @@ public class AdminProductService {
 	}
 
 	/**
-	 * 단품 상품을 첫 월 구독요금과 함께 등록한다. 상품·구성(STANDARD)·첫 줄을 한 트랜잭션으로 만든다.
-	 * 첫 줄의 마지막 확인 일시는 현재 시각이고, 시작일은 오늘 이하여야 한다.
+	 * 단품 상품을 첫 월 구독요금과 함께 등록한다. 상품·구성(STANDARD)·첫 요금 이력을 한 트랜잭션으로 만든다.
+	 * 첫 요금 이력의 마지막 확인 일시는 현재 시각이고, 시작일은 오늘 이하여야 한다.
 	 */
 	@Transactional
 	public AdminProductView createProduct(
@@ -108,11 +108,11 @@ public class AdminProductService {
 			throw new FieldValidationException("ottServiceId", "존재하지 않는 서비스입니다.");
 		}
 
-		// 3. 첫 줄의 시작일이 오늘 이하인지 저장 전에 확인한다
+		// 3. 첫 요금 이력의 시작일이 오늘 이하인지 저장 전에 확인한다
 		LocalDate today = LocalDate.now(clock);
 		ProductPriceRules.validateStartDate(null, effectiveFrom, today);
 
-		// 4. 상품 → 구성 → 첫 줄 순으로 저장한다(구성은 상품 ID가 필요하다)
+		// 4. 상품 → 구성 → 첫 요금 이력 순으로 저장한다(구성은 상품 ID가 필요하다)
 		SubscriptionProduct product = subscriptionProductRepository.save(
 				SubscriptionProduct.create(trimmedName, productType));
 		productComponentRepository.save(ProductComponent.create(product, found.get(), ProviderTier.STANDARD));
@@ -151,14 +151,14 @@ public class AdminProductService {
 		return loadView(product);
 	}
 
-	/** 월 구독요금 줄을 맨 뒤에 추가한다. 시작일은 마지막 줄보다 늦어야 하고 확인 일시는 현재 시각이다 */
+	/** 월 구독요금 이력을 맨 뒤에 추가한다. 시작일은 가장 최근 요금 이력보다 늦어야 하고 확인 일시는 현재 시각이다 */
 	@Transactional
 	public AdminProductView addPrice(long productId, int monthlyPrice, LocalDate effectiveFrom) {
-		// 1. 상품과 기존 줄을 읽는다
+		// 1. 상품과 기존 요금 이력을 읽는다
 		SubscriptionProduct product = findProduct(productId);
 		List<ProductPrice> prices = productPriceRepository.findByProductIdOrderByEffectiveFromAsc(productId);
 
-		// 2. 시작일이 마지막 줄보다 늦은지 확인한다(줄이 없으면 첫 줄 규칙)
+		// 2. 시작일이 가장 최근 요금 이력보다 늦은지 확인한다(요금 이력이 없으면 첫 요금 이력 규칙)
 		LocalDate lastFrom = null;
 		ProductPrice latest = ProductPriceRules.latestOf(prices);
 		if (latest != null) {
@@ -166,20 +166,20 @@ public class AdminProductService {
 		}
 		ProductPriceRules.validateStartDate(lastFrom, effectiveFrom, LocalDate.now(clock));
 
-		// 3. 새 줄을 저장한다
+		// 3. 새 요금 이력을 저장한다
 		productPriceRepository.save(ProductPrice.create(product, monthlyPrice, effectiveFrom, Instant.now(clock)));
 		return loadView(product);
 	}
 
-	/** 마지막 줄만 고친다. 시작일은 바로 앞 줄보다 늦어야 하고(첫 줄이면 오늘 이하), 확인 일시는 현재 시각으로 바뀐다 */
+	/** 가장 최근 요금 이력만 고친다. 시작일은 바로 앞 요금 이력보다 늦어야 하고(첫 요금 이력이면 오늘 이하), 확인 일시는 현재 시각으로 바뀐다 */
 	@Transactional
 	public AdminProductView updatePrice(long productId, long priceId, int monthlyPrice, LocalDate effectiveFrom) {
-		// 1. 상품과 줄을 찾는다
+		// 1. 상품과 요금 이력을 찾는다
 		SubscriptionProduct product = findProduct(productId);
 		List<ProductPrice> prices = productPriceRepository.findByProductIdOrderByEffectiveFromAsc(productId);
 		ProductPrice target = findPrice(prices, priceId);
 
-		// 2. 마지막 줄이고, 새 시작일이 앞 줄보다 늦은지 확인한다
+		// 2. 가장 최근 요금 이력이고, 새 시작일이 바로 앞 요금 이력보다 늦은지 확인한다
 		ProductPriceRules.validateEditable(prices, target);
 		LocalDate previousFrom = ProductPriceRules.previousFromOf(prices, target);
 		ProductPriceRules.validateStartDate(previousFrom, effectiveFrom, LocalDate.now(clock));
@@ -189,28 +189,28 @@ public class AdminProductService {
 		return loadView(product);
 	}
 
-	/** 마지막 줄을 삭제한다. 줄이 하나뿐이면 지울 수 없다 */
+	/** 가장 최근 요금 이력을 삭제한다. 요금 이력이 하나뿐이면 지울 수 없다 */
 	@Transactional
 	public void deletePrice(long productId, long priceId) {
-		// 1. 상품과 줄을 찾는다
+		// 1. 상품과 요금 이력을 찾는다
 		findProduct(productId);
 		List<ProductPrice> prices = productPriceRepository.findByProductIdOrderByEffectiveFromAsc(productId);
 		ProductPrice target = findPrice(prices, priceId);
 
-		// 2. 마지막 줄이고 유일한 줄이 아닌지 확인한 뒤 지운다
+		// 2. 가장 최근 요금 이력이고 유일한 요금 이력이 아닌지 확인한 뒤 지운다
 		ProductPriceRules.validateDeletable(prices, target);
 		productPriceRepository.delete(target);
 	}
 
-	/** [요금 확인함]: 오늘(KST) 적용 중인 줄만 허용하고 금액은 그대로 둔 채 마지막 확인 일시를 현재 시각으로 바꾼다 */
+	/** [요금 확인함]: 현재(KST) 적용 중인 요금만 허용하고 금액은 그대로 둔 채 마지막 확인 일시를 현재 시각으로 바꾼다 */
 	@Transactional
 	public AdminProductView verifyPrice(long productId, long priceId) {
-		// 1. 상품과 줄을 찾는다
+		// 1. 상품과 요금 이력을 찾는다
 		SubscriptionProduct product = findProduct(productId);
 		List<ProductPrice> prices = productPriceRepository.findByProductIdOrderByEffectiveFromAsc(productId);
 		ProductPrice target = findPrice(prices, priceId);
 
-		// 2. 오늘 적용 중인 줄인지 확인한다(기준일 선택은 계산·내 요금과 같은 조회 서비스를 쓴다)
+		// 2. 현재 적용 중인 요금인지 확인한다(기준일 선택은 계산·내 요금과 같은 조회 서비스를 쓴다)
 		Optional<ProductPriceView> current = productPriceQueryService.priceOn(productId, LocalDate.now(clock));
 		if (current.isEmpty() || current.get().priceId() != target.getId()) {
 			throw new ProductPriceConflictException(ErrorCode.PRICE_NOT_CURRENT);
@@ -241,7 +241,7 @@ public class AdminProductService {
 		return found.get();
 	}
 
-	/** 읽어 둔 줄 목록에서 ID가 같은 줄을 찾는다. 다른 상품의 줄이면 목록에 없어 404가 된다 */
+	/** 읽어 둔 요금 이력 목록에서 ID가 같은 요금 이력을 찾는다. 다른 상품의 요금 이력이면 목록에 없어 404가 된다 */
 	private ProductPrice findPrice(List<ProductPrice> prices, long priceId) {
 		for (ProductPrice price : prices) {
 			if (price.getId() == priceId) {
@@ -251,7 +251,7 @@ public class AdminProductService {
 		throw new ResourceNotFoundException("해당 월 구독요금을 찾을 수 없습니다.");
 	}
 
-	/** 변경 뒤 상품의 구성·요금 줄을 다시 읽어 응답용 값 묶음을 만든다 */
+	/** 변경 뒤 상품의 구성·요금 이력을 다시 읽어 응답용 값 묶음을 만든다 */
 	private AdminProductView loadView(SubscriptionProduct product) {
 		List<Long> productIds = new ArrayList<>();
 		productIds.add(product.getId());
