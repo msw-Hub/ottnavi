@@ -1,4 +1,4 @@
-package com.ottnavi.engine.benchmark;
+package com.ottnavi.plan.service.benchmark;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ottnavi.engine.model.OttProductCondition;
@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * 정답 세트 한 건(engine-benchmark/*.json 파일 하나). 입력과 기대 결과, 무엇을 검증하는 케이스인지 설명을 함께 담는다.
- * 이름·제목은 모두 가상이다(작품A, 서비스A 식). Task 065(관리자 측정 API)도 같은 파일을 쓴다.
+ * 이름·제목은 모두 가상이다(작품A, 서비스A 식). 관리자 측정 서비스(PlanBenchmarkService)도 같은 파일을 쓴다.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record BenchmarkCase(

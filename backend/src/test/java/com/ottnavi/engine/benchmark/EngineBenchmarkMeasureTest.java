@@ -1,5 +1,6 @@
 package com.ottnavi.engine.benchmark;
 
+import com.ottnavi.plan.service.benchmark.BenchmarkCase;
 import static com.ottnavi.engine.benchmark.BenchmarkSupport.heapCell;
 import static com.ottnavi.engine.benchmark.BenchmarkSupport.measure;
 import static com.ottnavi.engine.benchmark.BenchmarkSupport.ms;

@@ -1,11 +1,12 @@
 package com.ottnavi.engine.benchmark;
 
+import com.ottnavi.plan.service.benchmark.BenchmarkCase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.ottnavi.engine.InputHasher;
-import com.ottnavi.engine.benchmark.BenchmarkCase.Basis;
-import com.ottnavi.engine.benchmark.BenchmarkCase.ExpectedPlan;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase.Basis;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase.ExpectedPlan;
 import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.OttProductCondition;
 import com.ottnavi.engine.model.PlanInput;
