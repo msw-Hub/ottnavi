@@ -418,6 +418,27 @@ describe('요금', () => {
     }
   })
 
+  it('금액 오류(400)는 상품 존재 확인(404)보다 먼저이고 fieldErrors로 알린다(서버 실측 순서, Task 060)', async () => {
+    const decimal = await request({
+      url: '/me/service-prices/999', // 없는 상품이어도 본문 오류가 먼저다
+      method: 'PUT',
+      data: { monthlyPrice: 9900.5 },
+    }).catch((e: unknown) => e)
+    expect(decimal).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(decimal) && decimal.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '형식이 올바르지 않습니다.' },
+    ])
+
+    const tooHigh = await request({
+      url: `/me/service-prices/${NETFLIX_PRODUCT_ID}`,
+      method: 'PUT',
+      data: { monthlyPrice: 1_000_001 },
+    }).catch((e: unknown) => e)
+    expect(isApiError(tooHigh) && tooHigh.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' },
+    ])
+  })
+
   it('없는 상품은 PUT·DELETE 모두 404 SERVICE_PRICE_NOT_FOUND다', async () => {
     const putError = await request({
       url: '/me/service-prices/999',

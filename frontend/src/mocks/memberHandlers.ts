@@ -218,6 +218,31 @@ function validationError(request: Request, detail: string, fieldErrors?: FieldEr
   return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail, fieldErrors)
 }
 
+// 경로의 상품 ID가 1 이상 정수인지 본다(서버 @Positive). 어긋나면 fieldErrors에 담을 오류를 돌려준다
+function positiveProductIdError(raw: string | readonly string[] | undefined): FieldError | null {
+  const value = Number(raw)
+  return Number.isInteger(value) && value >= 1
+    ? null
+    : { field: 'productId', message: '1 이상이어야 합니다.' }
+}
+
+/**
+ * 내 월 요금 요청 본문의 금액을 서버(SetMyServicePriceRequest)와 같이 검사한다. 올바르면 null이다.
+ * 소수·숫자가 아닌 값은 "형식이 올바르지 않습니다."(Jackson 형식 오류가 Bean Validation보다 먼저), 없으면 필수 오류,
+ * 범위는 0 이상 1,000,000 이하다.
+ */
+function servicePriceBodyError(monthlyPrice: unknown): FieldError | null {
+  if (monthlyPrice == null) return { field: 'monthlyPrice', message: '월 요금은 필수입니다.' }
+  if (typeof monthlyPrice !== 'number' || !Number.isInteger(monthlyPrice)) {
+    return { field: 'monthlyPrice', message: '형식이 올바르지 않습니다.' }
+  }
+  if (monthlyPrice < 0) return { field: 'monthlyPrice', message: '0 이상이어야 합니다.' }
+  if (monthlyPrice > 1_000_000) {
+    return { field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' }
+  }
+  return null
+}
+
 // 서비스 ID 범위(서비스 목록 API의 7곳). 이 밖의 ID는 서버가 "없는 서비스"로 400을 준다
 const MOCK_SERVICE_ID_SET = new Set<number>(MOCK_SERVICE_IDS)
 
@@ -466,14 +491,20 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
+    // 1. 경로 변수·본문 검사(서버 컨트롤러 단계라 상품 존재 확인(404)보다 먼저다. Task 060 실측 기록).
+    //    소수 금액(9900.5)은 버림으로 통과하지 않고 형식 오류다(서버 accept-float-as-int=false)
+    const idError = positiveProductIdError(params.productId)
+    if (idError) return validationError(request, '요청 값이 올바르지 않습니다.', [idError])
+    const { monthlyPrice } = (await request.json()) as Partial<SetMyServicePriceRequest>
+    const priceError = servicePriceBodyError(monthlyPrice)
+    if (priceError) return validationError(request, '요청 값이 올바르지 않습니다.', [priceError])
+    const validPrice = monthlyPrice as number
+
+    // 2. 상품 확인: 없거나 판매 종료면 404 SERVICE_PRICE_NOT_FOUND
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
     if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 
-    const { monthlyPrice } = (await request.json()) as SetMyServicePriceRequest
-    if (!Number.isInteger(monthlyPrice) || monthlyPrice < 0 || monthlyPrice > 1_000_000) {
-      return validationError(request, '월 요금은 0원 이상 100만 원 이하의 정수여야 합니다.')
-    }
-    priceOverrides.set(product.productId, monthlyPrice)
+    priceOverrides.set(product.productId, validPrice)
     persistPriceOverrides()
 
     const body: CommonResponseServicePrice = {
@@ -489,6 +520,8 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
+    const idError = positiveProductIdError(params.productId)
+    if (idError) return validationError(request, '요청 값이 올바르지 않습니다.', [idError])
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
     if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 

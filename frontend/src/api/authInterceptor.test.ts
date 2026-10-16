@@ -173,6 +173,46 @@ describe('401 재발급 인터셉터', () => {
     expect(response.data.data).toBe('ok')
     expect(refreshCalls).toBe(0)
   })
+
+  // Task 061: 관리자 API가 일반 사용자 토큰에 403을 주는 경우. 권한 부족은 토큰이 낡은 것이 아니라서 재발급하지 않는다
+  it('관리자 API의 403(USER 토큰)은 재발급하지 않고 로그인 상태도 지우지 않는다', async () => {
+    useAuthStore.getState().setSession('old-token', 'USER')
+    useRefreshSuccess()
+    server.use(
+      mswHttp.get('/api/admin/products', () => {
+        protectedCalls += 1
+        return problem(403, 'FORBIDDEN')
+      }),
+    )
+
+    const error = await AXIOS_INSTANCE.get('/admin/products').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).status).toBe(403)
+    expect((error as ApiError).errorCode).toBe('FORBIDDEN')
+    expect(refreshCalls).toBe(0)
+    expect(protectedCalls).toBe(1)
+    expect(useAuthStore.getState().status).toBe('authenticated')
+  })
+
+  it('관리자 API의 401(토큰 만료)은 재발급을 한 번 하고 새 토큰으로 다시 보낸다', async () => {
+    useAuthStore.getState().setSession('old-token', 'ADMIN')
+    useRefreshSuccess()
+    server.use(
+      mswHttp.get('/api/admin/products', ({ request }) => {
+        protectedCalls += 1
+        return request.headers.get('Authorization') === 'Bearer new-token'
+          ? HttpResponse.json({ success: true, data: { products: [] } })
+          : problem(401, 'UNAUTHORIZED')
+      }),
+    )
+
+    const response = await AXIOS_INSTANCE.get('/admin/products')
+
+    expect(response.data.data.products).toEqual([])
+    expect(refreshCalls).toBe(1)
+    expect(protectedCalls).toBe(2)
+  })
 })
 
 describe('앱 시작 시 로그인 상태 복원(restoreSession)', () => {

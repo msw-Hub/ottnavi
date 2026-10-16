@@ -14,18 +14,18 @@ import type {
   CommonResponseCollectExecutionAccepted,
   CreateCollectExecutionRequest,
   CommonResponseAdminProviderList,
+  FieldError,
   UpdateAdminProviderRequest,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CreateAdminProductRequest,
   UpdateAdminProductRequest,
-  ProblemDetail,
 } from '@/api/generated/model'
 import {
   checkAddPriceStartDate,
   checkEditLastPriceStartDate,
   checkFirstPriceStartDate,
-  checkMonthlyPriceText,
+  MAX_MONTHLY_PRICE,
   getPriceRowKind,
   sortPricesAscending,
   type PriceStartDateIssue,
@@ -39,7 +39,6 @@ import {
   sortExecutionsForHistory,
   withActionFlags,
 } from '@/features/admin/collectRules'
-import { validateSaveRequest } from '@/features/admin/providerMapping'
 import { getTodayDateString } from '@/lib/dateUtils'
 import { hasMockScenario, problemResponse, readMockJson, writeMockJson } from '@/mocks/handlerUtils'
 import {
@@ -77,6 +76,10 @@ import {
  *
  * 규칙 위반은 서버처럼 409 + 오류 코드로 돌려준다(Task 031 계약 확정. 규칙 위반은 요청 모양 오류(400)가 아니라
  * 현재 저장된 줄과의 충돌이라 409다). 입력 모양 오류는 400 VALIDATION_FAILED다.
+ *
+ * 검사 순서와 오류 모양은 서버와 같다(Task 061): 경로 변수·요청 본문 검사(400) → 존재 확인(404) → 규칙(409).
+ * 400의 detail은 고정 문구("요청 값이 올바르지 않습니다.")이고 필드별 안내는 fieldErrors에 담는다. 소수 금액은 버림 통과하지 않고
+ * "형식이 올바르지 않습니다."로 거절한다. 404의 detail은 서버가 데이터 종류별로 쓰는 문장이다.
  */
 
 // 요청 처리에 걸리는 시간. 테스트에서는 기다리지 않고, 브라우저에서는 로딩 상태가 눈에 보이게 잠깐 기다린다
@@ -398,27 +401,97 @@ function okProduct(product: AdminProduct, status = 200) {
   return HttpResponse.json(body, { status })
 }
 
-function validationError(request: Request, detail: string) {
-  return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail)
+// 서버 ErrorCode.VALIDATION_FAILED의 기본 문구. 서버는 필드를 알리는 400의 detail에 항상 이 문구를 쓰고, 필드별 안내는 fieldErrors에 담는다
+const VALIDATION_FAILED_DETAIL = '요청 값이 올바르지 않습니다.'
+
+// 서버가 JSON 값의 형식(정수 자리의 소수, 잘못된 날짜 등)이 맞지 않을 때 fieldErrors에 담는 문구
+const TYPE_MISMATCH_MESSAGE = '형식이 올바르지 않습니다.'
+
+// 경로 변수 검사 문구(서버 @Positive)
+const POSITIVE_MESSAGE = '1 이상이어야 합니다.'
+
+/**
+ * 필드 오류 목록을 담은 400 VALIDATION_FAILED. 서버(GlobalExceptionHandler)처럼 detail은 고정 문구이고 필드별 안내는 fieldErrors에 담는다.
+ * Bean Validation 실패·형식 불일치·서버의 FieldValidationException이 모두 이 모양이다. 화면은 이 문구를 해당 입력 아래에 보인다.
+ */
+function validationFailed(request: Request, fieldErrors: FieldError[]) {
+  return problemResponse(
+    request,
+    400,
+    'Bad Request',
+    'VALIDATION_FAILED',
+    VALIDATION_FAILED_DETAIL,
+    fieldErrors,
+  )
+}
+
+// 필드 하나를 알리는 400 VALIDATION_FAILED(서버 FieldValidationException). 예: 수집 실행의 targetDate·tier
+function fieldValidationError(request: Request, field: string, message: string) {
+  return validationFailed(request, [{ field, message }])
+}
+
+// 경로 변수(상품·요금 줄·실행·제공처 ID)가 1 이상인지 본다. 아니면 400 응답, 맞으면 undefined (서버는 컨트롤러에서 가장 먼저 검사한다)
+function pathIdProblem(
+  request: Request,
+  ids: Record<string, string | readonly string[] | undefined>,
+) {
+  const errors: FieldError[] = []
+  for (const [field, raw] of Object.entries(ids)) {
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < 1) errors.push({ field, message: POSITIVE_MESSAGE })
+  }
+  return errors.length > 0 ? validationFailed(request, errors) : undefined
+}
+
+// 'YYYY-MM-DD'이면서 실제로 있는 날짜인지 본다(서버 LocalDate 해석). 2026-02-30 같은 날은 거절한다
+function isRealDate(text: unknown): text is string {
+  if (typeof text !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(text)) return false
+  const date = new Date(`${text}T00:00:00Z`)
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === text
 }
 
 /**
- * 필드를 알려 주는 400 VALIDATION_FAILED. 서버처럼 fieldErrors에 필드 이름과 문구를 담는다(계약 createCollectExecution:
- * 날짜 형식·미래 날짜·운영에서 오늘이 아닌 날짜는 targetDate, ALL이 아닌 범위는 tier). 화면은 이 문구를 해당 입력 아래에 보인다.
+ * 월 구독요금 요청 본문(금액·적용 시작일)을 서버의 요청 검사와 같은 순서로 본다. 올바르면 빈 배열이다.
+ * 서버는 먼저 JSON 값의 형식(소수 금액·잘못된 날짜 → "형식이 올바르지 않습니다.", 첫 오류에서 멈춤)을 보고,
+ * 통과하면 Bean Validation(필수·0 이상·1,000,000 이하)을 모든 필드에 대해 본다. 이 검사는 존재 확인(404)·규칙(409)보다 항상 먼저다.
  */
-function fieldValidationError(request: Request, field: string, message: string) {
-  const body: ProblemDetail = {
-    title: 'Bad Request',
-    status: 400,
-    detail: '입력값이 올바르지 않습니다.',
-    instance: new URL(request.url).pathname,
-    errorCode: 'VALIDATION_FAILED',
-    fieldErrors: [{ field, message }],
+function priceBodyProblems(body: Partial<AdminProductPriceRequest>): FieldError[] {
+  // 1. 형식 불일치: 값이 있는데 정수가 아닌 금액, 날짜가 아닌 시작일
+  const mismatches: FieldError[] = []
+  if (body.monthlyPrice != null && !Number.isInteger(body.monthlyPrice)) {
+    mismatches.push({ field: 'monthlyPrice', message: TYPE_MISMATCH_MESSAGE })
   }
-  return HttpResponse.json(body, {
-    status: 400,
-    headers: { 'Content-Type': 'application/problem+json' },
-  })
+  if (body.effectiveFrom != null && !isRealDate(body.effectiveFrom)) {
+    mismatches.push({ field: 'effectiveFrom', message: TYPE_MISMATCH_MESSAGE })
+  }
+  if (mismatches.length > 0) return mismatches.slice(0, 1)
+
+  // 2. 필수·범위
+  const errors: FieldError[] = []
+  if (body.monthlyPrice == null) {
+    errors.push({ field: 'monthlyPrice', message: '월 구독요금은 필수입니다.' })
+  } else if (body.monthlyPrice < 0) {
+    errors.push({ field: 'monthlyPrice', message: '0 이상이어야 합니다.' })
+  } else if (body.monthlyPrice > MAX_MONTHLY_PRICE) {
+    errors.push({ field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' })
+  }
+  if (body.effectiveFrom == null) {
+    errors.push({ field: 'effectiveFrom', message: '적용 시작일은 필수입니다.' })
+  }
+  return errors
+}
+
+// 상품 이름 길이 상한(서버 NAME_MAX_LENGTH)
+const NAME_MAX_LENGTH = 100
+
+/** 이름의 앞뒤 공백을 지우고 1~100자인지 본다(서버 normalizeName). 올바르면 정리한 이름을, 아니면 오류를 돌려준다. */
+function normalizeProductName(name: string): { name: string } | { error: FieldError } {
+  const trimmed = name.trim()
+  if (trimmed === '') return { error: { field: 'name', message: '이름은 비어 있을 수 없습니다.' } }
+  if (trimmed.length > NAME_MAX_LENGTH) {
+    return { error: { field: 'name', message: `이름은 ${NAME_MAX_LENGTH}자 이하여야 합니다.` } }
+  }
+  return { name: trimmed }
 }
 
 // 지금 시각(ISO 일시). 월 구독요금의 마지막 확인 일시(lastVerifiedAt)에 쓴다. 화면은 한국 날짜로 바꿔 보인다
@@ -439,6 +512,36 @@ function readPageParams(request: Request): { page: number; size: number } | null
   return { page, size }
 }
 
+/**
+ * 쪽 번호·크기가 계약 범위를 벗어났을 때의 400 응답. 서버처럼 어긋난 필드마다 fieldErrors를 담는다
+ * (page 0 이상, size 1 이상 100 이하, 숫자가 아니면 "형식이 올바르지 않습니다."). 모두 올바르면 undefined다.
+ */
+function pageParamsProblem(request: Request) {
+  const params = new URL(request.url).searchParams
+  const errors: FieldError[] = []
+  const pageText = params.get('page')
+  if (pageText !== null) {
+    const page = Number(pageText)
+    if (pageText.trim() === '' || !Number.isInteger(page)) {
+      errors.push({ field: 'page', message: TYPE_MISMATCH_MESSAGE })
+    } else if (page < 0) {
+      errors.push({ field: 'page', message: '0 이상이어야 합니다.' })
+    }
+  }
+  const sizeText = params.get('size')
+  if (sizeText !== null) {
+    const size = Number(sizeText)
+    if (sizeText.trim() === '' || !Number.isInteger(size)) {
+      errors.push({ field: 'size', message: TYPE_MISMATCH_MESSAGE })
+    } else if (size < 1) {
+      errors.push({ field: 'size', message: '1 이상이어야 합니다.' })
+    } else if (size > 100) {
+      errors.push({ field: 'size', message: '100 이하여야 합니다.' })
+    }
+  }
+  return errors.length > 0 ? validationFailed(request, errors) : undefined
+}
+
 // 전체 목록에서 한 쪽을 잘라 PageMeta 형식(content, page, size, totalElements, totalPages)으로 만든다
 function toPage<T>(all: T[], { page, size }: { page: number; size: number }) {
   return {
@@ -450,13 +553,18 @@ function toPage<T>(all: T[], { page, size }: { page: number; size: number }) {
   }
 }
 
-function invalidPageParams(request: Request) {
-  return validationError(request, 'page는 0 이상, size는 1~100 사이여야 합니다.')
+// 관리자 API의 없는 데이터는 도메인 코드 없이 404 RESOURCE_NOT_FOUND다(error-codes.md). detail 문구는 서버가 데이터 종류별로 쓰는 문장이다
+function notFound(request: Request, detail: string) {
+  return problemResponse(request, 404, 'Not Found', 'RESOURCE_NOT_FOUND', detail)
 }
 
-function notFound(request: Request) {
-  return problemResponse(request, 404, 'Not Found', 'RESOURCE_NOT_FOUND', '찾을 수 없습니다.')
-}
+const PRODUCT_NOT_FOUND = '해당 구독상품을 찾을 수 없습니다.'
+const PRICE_NOT_FOUND = '해당 월 구독요금을 찾을 수 없습니다.'
+const PROVIDER_NOT_FOUND = '해당 제공처를 찾을 수 없습니다.'
+const EXECUTION_NOT_FOUND = '해당 수집 실행을 찾을 수 없습니다.'
+
+// 수정·삭제가 같이 쓰는 서버 문구(ErrorCode.PRICE_NOT_LATEST)
+const PRICE_NOT_LATEST_DETAIL = '가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.'
 
 // 월 구독요금 규칙 위반을 제안 오류 코드(409)로 돌려준다
 function ruleViolation(request: Request, errorCode: string, detail: string) {
@@ -469,7 +577,8 @@ function startDateProblem(request: Request, issue: PriceStartDateIssue | null) {
     case null:
       return undefined
     case 'REQUIRED':
-      return validationError(request, '적용 시작일은 YYYY-MM-DD 형식이어야 합니다.')
+      // 본문 검사(priceBodyProblems)가 먼저 걸러 여기까지 오지 않지만, 검사 결과 종류를 빠짐없이 처리하려고 둔다
+      return fieldValidationError(request, 'effectiveFrom', TYPE_MISMATCH_MESSAGE)
     case 'DUPLICATE':
       return ruleViolation(
         request,
@@ -480,24 +589,15 @@ function startDateProblem(request: Request, issue: PriceStartDateIssue | null) {
       return ruleViolation(
         request,
         'PRICE_START_DATE_NOT_AFTER_LAST',
-        '적용 시작일은 앞 줄의 시작일보다 늦어야 합니다.',
+        '적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다.',
       )
     case 'FIRST_IN_FUTURE':
       return ruleViolation(
         request,
         'PRICE_FIRST_START_DATE_IN_FUTURE',
-        '첫 월 구독요금의 적용 시작일은 오늘 이하여야 합니다.',
+        '첫 월 구독요금의 적용 시작일은 오늘 또는 그 이전이어야 합니다.',
       )
   }
-}
-
-// 월 구독요금 값 검사(요청 본문의 숫자). 올바르면 undefined
-function monthlyPriceProblem(request: Request, monthlyPrice: unknown) {
-  if (typeof monthlyPrice !== 'number' || !Number.isInteger(monthlyPrice)) {
-    return validationError(request, '월 구독요금은 정수여야 합니다.')
-  }
-  const message = checkMonthlyPriceText(String(monthlyPrice))
-  return message ? validationError(request, message) : undefined
 }
 
 export const adminHandlers: RequestHandler[] = [
@@ -523,17 +623,37 @@ export const adminHandlers: RequestHandler[] = [
   // OTT 구독상품 등록(첫 월 구독요금 포함)
   http.post('/api/admin/products', async ({ request }) => {
     await wait()
-    const body = (await request.json()) as CreateAdminProductRequest
-    const name = typeof body.name === 'string' ? body.name.trim() : ''
-    if (name === '') return validationError(request, '이름을 입력해 주세요.')
+    const raw = (await request.json()) as Partial<CreateAdminProductRequest>
+
+    // 1. 요청 본문 검사(서버 Bean Validation): 형식 불일치 → 필수·범위. 존재 확인·규칙보다 항상 먼저다
+    const bodyErrors = priceBodyProblems(raw)
+    if (raw.productType != null && raw.productType !== 'SINGLE' && raw.productType !== 'BUNDLE') {
+      return fieldValidationError(request, 'productType', TYPE_MISMATCH_MESSAGE)
+    }
+    if (typeof raw.name !== 'string' || raw.name.trim() === '') {
+      bodyErrors.push({ field: 'name', message: '이름은 필수입니다.' })
+    }
+    if (raw.productType == null) {
+      bodyErrors.push({ field: 'productType', message: '상품 종류는 필수입니다.' })
+    }
+    if (raw.ottServiceId == null) {
+      bodyErrors.push({ field: 'ottServiceId', message: '서비스는 필수입니다.' })
+    } else if (!Number.isInteger(raw.ottServiceId) || raw.ottServiceId < 1) {
+      bodyErrors.push({ field: 'ottServiceId', message: POSITIVE_MESSAGE })
+    }
+    if (bodyErrors.length > 0) return validationFailed(request, bodyErrors)
+    // 위 검사로 필수 값이 모두 채워졌음이 확인됐다
+    const body = raw as CreateAdminProductRequest
+
+    // 2. 서비스 계층 검사 순서(서버 createProduct): 단품만 → 이름 길이 → 서비스 존재 → 첫 요금 시작일(409)
     if (body.productType !== 'SINGLE') {
-      return validationError(request, 'MVP는 단품(SINGLE)만 등록할 수 있습니다.')
+      return fieldValidationError(request, 'productType', '단품(SINGLE)만 등록할 수 있습니다.')
     }
+    const normalized = normalizeProductName(body.name)
+    if ('error' in normalized) return validationFailed(request, [normalized.error])
     if (!MOCK_PRODUCTS.some((p) => p.ottServiceId === body.ottServiceId)) {
-      return validationError(request, '서비스를 선택해 주세요.')
+      return fieldValidationError(request, 'ottServiceId', '존재하지 않는 서비스입니다.')
     }
-    const priceProblem = monthlyPriceProblem(request, body.monthlyPrice)
-    if (priceProblem) return priceProblem
     const today = getTodayDateString()
     const dateProblem = startDateProblem(
       request,
@@ -543,7 +663,7 @@ export const adminHandlers: RequestHandler[] = [
 
     const product: AdminProduct = {
       productId: nextProductId++,
-      name,
+      name: normalized.name,
       productType: 'SINGLE',
       ottServiceId: body.ottServiceId,
       isActive: true,
@@ -562,17 +682,30 @@ export const adminHandlers: RequestHandler[] = [
   // 이름·판매 상태 수정
   http.patch('/api/admin/products/:productId', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
-    if (!product) return notFound(request)
-
+    // 1. 경로 변수·본문 검사(404보다 먼저). 서버는 보낸 필드만 바꾸고 둘 다 없으면 400이다
+    const idProblem = pathIdProblem(request, { productId: params.productId })
+    if (idProblem) return idProblem
     const body = (await request.json()) as UpdateAdminProductRequest
-    if (body.name !== undefined && body.name.trim() === '') {
-      return validationError(request, '이름을 입력해 주세요.')
+    if (body.isActive != null && typeof body.isActive !== 'boolean') {
+      return fieldValidationError(request, 'isActive', TYPE_MISMATCH_MESSAGE)
     }
+    if (body.name == null && body.isActive == null) {
+      return fieldValidationError(request, 'request', 'name 또는 isActive 중 하나는 보내야 합니다.')
+    }
+    let newName: string | undefined
+    if (body.name != null) {
+      const normalized = normalizeProductName(body.name)
+      if ('error' in normalized) return validationFailed(request, [normalized.error])
+      newName = normalized.name
+    }
+
+    // 2. 상품을 찾아 바꾼다
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
+    if (!product) return notFound(request, PRODUCT_NOT_FOUND)
     return okProduct(
       saveProduct({
         ...product,
-        name: body.name !== undefined ? body.name.trim() : product.name,
+        name: newName ?? product.name,
         isActive: body.isActive ?? product.isActive,
       }),
     )
@@ -581,12 +714,16 @@ export const adminHandlers: RequestHandler[] = [
   // 월 구독요금 줄 추가
   http.post('/api/admin/products/:productId/prices', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
-    if (!product) return notFound(request)
-
+    // 1. 경로 변수·본문 검사(404·409보다 먼저, 서버 컨트롤러 단계)
+    const idProblem = pathIdProblem(request, { productId: params.productId })
+    if (idProblem) return idProblem
     const body = (await request.json()) as AdminProductPriceRequest
-    const priceProblem = monthlyPriceProblem(request, body.monthlyPrice)
-    if (priceProblem) return priceProblem
+    const bodyErrors = priceBodyProblems(body)
+    if (bodyErrors.length > 0) return validationFailed(request, bodyErrors)
+
+    // 2. 상품 확인 → 시작일 규칙(409)
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
+    if (!product) return notFound(request, PRODUCT_NOT_FOUND)
     const today = getTodayDateString()
     const dateProblem = startDateProblem(
       request,
@@ -606,21 +743,25 @@ export const adminHandlers: RequestHandler[] = [
   // 가장 최근 줄 수정. 금액을 직접 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 갱신한다(사용자 결정 2026-10-11)
   http.patch('/api/admin/products/:productId/prices/:priceId', async ({ request, params }) => {
     await wait()
-    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
-    const sorted = product ? sortPricesAscending(product.prices) : []
-    const target = sorted.find((row) => row.priceId === Number(params.priceId))
-    if (!product || !target) return notFound(request)
-    if (sorted[sorted.length - 1].priceId !== target.priceId) {
-      return ruleViolation(
-        request,
-        'PRICE_NOT_LATEST',
-        '가장 최근 월 구독요금만 수정할 수 있습니다.',
-      )
-    }
-
+    // 1. 경로 변수·본문 검사(404·409보다 먼저, 서버 컨트롤러 단계)
+    const idProblem = pathIdProblem(request, {
+      productId: params.productId,
+      priceId: params.priceId,
+    })
+    if (idProblem) return idProblem
     const body = (await request.json()) as AdminProductPriceRequest
-    const priceProblem = monthlyPriceProblem(request, body.monthlyPrice)
-    if (priceProblem) return priceProblem
+    const bodyErrors = priceBodyProblems(body)
+    if (bodyErrors.length > 0) return validationFailed(request, bodyErrors)
+
+    // 2. 상품·요금 줄 확인(404) → 가장 최근 줄인지(409) → 시작일 규칙(409). 서버 updatePrice와 같은 순서다
+    const product = getAllProducts().find((p) => p.productId === Number(params.productId))
+    if (!product) return notFound(request, PRODUCT_NOT_FOUND)
+    const sorted = sortPricesAscending(product.prices)
+    const target = sorted.find((row) => row.priceId === Number(params.priceId))
+    if (!target) return notFound(request, PRICE_NOT_FOUND)
+    if (sorted[sorted.length - 1].priceId !== target.priceId) {
+      return ruleViolation(request, 'PRICE_NOT_LATEST', PRICE_NOT_LATEST_DETAIL)
+    }
     const dateProblem = startDateProblem(
       request,
       checkEditLastPriceStartDate(sorted, body.effectiveFrom, getTodayDateString()).issue,
@@ -647,10 +788,17 @@ export const adminHandlers: RequestHandler[] = [
   // 가장 최근 줄 삭제. 줄이 하나뿐이면 삭제할 수 없다
   http.delete('/api/admin/products/:productId/prices/:priceId', async ({ request, params }) => {
     await wait()
+    const idProblem = pathIdProblem(request, {
+      productId: params.productId,
+      priceId: params.priceId,
+    })
+    if (idProblem) return idProblem
     const product = getAllProducts().find((p) => p.productId === Number(params.productId))
-    const sorted = product ? sortPricesAscending(product.prices) : []
+    if (!product) return notFound(request, PRODUCT_NOT_FOUND)
+    const sorted = sortPricesAscending(product.prices)
     const target = sorted.find((row) => row.priceId === Number(params.priceId))
-    if (!product || !target) return notFound(request)
+    if (!target) return notFound(request, PRICE_NOT_FOUND)
+    // 서버 validateDeletable 순서: 하나뿐인지 먼저, 그다음 가장 최근 줄인지
     if (sorted.length === 1) {
       return ruleViolation(
         request,
@@ -659,11 +807,7 @@ export const adminHandlers: RequestHandler[] = [
       )
     }
     if (sorted[sorted.length - 1].priceId !== target.priceId) {
-      return ruleViolation(
-        request,
-        'PRICE_NOT_LATEST',
-        '가장 최근 월 구독요금만 삭제할 수 있습니다.',
-      )
+      return ruleViolation(request, 'PRICE_NOT_LATEST', PRICE_NOT_LATEST_DETAIL)
     }
     saveProduct({
       ...product,
@@ -678,9 +822,15 @@ export const adminHandlers: RequestHandler[] = [
     '/api/admin/products/:productId/prices/:priceId/verify',
     async ({ request, params }) => {
       await wait()
+      const idProblem = pathIdProblem(request, {
+        productId: params.productId,
+        priceId: params.priceId,
+      })
+      if (idProblem) return idProblem
       const product = getAllProducts().find((p) => p.productId === Number(params.productId))
-      const target = product?.prices.find((row) => row.priceId === Number(params.priceId))
-      if (!product || !target) return notFound(request)
+      if (!product) return notFound(request, PRODUCT_NOT_FOUND)
+      const target = product.prices.find((row) => row.priceId === Number(params.priceId))
+      if (!target) return notFound(request, PRICE_NOT_FOUND)
 
       const today = getTodayDateString()
       const sorted = sortPricesAscending(product.prices)
@@ -740,21 +890,48 @@ export const adminHandlers: RequestHandler[] = [
         '일시적인 오류가 발생했습니다.',
       )
     }
-    const provider = getAllProviders().find((p) => p.providerId === Number(params.providerId))
-    if (!provider) return notFound(request)
 
-    const body = (await request.json()) as UpdateAdminProviderRequest
-    const problem = validateSaveRequest(
-      body,
-      MOCK_PRODUCTS.map((p) => p.ottServiceId),
-    )
-    if (problem) return validationError(request, problem)
+    // 1. 경로 변수·본문 형태 검사(서버 컨트롤러 단계, 404보다 먼저)
+    const idProblem = pathIdProblem(request, { providerId: params.providerId })
+    if (idProblem) return idProblem
+    const body = (await request.json()) as Partial<UpdateAdminProviderRequest>
+    const bodyErrors: FieldError[] = []
+    if (body.mappingState == null) {
+      bodyErrors.push({ field: 'mappingState', message: '매핑 상태는 필수입니다.' })
+    } else if (!['UNMAPPED', 'MAPPED', 'IGNORED'].includes(body.mappingState)) {
+      bodyErrors.push({ field: 'mappingState', message: TYPE_MISMATCH_MESSAGE })
+    }
+    if (body.tier == null) {
+      bodyErrors.push({ field: 'tier', message: 'tier는 필수입니다.' })
+    } else if (!['STANDARD', 'AD'].includes(body.tier)) {
+      bodyErrors.push({ field: 'tier', message: TYPE_MISMATCH_MESSAGE })
+    }
+    if (bodyErrors.length > 0) return validationFailed(request, bodyErrors)
+    const valid = body as UpdateAdminProviderRequest
+    const ottServiceId = valid.ottServiceId ?? null
+
+    // 2. 서비스 계층 검사 순서(서버 updateProvider): 상태와 서비스 연결이 맞는지(400) → 제공처 존재(404) → 서비스 존재(400)
+    if (valid.mappingState === 'MAPPED' && ottServiceId === null) {
+      return fieldValidationError(request, 'ottServiceId', 'MAPPED이면 서비스를 선택해야 합니다.')
+    }
+    if (valid.mappingState !== 'MAPPED' && ottServiceId !== null) {
+      return fieldValidationError(
+        request,
+        'ottServiceId',
+        'MAPPED가 아니면 서비스를 연결할 수 없습니다.',
+      )
+    }
+    const provider = getAllProviders().find((p) => p.providerId === Number(params.providerId))
+    if (!provider) return notFound(request, PROVIDER_NOT_FOUND)
+    if (ottServiceId !== null && !MOCK_PRODUCTS.some((p) => p.ottServiceId === ottServiceId)) {
+      return fieldValidationError(request, 'ottServiceId', '존재하지 않는 서비스입니다.')
+    }
 
     const saved: AdminProvider = {
       ...provider,
-      mappingState: body.mappingState,
-      ottServiceId: body.ottServiceId,
-      tier: body.mappingState === 'MAPPED' ? body.tier : 'STANDARD',
+      mappingState: valid.mappingState,
+      ottServiceId,
+      tier: valid.mappingState === 'MAPPED' ? valid.tier : 'STANDARD',
     }
     changedProviders.set(saved.providerId, saved)
     writeMockJson(PROVIDERS_STORAGE_KEY, [...changedProviders.values()])
@@ -766,8 +943,9 @@ export const adminHandlers: RequestHandler[] = [
   http.get('/api/admin/collect/executions', async ({ request }) => {
     await wait()
     if (hasMockScenario(request, 'error')) return internalError(request)
-    const pageParams = readPageParams(request)
-    if (!pageParams) return invalidPageParams(request)
+    const pageProblem = pageParamsProblem(request)
+    if (pageProblem) return pageProblem
+    const pageParams = readPageParams(request)!
     if (hasMockScenario(request, 'empty')) {
       const empty: CommonResponseCollectExecutionPage = {
         success: true,
@@ -786,10 +964,16 @@ export const adminHandlers: RequestHandler[] = [
   // 실행별 변경된 작품
   http.get('/api/admin/collect/executions/:executionId/changes', async ({ request, params }) => {
     await wait()
+    // 1. 경로 변수·쪽 번호 검사(서버 컨트롤러 단계, 404보다 먼저) 2. 실행 확인
+    const idProblem = pathIdProblem(request, { executionId: params.executionId })
+    if (idProblem) return idProblem
+    const pageProblem = pageParamsProblem(request)
+    if (pageProblem) return pageProblem
+    const pageParams = readPageParams(request)!
     const executionId = Number(params.executionId)
-    if (!getAllExecutions().some((e) => e.executionId === executionId)) return notFound(request)
-    const pageParams = readPageParams(request)
-    if (!pageParams) return invalidPageParams(request)
+    if (!getAllExecutions().some((e) => e.executionId === executionId)) {
+      return notFound(request, EXECUTION_NOT_FOUND)
+    }
     // 제목 순, 같으면 시즌 번호·서비스 ID 순(계약)
     const sorted = getChanges(executionId).sort(
       (a, b) =>
@@ -810,39 +994,40 @@ export const adminHandlers: RequestHandler[] = [
     if (hasMockScenario(request, 'run-error')) return internalError(request)
 
     const body = (await request.json()) as CreateCollectExecutionRequest
-    // 계약: targetDate는 선택이다. 비우거나 null이면 오늘(KST)로 본다. 문자열이 아닌 값은 형식 오류다
-    // 날짜·범위 오류는 서버처럼 fieldErrors로 필드를 알린다. 목업은 날짜 지정을 허용하는 로컬 환경처럼 미래만 막는다
-    // (운영은 오늘만 받아 "운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다."가 온다)
-    if (body.targetDate != null && typeof body.targetDate !== 'string') {
-      return fieldValidationError(
-        request,
-        'targetDate',
-        '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.',
-      )
+    // 1. 요청 본문 검사(서버 Bean Validation·JSON 형식). 계약: targetDate는 선택이라 비우거나 null이면 오늘(KST)로 본다.
+    //    날짜 형식이 아니거나 모르는 범위 값은 "형식이 올바르지 않습니다."이고, 범위를 비우면 필수 오류다
+    if (body.targetDate != null && !isRealDate(body.targetDate)) {
+      return fieldValidationError(request, 'targetDate', TYPE_MISMATCH_MESSAGE)
     }
-    const targetDate = body.targetDate ? body.targetDate : getTodayDateString()
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-      return fieldValidationError(
-        request,
-        'targetDate',
-        '대상 날짜는 YYYY-MM-DD 형식이어야 합니다.',
-      )
+    if (body.tier != null && !['ALL', 'DAILY', 'WEEKLY'].includes(body.tier)) {
+      return fieldValidationError(request, 'tier', TYPE_MISMATCH_MESSAGE)
     }
-    if (targetDate > getTodayDateString()) {
-      return fieldValidationError(request, 'targetDate', '미래 날짜는 실행할 수 없습니다.')
+    if (body.tier == null) {
+      return fieldValidationError(request, 'tier', '수집 범위는 필수입니다.')
     }
+
+    // 2. 서비스 계층 검사 순서(서버 start): 범위(ALL만) → 날짜. 목업은 날짜 지정을 허용하는 로컬 환경처럼 미래만 막는다
+    //    (운영은 오늘만 받아 "운영 환경에서는 오늘(KST) 날짜만 실행할 수 있습니다."가 온다)
     if (!RUNNABLE_COLLECT_TIERS.includes(body.tier)) {
       return fieldValidationError(request, 'tier', 'MVP는 ALL만 실행할 수 있습니다.')
     }
+    const targetDate = body.targetDate ? body.targetDate : getTodayDateString()
+    if (targetDate > getTodayDateString()) {
+      return fieldValidationError(request, 'targetDate', '미래 날짜는 실행할 수 없습니다.')
+    }
+
+    // 3. 같은 날짜·범위 판정(실행 중·완료·중단됨 409)과 접수(202)
     return startRun(request, targetDate, body.tier)
   }),
 
   // 복구: 서버가 중단됨으로 판정한 실행을 실패로 기록한다. 응답은 버튼 값을 다시 계산한 실행이다(canRestart로 이어서 재시작할 수 있는지 안다)
   http.post('/api/admin/collect/executions/:executionId/recover', async ({ request, params }) => {
     await wait()
+    const idProblem = pathIdProblem(request, { executionId: params.executionId })
+    if (idProblem) return idProblem
     const executionId = Number(params.executionId)
     const target = getAllExecutions().find((e) => e.executionId === executionId)
-    if (!target) return notFound(request)
+    if (!target) return notFound(request, EXECUTION_NOT_FOUND)
     if (!computeCanRecover(target)) {
       return ruleViolation(request, 'BATCH_NOT_STOPPED', '중단된 실행만 복구할 수 있습니다.')
     }
@@ -866,8 +1051,10 @@ export const adminHandlers: RequestHandler[] = [
   http.post('/api/admin/collect/executions/:executionId/restart', async ({ request, params }) => {
     await wait()
     if (hasMockScenario(request, 'run-error')) return internalError(request)
+    const idProblem = pathIdProblem(request, { executionId: params.executionId })
+    if (idProblem) return idProblem
     const target = getAllExecutions().find((e) => e.executionId === Number(params.executionId))
-    if (!target) return notFound(request)
+    if (!target) return notFound(request, EXECUTION_NOT_FOUND)
     // 예전 방식(Task 029~044): 실패가 아니면 판정 결과, 판정이 OK면 BATCH_NOT_STOPPED로 거절했다
     // if (!canRestart(target.status)) {
     //   return (
