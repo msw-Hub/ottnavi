@@ -67,17 +67,17 @@ stateDiagram-v2
 - 캐시(`planCalc`) 키는 `e1:` + 입력 해시이고, 엔진 규칙이 바뀌면 접두 버전을 올려 옛 결과를 쓰지 않게 한다.
 
 **저장(`activatePlan`)과 409 규칙.**
-1. 사용자가 고른 유형의 DRAFT를 잠그고 존재·소유자를 확인한다. 없으면 404 `PLAN_DRAFT_NOT_FOUND`(제안). 저장이 끝나면 같은 사용자의 나머지 DRAFT를 벌크 삭제한다(PRD 11절 35번).
-2. `data_as_of`(TIMESTAMPTZ)가 최신 수집 완료 시각(수집 Job의 마지막 COMPLETED 종료 시각, `BATCH_JOB_EXECUTION` 조회, 도출. 검색·상세·찜 목록 응답의 `dataAsOf`도 같은 시각을 한국 날짜로 바꾼 값이다, Task 032 D9)보다 이르면 **409 `PLAN_DRAFT_STALE`**(제안)로 막는다.
+1. `users` 행을 `FOR UPDATE`로 잠가(`UserQueryService.lockUser`, 계산 쓰기와 같은 잠금) 같은 사용자의 저장·재계산을 직렬화한 뒤, 사용자가 고른 DRAFT가 본인 것인지 확인한다. 없음·남의 것·DRAFT가 아님(이미 ACTIVE·ARCHIVED, 재계산으로 삭제)은 모두 404 `PLAN_DRAFT_NOT_FOUND`다(DRAFT 행 자체는 잠그지 않는다). 저장이 끝나면 같은 사용자의 나머지 DRAFT를 벌크 삭제한다(PRD 11절 35번).
+2. `data_as_of`(TIMESTAMPTZ)가 최신 수집 완료 시각(수집 Job의 마지막 COMPLETED 종료 시각, `BATCH_JOB_EXECUTION` 조회, 도출. 검색·상세·찜 목록 응답의 `dataAsOf`도 같은 시각을 한국 날짜로 바꾼 값이다, Task 032 D9)보다 이르면 **409 `PLAN_DRAFT_STALE`**로 막는다. 판정 기준(Task 066 구현): `plan.data_as_of` < 최신 수집 완료 시각이면 409, 같으면 통과, 완료된 수집이 없으면 비교할 기준이 없어 통과한다.
    - 이 기준은 수집이 매일 돌기 때문에 대부분의 DRAFT가 다음 날이면 막힌다.
    - MVP 대응: 프론트가 409 `PLAN_DRAFT_STALE`을 받으면 자동으로 재계산을 요청해 새 결과를 보여준다(도출).
    - 2단계 개선 후보: 판정 기준을 좁히는 안은 T-9(결정 필요).
 3. **함정: 기존 ACTIVE를 ARCHIVED로 바꾸고 명시적으로 flush한 뒤** DRAFT를 ACTIVE로 바꾸고 `previous_plan_id`를 연결한다. 부분 유니크 인덱스 `UNIQUE(user_id) WHERE status='ACTIVE'`는 문장마다 검사되므로, Hibernate의 UPDATE 순서에 맡기면 ACTIVE가 잠시 두 개가 되어 위반이 난다.
-4. 이번 달 가입 상품이 있으면 SUBSCRIBE_GUIDE outbox 행을 만든다(1회 판정 조건은 R11-17).
+4. SUBSCRIBE_GUIDE outbox 행 생성은 **MVP에서 하지 않고 Task 073에서 추가한다**(R-6 결정, 발송기 없이 쌓인 행이 2단계 배포 때 한꺼번에 나가는 것을 막기 위함). 073에서 추가할 때 이번 달 가입 상품이 있으면 만들고 1회 판정 조건은 R11-17이다.
 
 **대상 범위.** 매월 재계산, 변경 알림, 월초 알림은 `status = ACTIVE`만 읽는다. DRAFT는 어떤 배치도 읽지 않는다(R FR-14). 매월 재계산은 이전 ACTIVE를 ARCHIVED로 바꾸고 flush → 새 ACTIVE 생성 → `previous_plan_id` 연결 → `change_summary` 기록을 한 트랜잭션으로 하며, 3번의 flush 순서를 그대로 지킨다(새 ACTIVE를 먼저 만들면 ACTIVE가 잠시 둘이 되어 부분 유니크 인덱스 위반이 난다).
 
-신규 오류 코드 제안(`docs/api/error-codes.md` 작성 시 등록): `PLAN_DRAFT_STALE`(409), `PLAN_DRAFT_NOT_FOUND`(404), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409).
+신규 오류 코드(`PLAN_DRAFT_*`는 Task 066에서 `error-codes.md`·`ErrorCode`에 등록됨): `PLAN_DRAFT_STALE`(409), `PLAN_DRAFT_NOT_FOUND`(404), `BATCH_ALREADY_RUNNING`(409), `BATCH_ALREADY_COMPLETED`(409).
 
 ---
 

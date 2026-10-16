@@ -16,6 +16,9 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 	/** 사용자의 해당 상태 플랜 목록(DRAFT 최대 3건 조회 등) */
 	List<Plan> findAllByUserIdAndStatus(Long userId, PlanStatus status);
 
+	/** 사용자 본인의 해당 상태 플랜을 ID로 찾는다. 남의 것이나 상태가 다른 것은 비어 있다 */
+	Optional<Plan> findByIdAndUserIdAndStatus(Long id, Long userId, PlanStatus status);
+
 	/** 사용자의 ACTIVE 플랜을 찾는다. 부분 유니크 인덱스라 최대 1건이다(status는 ACTIVE로 넘긴다) */
 	Optional<Plan> findByUserIdAndStatus(Long userId, PlanStatus status);
 
