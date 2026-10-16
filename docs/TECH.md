@@ -56,9 +56,15 @@ stateDiagram-v2
 ```
 
 **계산(`calculatePlan`).** 입력 수집(readOnly) → 엔진 실행(트랜잭션 밖, CPU만) → 쓰기 트랜잭션 순이다. 쓰기 트랜잭션은 다음 순서다.
-1. `user_setting` 행을 `PESSIMISTIC_WRITE`로 잠가 같은 사용자의 동시 계산을 직렬화한다(도출). 없으면 더블 클릭 시 `UNIQUE(user_id, plan_type) WHERE status='DRAFT'` 위반이 난다. 저장(`activatePlan`)과 매월 재계산도 같은 잠금을 쓴다. 같은 사용자가 두 유형을 동시에 저장할 때 행을 서로 다른 순서로 잠그면 교착(deadlock detected)이 나기 때문이다(Task 032 db-reviewer 검토 후 확정).
+1. `users` 행을 `FOR UPDATE`로 잠가(`UserQueryService.lockUser`) 같은 사용자의 동시 계산을 직렬화한다(도출). 없으면 더블 클릭 시 `UNIQUE(user_id, plan_type) WHERE status='DRAFT'` 위반이 난다. 저장(`activatePlan`)과 매월 재계산도 같은 잠금을 쓴다. 설정·찜·요금 쓰기도 모두 `users` 행을 잠그므로 같은 행을 잠가야 교착(deadlock detected)이 없고, 같은 사용자가 두 유형을 동시에 저장할 때도 마찬가지다(Task 032 db-reviewer 검토 후 확정, `user_setting`에서 `users`로 바꾼 것은 Task 064, 2026-10-16 사용자 승인).
 2. 기존 DRAFT(세 유형 전부)를 벌크 JPQL 한 문장으로 삭제한다. 하위 행은 FK `ON DELETE CASCADE`가 지운다(T-1 확정). 이 삭제는 트랜잭션에서 엔티티를 읽기 전 첫 동작이다.
 3. 유형별 새 DRAFT(최대 3개)와 하위 행, 유형별 `calc_run`을 저장한다. 엔진 실행은 추천형을 먼저 풀고 그 점수로 절약형·간편형 기준을 만든다(트랜잭션 밖).
+
+**쓰기 구조(Task 064 구현).**
+- 흐름: 트랜잭션 없는 `PlanCalculateService` → 읽기 조립(`PlanInputService`, readOnly) → 엔진(`PlanSolveService`, 트랜잭션 밖) → 쓰기(`PlanDraftWriter`, 쓰기 트랜잭션). 세 단계가 서로 다른 빈이라 각자 트랜잭션이 프록시를 거쳐 적용된다.
+- 잠금 직후 기존 DRAFT를 벌크 삭제하고, `data_as_of`는 입력을 조립한 시점의 값을 저장한다.
+- 같은 사용자의 동시 계산은 직렬화되며 나중 요청이 앞 요청의 DRAFT를 덮어쓴다.
+- 캐시(`planCalc`) 키는 `e1:` + 입력 해시이고, 엔진 규칙이 바뀌면 접두 버전을 올려 옛 결과를 쓰지 않게 한다.
 
 **저장(`activatePlan`)과 409 규칙.**
 1. 사용자가 고른 유형의 DRAFT를 잠그고 존재·소유자를 확인한다. 없으면 404 `PLAN_DRAFT_NOT_FOUND`(제안). 저장이 끝나면 같은 사용자의 나머지 DRAFT를 벌크 삭제한다(PRD 11절 35번).
