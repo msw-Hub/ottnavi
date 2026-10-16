@@ -364,6 +364,53 @@ describe('플랜 계산과 저장', () => {
     }).catch((e: unknown) => e)
     expect(error).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
   })
+
+  it('초안 조회는 계산 응답과 같은 값·순서이고, 요금을 고쳐도 다시 계산하기 전에는 바뀌지 않는다(서버 규칙)', async () => {
+    const { data } = await calculate()
+    await request({ url: `/me/service-prices/101`, method: 'PUT', data: { monthlyPrice: 1000 } })
+    const drafts = await request<CommonResponsePlanDraftList>({
+      url: '/me/plan-drafts',
+      method: 'GET',
+    })
+    expect(drafts.data.drafts).toEqual(data.drafts)
+  })
+
+  it('stale 시나리오에서도 없는 planId는 409가 아니라 404가 먼저다(서버 판정 순서)', async () => {
+    await calculate('stale')
+    const error = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: 999999 },
+      headers: { 'X-Mock-Scenario': 'stale' },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
+  })
+
+  it('저장하기 전 현재 플랜은 404가 아니라 200 { plan: null }이고, 저장하면 초안 필드와 activatedAt을 준다', async () => {
+    const before = await request<{ data: { plan: unknown } }>({
+      url: '/me/plans/current',
+      method: 'GET',
+    })
+    expect(before.data.plan).toBeNull()
+
+    const { data } = await calculate()
+    const saver = data.drafts.find((d) => d.planType === 'SAVER')!
+    await request({ url: '/me/plans', method: 'POST', data: { planId: saver.planId } })
+
+    const after = await request<{ data: { plan: Record<string, unknown> } }>({
+      url: '/me/plans/current',
+      method: 'GET',
+    })
+    expect(after.data.plan).toMatchObject({ ...saver, activatedAt: expect.any(String) })
+
+    // 이미 저장돼 DRAFT가 아닌 planId를 다시 저장하면 404다
+    const again = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: saver.planId },
+    }).catch((e: unknown) => e)
+    expect(again).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
+  })
 })
 
 describe('요금', () => {

@@ -6,9 +6,12 @@ import type {
   UserSettings,
 } from '@/api/generated/model'
 import type {
+  ActivePlan,
+  CommonResponseCurrentPlan,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
   CreatePlanRequest,
+  PlanDraft,
 } from '@/api/generated/model'
 import type {
   CommonResponseServicePrice,
@@ -61,8 +64,9 @@ import {
  *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없거나 판매 종료인 상품은 404 SERVICE_PRICE_NOT_FOUND)
  *              DELETE /api/me/service-prices/{productId}    (고친 금액을 지우고 기본 요금으로 되돌림, 204)
  * - 플랜:      POST /api/me/plan-drafts              (유형 3종 초안을 새로 계산, 201 + 초안 3개)
- *              GET  /api/me/plan-drafts              (계산 전이거나 저장한 뒤에는 빈 목록)
- *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 저장하면 나머지 초안은 삭제)
+ *              GET  /api/me/plan-drafts              (저장해 둔 초안을 그대로 돌려줌. 계산 전이거나 저장한 뒤에는 빈 목록)
+ *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 404 판정이 409보다 먼저. 저장하면 나머지 초안은 삭제)
+ *              GET  /api/me/plans/current            (저장한 현재 플랜. 없으면 404가 아니라 200 { plan: null })
  *
  * 시나리오(주소의 ?mockScenario= 값을 목업 모드가 X-Mock-Scenario 요청 헤더로 보낸다):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
@@ -120,10 +124,48 @@ function persistPriceOverrides(): void {
   writeMockJson(PRICE_OVERRIDES_STORAGE_KEY, priceOverrides.size === 0 ? null : [...priceOverrides])
 }
 
-// 플랜 계산 상태
-let calculationSeq = 0 // 계산한 횟수. 플랜 ID를 새로 발급하는 기준
-let hasDrafts = false // 지금 DRAFT가 있는지(계산 후 true, 저장하면 false: 나머지 DRAFT는 삭제된다)
-let isStaleServed = false // stale 시나리오에서 409를 이미 한 번 돌려줬는지
+/*
+ * 플랜 계산 상태. 서버처럼 "계산한 결과(초안)"를 저장해 두고 GET이 그 저장값을 그대로 돌려준다(요청마다 다시 만들지 않는다).
+ * 왜: 실제 서버는 POST 계산 시 DB에 초안을 저장하고 GET이 DB에서 읽는다. 목업이 매번 다시 만들면 요금을 고친 뒤 계산 전인데도
+ * 초안 금액이 바뀌어 보이는 등 서버와 다르게 움직인다. 새로고침에도 같은 결과가 복원되도록 초안·현재 플랜은 sessionStorage에도 적는다.
+ */
+const PLAN_STATE_STORAGE_KEY = 'ottnavi:mock-plan-state'
+
+interface StoredPlanState {
+  calculationSeq: number
+  drafts: PlanDraft[]
+  activePlan: ActivePlan | null
+}
+
+function readStoredPlanState(): StoredPlanState {
+  const stored = readMockJson(PLAN_STATE_STORAGE_KEY)
+  if (
+    typeof stored === 'object' &&
+    stored !== null &&
+    'drafts' in stored &&
+    Array.isArray(stored.drafts) &&
+    'calculationSeq' in stored &&
+    typeof stored.calculationSeq === 'number'
+  ) {
+    const activePlan = 'activePlan' in stored ? (stored.activePlan as ActivePlan | null) : null
+    return {
+      calculationSeq: stored.calculationSeq,
+      drafts: stored.drafts as PlanDraft[],
+      activePlan,
+    }
+  }
+  return { calculationSeq: 0, drafts: [], activePlan: null }
+}
+
+const initialPlanState = readStoredPlanState()
+let calculationSeq = initialPlanState.calculationSeq // 계산한 횟수. 플랜 ID를 새로 발급하는 기준
+let storedDrafts: PlanDraft[] = initialPlanState.drafts // 지금 저장돼 있는 DRAFT(계산하면 덮어쓰고, 저장하면 비운다)
+let activePlan: ActivePlan | null = initialPlanState.activePlan // 저장한 현재 플랜(ACTIVE). 없으면 null
+let isStaleServed = false // stale 시나리오에서 409를 이미 한 번 돌려줬는지(새로고침하면 다시 한 번 재현된다)
+
+function persistPlanState(): void {
+  writeMockJson(PLAN_STATE_STORAGE_KEY, { calculationSeq, drafts: storedDrafts, activePlan })
+}
 
 // 저장한 설정을 지운다(테스트가 서로 영향을 주지 않게 쓴다)
 export function resetMockSettings(): void {
@@ -140,8 +182,10 @@ export function resetMockPricing(): void {
 // 플랜 계산·저장 상태를 처음으로 되돌린다
 export function resetMockPlans(): void {
   calculationSeq = 0
-  hasDrafts = false
+  storedDrafts = []
+  activePlan = null
   isStaleServed = false
+  writeMockJson(PLAN_STATE_STORAGE_KEY, null)
 }
 
 // 회원 화면 목업 상태를 한꺼번에 되돌린다(찜 목록은 resetMockWishlist, 로그인 역할은 resetMockSession으로 따로 되돌린다)
@@ -557,42 +601,49 @@ export const memberHandlers: RequestHandler[] = [
       return validationError(request, '계산할 찜 작품이 없습니다. 작품을 찜해 주세요.')
     }
 
+    // 1. 계산 결과를 저장해 둔다(서버가 DB에 초안 3종을 저장하고 기존 초안은 덮어쓰는 것과 같다)
     calculationSeq += 1
-    hasDrafts = true
-    const body: CommonResponsePlanDraftList = {
-      success: true,
-      data: { drafts: buildCurrentDrafts(request, settings) },
-    }
+    storedDrafts = buildCurrentDrafts(request, settings)
+    persistPlanState()
+    const body: CommonResponsePlanDraftList = { success: true, data: { drafts: storedDrafts } }
     return HttpResponse.json(body, { status: 201 })
   }),
 
-  // 플랜 초안 조회(계약 listPlanDrafts): 계산 전이거나 저장한 뒤에는 빈 목록이다(저장하면 나머지 DRAFT는 삭제되기 때문)
+  // 플랜 초안 조회(계약 listPlanDrafts): 저장해 둔 초안을 계산 응답과 같은 값·순서로 돌려준다. 계산 전이거나 저장한 뒤에는 빈 목록이다
   http.get('/api/me/plan-drafts', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
-    const settings = getEffectiveSettings()
-    const body: CommonResponsePlanDraftList = {
-      success: true,
-      data: { drafts: hasDrafts && settings ? buildCurrentDrafts(request, settings) : [] },
-    }
+    const body: CommonResponsePlanDraftList = { success: true, data: { drafts: storedDrafts } }
     return HttpResponse.json(body)
   }),
 
-  // 플랜 저장(계약 createPlan): 본문의 planId인 초안을 ACTIVE로 만든다(유형은 초안이 안다). stale 시나리오에서는 첫 요청만 409다
+  // 현재 플랜 조회(계약 getCurrentPlan): 저장한 플랜이 없으면 404가 아니라 200 { plan: null }이다
+  http.get('/api/me/plans/current', async ({ request }) => {
+    await wait()
+    const denied = denyGuest(request)
+    if (denied) return denied
+
+    const body: CommonResponseCurrentPlan = { success: true, data: { plan: activePlan } }
+    return HttpResponse.json(body)
+  }),
+
+  // 플랜 저장(계약 createPlan): 본문의 planId인 초안을 ACTIVE로 만든다(유형은 초안이 안다)
   http.post('/api/me/plans', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
+    // 1. 요청 값 검사(400)
     const { planId } = (await request.json()) as CreatePlanRequest
     if (!Number.isInteger(planId) || planId < 1) {
       return validationError(request, '저장할 플랜 ID가 올바르지 않습니다.')
     }
 
-    const settings = getEffectiveSettings()
-    if (!hasDrafts || !settings) {
+    // 2. 404를 먼저 판정한다(서버 순서). 저장된 초안에 없는 ID는 없음·남의 것·이미 저장됨·다시 계산해 지워진 것을 모두 포함한다
+    const draft = storedDrafts.find((d) => d.planId === planId)
+    if (!draft) {
       return problemResponse(
         request,
         404,
@@ -602,7 +653,7 @@ export const memberHandlers: RequestHandler[] = [
       )
     }
 
-    // 계산한 뒤 데이터 수집이 새로 끝나 초안의 기준일이 낡은 상황을 흉내 낸다. 클라이언트가 다시 계산하면 두 번째 저장부터 성공한다
+    // 3. 409: 계산한 뒤 데이터 수집이 새로 끝나 초안의 기준일이 낡은 상황을 흉내 낸다. 클라이언트가 다시 계산하면 두 번째 저장부터 성공한다
     if (hasMockScenario(request, 'stale') && !isStaleServed) {
       isStaleServed = true
       return problemResponse(
@@ -614,27 +665,17 @@ export const memberHandlers: RequestHandler[] = [
       )
     }
 
-    // 지금 초안 중 planId가 같은 것을 찾는다. 다시 계산해 ID가 바뀐 옛 초안이나 없는 ID는 404다
-    const draft = buildCurrentDrafts(request, settings).find((d) => d.planId === planId)
-    if (!draft) {
-      return problemResponse(
-        request,
-        404,
-        'Not Found',
-        'PLAN_DRAFT_NOT_FOUND',
-        '계산된 플랜을 찾을 수 없습니다.',
-      )
-    }
-
-    hasDrafts = false // 저장하면 고른 유형만 ACTIVE가 되고 나머지 DRAFT는 삭제된다(PRD 11절 35번)
+    // 4. 저장: 고른 초안만 ACTIVE가 되고 나머지 DRAFT는 삭제된다(PRD 11절 35번). 기존 ACTIVE는 서버에서 ARCHIVED가 된다
+    //    저장 시각은 서버처럼 오프셋이 붙은 형식(한국 시간 +09:00)으로 만든다
+    const activatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .replace('Z', '+09:00')
+    activePlan = { ...draft, activatedAt }
+    storedDrafts = []
+    persistPlanState()
     const body: CommonResponseSavedPlan = {
       success: true,
-      data: {
-        planId: draft.planId,
-        planType: draft.planType,
-        status: 'ACTIVE',
-        activatedAt: new Date().toISOString(),
-      },
+      data: { planId: draft.planId, planType: draft.planType, status: 'ACTIVE', activatedAt },
     }
     return HttpResponse.json(body, { status: 201 })
   }),

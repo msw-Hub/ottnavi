@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -36,6 +36,18 @@ afterEach(() => {
 })
 afterAll(() => server.close())
 
+// 결과 화면만 연다. 새로고침·재방문을 흉내 내려고 같은 서버 상태(목업)에서 새 화면(새 QueryClient)을 다시 그릴 때도 쓴다
+function renderPlanScreen() {
+  const router = createMemoryRouter([{ path: '/plan', element: <PlanScreen /> }], {
+    initialEntries: ['/plan'],
+  })
+  return render(
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>,
+  )
+}
+
 // 시나리오를 고른 뒤, 찜 하나를 만들고 플랜을 한 번 계산해 둔 상태에서 결과 화면을 연다(계산 전이면 "아직 계산한 플랜이 없어요"만 보인다)
 async function renderPlanAfterCalculate(scenario: 'stale' | 'same' | null) {
   window.history.pushState({}, '', scenario ? `/plan?mockScenario=${scenario}` : '/plan')
@@ -46,14 +58,7 @@ async function renderPlanAfterCalculate(scenario: 'stale' | 'same' | null) {
   })
   await customInstance({ url: '/me/plan-drafts', method: 'POST' })
 
-  const router = createMemoryRouter([{ path: '/plan', element: <PlanScreen /> }], {
-    initialEntries: ['/plan'],
-  })
-  render(
-    <Providers>
-      <RouterProvider router={router} />
-    </Providers>,
-  )
+  renderPlanScreen()
   await screen.findByRole('heading', { level: 2, name: '플랜 유형 고르기' })
 }
 
@@ -87,6 +92,45 @@ describe('플랜 결과 화면', () => {
     expect(
       screen.getByRole('button', { name: '추천형 · 절약형 · 간편형 플랜으로 저장하기' }),
     ).toBeEnabled()
+  })
+
+  it('저장하면 완료 안내와 "내 현재 플랜"이 보이고, 새로고침해도 서버의 현재 플랜이 복원된다', async () => {
+    const user = userEvent.setup()
+    window.scrollTo = vi.fn()
+    await renderPlanAfterCalculate(null)
+
+    await user.click(screen.getByRole('button', { name: /플랜으로 저장하기$/ }))
+    expect(await screen.findByText('추천형 플랜을 저장했어요')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: '내 현재 플랜 · 추천형' })).toBeVisible()
+
+    // 새로고침: 화면을 지우고 새 QueryClient로 다시 그려도 서버 상태(GET)에서 같은 플랜이 나온다. 저장 직후 안내 띠는 없다
+    cleanup()
+    renderPlanScreen()
+    expect(
+      await screen.findByRole('heading', { level: 2, name: '내 현재 플랜 · 추천형' }),
+    ).toBeVisible()
+    expect(screen.queryByText('추천형 플랜을 저장했어요')).not.toBeInTheDocument()
+  })
+
+  it('저장하려던 초안이 서버에 없으면(404) 안내를 보이고 목록을 다시 불러온다', async () => {
+    const user = userEvent.setup()
+    await renderPlanAfterCalculate(null)
+
+    // 화면이 보는 사이 다른 곳에서 다시 계산해 서버의 초안 ID가 바뀐 상황
+    await customInstance({ url: '/me/plan-drafts', method: 'POST' })
+    await user.click(screen.getByRole('button', { name: /플랜으로 저장하기$/ }))
+
+    expect(await screen.findByText('저장하려던 플랜을 찾지 못했어요')).toBeInTheDocument()
+    // 새로 불러온 초안으로 다시 고를 수 있다
+    await user.click(await screen.findByRole('button', { name: /플랜으로 저장하기$/ }))
+    expect(await screen.findByText('추천형 플랜을 저장했어요')).toBeInTheDocument()
+  })
+
+  it('초안도 현재 플랜도 없으면 계산 안내를 보인다', async () => {
+    renderPlanScreen()
+
+    expect(await screen.findByText('아직 계산한 플랜이 없어요')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '요금 확인하고 계산하기' })).toBeVisible()
   })
 
   it('선택이 서로 다르면 유형마다 카드가 3장이다', async () => {
