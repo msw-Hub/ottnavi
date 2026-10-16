@@ -16,7 +16,7 @@ const LOGOUT_SERVER_FAILED_MESSAGE =
  *
  * 흐름:
  * 1. POST /api/auth/logout: 서버가 Refresh Token 계열을 폐기하고 쿠키를 지운다(HttpOnly 쿠키는 프론트가 못 지운다)
- * 2. 첫 화면으로 이동한다(보호 화면에 남아 가드가 로그인 화면으로 다시 보내는 일을 피하려고 이동을 먼저 마친다)
+ * 2. 로그아웃 중 표시를 켜고 첫 화면으로 이동한다(보호 화면에 남아 가드가 로그인 화면으로 다시 보내는 일을 피하려고 이동을 먼저 마친다)
  * 3. 메모리의 Access Token·역할을 비운다
  * 4. 쿼리 캐시를 모두 지운다(이전 사용자의 찜·플랜 데이터가 다음 사용자 화면에 남지 않게)
  *
@@ -47,7 +47,7 @@ export function useLogout(): () => Promise<void> {
     // 4.
     queryClient.clear()
     if (serverFailed) toast.warning(LOGOUT_SERVER_FAILED_MESSAGE)
-    // 5. 표시를 거둔다. 상태 변경에 따른 가드의 다시 그리기가 끝난 뒤에 거둬야 해서 한 박자 늦춘다
-    window.setTimeout(() => useAuthStore.getState().setSigningOut(false), 0)
+    // 로그아웃 표시는 여기서 거두지 않는다. 옛 보호 화면의 가드(RequireAuth)가 화면에서 사라질 때 스스로 거둔다.
+    // (예전에는 setTimeout(…, 0)으로 거뒀는데, 첫 화면이 그려지기 전에 꺼질 수 있어 느린 CI에서 테스트가 흔들렸다)
   }, [navigate, queryClient])
 }

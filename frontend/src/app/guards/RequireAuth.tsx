@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { restoreSession } from '@/api/http'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -34,6 +34,15 @@ export function RequireAuth({ children }: RequireAuthProps) {
   const session = useSession()
   const location = useLocation()
   const isSigningOut = useAuthStore((state) => state.isSigningOut)
+
+  // 로그아웃 표시는 이 가드가 화면에서 사라질 때(첫 화면이 그려진 뒤) 거둔다. 타이머로 거두면 느린 환경에서
+  // 새 화면이 그려지기 전에 표시가 꺼져 가드가 로그인 화면으로 보내는 경쟁이 생긴다(useLogout 참고)
+  useEffect(
+    () => () => {
+      if (useAuthStore.getState().isSigningOut) useAuthStore.getState().setSigningOut(false)
+    },
+    [],
+  )
 
   // 1. (화면 제목 h1을 둔다: 낭독기 사용자가 제목으로 이동했을 때 지금 어떤 화면인지 알 수 있게 한다. 로그인 콜백 화면과 같은 모양, 057 검수 제안 4)
   if (session.status === 'checking') {
