@@ -43,6 +43,8 @@ export function useSaveUserSettings() {
       // 다른 기능(pricing, plan)의 캐시 키를 문자열로 직접 무효화한다. 기능 폴더끼리 import하지 않기 위함이다
       void queryClient.invalidateQueries({ queryKey: ['/me/service-prices'] })
       void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
+      // 찜 목록의 "이미 시청 가능" 표시(isWatchableNow)는 내 이용 서비스에 따라 서버가 계산하므로 설정을 바꾸면 낡은 값이 된다
+      void queryClient.invalidateQueries({ queryKey: ['/me/wishlist-items'] })
     },
   })
 }

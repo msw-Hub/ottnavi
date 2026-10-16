@@ -1,6 +1,7 @@
 import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import type {
   CommonResponseUserSettings,
+  FieldError,
   UpdateMySettingsRequest,
   UserSettings,
 } from '@/api/generated/model'
@@ -34,7 +35,11 @@ import {
   MOCK_PRODUCTS,
   isProductOnSale,
 } from '@/mocks/fixtures/admin'
-import { DEFAULT_USER_SETTINGS, EMPTY_USER_SETTINGS } from '@/mocks/fixtures/settings'
+import {
+  DEFAULT_USER_SETTINGS,
+  EMPTY_USER_SETTINGS,
+  MOCK_SERVICE_IDS,
+} from '@/mocks/fixtures/settings'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { isMockOnboardingDone, setMockOnboardingDone } from '@/mocks/mockSession'
 import {
@@ -209,46 +214,105 @@ function servicePriceNotFound(request: Request) {
   )
 }
 
-function validationError(request: Request, detail: string) {
-  return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail)
+function validationError(request: Request, detail: string, fieldErrors?: FieldError[]) {
+  return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail, fieldErrors)
 }
 
-// 저장 요청의 값이 입력 규칙(schema.ts와 같은 규칙)을 지키는지 검사한다. 어긋나면 안내 문장을, 맞으면 null을 돌려준다
-function validateSettingsRequest(body: UpdateMySettingsRequest): string | null {
+// 서비스 ID 범위(서비스 목록 API의 7곳). 이 밖의 ID는 서버가 "없는 서비스"로 400을 준다
+const MOCK_SERVICE_ID_SET = new Set<number>(MOCK_SERVICE_IDS)
+
+// 요금제 이름 최대 길이, 서비스 상태 최대 개수(계약 UpdateMySettingsRequest)
+const MAX_PLAN_NAME_LENGTH = 30
+const MAX_SUBSCRIPTION_COUNT = 7
+
+/**
+ * 저장 요청이 서버 규칙을 지키는지 검사한다. 어긋나면 필드별 오류 목록을, 맞으면 빈 배열을 돌려준다.
+ * 순서는 실제 서버(USER_SETTINGS_WISHLIST_GUIDE 2.3~2.4)와 같다: 1단계 형태·범위(Bean Validation) → 2단계 서비스 간 규칙(서비스 계층).
+ * 1단계에서 하나라도 어긋나면 2단계는 검사하지 않고 거절한다(서버는 1단계에서 요청이 끝난다).
+ * 금액·시청 시간·결제일이 소수이면 정수가 아니라서 400이다(Number.isInteger).
+ */
+function validateSettingsRequest(body: UpdateMySettingsRequest): FieldError[] {
+  // 1. 1단계: 형태·범위
+  const shapeErrors: FieldError[] = []
   if (!Number.isInteger(body.monthlyBudget) || body.monthlyBudget < 0) {
-    return '월 예산은 0 이상의 정수여야 합니다.'
+    shapeErrors.push({ field: 'monthlyBudget', message: '0 이상의 정수여야 합니다.' })
   }
   if (
     !Number.isInteger(body.monthlyWatchMinutes) ||
     body.monthlyWatchMinutes < MIN_MONTHLY_WATCH_MINUTES ||
     body.monthlyWatchMinutes > MAX_MONTHLY_WATCH_MINUTES
   ) {
-    return `월 시청 시간은 ${MIN_MONTHLY_WATCH_MINUTES}분 이상이어야 합니다.`
+    shapeErrors.push({
+      field: 'monthlyWatchMinutes',
+      message: `${MIN_MONTHLY_WATCH_MINUTES} 이상 ${MAX_MONTHLY_WATCH_MINUTES} 이하의 정수여야 합니다.`,
+    })
   }
-  // 계약: 서비스 상태는 1~7개이고 같은 서비스를 두 번 보내면 400이다
+  if (!body.watchPreset) {
+    shapeErrors.push({ field: 'watchPreset', message: '시청 시간 방식을 골라야 합니다.' })
+  }
+  const subscriptions = body.subscriptions
   if (
-    !Array.isArray(body.subscriptions) ||
-    body.subscriptions.length === 0 ||
-    body.subscriptions.length > 7
+    !Array.isArray(subscriptions) ||
+    subscriptions.length < 1 ||
+    subscriptions.length > MAX_SUBSCRIPTION_COUNT
   ) {
-    return '서비스별 이용 상태를 입력해 주세요.'
+    shapeErrors.push({
+      field: 'subscriptions',
+      message: `서비스 상태는 1개 이상 ${MAX_SUBSCRIPTION_COUNT}개 이하여야 합니다.`,
+    })
+    return shapeErrors
   }
-  const ottServiceIds = body.subscriptions.map((s) => s.ottServiceId)
-  if (new Set(ottServiceIds).size !== ottServiceIds.length) {
-    return '같은 서비스를 두 번 보낼 수 없습니다.'
-  }
-  for (const subscription of body.subscriptions) {
-    if (subscription.status !== 'SUBSCRIBED') continue
-    // 구독 중이면 요금제 이름(30자 이하)이 필요하다. 결제일은 비어 있으면 1일로 저장한다(계약, PRD FR-08 기본값)
-    if (!subscription.planName || subscription.planName.length > 30) {
-      return '구독 중인 서비스는 30자 이하의 요금제 이름이 필요합니다.'
+  subscriptions.forEach((s, index) => {
+    if (s.planName != null && s.planName.length > MAX_PLAN_NAME_LENGTH) {
+      shapeErrors.push({
+        field: `subscriptions[${index}].planName`,
+        message: `${MAX_PLAN_NAME_LENGTH}자 이하여야 합니다.`,
+      })
     }
-    const day = subscription.billingDay
-    if (day !== null && (!Number.isInteger(day) || day < 1 || day > 31)) {
-      return '결제일은 1일부터 31일 사이여야 합니다.'
+    const day = s.billingDay
+    if (day != null && (!Number.isInteger(day) || day < 1 || day > 31)) {
+      shapeErrors.push({
+        field: `subscriptions[${index}].billingDay`,
+        message: '1 이상 31 이하의 정수여야 합니다.',
+      })
     }
-  }
-  return null
+  })
+  if (shapeErrors.length > 0) return shapeErrors
+
+  // 2. 2단계: 서비스 간 규칙. 없는 서비스·중복·상태별 요금제/결제일 규칙
+  const ruleErrors: FieldError[] = []
+  const seen = new Set<number>()
+  subscriptions.forEach((s, index) => {
+    if (!MOCK_SERVICE_ID_SET.has(s.ottServiceId)) {
+      ruleErrors.push({
+        field: `subscriptions[${index}].ottServiceId`,
+        message: '존재하지 않는 서비스입니다.',
+      })
+    } else if (seen.has(s.ottServiceId)) {
+      // 같은 서비스를 두 번 보내면 어느 쪽이 의도인지 알 수 없어 요청 전체를 거절한다
+      ruleErrors.push({
+        field: `subscriptions[${index}].ottServiceId`,
+        message: '같은 서비스를 두 번 보낼 수 없습니다.',
+      })
+    }
+    seen.add(s.ottServiceId)
+
+    if (s.status === 'SUBSCRIBED') {
+      if (s.planName == null || s.planName.trim() === '') {
+        ruleErrors.push({
+          field: `subscriptions[${index}].planName`,
+          message: '구독 중인 서비스는 요금제 이름이 필요합니다.',
+        })
+      }
+    } else if (s.planName != null || s.billingDay != null) {
+      // 구독 중이 아닌데 요금제 이름·결제일을 보내면 DB CHECK에 걸리기 전에 400으로 거절한다(Task 055, 계약 설명)
+      ruleErrors.push({
+        field: `subscriptions[${index}]`,
+        message: '구독 중이 아닌 서비스에는 요금제 이름과 결제일을 보낼 수 없습니다.',
+      })
+    }
+  })
+  return ruleErrors
 }
 
 /* ----- 찜 목록 변환 ----- */
@@ -314,8 +378,10 @@ export const memberHandlers: RequestHandler[] = [
     if (denied) return denied
 
     const requestBody = (await request.json()) as UpdateMySettingsRequest
-    const invalidReason = validateSettingsRequest(requestBody)
-    if (invalidReason) return validationError(request, invalidReason)
+    const fieldErrors = validateSettingsRequest(requestBody)
+    if (fieldErrors.length > 0) {
+      return validationError(request, '요청 값이 올바르지 않습니다.', fieldErrors)
+    }
 
     // 환산 결과(분)만 저장한다(R11-18 안 a 확정, 환산 입력값 필드는 계약에 없다).
     // 구독 중인데 결제일이 비어 있으면 1일로 채우고, 구독 중이 아니면 요금제·결제일을 비운다(계약)
@@ -323,7 +389,7 @@ export const memberHandlers: RequestHandler[] = [
       isOnboardingDone: true,
       subscriptions: requestBody.subscriptions.map((s) =>
         s.status === 'SUBSCRIBED'
-          ? { ...s, billingDay: s.billingDay ?? 1 }
+          ? { ...s, planName: s.planName?.trim() ?? null, billingDay: s.billingDay ?? 1 }
           : { ...s, planName: null, billingDay: null },
       ),
       monthlyBudget: requestBody.monthlyBudget,

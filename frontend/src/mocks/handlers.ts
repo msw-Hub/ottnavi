@@ -37,6 +37,9 @@ export { resetMockWishlist }
 // 활성 찜(= "다 봤음"이 아닌 찜)의 상한. PRD 11절 36번
 const WISHLIST_ACTIVE_LIMIT = 20
 
+// 우선순위 값(계약 WishlistPriority). 이 밖의 값은 400이다
+const WISHLIST_PRIORITIES: readonly string[] = ['MUST', 'WANT', 'MAYBE']
+
 /*
  * 시나리오 핸들러. 생성 핸들러(getProductMock)보다 배열 앞에 둔다.
  * MSW는 배열 앞에서부터 주소가 맞는 핸들러를 찾고, 핸들러가 아무것도 돌려주지 않으면(undefined) 다음 핸들러로 넘어간다.
@@ -90,6 +93,25 @@ function toSearchItem(detail: (typeof TITLE_FIXTURES)[number]): TitleSearchItem 
     posterPath: detail.posterPath,
     availabilities: detail.availabilities,
   }
+}
+
+// 경로의 찜 항목 ID가 1 이상의 정수 형식인지 본다(계약 WishlistItemIdPath: int64, minimum 1). 아니면 null이다
+// 왜 문자열로 검사하나: Number("1.5")·Number("")·Number("0x10") 같은 값이 정수로 오인되지 않게 숫자만 있는 문자열만 받는다
+function parseWishlistItemId(raw: string | readonly string[] | undefined): number | null {
+  if (typeof raw !== 'string' || !/^[1-9]\d{0,15}$/.test(raw)) return null
+  return Number(raw)
+}
+
+// 경로 값 형식 오류의 400 응답(서버: VALIDATION_FAILED, 경로 파라미터 제약 위반)
+function invalidWishlistItemIdResponse(request: Request) {
+  return problemResponse(
+    request,
+    400,
+    'Bad Request',
+    'VALIDATION_FAILED',
+    '요청 값이 올바르지 않습니다.',
+    [{ field: 'wishlistItemId', message: '1 이상의 정수여야 합니다.' }],
+  )
 }
 
 // 지금 활성 찜(= "다 봤음"이 아닌 찜)의 개수. wishlist-full 시나리오에서는 상한과 같은 20개로 본다
@@ -202,7 +224,25 @@ const publicScreenHandlers: RequestHandler[] = [
     }
 
     const requestBody = (await request.json()) as AddWishlistItemRequest
-    // 영화는 seasonNumber가 null, 드라마(tv)는 시즌 번호가 필수다
+    // 1. 형태 검사: 작품 구분·TMDB ID·우선순위·시즌 번호 형식(서버 Bean Validation). 어긋나면 400이다
+    const isShapeInvalid =
+      (requestBody.mediaType !== 'movie' && requestBody.mediaType !== 'tv') ||
+      !Number.isInteger(requestBody.tmdbId) ||
+      requestBody.tmdbId < 1 ||
+      requestBody.tmdbId > 2147483647 ||
+      !WISHLIST_PRIORITIES.includes(requestBody.priority) ||
+      (requestBody.seasonNumber !== null &&
+        (!Number.isInteger(requestBody.seasonNumber) || requestBody.seasonNumber < 1))
+    if (isShapeInvalid) {
+      return problemResponse(
+        request,
+        400,
+        'Bad Request',
+        'VALIDATION_FAILED',
+        '요청 값이 올바르지 않습니다.',
+      )
+    }
+    // 2. 영화는 seasonNumber가 null, 드라마(tv)는 시즌 번호가 필수다
     const isSeasonMismatch =
       requestBody.mediaType === 'tv'
         ? requestBody.seasonNumber === null
@@ -259,7 +299,31 @@ const publicScreenHandlers: RequestHandler[] = [
     if (getMockRole() === 'GUEST') {
       return problemResponse(request, 401, 'Unauthorized', 'UNAUTHORIZED', '로그인이 필요합니다.')
     }
-    const id = Number(params.id)
+    // 1. 경로 ID 형식(1 이상 정수). 서버는 존재 확인보다 먼저 거절한다
+    const id = parseWishlistItemId(params.id)
+    if (id === null) return invalidWishlistItemIdResponse(request)
+
+    // 2. 본문 검사: 우선순위와 "다 봤음" 중 하나 이상이 있어야 하고 값 형식이 맞아야 한다(빈 요청·잘못된 값은 400)
+    const patchBody = (await request.json().catch(() => null)) as UpdateWishlistItemRequest | null
+    const hasPriority = patchBody !== null && patchBody.priority !== undefined
+    const hasIsWatched = patchBody !== null && patchBody.isWatched !== undefined
+    if (
+      patchBody === null ||
+      typeof patchBody !== 'object' ||
+      (!hasPriority && !hasIsWatched) ||
+      (hasPriority && !WISHLIST_PRIORITIES.includes(patchBody.priority as string)) ||
+      (hasIsWatched && typeof patchBody.isWatched !== 'boolean')
+    ) {
+      return problemResponse(
+        request,
+        400,
+        'Bad Request',
+        'VALIDATION_FAILED',
+        '변경할 값(우선순위 또는 다 봤음)을 하나 이상 올바르게 보내야 합니다.',
+      )
+    }
+
+    // 3. 본인 찜인지(목업은 한 사용자라 존재 여부) 확인한다
     const current = mockWishlist.get(id)
     if (!current) {
       return problemResponse(
@@ -272,8 +336,7 @@ const publicScreenHandlers: RequestHandler[] = [
     }
     // 우선순위(priority)와 "다 봤음"(isWatched)을 보낸 것만 바꾼다. 다 봤음 시각은 목업이라 요청 시각을 그대로 쓴다.
     // 이미 "다 봤음"인 항목에 true를 보내도 watchedAt은 처음 값을 유지한다(계약)
-    const { priority = current.priority, isWatched } =
-      (await request.json()) as UpdateWishlistItemRequest
+    const { priority = current.priority, isWatched } = patchBody
     // "다 봤음"을 되돌리면 활성 찜이 하나 늘어난다. 이미 20개면 되돌릴 수 없다(PRD 11절 36번)
     if (
       isWatched === false &&
@@ -305,7 +368,9 @@ const publicScreenHandlers: RequestHandler[] = [
     if (getMockRole() === 'GUEST') {
       return problemResponse(request, 401, 'Unauthorized', 'UNAUTHORIZED', '로그인이 필요합니다.')
     }
-    mockWishlist.delete(Number(params.id))
+    const id = parseWishlistItemId(params.id)
+    if (id === null) return invalidWishlistItemIdResponse(request)
+    mockWishlist.delete(id)
     return new HttpResponse(null, { status: 204 })
   }),
 ]

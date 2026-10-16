@@ -212,6 +212,16 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
             <AlertDescription className="text-destructive/90">
               {isApiError(save.error) ? save.error.userMessage : '잠시 후 다시 시도해 주세요.'}
             </AlertDescription>
+            {/* 폼 검증을 통과했는데 서버만 거절한 경우(400 VALIDATION_FAILED)의 필드별 이유 */}
+            {isApiError(save.error) && save.error.fieldErrors.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-sm text-destructive/90">
+                {save.error.fieldErrors.map((fieldError) => (
+                  <li key={`${fieldError.field}:${fieldError.message}`}>
+                    {fieldError.field}: {fieldError.message}
+                  </li>
+                ))}
+              </ul>
+            )}
           </Alert>
         )}
         <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={save.isPending}>

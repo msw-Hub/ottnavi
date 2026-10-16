@@ -78,15 +78,15 @@ describe('내 설정', () => {
     expect(saved.data).not.toHaveProperty('weeklyInput')
   })
 
-  it('구독 중인데 결제일이 비어 있으면 1일로 저장하고, 구독 중이 아니면 요금제·결제일을 비운다', async () => {
+  it('구독 중인데 결제일이 비어 있으면 1일로 저장하고 요금제 이름 앞뒤 공백을 뗀다', async () => {
     const saved = await request<CommonResponseUserSettings>({
       url: '/me/settings',
       method: 'PUT',
       data: {
         ...SETTINGS_REQUEST,
         subscriptions: [
-          { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: null },
-          { ottServiceId: 2, status: 'UNKNOWN', planName: '남은 값', billingDay: 9 },
+          { ottServiceId: 1, status: 'SUBSCRIBED', planName: ' 스탠다드 ', billingDay: null },
+          { ottServiceId: 2, status: 'UNKNOWN', planName: null, billingDay: null },
         ],
       },
     })
@@ -94,6 +94,38 @@ describe('내 설정', () => {
       { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: 1 },
       { ottServiceId: 2, status: 'UNKNOWN', planName: null, billingDay: null },
     ])
+  })
+
+  it('구독 중이 아닌 서비스에 요금제 이름이나 결제일을 보내면 400이다(서버 규칙)', async () => {
+    const error = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [{ ottServiceId: 2, status: 'UNKNOWN', planName: '남은 값', billingDay: 9 }],
+      },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(error) && error.fieldErrors[0]?.field).toBe('subscriptions[0]')
+  })
+
+  it('없는 서비스 ID와 소수 금액은 400이다', async () => {
+    const unknownService = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [{ ottServiceId: 99, status: 'FREE', planName: null, billingDay: null }],
+      },
+    }).catch((e: unknown) => e)
+    expect(unknownService).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const decimalBudget = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: { ...SETTINGS_REQUEST, monthlyBudget: 15000.5 },
+    }).catch((e: unknown) => e)
+    expect(decimalBudget).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
   })
 
   it('같은 서비스를 두 번 보내면 400이다', async () => {
@@ -118,6 +150,45 @@ describe('내 설정', () => {
       data: { ...SETTINGS_REQUEST, monthlyWatchMinutes: 60 },
     }).catch((e: unknown) => e)
     expect(isApiError(error) && error.status === 400 && error.errorCode).toBe('VALIDATION_FAILED')
+  })
+})
+
+describe('찜 변경·삭제의 서버 규칙(Task 058)', () => {
+  it('PATCH 본문이 비어 있으면 400이고, 경로 ID 형식이 틀리면 PATCH·DELETE 모두 400이다', async () => {
+    const created = await request<{ data: { wishlistItemId: number } }>({
+      url: '/me/wishlist-items',
+      method: 'POST',
+      data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
+    })
+    const id = created.data.wishlistItemId
+
+    const emptyBody = await request({
+      url: `/me/wishlist-items/${id}`,
+      method: 'PATCH',
+      data: {},
+    }).catch((e: unknown) => e)
+    expect(emptyBody).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const badId = await request({
+      url: '/me/wishlist-items/abc',
+      method: 'PATCH',
+      data: { priority: 'WANT' },
+    }).catch((e: unknown) => e)
+    expect(badId).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const badDeleteId = await request({ url: '/me/wishlist-items/0', method: 'DELETE' }).catch(
+      (e: unknown) => e,
+    )
+    expect(badDeleteId).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+  })
+
+  it('없는 찜 항목의 변경은 404 WISHLIST_ITEM_NOT_FOUND다', async () => {
+    const notFound = await request({
+      url: '/me/wishlist-items/999',
+      method: 'PATCH',
+      data: { priority: 'WANT' },
+    }).catch((e: unknown) => e)
+    expect(notFound).toMatchObject({ status: 404, errorCode: 'WISHLIST_ITEM_NOT_FOUND' })
   })
 })
 

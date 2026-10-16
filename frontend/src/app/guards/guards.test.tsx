@@ -56,6 +56,7 @@ const testRoutes: RouteObject[] = [
   { path: '/', element: <h1>첫 화면</h1> },
   { path: '/login', element: <LoginProbe /> },
   { path: '/auth/callback', element: <AuthCallbackScreen /> },
+  { path: '/settings', element: <h1>내 설정</h1> },
   {
     Component: RequireAuth,
     children: [
@@ -174,10 +175,23 @@ describe('RequireAdmin', () => {
 })
 
 describe('로그인 콜백(실제 환경)', () => {
-  function useRefreshSuccess() {
+  // isOnboardingDone: 로그인 직후 내 설정 조회(GET /api/me/settings)가 돌려줄 값. 콜백이 이 값으로 온보딩(/settings) 이동을 정한다(Task 058)
+  function useRefreshSuccess(isOnboardingDone = true) {
     server.use(
       mswHttp.post('/api/auth/refresh', () =>
         HttpResponse.json({ success: true, data: { accessToken: 'tok', role: 'USER' } }),
+      ),
+      mswHttp.get('/api/me/settings', () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            isOnboardingDone,
+            subscriptions: [],
+            monthlyBudget: null,
+            monthlyWatchMinutes: null,
+            watchPreset: null,
+          },
+        }),
       ),
     )
   }
@@ -200,6 +214,16 @@ describe('로그인 콜백(실제 환경)', () => {
     renderAt('/auth/callback')
 
     expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+  })
+
+  it('첫 로그인(내 설정의 isOnboardingDone=false)이면 원래 화면 대신 내 설정(온보딩)으로 가고 돌아갈 곳을 넘긴다', async () => {
+    useRefreshSuccess(false)
+    saveLoginReturnTo('/wishlist')
+    const router = renderAt('/auth/callback')
+
+    expect(await screen.findByRole('heading', { name: '내 설정' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/settings')
+    expect(router.state.location.state).toEqual({ from: '/wishlist' })
   })
 
   it('?error=login_failed면 재발급하지 않고 실패 안내를 보인다', async () => {
