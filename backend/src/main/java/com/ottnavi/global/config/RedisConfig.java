@@ -1,6 +1,7 @@
 package com.ottnavi.global.config;
 
 import com.ottnavi.catalog.service.model.TitleDetailView;
+import com.ottnavi.plan.service.model.PlanCalcResults;
 import org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer; // Boot 4 위치(3.2 참고)
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -42,9 +43,13 @@ public class RedisConfig {
         RedisCacheConfiguration titleDetailConfig = base.entryTtl(Duration.ofHours(24))
                 .serializeValuesWith(SerializationPair.fromSerializer(
                         new JacksonJsonRedisSerializer<>(TitleDetailView.class)));
+        // 계산 결과는 세 유형 결과 묶음(PlanCalcResults) 전용 직렬화기를 쓴다
+        RedisCacheConfiguration planCalcConfig = base.entryTtl(Duration.ofHours(24))
+                .serializeValuesWith(SerializationPair.fromSerializer(
+                        new JacksonJsonRedisSerializer<>(PlanCalcResults.class)));
         return builder -> builder
                 .withCacheConfiguration(TITLE_DETAIL, titleDetailConfig)
-                .withCacheConfiguration(PLAN_CALC, base.entryTtl(Duration.ofHours(24)))
+                .withCacheConfiguration(PLAN_CALC, planCalcConfig)
                 .withCacheConfiguration(EXCLUSIVE_TITLES, base.entryTtl(Duration.ofHours(24)));
     }
 

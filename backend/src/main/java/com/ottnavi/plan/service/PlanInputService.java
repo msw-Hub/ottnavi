@@ -88,19 +88,21 @@ public class PlanInputService {
 		}
 		WatchUnitSummaries summaries = watchUnitQueryService.loadSummaries(unitIds);
 		Map<Long, Long> wishlistItemIdByUnit = new HashMap<>();
-		List<WatchUnit> units = buildUnits(entries, summaries, productIdsByService, wishlistItemIdByUnit);
+		Map<Long, WatchUnitSummary> unitSummaries = new LinkedHashMap<>();
+		List<WatchUnit> units = buildUnits(entries, summaries, productIdsByService, wishlistItemIdByUnit, unitSummaries);
 
 		// 5. 엔진 입력과 전체 구독 비용을 만든다(PlanInput 생성자가 시청 가능 상품 ID와 상품 목록의 일치를 다시 검증한다)
 		PlanInput planInput = new PlanInput(units, products, settings.monthlyBudget(), settings.monthlyWatchMinutes());
 		int allSubscribeCost = AllSubscribeCostCalculator.calculate(planInput.units(), planInput.products());
 
 		// 6. 데이터 기준 시각, 시작 달, 달 번호(0~2)를 정한다
+		// 완료된 수집이 없으면 현재 시각으로 대체한다(plan.data_as_of가 NOT NULL이라 비워 둘 수 없다)
 		Optional<Instant> dataAsOf = collectDataVersionService.findDataAsOf();
-		Instant dataAsOfValue = null;
+		Instant dataAsOfValue = clock.instant();
 		if (dataAsOf.isPresent()) {
 			dataAsOfValue = dataAsOf.get();
 		} else {
-			log.warn("완료된 수집 실행이 없어 데이터 기준 시각을 비워 둔다: userId={}", userId);
+			log.warn("완료된 수집 실행이 없어 데이터 기준 시각을 현재 시각으로 대체한다: userId={}", userId);
 		}
 		LocalDate startMonth = LocalDate.now(clock).withDayOfMonth(1);
 		List<Integer> monthIndexes = new ArrayList<>();
@@ -109,7 +111,7 @@ public class PlanInputService {
 		}
 
 		return new PlanInputBundle(planInput, allSubscribeCost, productPrices, excludedProductIds, wishlistItemIdByUnit,
-				dataAsOfValue, startMonth, monthIndexes, settings.monthlyBudget(), settings.monthlyWatchMinutes(),
+				unitSummaries, dataAsOfValue, startMonth, monthIndexes, settings.monthlyBudget(), settings.monthlyWatchMinutes(),
 				settings.watchPreset());
 	}
 
@@ -132,10 +134,11 @@ public class PlanInputService {
 
 			// 2. 구독 상태와 가격 출처를 정한다
 			OttProductCondition condition = OttProductCondition.NONE;
-			PriceSource priceSource = PriceSource.ADMIN;
+			PriceSource basePriceSource = PriceSource.ADMIN; // 구독 상태와 무관한 기본 출처
 			if (view.userPrice() != null) {
-				priceSource = PriceSource.USER_OVERRIDE;
+				basePriceSource = PriceSource.USER_OVERRIDE;
 			}
+			PriceSource priceSource = basePriceSource;
 			if (view.subscriptionStatus() == ServiceSubscriptionStatus.FREE) {
 				condition = OttProductCondition.FREE;
 				priceSource = PriceSource.FREE;
@@ -147,7 +150,8 @@ public class PlanInputService {
 			// 3. 상품·가격 정보·서비스별 상품 목록에 담는다
 			products.add(new OttProduct(view.productId(), view.appliedPrice(), condition));
 			productPrices.put(view.productId(),
-					new ProductPriceInfo(view.productId(), view.ottServiceId(), view.appliedPrice(), priceSource));
+					new ProductPriceInfo(view.productId(), view.productName(), view.ottServiceId(), view.appliedPrice(),
+							priceSource, basePriceSource));
 			List<Long> sameService = productIdsByService.get(view.ottServiceId());
 			if (sameService == null) {
 				sameService = new ArrayList<>();
@@ -163,7 +167,8 @@ public class PlanInputService {
 	 * 제공 상태 "모름"이 있는 서비스가 하나라도 있으면 isProviderUnknown이다. 영화는 시리즈 식별자·시즌 번호가 null이다(PRD 11절 37번).
 	 */
 	private List<WatchUnit> buildUnits(List<ActiveWishlistEntry> entries, WatchUnitSummaries summaries,
-			Map<Long, List<Long>> productIdsByService, Map<Long, Long> wishlistItemIdByUnit) {
+			Map<Long, List<Long>> productIdsByService, Map<Long, Long> wishlistItemIdByUnit,
+			Map<Long, WatchUnitSummary> unitSummaries) {
 		List<WatchUnit> units = new ArrayList<>();
 		for (ActiveWishlistEntry entry : entries) {
 			// 1. 시청 단위 요약이 없거나 필요 시간이 0 이하면 계산에 넣을 수 없어 건너뛴다
@@ -204,6 +209,7 @@ public class PlanInputService {
 			units.add(new WatchUnit(entry.watchUnitId(), priority, summary.requiredMin(), watchableProductIds,
 					isProviderUnknown, titleId, summary.seasonNumber()));
 			wishlistItemIdByUnit.put(entry.watchUnitId(), entry.wishlistItemId());
+			unitSummaries.put(entry.watchUnitId(), summary); // 응답에 쓸 제목·시즌 정보를 다시 읽지 않도록 그대로 전달한다
 		}
 		return units;
 	}

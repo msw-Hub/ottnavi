@@ -197,7 +197,14 @@ class PlanInputServiceTest extends IntegrationTestSupport {
 		assertThat(bundle.wishlistItemIdByUnit().get(movie.getId())).isEqualTo(movieItem.getId());
 		assertThat(bundle.wishlistItemIdByUnit().get(season1.getId())).isEqualTo(s1Item.getId());
 		assertThat(bundle.wishlistItemIdByUnit().get(season2.getId())).isEqualTo(s2Item.getId());
-		assertThat(bundle.dataAsOf()).isEqualTo(collectDataVersionService.findDataAsOf().orElse(null));
+		// 완료된 수집이 없으면 계산 시각으로 대체되므로 null이 아니다
+		assertThat(bundle.dataAsOf()).isNotNull();
+		if (collectDataVersionService.findDataAsOf().isPresent()) {
+			assertThat(bundle.dataAsOf()).isEqualTo(collectDataVersionService.findDataAsOf().get());
+		}
+		assertThat(bundle.unitSummaries()).containsOnlyKeys(movie.getId(), season1.getId(), season2.getId());
+		assertThat(bundle.productPrices().get(p1).basePriceSource()).isEqualTo(PriceSource.USER_OVERRIDE);
+		assertThat(bundle.productPrices().get(p2).basePriceSource()).isEqualTo(PriceSource.ADMIN);
 	}
 
 	@Test

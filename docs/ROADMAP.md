@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 20/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 23/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 56/105 | |
+| 합계 | | 59/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -817,7 +817,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 20/30
+## 7. Phase 3 — 핵심 기능 개발 · 23/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -1161,41 +1161,42 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: ADMIN 계정으로 상품·가격 등록, 매핑, 수집 실행·이력·변경된 작품이 실제 값으로 동작하고 USER는 차단된다.
 
-#### Task 062: 플랜 영역 엔티티와 리포지토리 작성으로 플랜 저장 모델 마련 ⬜
+#### Task 062: 플랜 영역 엔티티와 리포지토리 작성으로 플랜 저장 모델 마련 ✅
 - 태그: [B] · PRD: B7 · 선행: 034, 035 · 브랜치: `feature/b7-plan-entities`
 - 관련: TECH T-1, ERD D·"벌크 삭제 전제"
 - 구현 사항
-  - [ ] `plan/domain`: Plan(`planType` 포함), PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun(`planType` 포함)
-  - [ ] JPA cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`) 금지, 자식 `@ManyToOne`에 `@OnDelete(action = OnDeleteAction.CASCADE)` 표기
-  - [ ] DRAFT 벌크 삭제 쿼리 `@Modifying(flushAutomatically = true, clearAutomatically = true)`
+  - [x] `plan/domain`: Plan(`planType` 포함), PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun(`planType` 포함)
+  - [x] JPA cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`) 금지, 자식 `@ManyToOne`에 `@OnDelete(action = OnDeleteAction.CASCADE)` 표기
+  - [x] DRAFT 벌크 삭제 쿼리 `@Modifying(flushAutomatically = true, clearAutomatically = true)`
 - 완료 기준
   - V-B: `ddl-auto=validate` 통과, 벌크 삭제 후 하위 4개 테이블 0행이고 영속성 컨텍스트에 삭제된 엔티티가 남지 않는다.
 
-#### Task 063: 계산 입력 수집과 엔진 입출력 변환 구현으로 엔진 연결 ⬜
+#### Task 063: 계산 입력 수집과 엔진 입출력 변환 구현으로 엔진 연결 ✅
 - 태그: [B] · PRD: B7, FR-12 · 선행: 062, 039, 056, 060 · 기한 전제: R11-13(2026-10-29) · 브랜치: `feature/b7-plan-input`
 - 구현 사항
-  - [ ] 소속 일치: `plan_assignment`는 한 플랜의 `plan_item`과 `plan_month`만 묶는다(DB가 `plan_id` 일치를 검사하지 않는다, Task 034 결정, ERD 설계 결정). 이 변환 단계가 지킨다
-  - [ ] 월 번호 범위: `plan_month.month_index`는 DB가 `>= 0`만 검사하므로(Task 034 결정, ERD D3) 변환 단계가 0~2만 만든다
-  - [ ] 입력 수집(readOnly): 다 봤음 제외 찜, 제공 상태, 적용 가격, 구독 상태, 설정, `data_as_of`(수집 Job 마지막 COMPLETED 종료 시각)
-  - [ ] 쿠팡플레이 포함 여부 필터(R11-13, 입력 단계). 상품을 걸러낼 때 시청 단위의 시청 가능 상품 ID 집합에서도 같은 상품을 함께 거른다(`PlanInput` 생성자가 `products`에 없는 시청 가능 상품 ID를 예외로 막는다). 제외로 시청 가능 상품이 비게 된 단위를 어떤 이유 코드(`NO_PROVIDER` 등)로 보일지는 R11-13 결정(2026-10-29)에 따라 정한다. 원천 상태(모름·없음)를 구분해 넘기지 않으면 `NO_PROVIDER`로 오분류될 수 있어서다(PR #24 CodeRabbit 지적)
-  - [ ] 엔티티 ↔ 엔진 record 변환(`plan` 서비스만 `engine` 호출). **시리즈 식별자·시즌 번호 반영(2026-10-10 결정, 시즌 순서 규칙 PRD 5.4·11절 37번)**: 시청 단위를 만들 때 `watch_unit.title_id`를 시리즈 식별자로, `season_number`를 시즌 번호로 채운다(영화는 시즌 번호 없음). 앞 시즌이 찜 목록에 없거나 "다 봤음"이면 입력에 넣지 않는 것으로 충분하다(제약 없음). 후속 항목 S(Task 040 뒤)의 모델 변경이 끝난 뒤에 구현한다
-  - [ ] **전체 구독 비용 `all_subscribe_cost` 계산(2026-10-10 결정, PRD 5.4·11절 38번)**: 같은 입력(찜한 안 다 본 작품의 시청 가능 상품, 적용 가격 = 기본 요금 또는 사용자 수정 금액, 구독 상태)에서 시청 가능 상품을 모두 3개월 내내 구독한 비용을 구한다. FREE는 모든 달 0원, SUBSCRIBED는 0번째 달 0원·1·2번째 달 가격, 입력 단계에서 제외한 서비스(R11-13)는 뺀다. 엔진 밖(`plan` 서비스)에서 계산하며 세 유형이 같은 값을 쓴다
+  - [x] 소속 일치: `plan_assignment`는 한 플랜의 `plan_item`과 `plan_month`만 묶는다(DB가 `plan_id` 일치를 검사하지 않는다, Task 034 결정, ERD 설계 결정). 이 변환 단계가 지킨다
+  - [x] 월 번호 범위: `plan_month.month_index`는 DB가 `>= 0`만 검사하므로(Task 034 결정, ERD D3) 변환 단계가 0~2만 만든다
+  - [x] 입력 수집(readOnly): 다 봤음 제외 찜, 제공 상태, 적용 가격, 구독 상태, 설정, `data_as_of`(수집 Job 마지막 COMPLETED 종료 시각)
+  - [x] 쿠팡플레이 포함 여부 필터(R11-13, 입력 단계). 상품을 걸러낼 때 시청 단위의 시청 가능 상품 ID 집합에서도 같은 상품을 함께 거른다(`PlanInput` 생성자가 `products`에 없는 시청 가능 상품 ID를 예외로 막는다). 제외로 시청 가능 상품이 비게 된 단위를 어떤 이유 코드(`NO_PROVIDER` 등)로 보일지는 R11-13 결정(2026-10-29)에 따라 정한다. 원천 상태(모름·없음)를 구분해 넘기지 않으면 `NO_PROVIDER`로 오분류될 수 있어서다(PR #24 CodeRabbit 지적)
+  - [x] 엔티티 ↔ 엔진 record 변환(`plan` 서비스만 `engine` 호출). **시리즈 식별자·시즌 번호 반영(2026-10-10 결정, 시즌 순서 규칙 PRD 5.4·11절 37번)**: 시청 단위를 만들 때 `watch_unit.title_id`를 시리즈 식별자로, `season_number`를 시즌 번호로 채운다(영화는 시즌 번호 없음). 앞 시즌이 찜 목록에 없거나 "다 봤음"이면 입력에 넣지 않는 것으로 충분하다(제약 없음). 후속 항목 S(Task 040 뒤)의 모델 변경이 끝난 뒤에 구현한다
+  - [x] **전체 구독 비용 `all_subscribe_cost` 계산(2026-10-10 결정, PRD 5.4·11절 38번)**: 같은 입력(찜한 안 다 본 작품의 시청 가능 상품, 적용 가격 = 기본 요금 또는 사용자 수정 금액, 구독 상태)에서 시청 가능 상품을 모두 3개월 내내 구독한 비용을 구한다. FREE는 모든 달 0원, SUBSCRIBED는 0번째 달 0원·1·2번째 달 가격, 입력 단계에서 제외한 서비스(R11-13)는 뺀다. 엔진 밖(`plan` 서비스)에서 계산하며 세 유형이 같은 값을 쓴다
 - 완료 기준
   - V-B: 정답 세트 한 케이스를 DB 데이터로 구성했을 때 변환 결과가 세트 입력과 같다. `all_subscribe_cost`가 손으로 계산한 값(FREE·SUBSCRIBED 포함)과 일치한다.
 
-#### Task 064: 계산 트랜잭션·input_hash 캐시·계산 API 구현으로 DRAFT 생성 ⬜
+#### Task 064: 계산 트랜잭션·input_hash 캐시·계산 API 구현으로 DRAFT 생성 ✅
 - 태그: [B] · PRD: B7, FR-12, SCR-09·10 · 선행: 063, 040, 031 · 브랜치: `feature/b7-plan-calculate`
 - 관련: TECH 1·2절, T-4
 - 구현 사항
-  - [ ] `POST /api/me/plan-drafts`(`createPlanDrafts`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
-  - [ ] 쓰기 트랜잭션: `user_setting` `PESSIMISTIC_WRITE` → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
-  - [ ] 소속 일치 통합 테스트: 한 번의 계산 저장으로 만든 `plan_assignment`의 `plan_item`과 `plan_month`가 모두 같은 `plan_id`이다(DB 제약이 없어 테스트로 고정)
-  - [ ] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
-  - [ ] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 가입 즉시 해지 예약 권장, 기준일
-  - [ ] 절감액(2026-10-10 결정, PRD 5.4·11절 38번): `plan.all_subscribe_cost`는 Task 063이 만든 값으로 저장하고 세 유형의 DRAFT에 같은 값을 넣는다. 절감액 = `all_subscribe_cost` − `total_cost`. `input_hash` 정규화에는 시리즈 식별자·시즌 번호(시즌 순서 규칙, 후속 항목 S)도 포함한다
+  - [x] `POST /api/me/plan-drafts`(`createPlanDrafts`): 엔진은 트랜잭션 밖, `PlanTypeSolver.solveAll`로 플랜 유형 3종(추천형 → 절약형·간편형)을 푼다. 유형마다 완전탐색 기본·상한 초과 시 그리디 **하나만** 실행하고 `plan.algorithm`에 남김
+  - [x] 쓰기 트랜잭션: `users` 행 `FOR UPDATE`(`UserQueryService.lockUser`, 설정·찜·요금 쓰기와 같은 행을 잠가 교착을 막는다. 2026-10-16 사용자 승인) → 기존 DRAFT(세 유형 전부) 벌크 삭제(첫 동작) → 유형별 DRAFT(최대 3개)·하위 행·`calc_run` 유형별 1행 저장
+  - [x] 소속 일치 통합 테스트: 한 번의 계산 저장으로 만든 `plan_assignment`의 `plan_item`과 `plan_month`가 모두 같은 `plan_id`이다(DB 제약이 없어 테스트로 고정)
+  - [x] `input_hash` 키 Redis `planCalc` 캐시(맞아도 DRAFT 저장), `plan.calculate` 타이머
+  - [x] 응답: 유형별(`planType`) 요약, 월별 카드, 남은 작품·이유(꼭 먼저), 절감액, 기준일. 가입 즉시 해지 예약 권장은 응답 필드를 따로 두지 않고 프론트가 이번 달 상품의 가격 출처로 판단한다(결정 Q3-A)
+  - [x] 절감액(2026-10-10 결정, PRD 5.4·11절 38번): `plan.all_subscribe_cost`는 Task 063이 만든 값으로 저장하고 세 유형의 DRAFT에 같은 값을 넣는다. 절감액 = `all_subscribe_cost` − `total_cost`. `input_hash` 정규화에는 시리즈 식별자·시즌 번호(시즌 순서 규칙, 후속 항목 S)도 포함한다
 - 완료 기준
   - V-B: 동시 계산 2건 직렬화(유니크 위반 없음), 재계산 후 이전 DRAFT 하위 행 0행이고 유형마다 DRAFT 1개(최대 3개), 설정 누락 400.
   - V-API: 결과가 정답 세트 한 케이스와 일치하고 `calc_run`에 선택된 알고리즘 1행이 남는다.
+- 기록: 2026-10-16 구현(PR 번호 ). `POST /api/me/plan-drafts`를 `plan`에 구현했다. 비트랜잭션 `PlanCalculateService`가 읽기 조립(`PlanInputService`) → 엔진(`PlanSolveService`, `planCalc` 캐시 키 `e1:`+입력 해시, 엔진 규칙이 바뀌면 버전을 올린다) → 쓰기(`PlanDraftWriter`: `users` 행 잠금, 기존 DRAFT 벌크 삭제, DRAFT 3건·하위 행·`calc_run` 저장)를 잇고, 응답은 저장 직후 ID와 계산 결과로 조립한다(`PlanDraftViewAssembler`, DB 재조회 없음). `data_as_of`는 입력 조립 시점 값을 저장하고 동시 계산은 나중 요청이 덮어쓴다. 계약 `openapi.yaml`의 `x-planned`를 제거했고 응답 필드는 바꾸지 않았다.
 
 #### Task 065: FR-13 비교 측정 경로 구현으로 완전탐색·그리디 비교 기록 확보 ⬜
 - 태그: [B] · PRD: B2·B7, FR-13, MVP 완료 기준 ③ · 선행: 062, 040, 054 · 브랜치: `feature/b7-algorithm-benchmark`
@@ -1211,6 +1212,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `POST /api/me/plans`(`createPlan`, 본문 `planId`): 고른 유형의 DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
   - [ ] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`. 저장 후 같은 사용자의 나머지 DRAFT는 벌크 삭제한다(PRD 11절 35번)
+  - [ ] `listPlanDrafts`(GET) 응답 조립(DB에서 재구성)을 이 Task에서 한다(결정 Q4-A, Task 064는 POST 응답만 저장 직후 값으로 조립)
   - [ ] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6
 - 완료 기준
   - V-B: 저장 후 ACTIVE 1·ARCHIVED 1(유니크 위반 없음)이고 나머지 유형 DRAFT는 삭제됨, 수집이 더 늦으면 409, 다른 사용자 DRAFT 404. V-API: 계산 → 저장 → 조회.

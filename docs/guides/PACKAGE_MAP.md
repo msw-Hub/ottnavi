@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-16 (Task 056 반영 기준)
+> 마지막 갱신: 2026-10-16 (Task 064 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -62,8 +62,11 @@ com.ottnavi
 │   ├── service/           AdminProductService(관리자 상품·요금 관리), ProductPriceQueryService(기준일 유효 요금 조회, 계산·내 요금이 재사용), MyServicePriceService(내 요금 조회·수정·되돌리기, 사용자 행 잠금 직렬화) + model/ (AdminProductView, ProductPriceView, MyServicePriceView)
 │   ├── exception/         ProductPriceConflictException (PRICE_* 409 6종을 코드로 구분), ServicePriceNotFoundException(404)
 │   └── domain/            entity(…, UserPriceOverride: 사용자·상품은 ID만 보관) · enums(ProductType, PriceSource) · repository(…, UserPriceOverrideRepository) · rule(ProductPriceRules: 요금 이력 추가·수정·삭제 허용 판정과 기준일 선택)
-├── plan/                3개월 플랜 저장·계산 기록 (Task 062 엔티티·리포지토리, Task 063 계산 입력 조립. 계산 실행·API는 064 이후)
-│   ├── service/           PlanInputService(설정·찜·제공 상태·요금·구독 상태 → 엔진 입력, 읽기 전용), AllSubscribeCostCalculator(전체 구독 비용, 순수 계산) + model/ (PlanInputBundle, ProductPriceInfo)
+├── plan/                3개월 플랜 저장·계산 (Task 062 엔티티·리포지토리, Task 063 계산 입력 조립, Task 064 계산 API·DRAFT 저장)
+│   ├── controller/        PlanController (POST /api/me/plan-drafts, 플랜 계산)
+│   ├── dto/
+│   │   └── response/        PlanDraftListResponse, PlanDraftResponse, PlanMonthResponse, PlanMonthProductResponse, PlanAssignmentResponse, UnscheduledItemResponse
+│   ├── service/           PlanCalculateService(진입점: 입력 조립 → 계산 → 저장 → 응답 조립, 트랜잭션 없음), PlanInputService(설정·찜·제공 상태·요금·구독 상태 → 엔진 입력, 읽기 전용), PlanSolveService(입력 해시 키로 세 유형 계산, planCalc 캐시), RecordingPlanSolver(유형별 계산 시간·후보 수 기록), PlanDraftWriter(users 행 잠금 → 기존 DRAFT 삭제 → DRAFT 3건 저장), PlanDraftMapper(결과 → 달별 상품·비용·조각 번호 규칙), PlanDraftViewAssembler(저장 직후 ID와 결과로 응답 값 조립), AllSubscribeCostCalculator(전체 구독 비용, 순수 계산), EngineConfig(엔진 빈 등록) + model/ (PlanInputBundle, ProductPriceInfo, PlanCalcResult, PlanCalcResults, SavedDraft, PlanDraftView)
 │   └── domain/            entity(Plan, PlanMonth, PlanMonthProduct, PlanItem, PlanAssignment, CalcRun: 사용자·상품·시청 단위·서비스는 ID만 보관, 하위 행 삭제는 DB FK CASCADE) · enums(PlanStatus, PlanItemOutcome. 플랜 유형·알고리즘·우선순위·이유 코드는 engine.model, 가격 출처는 product PriceSource 재사용) · repository(PlanRepository: DRAFT 벌크 삭제·ACTIVE 잠금 조회 …)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출)
