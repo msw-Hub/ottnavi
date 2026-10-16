@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -36,10 +36,11 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 /**
- * **제안(Task 031, 미구현).** Refresh Token(HttpOnly 쿠키 사용)으로 새 Access Token을 발급한다. 요청 본문은 없다. Refresh Token은 재발급 때 회전하며(새 쿠키), 응답 본문에는 담지 않는다(TECH 4절).
- * CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다. 인증 경로도 공개 API와 같은 요청 제한을 받는다(`.claude/rules/backend.md`).
- * 오류: `UNAUTHORIZED`(401, 쿠키 없음·만료·무효·재사용 감지), `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
- * @summary Access Token 재발급 (제안)
+ * Refresh Token(HttpOnly 쿠키 `rt`)으로 새 Access Token과 사용자 권한(`role`)을 발급한다. 요청 본문은 없다. Refresh Token은 재발급 때 회전하며(새 쿠키, 수명은 그때부터 다시 14일), 응답 본문에는 담지 않는다(TECH 4절).
+ * 직전 Refresh Token이 10초 안에 다시 오면(동시 요청·응답 유실) 회전 없이 Access Token만 발급한다(새 쿠키를 내리지 않는다). 유예가 지난 직전 토큰을 재사용하면 해당 계열을 무효화하고 401이다. 실패한 401 응답은 쿠키를 지운다.
+ * CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다(회전 전에 검사). 인증 경로도 공개 API와 같은 요청 제한을 받는다(`.claude/rules/backend.md`).
+ * 오류: `UNAUTHORIZED`(401, 쿠키 없음·만료·무효·재사용 감지), `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500, Redis 장애 포함).
+ * @summary Access Token 재발급
  */
 export const refreshAccessToken = (
 
@@ -91,7 +92,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary Access Token 재발급 (제안)
+ * @summary Access Token 재발급
  */
 export const useRefreshAccessToken = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | TooManyRequestsResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof refreshAccessToken>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -104,11 +105,11 @@ export const useRefreshAccessToken = <TError = ErrorType<UnauthorizedResponse | 
       return useMutation(getRefreshAccessTokenMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** Refresh Token(HttpOnly 쿠키 사용)을 서버에서 폐기하고 쿠키를 지운다. 요청 본문은 없다. 쿠키가 없거나 이미 무효여도 204다.
+ * Refresh Token(HttpOnly 쿠키 `rt`)의 계열을 서버에서 폐기하고(현재 기기만) 쿠키를 지운다. 요청 본문은 없다. 쿠키가 없거나 이미 무효여도 204다.
  * Access Token은 요구하지 않는다. 폐기 대상은 쿠키의 Refresh Token이고, Access Token이 만료된 뒤에도 재발급 없이 로그아웃할 수 있어야 하기 때문이다. Access Token은 서버에 저장하지 않으므로 수명(30분)이 끝날 때까지 유효하고, 프론트가 메모리에서 지운다(TECH 4절).
  * CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다. 인증 경로도 공개 API와 같은 요청 제한을 받는다.
  * 오류: `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
- * @summary 로그아웃 (제안)
+ * @summary 로그아웃
  */
 export const logout = (
 
@@ -160,7 +161,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary 로그아웃 (제안)
+ * @summary 로그아웃
  */
 export const useLogout = <TError = ErrorType<ForbiddenResponse | TooManyRequestsResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logout>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}

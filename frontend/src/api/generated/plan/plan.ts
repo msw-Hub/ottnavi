@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -30,6 +30,7 @@ import type {
 
 import type {
   BadRequestResponse,
+  CommonResponseCurrentPlan,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
   ConflictResponse,
@@ -63,13 +64,13 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * **제안(Task 031, 미구현).** 내 찜·설정·요금으로 3개월 플랜을 계산해 플랜 유형(`RECOMMENDED`·`SAVER`·`SIMPLE`)마다 초안(DRAFT)을 하나씩, 항상 3개 만든다. 기존 초안은 덮어쓴다. 요청 본문은 없다.
+ * 내 찜·설정·요금으로 3개월 플랜을 계산해 플랜 유형(`RECOMMENDED`·`SAVER`·`SIMPLE`)마다 초안(DRAFT)을 하나씩, 항상 3개 만든다. 기존 초안은 덮어쓴다. 요청 본문은 없다.
  * 세 유형의 선택이 같으면 합쳐 보여 주는 것은 화면 몫이라 응답은 항상 3개다. `allSubscribeCost`·`savedAmount`는 세 유형이 같은 정의다(PRD 5.4, 11절 38번).
  * 계산 선행 조건(월 예산·월 시청 시간 입력, "다 봤음"이 아닌 찜 1개 이상)을 채우지 않으면 400이다(PRD FR-10).
  * 동기 처리다. 엔진은 순수 계산(CPU)이고 후보 조합이 상한을 넘으면 그리디로 바뀌어 시간이 묶이므로(TECH 1절, T-4) 응답 안에서 끝낸다. 같은 사용자의 동시 계산은 서버가 직렬화한다(TECH 2절).
  * 회원 API라 요청 제한(429)은 두지 않는다. 남용이 보이면 사용자별 제한을 추가하고 이 operation에 429를 단다.
  * 오류: `VALIDATION_FAILED`(400, 선행 조건 미충족), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 플랜 계산(초안 3종 생성) (제안)
+ * @summary 플랜 계산(초안 3종 생성)
  */
 export const createPlanDrafts = (
 
@@ -121,7 +122,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
- * @summary 플랜 계산(초안 3종 생성) (제안)
+ * @summary 플랜 계산(초안 3종 생성)
  */
 export const useCreatePlanDrafts = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlanDrafts>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -134,9 +135,10 @@ export const useCreatePlanDrafts = <TError = ErrorType<BadRequestResponse | Unau
       return useMutation(getCreatePlanDraftsMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 지금 있는 초안을 조회한다. 계산 전이거나 저장한 뒤(나머지 DRAFT 삭제)에는 `drafts`가 빈 배열이다.
+ * 지금 있는 내 초안을 조회한다. 계산 전이거나 저장한 뒤(나머지 DRAFT 삭제)에는 `drafts`가 빈 배열이다.
+ * 계산 직후의 `POST /me/plan-drafts` 응답과 같은 내용·같은 순서(플랜 유형 `RECOMMENDED`·`SAVER`·`SIMPLE` 순)다. 상품 이름은 조회 시점의 이름이다.
  * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 플랜 초안 조회 (제안)
+ * @summary 플랜 초안 조회
  */
 export const listPlanDrafts = (
 
@@ -207,7 +209,7 @@ export function useListPlanDrafts<TData = Awaited<ReturnType<typeof listPlanDraf
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 플랜 초안 조회 (제안)
+ * @summary 플랜 초안 조회
  */
 
 export function useListPlanDrafts<TData = Awaited<ReturnType<typeof listPlanDrafts>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
@@ -228,10 +230,105 @@ export function useListPlanDrafts<TData = Awaited<ReturnType<typeof listPlanDraf
 
 
 /**
- * **제안(Task 031, 미구현).** 고른 초안(`planId`)을 ACTIVE로 저장한다. 기존 ACTIVE는 ARCHIVED가 되고 나머지 DRAFT는 삭제된다(TECH 2절).
+ * 저장한 현재 플랜(ACTIVE)을 조회한다. 초안(`PlanDraft`)의 필드를 모두 담고 저장 시각(`activatedAt`)이 더해진다.
+ * 저장한 플랜이 없으면 404가 아니라 200이고 `plan`이 `null`이다(아직 저장 전인 사용자의 정상 상태다).
+ * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * @summary 현재 플랜 조회
+ */
+export const getCurrentPlan = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseCurrentPlan>(
+      {url: `/me/plans/current`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetCurrentPlanQueryKey = () => {
+    return [
+    `/me/plans/current`
+    ] as const;
+    }
+
+
+export const getGetCurrentPlanQueryOptions = <TData = Awaited<ReturnType<typeof getCurrentPlan>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCurrentPlanQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCurrentPlan>>> = ({ signal }) => getCurrentPlan(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetCurrentPlanQueryResult = NonNullable<Awaited<ReturnType<typeof getCurrentPlan>>>
+export type GetCurrentPlanQueryError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+
+
+export function useGetCurrentPlan<TData = Awaited<ReturnType<typeof getCurrentPlan>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCurrentPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getCurrentPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCurrentPlan<TData = Awaited<ReturnType<typeof getCurrentPlan>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCurrentPlan>>,
+          TError,
+          Awaited<ReturnType<typeof getCurrentPlan>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetCurrentPlan<TData = Awaited<ReturnType<typeof getCurrentPlan>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 현재 플랜 조회
+ */
+
+export function useGetCurrentPlan<TData = Awaited<ReturnType<typeof getCurrentPlan>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getCurrentPlan>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetCurrentPlanQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 고른 초안(`planId`)을 ACTIVE로 저장한다. 기존 ACTIVE는 ARCHIVED가 되고 나머지 DRAFT는 삭제된다(TECH 2절).
  * 초안을 계산한 뒤 데이터 수집이 새로 끝났으면 409 `PLAN_DRAFT_STALE`이고, 프론트는 다시 계산을 요청한다.
  * 오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `PLAN_DRAFT_NOT_FOUND`(404, 없음·본인 초안이 아님·이미 저장돼 DRAFT가 아님·다시 계산해 지워짐), `PLAN_DRAFT_STALE`(409), `INTERNAL_ERROR`(500).
- * @summary 플랜 저장(초안을 현재 플랜으로) (제안)
+ * @summary 플랜 저장(초안을 현재 플랜으로)
  */
 export const createPlan = (
     createPlanRequest: BodyType<CreatePlanRequest>,
@@ -285,7 +382,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreatePlanMutationVariables = {data: BodyType<CreatePlanRequest>}
 
     /**
- * @summary 플랜 저장(초안을 현재 플랜으로) (제안)
+ * @summary 플랜 저장(초안을 현재 플랜으로)
  */
 export const useCreatePlan = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlan>>, TError,CreatePlanMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

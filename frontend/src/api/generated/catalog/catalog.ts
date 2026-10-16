@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -59,11 +59,14 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * **제안(Task 031, 미구현).** 제목(한국어·원제)으로 작품을 검색한다. 비로그인 공개 API(요청 제한 적용).
- * DB에 없으면 TMDB에서 수집해 함께 돌려준다. TMDB 수집이 실패하면 오류 대신 DB 결과만 주고 `isExternalCollectFailed`를 `true`로 둔다.
+ * 제목(한국어·원제)에 검색어가 들어간 작품을 찾는다(대소문자 구분 없는 부분 일치). 비로그인 공개 API(요청 제한 적용).
+ * **DB에 저장된 작품만 대상**이며 TMDB를 호출하지 않는다. 결과는 인기도 높은 순이다(같으면 먼저 저장된 작품 먼저).
+ * 서비스별 상태(`availabilities`)는 7개 서비스를 서비스 ID 순으로 모두 담는다. 드라마는 시즌 중 하나라도 제공되면 AVAILABLE이고, 판정이 없는 서비스는 UNKNOWN이다.
+ * `dataAsOf`는 이 페이지 작품들의 판정 확인일(KST) 중 가장 오래된 날짜다(결과가 없으면 전체 판정의 최신 확인일).
+ * `isExternalCollectFailed`는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입하기 전까지 항상 `false`다. 필드는 호환을 위해 유지한다.
  * 페이지네이션 응답(`content`, `page`, `size`, `totalElements`, `totalPages`)이다.
  * 오류: `VALIDATION_FAILED`(400, 검색어 없음·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
- * @summary 작품 검색 (제안)
+ * @summary 작품 검색
  */
 export const searchTitles = (
     params: SearchTitlesParams,
@@ -135,7 +138,7 @@ export function useSearchTitles<TData = Awaited<ReturnType<typeof searchTitles>>
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 작품 검색 (제안)
+ * @summary 작품 검색
  */
 
 export function useSearchTitles<TData = Awaited<ReturnType<typeof searchTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
@@ -156,9 +159,12 @@ export function useSearchTitles<TData = Awaited<ReturnType<typeof searchTitles>>
 
 
 /**
- * **제안(Task 031, 미구현).** TMDB 기준(`mediaType` + `tmdbId`)으로 작품 상세와 서비스별 제공 상태를 조회한다. 드라마는 시즌별 정보와 시즌별 제공 상태를 함께 준다. 비로그인 공개 API(요청 제한 적용).
- * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `TITLE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500), `EXTERNAL_API_ERROR`(502, DB에 없어 TMDB에서 가져오다 실패).
- * @summary 작품 상세 조회 (제안)
+ * TMDB 기준(`mediaType` + `tmdbId`)으로 작품 상세와 서비스별 제공 상태를 조회한다. 드라마는 시즌별 정보와 시즌별 제공 상태를 함께 준다. 비로그인 공개 API(요청 제한 적용).
+ * **DB에 저장된 작품만 조회**하며, 없으면 TMDB를 호출하지 않고 `TITLE_NOT_FOUND`(404)로 응답한다. 응답은 서버에서 24시간 캐시되고 수집이 끝나면 갱신된다.
+ * `mediaType`은 소문자(`movie`/`tv`)만 받는다. 출연진은 출연 순서 상위 10명, 시즌은 시즌 번호 순이다.
+ * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `TITLE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * `EXTERNAL_API_ERROR`(502)는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입할 때 쓸 응답이며, 현재는 발생하지 않는다.
+ * @summary 작품 상세 조회
  */
 export const getTitleDetail = (
     mediaType: 'movie' | 'tv',
@@ -235,7 +241,7 @@ export function useGetTitleDetail<TData = Awaited<ReturnType<typeof getTitleDeta
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 작품 상세 조회 (제안)
+ * @summary 작품 상세 조회
  */
 
 export function useGetTitleDetail<TData = Awaited<ReturnType<typeof getTitleDetail>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse | BadGatewayResponse>>(
