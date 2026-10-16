@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react'
 /** 찜 추가 팝업에 보일 내용 */
 export interface WishlistAddedInfo {
   entryKey: string // 찜 항목 키("movie:496243:all"). 같은 작품이 다시 들어오면 새로 쌓지 않고 내용만 갱신된다
+  wishlistItemId: number // 방금 담은(또는 이미 있던) 찜 항목 ID. 팝업에서 우선순위를 바꿀 때 쓴다. 현재 단계는 서버 찜 목록에서 읽는다
   name: string // 팝업 문장에 쓸 이름(영화 제목, 또는 "드라마 제목 시즌 2")
   posterUrl: string | null // 썸네일 포스터 주소. 없으면 "포스터 없음" 대체 표시
 }

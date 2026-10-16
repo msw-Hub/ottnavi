@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -11,15 +11,15 @@
  */
 
 /**
- * 월 구독요금 한 줄. 적용 종료일은 저장하지 않는다(다음 줄 시작일의 전날까지, 마지막 줄은 계속)
+ * 월 구독요금 이력 한 건. 적용 종료일은 저장하지 않는다(다음 요금 이력 시작일의 전날까지, 가장 최근 요금 이력은 계속)
  */
 export interface AdminProductPrice {
-  /** 월 구독요금 줄 ID */
+  /** 월 구독요금 이력 ID */
   priceId: number;
   /** 월 구독요금(원) */
   monthlyPrice: number;
   /** 적용 시작일. 같은 상품 안에서 겹치지 않는다 */
   effectiveFrom: string;
-  /** 마지막 확인 일시. [요금 확인함]과 줄 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
+  /** 마지막 확인 일시. [요금 확인함]과 요금 이력 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다 */
   lastVerifiedAt: string;
 }

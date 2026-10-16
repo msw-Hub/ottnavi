@@ -1,20 +1,30 @@
 import Axios from 'axios'
 import type { AxiosRequestConfig } from 'axios'
 import { toast } from 'sonner'
-import type { FieldError } from '@/api/generated/model'
+import type { CommonResponseAccessToken, FieldError } from '@/api/generated/model'
 import { attachMockHeaders } from '@/api/mockHeaders'
 import { getErrorMessage, isKnownErrorCode, NETWORK_ERROR_MESSAGE } from '@/lib/errorMessages'
+import { isMockMode } from '@/lib/mockScenario'
+import { useAuthStore } from '@/stores/authStore'
 
 // axios 인스턴스와 orval custom mutator.
 // - 베이스 URL은 항상 상대 경로 '/api'다. 배포는 Vercel rewrite, 로컬은 Vite dev server proxy가 백엔드로 전달하므로
 //   백엔드 주소를 코드나 환경변수에 직접 두지 않는다(같은 출처로 호출해야 HttpOnly 쿠키와 CORS 문제가 생기지 않는다).
-// - 인증(Access Token 첨부, 401 재발급 1회)은 Task 057에서, ProblemDetail 파싱(오류 정리) 인터셉터는 이 파일 아래쪽에 있다(Task 025).
+// - 인증(Access Token 첨부, 401 재발급 1회, 동시 401은 재발급 요청 하나)은 아래 "인증" 절에, ProblemDetail 파싱(오류 정리)
+//   인터셉터는 그 아래에 있다(Task 025·057).
 export const AXIOS_INSTANCE = Axios.create({
   baseURL: '/api',
 })
 
+// 재시도했던 요청인지 표시하는 필드. 한 요청은 재발급 후 "한 번만" 다시 보내고, 그래도 401이면 그대로 실패시킨다(무한 반복 방지).
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    _authRetried?: boolean
+  }
+}
+
 // 목업 모드에서만 화면 검토용 전환 값을 X-Mock-* 헤더로 붙인다(Task 031 6-0). 계약에 없는 값을 쿼리 파라미터로 보내지 않기 위함이다.
-// 운영(VITE_USE_MOCK이 true가 아님)에서는 붙일 헤더가 없다. 인증 로직과 무관하며, Task 057의 토큰 첨부 인터셉터와 따로 동작한다.
+// 운영(VITE_USE_MOCK이 true가 아님)에서는 붙일 헤더가 없다. 인증 로직과 무관하며, 아래 토큰 첨부 인터셉터와 따로 동작한다.
 AXIOS_INSTANCE.interceptors.request.use(attachMockHeaders)
 
 // orval이 생성한 함수가 호출하는 mutator. 응답 본문(body)을 그대로 돌려준다.
@@ -278,10 +288,138 @@ export function handleResponseError(error: unknown): Promise<never> {
   return Promise.reject(apiError)
 }
 
-// TODO(Task 057): 401 재발급 인터셉터를 이 줄 위에 등록한다.
-// axios는 응답 인터셉터를 등록한 순서대로 실행한다. 재발급 인터셉터는 원래 요청 설정(config)이 든 AxiosError가
-// 있어야 같은 요청을 다시 보낼 수 있는데, 아래 인터셉터를 지나면 ApiError로 바뀌어 config가 사라진다.
-// 그래서 재발급 인터셉터가 먼저 실행되도록 이 등록보다 앞에 둔다. (재발급은 한 번만, 동시 401은 요청 하나로 묶기: frontend.md 인증 규칙)
+/*
+ * ===== 인증: Access Token 첨부와 401 재발급 (Task 057) =====
+ *
+ * [보안] 이 절은 사용자가 직접 검토하는 인증 코드다. 지키는 원칙:
+ * - Access Token(AT)은 stores/authStore의 메모리에만 있고 여기서도 저장소·주소·로그에 내보내지 않는다.
+ * - Refresh Token은 HttpOnly 쿠키라 자바스크립트가 읽지 못한다. 재발급 요청에 쿠키가 실리도록 withCredentials만 켠다.
+ * - 재발급 요청은 이 파일의 인터셉터가 없는 별도 axios 인스턴스(REFRESH_CLIENT)로 보낸다. 같은 인스턴스를 쓰면
+ *   재발급 요청이 401을 받았을 때 다시 재발급을 부르는 재귀가 생길 수 있다.
+ * - 화면 가드는 편의일 뿐이고 실제 권한은 백엔드가 검사한다(frontend.md).
+ */
+
+// 재발급 전용 axios 인스턴스. 인터셉터(401 재시도, 오류 정리)를 일부러 달지 않아 재귀가 생길 수 없다.
+// withCredentials: Refresh Token 쿠키(Path=/api/auth)를 실어 보낸다. 같은 출처(/api)라 브라우저가 어차피 보내지만,
+// 이후 백엔드를 다른 출처로 옮겨도 쿠키가 빠지지 않게 명시한다. 목업 전환 헤더만 붙인다(재발급 실패 시나리오 확인용).
+const REFRESH_CLIENT = Axios.create({ baseURL: '/api', withCredentials: true })
+REFRESH_CLIENT.interceptors.request.use(attachMockHeaders)
+
+// 요청에 Access Token을 붙인다. 로그인 전(토큰 없음)에는 아무것도 붙이지 않는다.
+// 이미 Authorization이 있으면(재시도 요청이 새 토큰을 직접 넣은 경우) 덮어쓰지 않는다.
+AXIOS_INSTANCE.interceptors.request.use((config) => {
+  const { accessToken } = useAuthStore.getState()
+  if (accessToken && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+  return config
+})
+
+// 진행 중인 재발급 요청. 있으면 새로 보내지 않고 이 요청의 결과를 함께 기다린다(single-flight).
+// 동시에 여러 요청이 401을 받아도 재발급은 하나만 나간다. Refresh Token은 회전(1회용)이라 동시에 여러 번 보내면
+// 두 번째부터 "이미 쓴 토큰 재사용"으로 보여 계열이 폐기될 수 있어, 한 번에 하나만 보내는 것이 안전하다.
+let refreshInFlight: Promise<void> | null = null
+
+// 재발급 요청 한 번을 보내고 결과를 authStore에 반영한다.
+// 401이면 로그인 상태를 비우고(guest), 그 밖의 오류(500·네트워크 등)는 상태를 건드리지 않고 ApiError로 던진다.
+async function requestRefresh(): Promise<void> {
+  try {
+    // 1. 쿠키만 보내고 본문은 없다(계약: POST /auth/refresh)
+    const response = await REFRESH_CLIENT.post<CommonResponseAccessToken>('/auth/refresh')
+    // 2. 응답은 네트워크에서 온 값이라 타입을 믿지 않고 확인한다
+    const data = response.data?.data
+    if (!data || typeof data.accessToken !== 'string' || data.accessToken === '') {
+      throw new Error('재발급 응답 형식이 올바르지 않습니다')
+    }
+    // 3. AT와 역할을 메모리에만 저장한다(역할은 재발급 때마다 서버가 DB에서 다시 읽은 값이다)
+    useAuthStore.getState().setSession(data.accessToken, data.role)
+  } catch (error) {
+    const apiError = normalizeApiError(error)
+    // 4. 401은 "다시 로그인해야 함"이다(쿠키 없음·만료·재사용 감지). 그 밖은 서버 사정이라 로그인 상태를 지우지 않는다
+    if (apiError.status === 401) useAuthStore.getState().clearSession()
+    throw apiError
+  }
+}
+
+/**
+ * Access Token을 재발급받아 authStore에 넣는다. 진행 중인 요청이 있으면 그 결과를 함께 기다린다(single-flight).
+ *
+ * 실패하면 ApiError를 던진다. status가 401이면 이미 authStore가 guest로 바뀐 상태다.
+ * 로그인 콜백 화면, 앱 시작(restoreSession), 401 인터셉터가 모두 이 함수를 쓰므로 같은 순간에 겹쳐도 요청은 하나다.
+ */
+export function refreshSession(): Promise<void> {
+  if (!refreshInFlight) {
+    refreshInFlight = requestRefresh().finally(() => {
+      refreshInFlight = null
+    })
+  }
+  return refreshInFlight
+}
+
+/**
+ * 앱을 열 때(새로고침 포함) 로그인 상태를 복원한다. 쿠키의 Refresh Token으로 Access Token을 다시 받는다.
+ *
+ * - 성공: authenticated. 401: guest(원래 로그아웃 상태였다). 그 밖의 실패: error(로그인 여부를 알 수 없음).
+ * - 목업 모드에서는 하지 않는다(로그인 상태는 개발용 전환 토글이 정한다, hooks/useSession).
+ * "다시 시도" 버튼도 이 함수를 다시 부른다.
+ */
+export async function restoreSession(): Promise<void> {
+  if (isMockMode()) return
+  useAuthStore.getState().markChecking()
+  try {
+    await refreshSession()
+  } catch (error) {
+    if (isApiError(error) && error.status === 401) return // 이미 guest로 바뀌어 있다
+    useAuthStore.getState().markUnavailable()
+  }
+}
+
+/**
+ * 401 응답을 받으면 재발급 후 같은 요청을 한 번 다시 보내는 인터셉터 처리부다.
+ *
+ * 흐름:
+ * 1. 401이 아니거나, 이미 한 번 재시도한 요청이면 그대로 실패시킨다(무한 반복 방지)
+ * 2. 이 요청에 Access Token을 붙여 보내지 않았다면(비로그인 요청) 재발급할 대상이 아니라 그대로 실패시킨다
+ * 3. 그 사이 다른 요청이 이미 토큰을 갱신했다면(보낸 토큰 ≠ 지금 토큰) 재발급 없이 새 토큰으로 바로 재시도한다
+ * 4. 아니면 재발급한다(동시 401은 refreshSession이 요청 하나로 묶는다)
+ *    - 재발급이 401: 로그인 상태가 비워졌다. 원래 401을 그대로 던지고, 화면은 가드가 로그인 화면으로 보낸다
+ *    - 재발급이 500·네트워크 오류: 로그인 화면으로 보내지 않는다(상태 유지). 재발급의 오류를 그대로 던진다
+ * 5. 새 토큰을 붙여 원래 요청을 한 번 다시 보낸다
+ *
+ * 이 인터셉터가 오류 정리 인터셉터(handleResponseError)보다 먼저 실행돼야 한다. 다시 보내려면 원래 요청 설정(config)이 든
+ * AxiosError가 필요한데, 정리 단계를 지나면 ApiError로 바뀌어 config가 사라진다(axios는 등록한 순서대로 실행한다).
+ */
+async function retryAfterRefresh(error: unknown): Promise<unknown> {
+  // 1.
+  if (!Axios.isAxiosError(error) || error.response?.status !== 401 || !error.config) throw error
+  const config = error.config
+  if (config._authRetried) throw error
+
+  // 2.
+  const sentAuthorization = config.headers.get('Authorization')
+  if (!sentAuthorization) throw error
+
+  // 3. + 4.
+  const currentToken = useAuthStore.getState().accessToken
+  const alreadyRefreshed = currentToken !== null && sentAuthorization !== `Bearer ${currentToken}`
+  if (!alreadyRefreshed) {
+    try {
+      await refreshSession()
+    } catch (refreshError) {
+      if (isApiError(refreshError) && refreshError.status === 401) throw error
+      throw refreshError
+    }
+  }
+
+  // 5. 로그아웃 등으로 그 사이 토큰이 비워졌다면 다시 보내지 않고 원래 401을 돌려준다
+  const newToken = useAuthStore.getState().accessToken
+  if (!newToken) throw error
+  config._authRetried = true
+  config.headers.set('Authorization', `Bearer ${newToken}`)
+  return AXIOS_INSTANCE(config)
+}
+
+AXIOS_INSTANCE.interceptors.response.use((response) => response, retryAfterRefresh)
 
 // 성공 응답(2xx)은 그대로 통과시키고(래퍼를 벗기지 않음), 실패만 위 함수로 정리한다
 AXIOS_INSTANCE.interceptors.response.use((response) => response, handleResponseError)

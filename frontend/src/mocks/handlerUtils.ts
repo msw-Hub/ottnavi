@@ -5,7 +5,7 @@
  * 써야 한다. 한쪽 파일이 다른 쪽을 import하면 서로를 끌어와 순환 import가 되므로, 공통 부분을 이 파일로 뺐다.
  */
 import { HttpResponse } from 'msw'
-import type { ProblemDetail } from '@/api/generated/model'
+import type { FieldError, ProblemDetail } from '@/api/generated/model'
 import type { AddWishlistItemRequest } from '@/api/generated/model'
 import { MOCK_PAGE_SIZE_HEADER, MOCK_SCENARIO_HEADER } from '@/lib/mockScenario'
 import { getMockRole, readStored, writeStored } from '@/mocks/mockSession'
@@ -34,6 +34,7 @@ export function problemResponse(
   title: string,
   errorCode: string,
   detail: string,
+  fieldErrors?: FieldError[],
 ) {
   const body: ProblemDetail = {
     title,
@@ -41,6 +42,8 @@ export function problemResponse(
     detail,
     instance: new URL(request.url).pathname,
     errorCode,
+    // 검증 실패(VALIDATION_FAILED)일 때만 필드별 오류를 싣는다(error-codes.md "fieldErrors 구조")
+    ...(fieldErrors ? { fieldErrors } : {}),
   }
   return HttpResponse.json(body, {
     status,

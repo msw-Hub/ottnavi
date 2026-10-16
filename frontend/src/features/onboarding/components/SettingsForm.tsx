@@ -26,6 +26,19 @@ import {
 import { formatWon } from '@/lib/format'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
 
+// 서버 400의 fieldErrors에 담기는 영문 필드명을 사용자가 아는 화면 이름표로 바꾸는 표.
+// 표에 없는 필드는 원래 이름을 그대로 보인다(이름을 지어내지 않기 위함)
+const FIELD_LABELS: Record<string, string> = {
+  monthlyBudget: '월 예산',
+  monthlyWatchMinutes: '한 달 시청 시간',
+  subscriptions: '이용 중인 서비스',
+}
+
+// 이름표 표에서 찾는다. hasOwn으로 확인하는 이유: 서버가 "constructor" 같은 이름을 보내도 객체 기본 속성이 딸려 나오지 않게 하기 위함이다
+function getFieldLabel(field: string): string {
+  return Object.hasOwn(FIELD_LABELS, field) ? FIELD_LABELS[field] : field
+}
+
 interface SectionCardProps {
   stepNumber: number // 위에서부터 몇 번째 구역인지(1부터). 입력 순서를 눈에 보이게 한다
   title: string // 구역 제목
@@ -212,6 +225,16 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
             <AlertDescription className="text-destructive/90">
               {isApiError(save.error) ? save.error.userMessage : '잠시 후 다시 시도해 주세요.'}
             </AlertDescription>
+            {/* 폼 검증을 통과했는데 서버만 거절한 경우(400 VALIDATION_FAILED)의 필드별 이유 */}
+            {isApiError(save.error) && save.error.fieldErrors.length > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-sm text-destructive/90">
+                {save.error.fieldErrors.map((fieldError) => (
+                  <li key={`${fieldError.field}:${fieldError.message}`}>
+                    {getFieldLabel(fieldError.field)}: {fieldError.message}
+                  </li>
+                ))}
+              </ul>
+            )}
           </Alert>
         )}
         <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={save.isPending}>

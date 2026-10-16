@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -65,11 +65,11 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * **제안(Task 031, 미구현).** 내 찜을 최근에 찜한 순으로 전부 돌려준다. 드라마는 시즌 단위로 한 줄씩이다(R11-19).
+ * 내 찜을 최근에 찜한 순으로 전부 돌려준다. 드라마는 시즌 단위로 한 항목씩이다(R11-19).
  * "다 봤음" 항목(`watchedAt`이 있음)도 목록에 포함하되 `activeItemCount`에는 세지 않는다(PRD 11절 36번).
  * 페이지네이션은 두지 않는다. 계산 대상 찜은 20개로 막히고, "다 봤음" 항목은 상한이 없지만 사용자가 직접 체크해야 늘어나 증가가 느리다. 많아져 문제가 되면 "다 봤음"만 따로 나눠 조회하는 API를 추가한다.
  * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 내 찜 목록 조회 (제안)
+ * @summary 내 찜 목록 조회
  */
 export const listWishlistItems = (
 
@@ -140,7 +140,7 @@ export function useListWishlistItems<TData = Awaited<ReturnType<typeof listWishl
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 내 찜 목록 조회 (제안)
+ * @summary 내 찜 목록 조회
  */
 
 export function useListWishlistItems<TData = Awaited<ReturnType<typeof listWishlistItems>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
@@ -161,11 +161,11 @@ export function useListWishlistItems<TData = Awaited<ReturnType<typeof listWishl
 
 
 /**
- * **제안(Task 031, 미구현).** 작품(드라마는 시즌)을 찜한다. 새로 만들면 201, 같은 작품(시즌)이 이미 찜돼 있으면 새로 만들지 않고 기존 항목 ID와 함께 200을 준다(PRD FR-09 "중복 추가는 무시"). 중복이면 기존 우선순위·"다 봤음" 상태를 바꾸지 않는다(우선순위 변경은 PATCH).
+ * 작품(드라마는 시즌)을 찜한다. 새로 만들면 201, 같은 작품(시즌)이 이미 찜돼 있으면 새로 만들지 않고 기존 항목 ID와 함께 200을 준다(PRD FR-09 "중복 추가는 무시"). 중복이면 기존 우선순위·"다 봤음" 상태를 바꾸지 않는다(우선순위 변경은 PATCH).
  * 드라마(`tv`)는 `seasonNumber`가 필수이고 영화(`movie`)는 `null`이어야 한다. 작품은 검색·상세 조회로 이미 저장된 것이어야 한다(찜 추가는 TMDB를 호출하지 않는다).
  * "다 봤음"이 아닌 찜이 이미 20개면 새로 추가할 수 없다(PRD 11절 36번). 이미 20개여도 중복 추가는 409가 아니라 200이다(PRD FR-09).
  * 오류: `VALIDATION_FAILED`(400, 필드 누락·영화/드라마와 seasonNumber 불일치), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `TITLE_NOT_FOUND`(404, 작품 또는 시즌 없음), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
- * @summary 찜 추가 (제안)
+ * @summary 찜 추가
  */
 export const addWishlistItem = (
     addWishlistItemRequest: BodyType<AddWishlistItemRequest>,
@@ -219,7 +219,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type AddWishlistItemMutationVariables = {data: BodyType<AddWishlistItemRequest>}
 
     /**
- * @summary 찜 추가 (제안)
+ * @summary 찜 추가
  */
 export const useAddWishlistItem = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addWishlistItem>>, TError,AddWishlistItemMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -232,10 +232,10 @@ export const useAddWishlistItem = <TError = ErrorType<BadRequestResponse | Unaut
       return useMutation(getAddWishlistItemMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 보낸 필드만 바꾼다(하나 이상 필요). `isWatched: true`면 "다 봤음"으로 표시해 `watchedAt`을 기록하고 계산에서 뺀다. `false`면 되돌린다. 이미 같은 상태면 그대로 둔다(이미 "다 봤음"인 항목에 `true`를 보내도 `watchedAt`은 처음 값 유지).
+ * 보낸 필드만 바꾼다(하나 이상 필요). `isWatched: true`면 "다 봤음"으로 표시해 `watchedAt`을 기록하고 계산에서 뺀다. `false`면 되돌린다. 이미 같은 상태면 그대로 둔다(이미 "다 봤음"인 항목에 `true`를 보내도 `watchedAt`은 처음 값 유지).
  * 되돌릴 때 "다 봤음"이 아닌 찜이 이미 20개면 되돌릴 수 없다(PRD 11절 36번).
- * 오류: `VALIDATION_FAILED`(400, 빈 요청·잘못된 값), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `WISHLIST_ITEM_NOT_FOUND`(404, 없거나 본인 찜이 아님), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
- * @summary 찜 우선순위·"다 봤음" 변경 (제안)
+ * 오류: `VALIDATION_FAILED`(400, 빈 요청·잘못된 값·경로 ID 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `WISHLIST_ITEM_NOT_FOUND`(404, 없거나 본인 찜이 아님), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
+ * @summary 찜 우선순위·"다 봤음" 변경
  */
 export const updateWishlistItem = (
     wishlistItemId: number,
@@ -290,7 +290,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateWishlistItemMutationVariables = {wishlistItemId: number;data: BodyType<UpdateWishlistItemRequest>}
 
     /**
- * @summary 찜 우선순위·"다 봤음" 변경 (제안)
+ * @summary 찜 우선순위·"다 봤음" 변경
  */
 export const useUpdateWishlistItem = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWishlistItem>>, TError,UpdateWishlistItemMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -303,9 +303,9 @@ export const useUpdateWishlistItem = <TError = ErrorType<BadRequestResponse | Un
       return useMutation(getUpdateWishlistItemMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 찜을 삭제한다. 이미 없는 항목(또는 본인 것이 아닌 항목)도 오류 없이 204다(여러 번 해도 결과가 같다).
+ * 찜을 삭제한다. 이미 없는 항목(또는 본인 것이 아닌 항목)도 오류 없이 204다(여러 번 해도 결과가 같다).
  * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 찜 삭제 (제안)
+ * @summary 찜 삭제
  */
 export const removeWishlistItem = (
     wishlistItemId: number,
@@ -357,7 +357,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RemoveWishlistItemMutationVariables = {wishlistItemId: number}
 
     /**
- * @summary 찜 삭제 (제안)
+ * @summary 찜 삭제
  */
 export const useRemoveWishlistItem = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeWishlistItem>>, TError,RemoveWishlistItemMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

@@ -68,6 +68,12 @@ export function TitleDetailScreen() {
       <StateLayout>
         <ErrorState
           error={detail.error}
+          // 서버는 DB에 저장된 작품만 돌려준다(단건 수집은 이월, Task 050·051). 그래서 404는 "아직 수집되지 않은 작품"일 수 있다고 덧붙인다
+          message={
+            isNotFound
+              ? '작품을 찾을 수 없습니다. 아직 수집되지 않은 작품일 수 있습니다.'
+              : undefined
+          }
           onRetry={isNotFound ? undefined : () => detail.refetch()}
         />
         {isNotFound && <BackToSearchLink />}

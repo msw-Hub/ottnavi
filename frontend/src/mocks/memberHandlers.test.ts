@@ -78,15 +78,15 @@ describe('내 설정', () => {
     expect(saved.data).not.toHaveProperty('weeklyInput')
   })
 
-  it('구독 중인데 결제일이 비어 있으면 1일로 저장하고, 구독 중이 아니면 요금제·결제일을 비운다', async () => {
+  it('구독 중인데 결제일이 비어 있으면 1일로 저장하고 요금제 이름 앞뒤 공백을 뗀다', async () => {
     const saved = await request<CommonResponseUserSettings>({
       url: '/me/settings',
       method: 'PUT',
       data: {
         ...SETTINGS_REQUEST,
         subscriptions: [
-          { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: null },
-          { ottServiceId: 2, status: 'UNKNOWN', planName: '남은 값', billingDay: 9 },
+          { ottServiceId: 1, status: 'SUBSCRIBED', planName: ' 스탠다드 ', billingDay: null },
+          { ottServiceId: 2, status: 'UNKNOWN', planName: null, billingDay: null },
         ],
       },
     })
@@ -94,6 +94,38 @@ describe('내 설정', () => {
       { ottServiceId: 1, status: 'SUBSCRIBED', planName: '스탠다드', billingDay: 1 },
       { ottServiceId: 2, status: 'UNKNOWN', planName: null, billingDay: null },
     ])
+  })
+
+  it('구독 중이 아닌 서비스에 요금제 이름이나 결제일을 보내면 400이다(서버 규칙)', async () => {
+    const error = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [{ ottServiceId: 2, status: 'UNKNOWN', planName: '남은 값', billingDay: 9 }],
+      },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(error) && error.fieldErrors[0]?.field).toBe('subscriptions[0]')
+  })
+
+  it('없는 서비스 ID와 소수 금액은 400이다', async () => {
+    const unknownService = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: {
+        ...SETTINGS_REQUEST,
+        subscriptions: [{ ottServiceId: 99, status: 'FREE', planName: null, billingDay: null }],
+      },
+    }).catch((e: unknown) => e)
+    expect(unknownService).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const decimalBudget = await request({
+      url: '/me/settings',
+      method: 'PUT',
+      data: { ...SETTINGS_REQUEST, monthlyBudget: 15000.5 },
+    }).catch((e: unknown) => e)
+    expect(decimalBudget).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
   })
 
   it('같은 서비스를 두 번 보내면 400이다', async () => {
@@ -118,6 +150,45 @@ describe('내 설정', () => {
       data: { ...SETTINGS_REQUEST, monthlyWatchMinutes: 60 },
     }).catch((e: unknown) => e)
     expect(isApiError(error) && error.status === 400 && error.errorCode).toBe('VALIDATION_FAILED')
+  })
+})
+
+describe('찜 변경·삭제의 서버 규칙(Task 058)', () => {
+  it('PATCH 본문이 비어 있으면 400이고, 경로 ID 형식이 틀리면 PATCH·DELETE 모두 400이다', async () => {
+    const created = await request<{ data: { wishlistItemId: number } }>({
+      url: '/me/wishlist-items',
+      method: 'POST',
+      data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
+    })
+    const id = created.data.wishlistItemId
+
+    const emptyBody = await request({
+      url: `/me/wishlist-items/${id}`,
+      method: 'PATCH',
+      data: {},
+    }).catch((e: unknown) => e)
+    expect(emptyBody).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const badId = await request({
+      url: '/me/wishlist-items/abc',
+      method: 'PATCH',
+      data: { priority: 'WANT' },
+    }).catch((e: unknown) => e)
+    expect(badId).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+
+    const badDeleteId = await request({ url: '/me/wishlist-items/0', method: 'DELETE' }).catch(
+      (e: unknown) => e,
+    )
+    expect(badDeleteId).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+  })
+
+  it('없는 찜 항목의 변경은 404 WISHLIST_ITEM_NOT_FOUND다', async () => {
+    const notFound = await request({
+      url: '/me/wishlist-items/999',
+      method: 'PATCH',
+      data: { priority: 'WANT' },
+    }).catch((e: unknown) => e)
+    expect(notFound).toMatchObject({ status: 404, errorCode: 'WISHLIST_ITEM_NOT_FOUND' })
   })
 })
 
@@ -293,6 +364,53 @@ describe('플랜 계산과 저장', () => {
     }).catch((e: unknown) => e)
     expect(error).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
   })
+
+  it('초안 조회는 계산 응답과 같은 값·순서이고, 요금을 고쳐도 다시 계산하기 전에는 바뀌지 않는다(서버 규칙)', async () => {
+    const { data } = await calculate()
+    await request({ url: `/me/service-prices/101`, method: 'PUT', data: { monthlyPrice: 1000 } })
+    const drafts = await request<CommonResponsePlanDraftList>({
+      url: '/me/plan-drafts',
+      method: 'GET',
+    })
+    expect(drafts.data.drafts).toEqual(data.drafts)
+  })
+
+  it('stale 시나리오에서도 없는 planId는 409가 아니라 404가 먼저다(서버 판정 순서)', async () => {
+    await calculate('stale')
+    const error = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: 999999 },
+      headers: { 'X-Mock-Scenario': 'stale' },
+    }).catch((e: unknown) => e)
+    expect(error).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
+  })
+
+  it('저장하기 전 현재 플랜은 404가 아니라 200 { plan: null }이고, 저장하면 초안 필드와 activatedAt을 준다', async () => {
+    const before = await request<{ data: { plan: unknown } }>({
+      url: '/me/plans/current',
+      method: 'GET',
+    })
+    expect(before.data.plan).toBeNull()
+
+    const { data } = await calculate()
+    const saver = data.drafts.find((d) => d.planType === 'SAVER')!
+    await request({ url: '/me/plans', method: 'POST', data: { planId: saver.planId } })
+
+    const after = await request<{ data: { plan: Record<string, unknown> } }>({
+      url: '/me/plans/current',
+      method: 'GET',
+    })
+    expect(after.data.plan).toMatchObject({ ...saver, activatedAt: expect.any(String) })
+
+    // 이미 저장돼 DRAFT가 아닌 planId를 다시 저장하면 404다
+    const again = await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: saver.planId },
+    }).catch((e: unknown) => e)
+    expect(again).toMatchObject({ status: 404, errorCode: 'PLAN_DRAFT_NOT_FOUND' })
+  })
 })
 
 describe('요금', () => {
@@ -345,6 +463,27 @@ describe('요금', () => {
       }).catch((e: unknown) => e)
       expect(isApiError(error) && error.status).toBe(400)
     }
+  })
+
+  it('금액 오류(400)는 상품 존재 확인(404)보다 먼저이고 fieldErrors로 알린다(서버 실측 순서, Task 060)', async () => {
+    const decimal = await request({
+      url: '/me/service-prices/999', // 없는 상품이어도 본문 오류가 먼저다
+      method: 'PUT',
+      data: { monthlyPrice: 9900.5 },
+    }).catch((e: unknown) => e)
+    expect(decimal).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(isApiError(decimal) && decimal.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '형식이 올바르지 않습니다.' },
+    ])
+
+    const tooHigh = await request({
+      url: `/me/service-prices/${NETFLIX_PRODUCT_ID}`,
+      method: 'PUT',
+      data: { monthlyPrice: 1_000_001 },
+    }).catch((e: unknown) => e)
+    expect(isApiError(tooHigh) && tooHigh.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' },
+    ])
   })
 
   it('없는 상품은 PUT·DELETE 모두 404 SERVICE_PRICE_NOT_FOUND다', async () => {

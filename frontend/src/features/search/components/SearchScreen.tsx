@@ -125,7 +125,7 @@ function SearchResultList({
       {result.items.length === 0 ? (
         <EmptyState
           title="검색 결과가 없습니다"
-          description={`"${query}"에 해당하는 작품을 찾지 못했습니다. 제목을 다르게 입력하거나 원제로 검색해 보세요.`}
+          description={`"${query}"에 해당하는 작품을 찾지 못했습니다. 제목을 다르게 입력하거나 원제로 검색해 보세요. 아직 수집되지 않은 작품은 검색되지 않을 수 있습니다.`}
         />
       ) : (
         <>

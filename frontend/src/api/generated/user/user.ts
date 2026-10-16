@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -60,11 +60,11 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * **제안(Task 031, 미구현).** 서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
+ * 서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
  * 온보딩 뒤에는 `subscriptions`에 서비스 7개가 모두 온다. 미구독은 저장 행이 없으므로(PRD FR-08) 서버가 `NOT_SUBSCRIBED`로 채운다.
  * 요금 화면(SCR-09)의 예산·시청 시간 요약도 이 API로 가져온다.
  * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 내 설정 조회 (제안)
+ * @summary 내 설정 조회
  */
 export const getMySettings = (
 
@@ -135,7 +135,7 @@ export function useGetMySettings<TData = Awaited<ReturnType<typeof getMySettings
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 내 설정 조회 (제안)
+ * @summary 내 설정 조회
  */
 
 export function useGetMySettings<TData = Awaited<ReturnType<typeof getMySettings>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
@@ -156,11 +156,11 @@ export function useGetMySettings<TData = Awaited<ReturnType<typeof getMySettings
 
 
 /**
- * **제안(Task 031, 미구현).** 설정 전체를 저장한다. 처음 저장하면 온보딩이 끝난 것으로 본다(`isOnboardingDone: true`).
+ * 설정 전체를 저장한다. 처음 저장하면 온보딩이 끝난 것으로 본다(`isOnboardingDone: true`).
  * 시청 시간은 분 단위 결과(`monthlyWatchMinutes`)와 고른 방식(`watchPreset`)만 저장한다. "주 N회 × 회당 M시간" 환산 입력값은 저장하지 않는다(R11-18 A안).
  * `subscriptions`에 없는 서비스는 미구독으로 본다. `SUBSCRIBED`인데 `billingDay`가 `null`이면 1일로 저장한다(PRD FR-08 결제일 기본값 1일).
- * 오류: `VALIDATION_FAILED`(400, 예산 음수·시청 시간 범위 밖·구독 중인데 요금제 이름 없음·없는 서비스·같은 서비스 중복 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 내 설정 저장 (제안)
+ * 오류: `VALIDATION_FAILED`(400, 예산 음수·시청 시간 범위 밖·구독 중인데 요금제 이름 없음·구독 중이 아닌데 요금제 이름이나 결제일을 보냄·없는 서비스·같은 서비스 중복 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * @summary 내 설정 저장
  */
 export const updateMySettings = (
     updateMySettingsRequest: BodyType<UpdateMySettingsRequest>,
@@ -214,7 +214,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateMySettingsMutationVariables = {data: BodyType<UpdateMySettingsRequest>}
 
     /**
- * @summary 내 설정 저장 (제안)
+ * @summary 내 설정 저장
  */
 export const useUpdateMySettings = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMySettings>>, TError,UpdateMySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

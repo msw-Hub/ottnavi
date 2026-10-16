@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
@@ -12,6 +12,7 @@ import { TitleDetailScreen } from '@/features/title-detail/components/TitleDetai
 import { TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { getMockRole, resetMockSession, setMockOnboardingDone } from '@/mocks/mockSession'
+import { useAuthStore } from '@/stores/authStore'
 
 /*
  * 로그인 흐름 테스트(Task 027 2회차): 로그인 화면, 콜백 성공·실패, 비로그인 찜 → 로그인 → 원래 화면 복귀,
@@ -75,12 +76,21 @@ describe('로그인 화면', () => {
     expect(screen.getByRole('list', { name: '로그인 혜택' })).toBeInTheDocument()
   })
 
-  it('목업이 아닌 환경에서는 로그인 버튼이 꺼져 있고 준비 중이라고 알린다', async () => {
+  it('목업이 아닌 환경에서는 버튼이 켜져 있고, 누르면 돌아갈 곳을 보관한 뒤 Google 로그인 주소로 보낸다', async () => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
-    renderAt('/login')
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    const user = userEvent.setup()
+    renderAt('/login', { from: '/wishlist' })
 
-    expect(await screen.findByRole('button', { name: 'Google로 로그인' })).toBeDisabled()
-    expect(screen.getByText('로그인 연동은 아직 준비 중입니다.')).toBeInTheDocument()
+    const button = await screen.findByRole('button', { name: 'Google로 로그인' })
+    expect(button).toBeEnabled()
+    await user.click(button)
+
+    expect(assign).toHaveBeenCalledWith('/api/oauth2/authorization/google')
+    expect(window.sessionStorage.getItem('ottnavi:login-return-to')).toBe('/wishlist')
+    vi.unstubAllGlobals()
+    window.sessionStorage.clear()
   })
 })
 
@@ -102,7 +112,7 @@ describe('로그인 콜백 화면', () => {
     const user = userEvent.setup()
     renderAt('/auth/callback?mockScenario=login-failed')
 
-    expect(await screen.findByText('로그인에 실패했습니다', undefined, WAIT)).toBeInTheDocument()
+    expect(await screen.findByText('다시 로그인해 주세요', undefined, WAIT)).toBeInTheDocument()
     expect(getMockRole()).toBe('GUEST')
     await user.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByRole('heading', { level: 1, name: '로그인' })).toBeInTheDocument()
@@ -140,7 +150,8 @@ describe('비로그인 찜 → 로그인 → 원래 화면', () => {
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe(`/titles/movie/${movie.tmdbId}`)
     expect(getMockRole()).toBe('USER')
-    // 로그인 뒤에는 찜이 된다
+    // 로그인 뒤에는 찜이 된다(서버 찜 목록을 받아 버튼이 활성화되기를 기다린다)
+    await waitFor(() => expect(screen.getByRole('button', { name: '기생충 찜하기' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '기생충 찜하기' }))
     // 찜하면 선택지 팝업이 뜬다(팝업이 열린 동안 뒤 화면은 낭독기에서 가려지므로 닫은 뒤 버튼을 확인한다)
     expect(await screen.findByRole('dialog', { name: '기생충을 찜했어요' })).toBeInTheDocument()
@@ -176,8 +187,9 @@ describe('머리글의 목업 로그인 상태 전환', () => {
     expect(await screen.findByRole('link', { name: '로그인' })).toBeInTheDocument()
   })
 
-  it('운영(목업이 아닌 환경)에서는 전환이 보이지 않고 항상 로그인 링크만 보인다', async () => {
+  it('운영(목업이 아닌 환경)에서는 전환이 보이지 않고 비로그인이면 로그인 링크만 보인다', async () => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
+    useAuthStore.getState().clearSession() // 재발급 확인이 끝나 비로그인으로 정해진 상태
     renderAt('/about')
 
     expect(await screen.findByRole('link', { name: '로그인' })).toBeInTheDocument()

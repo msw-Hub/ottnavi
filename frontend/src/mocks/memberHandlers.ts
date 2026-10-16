@@ -1,13 +1,17 @@
 import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import type {
   CommonResponseUserSettings,
+  FieldError,
   UpdateMySettingsRequest,
   UserSettings,
 } from '@/api/generated/model'
 import type {
+  ActivePlan,
+  CommonResponseCurrentPlan,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
   CreatePlanRequest,
+  PlanDraft,
 } from '@/api/generated/model'
 import type {
   CommonResponseServicePrice,
@@ -34,7 +38,11 @@ import {
   MOCK_PRODUCTS,
   isProductOnSale,
 } from '@/mocks/fixtures/admin'
-import { DEFAULT_USER_SETTINGS, EMPTY_USER_SETTINGS } from '@/mocks/fixtures/settings'
+import {
+  DEFAULT_USER_SETTINGS,
+  EMPTY_USER_SETTINGS,
+  MOCK_SERVICE_IDS,
+} from '@/mocks/fixtures/settings'
 import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 import { isMockOnboardingDone, setMockOnboardingDone } from '@/mocks/mockSession'
 import {
@@ -56,8 +64,9 @@ import {
  *              PUT    /api/me/service-prices/{productId}    ({ monthlyPrice } 내 금액으로 고침. 없거나 판매 종료인 상품은 404 SERVICE_PRICE_NOT_FOUND)
  *              DELETE /api/me/service-prices/{productId}    (고친 금액을 지우고 기본 요금으로 되돌림, 204)
  * - 플랜:      POST /api/me/plan-drafts              (유형 3종 초안을 새로 계산, 201 + 초안 3개)
- *              GET  /api/me/plan-drafts              (계산 전이거나 저장한 뒤에는 빈 목록)
- *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 저장하면 나머지 초안은 삭제)
+ *              GET  /api/me/plan-drafts              (저장해 둔 초안을 그대로 돌려줌. 계산 전이거나 저장한 뒤에는 빈 목록)
+ *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 404 판정이 409보다 먼저. 저장하면 나머지 초안은 삭제)
+ *              GET  /api/me/plans/current            (저장한 현재 플랜. 없으면 404가 아니라 200 { plan: null })
  *
  * 시나리오(주소의 ?mockScenario= 값을 목업 모드가 X-Mock-Scenario 요청 헤더로 보낸다):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
@@ -115,10 +124,48 @@ function persistPriceOverrides(): void {
   writeMockJson(PRICE_OVERRIDES_STORAGE_KEY, priceOverrides.size === 0 ? null : [...priceOverrides])
 }
 
-// 플랜 계산 상태
-let calculationSeq = 0 // 계산한 횟수. 플랜 ID를 새로 발급하는 기준
-let hasDrafts = false // 지금 DRAFT가 있는지(계산 후 true, 저장하면 false: 나머지 DRAFT는 삭제된다)
-let isStaleServed = false // stale 시나리오에서 409를 이미 한 번 돌려줬는지
+/*
+ * 플랜 계산 상태. 서버처럼 "계산한 결과(초안)"를 저장해 두고 GET이 그 저장값을 그대로 돌려준다(요청마다 다시 만들지 않는다).
+ * 왜: 실제 서버는 POST 계산 시 DB에 초안을 저장하고 GET이 DB에서 읽는다. 목업이 매번 다시 만들면 요금을 고친 뒤 계산 전인데도
+ * 초안 금액이 바뀌어 보이는 등 서버와 다르게 움직인다. 새로고침에도 같은 결과가 복원되도록 초안·현재 플랜은 sessionStorage에도 적는다.
+ */
+const PLAN_STATE_STORAGE_KEY = 'ottnavi:mock-plan-state'
+
+interface StoredPlanState {
+  calculationSeq: number
+  drafts: PlanDraft[]
+  activePlan: ActivePlan | null
+}
+
+function readStoredPlanState(): StoredPlanState {
+  const stored = readMockJson(PLAN_STATE_STORAGE_KEY)
+  if (
+    typeof stored === 'object' &&
+    stored !== null &&
+    'drafts' in stored &&
+    Array.isArray(stored.drafts) &&
+    'calculationSeq' in stored &&
+    typeof stored.calculationSeq === 'number'
+  ) {
+    const activePlan = 'activePlan' in stored ? (stored.activePlan as ActivePlan | null) : null
+    return {
+      calculationSeq: stored.calculationSeq,
+      drafts: stored.drafts as PlanDraft[],
+      activePlan,
+    }
+  }
+  return { calculationSeq: 0, drafts: [], activePlan: null }
+}
+
+const initialPlanState = readStoredPlanState()
+let calculationSeq = initialPlanState.calculationSeq // 계산한 횟수. 플랜 ID를 새로 발급하는 기준
+let storedDrafts: PlanDraft[] = initialPlanState.drafts // 지금 저장돼 있는 DRAFT(계산하면 덮어쓰고, 저장하면 비운다)
+let activePlan: ActivePlan | null = initialPlanState.activePlan // 저장한 현재 플랜(ACTIVE). 없으면 null
+let isStaleServed = false // stale 시나리오에서 409를 이미 한 번 돌려줬는지(새로고침하면 다시 한 번 재현된다)
+
+function persistPlanState(): void {
+  writeMockJson(PLAN_STATE_STORAGE_KEY, { calculationSeq, drafts: storedDrafts, activePlan })
+}
 
 // 저장한 설정을 지운다(테스트가 서로 영향을 주지 않게 쓴다)
 export function resetMockSettings(): void {
@@ -135,8 +182,10 @@ export function resetMockPricing(): void {
 // 플랜 계산·저장 상태를 처음으로 되돌린다
 export function resetMockPlans(): void {
   calculationSeq = 0
-  hasDrafts = false
+  storedDrafts = []
+  activePlan = null
   isStaleServed = false
+  writeMockJson(PLAN_STATE_STORAGE_KEY, null)
 }
 
 // 회원 화면 목업 상태를 한꺼번에 되돌린다(찜 목록은 resetMockWishlist, 로그인 역할은 resetMockSession으로 따로 되돌린다)
@@ -209,46 +258,130 @@ function servicePriceNotFound(request: Request) {
   )
 }
 
-function validationError(request: Request, detail: string) {
-  return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail)
+function validationError(request: Request, detail: string, fieldErrors?: FieldError[]) {
+  return problemResponse(request, 400, 'Bad Request', 'VALIDATION_FAILED', detail, fieldErrors)
 }
 
-// 저장 요청의 값이 입력 규칙(schema.ts와 같은 규칙)을 지키는지 검사한다. 어긋나면 안내 문장을, 맞으면 null을 돌려준다
-function validateSettingsRequest(body: UpdateMySettingsRequest): string | null {
+// 경로의 상품 ID가 1 이상 정수인지 본다(서버 @Positive). 어긋나면 fieldErrors에 담을 오류를 돌려준다
+function positiveProductIdError(raw: string | readonly string[] | undefined): FieldError | null {
+  const value = Number(raw)
+  return Number.isInteger(value) && value >= 1
+    ? null
+    : { field: 'productId', message: '1 이상이어야 합니다.' }
+}
+
+/**
+ * 내 월 요금 요청 본문의 금액을 서버(SetMyServicePriceRequest)와 같이 검사한다. 올바르면 null이다.
+ * 소수·숫자가 아닌 값은 "형식이 올바르지 않습니다."(Jackson 형식 오류가 Bean Validation보다 먼저), 없으면 필수 오류,
+ * 범위는 0 이상 1,000,000 이하다.
+ */
+function servicePriceBodyError(monthlyPrice: unknown): FieldError | null {
+  if (monthlyPrice == null) return { field: 'monthlyPrice', message: '월 요금은 필수입니다.' }
+  if (typeof monthlyPrice !== 'number' || !Number.isInteger(monthlyPrice)) {
+    return { field: 'monthlyPrice', message: '형식이 올바르지 않습니다.' }
+  }
+  if (monthlyPrice < 0) return { field: 'monthlyPrice', message: '0 이상이어야 합니다.' }
+  if (monthlyPrice > 1_000_000) {
+    return { field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' }
+  }
+  return null
+}
+
+// 서비스 ID 범위(서비스 목록 API의 7곳). 이 밖의 ID는 서버가 "없는 서비스"로 400을 준다
+const MOCK_SERVICE_ID_SET = new Set<number>(MOCK_SERVICE_IDS)
+
+// 요금제 이름 최대 길이, 서비스 상태 최대 개수(계약 UpdateMySettingsRequest)
+const MAX_PLAN_NAME_LENGTH = 30
+const MAX_SUBSCRIPTION_COUNT = 7
+
+/**
+ * 저장 요청이 서버 규칙을 지키는지 검사한다. 어긋나면 필드별 오류 목록을, 맞으면 빈 배열을 돌려준다.
+ * 순서는 실제 서버(USER_SETTINGS_WISHLIST_GUIDE 2.3~2.4)와 같다: 1단계 형태·범위(Bean Validation) → 2단계 서비스 간 규칙(서비스 계층).
+ * 1단계에서 하나라도 어긋나면 2단계는 검사하지 않고 거절한다(서버는 1단계에서 요청이 끝난다).
+ * 금액·시청 시간·결제일이 소수이면 정수가 아니라서 400이다(Number.isInteger).
+ */
+function validateSettingsRequest(body: UpdateMySettingsRequest): FieldError[] {
+  // 1. 1단계: 형태·범위
+  const shapeErrors: FieldError[] = []
   if (!Number.isInteger(body.monthlyBudget) || body.monthlyBudget < 0) {
-    return '월 예산은 0 이상의 정수여야 합니다.'
+    shapeErrors.push({ field: 'monthlyBudget', message: '0 이상의 정수여야 합니다.' })
   }
   if (
     !Number.isInteger(body.monthlyWatchMinutes) ||
     body.monthlyWatchMinutes < MIN_MONTHLY_WATCH_MINUTES ||
     body.monthlyWatchMinutes > MAX_MONTHLY_WATCH_MINUTES
   ) {
-    return `월 시청 시간은 ${MIN_MONTHLY_WATCH_MINUTES}분 이상이어야 합니다.`
+    shapeErrors.push({
+      field: 'monthlyWatchMinutes',
+      message: `${MIN_MONTHLY_WATCH_MINUTES} 이상 ${MAX_MONTHLY_WATCH_MINUTES} 이하의 정수여야 합니다.`,
+    })
   }
-  // 계약: 서비스 상태는 1~7개이고 같은 서비스를 두 번 보내면 400이다
+  if (!body.watchPreset) {
+    shapeErrors.push({ field: 'watchPreset', message: '시청 시간 방식을 골라야 합니다.' })
+  }
+  const subscriptions = body.subscriptions
   if (
-    !Array.isArray(body.subscriptions) ||
-    body.subscriptions.length === 0 ||
-    body.subscriptions.length > 7
+    !Array.isArray(subscriptions) ||
+    subscriptions.length < 1 ||
+    subscriptions.length > MAX_SUBSCRIPTION_COUNT
   ) {
-    return '서비스별 이용 상태를 입력해 주세요.'
+    shapeErrors.push({
+      field: 'subscriptions',
+      message: `서비스 상태는 1개 이상 ${MAX_SUBSCRIPTION_COUNT}개 이하여야 합니다.`,
+    })
+    return shapeErrors
   }
-  const ottServiceIds = body.subscriptions.map((s) => s.ottServiceId)
-  if (new Set(ottServiceIds).size !== ottServiceIds.length) {
-    return '같은 서비스를 두 번 보낼 수 없습니다.'
-  }
-  for (const subscription of body.subscriptions) {
-    if (subscription.status !== 'SUBSCRIBED') continue
-    // 구독 중이면 요금제 이름(30자 이하)이 필요하다. 결제일은 비어 있으면 1일로 저장한다(계약, PRD FR-08 기본값)
-    if (!subscription.planName || subscription.planName.length > 30) {
-      return '구독 중인 서비스는 30자 이하의 요금제 이름이 필요합니다.'
+  subscriptions.forEach((s, index) => {
+    if (s.planName != null && s.planName.length > MAX_PLAN_NAME_LENGTH) {
+      shapeErrors.push({
+        field: `subscriptions[${index}].planName`,
+        message: `${MAX_PLAN_NAME_LENGTH}자 이하여야 합니다.`,
+      })
     }
-    const day = subscription.billingDay
-    if (day !== null && (!Number.isInteger(day) || day < 1 || day > 31)) {
-      return '결제일은 1일부터 31일 사이여야 합니다.'
+    const day = s.billingDay
+    if (day != null && (!Number.isInteger(day) || day < 1 || day > 31)) {
+      shapeErrors.push({
+        field: `subscriptions[${index}].billingDay`,
+        message: '1 이상 31 이하의 정수여야 합니다.',
+      })
     }
-  }
-  return null
+  })
+  if (shapeErrors.length > 0) return shapeErrors
+
+  // 2. 2단계: 서비스 간 규칙. 없는 서비스·중복·상태별 요금제/결제일 규칙
+  const ruleErrors: FieldError[] = []
+  const seen = new Set<number>()
+  subscriptions.forEach((s, index) => {
+    if (!MOCK_SERVICE_ID_SET.has(s.ottServiceId)) {
+      ruleErrors.push({
+        field: `subscriptions[${index}].ottServiceId`,
+        message: '존재하지 않는 서비스입니다.',
+      })
+    } else if (seen.has(s.ottServiceId)) {
+      // 같은 서비스를 두 번 보내면 어느 쪽이 의도인지 알 수 없어 요청 전체를 거절한다
+      ruleErrors.push({
+        field: `subscriptions[${index}].ottServiceId`,
+        message: '같은 서비스를 두 번 보낼 수 없습니다.',
+      })
+    }
+    seen.add(s.ottServiceId)
+
+    if (s.status === 'SUBSCRIBED') {
+      if (s.planName == null || s.planName.trim() === '') {
+        ruleErrors.push({
+          field: `subscriptions[${index}].planName`,
+          message: '구독 중인 서비스는 요금제 이름이 필요합니다.',
+        })
+      }
+    } else if (s.planName != null || s.billingDay != null) {
+      // 구독 중이 아닌데 요금제 이름·결제일을 보내면 DB CHECK에 걸리기 전에 400으로 거절한다(Task 055, 계약 설명)
+      ruleErrors.push({
+        field: `subscriptions[${index}]`,
+        message: '구독 중이 아닌 서비스에는 요금제 이름과 결제일을 보낼 수 없습니다.',
+      })
+    }
+  })
+  return ruleErrors
 }
 
 /* ----- 찜 목록 변환 ----- */
@@ -314,8 +447,10 @@ export const memberHandlers: RequestHandler[] = [
     if (denied) return denied
 
     const requestBody = (await request.json()) as UpdateMySettingsRequest
-    const invalidReason = validateSettingsRequest(requestBody)
-    if (invalidReason) return validationError(request, invalidReason)
+    const fieldErrors = validateSettingsRequest(requestBody)
+    if (fieldErrors.length > 0) {
+      return validationError(request, '요청 값이 올바르지 않습니다.', fieldErrors)
+    }
 
     // 환산 결과(분)만 저장한다(R11-18 안 a 확정, 환산 입력값 필드는 계약에 없다).
     // 구독 중인데 결제일이 비어 있으면 1일로 채우고, 구독 중이 아니면 요금제·결제일을 비운다(계약)
@@ -323,7 +458,7 @@ export const memberHandlers: RequestHandler[] = [
       isOnboardingDone: true,
       subscriptions: requestBody.subscriptions.map((s) =>
         s.status === 'SUBSCRIBED'
-          ? { ...s, billingDay: s.billingDay ?? 1 }
+          ? { ...s, planName: s.planName?.trim() ?? null, billingDay: s.billingDay ?? 1 }
           : { ...s, planName: null, billingDay: null },
       ),
       monthlyBudget: requestBody.monthlyBudget,
@@ -400,14 +535,20 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
+    // 1. 경로 변수·본문 검사(서버 컨트롤러 단계라 상품 존재 확인(404)보다 먼저다. Task 060 실측 기록).
+    //    소수 금액(9900.5)은 버림으로 통과하지 않고 형식 오류다(서버 accept-float-as-int=false)
+    const idError = positiveProductIdError(params.productId)
+    if (idError) return validationError(request, '요청 값이 올바르지 않습니다.', [idError])
+    const { monthlyPrice } = (await request.json()) as Partial<SetMyServicePriceRequest>
+    const priceError = servicePriceBodyError(monthlyPrice)
+    if (priceError) return validationError(request, '요청 값이 올바르지 않습니다.', [priceError])
+    const validPrice = monthlyPrice as number
+
+    // 2. 상품 확인: 없거나 판매 종료면 404 SERVICE_PRICE_NOT_FOUND
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
     if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 
-    const { monthlyPrice } = (await request.json()) as SetMyServicePriceRequest
-    if (!Number.isInteger(monthlyPrice) || monthlyPrice < 0 || monthlyPrice > 1_000_000) {
-      return validationError(request, '월 요금은 0원 이상 100만 원 이하의 정수여야 합니다.')
-    }
-    priceOverrides.set(product.productId, monthlyPrice)
+    priceOverrides.set(product.productId, validPrice)
     persistPriceOverrides()
 
     const body: CommonResponseServicePrice = {
@@ -423,6 +564,8 @@ export const memberHandlers: RequestHandler[] = [
     const denied = denyGuest(request)
     if (denied) return denied
 
+    const idError = positiveProductIdError(params.productId)
+    if (idError) return validationError(request, '요청 값이 올바르지 않습니다.', [idError])
     const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
     if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
 
@@ -458,42 +601,49 @@ export const memberHandlers: RequestHandler[] = [
       return validationError(request, '계산할 찜 작품이 없습니다. 작품을 찜해 주세요.')
     }
 
+    // 1. 계산 결과를 저장해 둔다(서버가 DB에 초안 3종을 저장하고 기존 초안은 덮어쓰는 것과 같다)
     calculationSeq += 1
-    hasDrafts = true
-    const body: CommonResponsePlanDraftList = {
-      success: true,
-      data: { drafts: buildCurrentDrafts(request, settings) },
-    }
+    storedDrafts = buildCurrentDrafts(request, settings)
+    persistPlanState()
+    const body: CommonResponsePlanDraftList = { success: true, data: { drafts: storedDrafts } }
     return HttpResponse.json(body, { status: 201 })
   }),
 
-  // 플랜 초안 조회(계약 listPlanDrafts): 계산 전이거나 저장한 뒤에는 빈 목록이다(저장하면 나머지 DRAFT는 삭제되기 때문)
+  // 플랜 초안 조회(계약 listPlanDrafts): 저장해 둔 초안을 계산 응답과 같은 값·순서로 돌려준다. 계산 전이거나 저장한 뒤에는 빈 목록이다
   http.get('/api/me/plan-drafts', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
-    const settings = getEffectiveSettings()
-    const body: CommonResponsePlanDraftList = {
-      success: true,
-      data: { drafts: hasDrafts && settings ? buildCurrentDrafts(request, settings) : [] },
-    }
+    const body: CommonResponsePlanDraftList = { success: true, data: { drafts: storedDrafts } }
     return HttpResponse.json(body)
   }),
 
-  // 플랜 저장(계약 createPlan): 본문의 planId인 초안을 ACTIVE로 만든다(유형은 초안이 안다). stale 시나리오에서는 첫 요청만 409다
+  // 현재 플랜 조회(계약 getCurrentPlan): 저장한 플랜이 없으면 404가 아니라 200 { plan: null }이다
+  http.get('/api/me/plans/current', async ({ request }) => {
+    await wait()
+    const denied = denyGuest(request)
+    if (denied) return denied
+
+    const body: CommonResponseCurrentPlan = { success: true, data: { plan: activePlan } }
+    return HttpResponse.json(body)
+  }),
+
+  // 플랜 저장(계약 createPlan): 본문의 planId인 초안을 ACTIVE로 만든다(유형은 초안이 안다)
   http.post('/api/me/plans', async ({ request }) => {
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
 
+    // 1. 요청 값 검사(400)
     const { planId } = (await request.json()) as CreatePlanRequest
     if (!Number.isInteger(planId) || planId < 1) {
       return validationError(request, '저장할 플랜 ID가 올바르지 않습니다.')
     }
 
-    const settings = getEffectiveSettings()
-    if (!hasDrafts || !settings) {
+    // 2. 404를 먼저 판정한다(서버 순서). 저장된 초안에 없는 ID는 없음·남의 것·이미 저장됨·다시 계산해 지워진 것을 모두 포함한다
+    const draft = storedDrafts.find((d) => d.planId === planId)
+    if (!draft) {
       return problemResponse(
         request,
         404,
@@ -503,7 +653,7 @@ export const memberHandlers: RequestHandler[] = [
       )
     }
 
-    // 계산한 뒤 데이터 수집이 새로 끝나 초안의 기준일이 낡은 상황을 흉내 낸다. 클라이언트가 다시 계산하면 두 번째 저장부터 성공한다
+    // 3. 409: 계산한 뒤 데이터 수집이 새로 끝나 초안의 기준일이 낡은 상황을 흉내 낸다. 클라이언트가 다시 계산하면 두 번째 저장부터 성공한다
     if (hasMockScenario(request, 'stale') && !isStaleServed) {
       isStaleServed = true
       return problemResponse(
@@ -515,27 +665,17 @@ export const memberHandlers: RequestHandler[] = [
       )
     }
 
-    // 지금 초안 중 planId가 같은 것을 찾는다. 다시 계산해 ID가 바뀐 옛 초안이나 없는 ID는 404다
-    const draft = buildCurrentDrafts(request, settings).find((d) => d.planId === planId)
-    if (!draft) {
-      return problemResponse(
-        request,
-        404,
-        'Not Found',
-        'PLAN_DRAFT_NOT_FOUND',
-        '계산된 플랜을 찾을 수 없습니다.',
-      )
-    }
-
-    hasDrafts = false // 저장하면 고른 유형만 ACTIVE가 되고 나머지 DRAFT는 삭제된다(PRD 11절 35번)
+    // 4. 저장: 고른 초안만 ACTIVE가 되고 나머지 DRAFT는 삭제된다(PRD 11절 35번). 기존 ACTIVE는 서버에서 ARCHIVED가 된다
+    //    저장 시각은 서버처럼 오프셋이 붙은 형식(한국 시간 +09:00)으로 만든다
+    const activatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000)
+      .toISOString()
+      .replace('Z', '+09:00')
+    activePlan = { ...draft, activatedAt }
+    storedDrafts = []
+    persistPlanState()
     const body: CommonResponseSavedPlan = {
       success: true,
-      data: {
-        planId: draft.planId,
-        planType: draft.planType,
-        status: 'ACTIVE',
-        activatedAt: new Date().toISOString(),
-      },
+      data: { planId: draft.planId, planType: draft.planType, status: 'ACTIVE', activatedAt },
     }
     return HttpResponse.json(body, { status: 201 })
   }),

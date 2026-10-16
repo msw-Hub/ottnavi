@@ -36,8 +36,9 @@ export function ErrorState({
       className="grid content-start justify-items-center gap-2 rounded-lg border border-border bg-background px-4 py-5 text-center"
     >
       <TriangleAlertIcon aria-hidden="true" className="size-8 text-destructive" />
-      <p className="font-bold text-destructive">{title}</p>
-      <p className="text-sm text-muted-foreground">{description}</p>
+      {/* break-keep: 한글 문장이 글자 중간("다시 시도해 주/세요")에서 끊기지 않고 단어 단위로 줄바꿈되게 한다(375px 등 좁은 폭에서 읽기 쉽게) */}
+      <p className="font-bold break-keep text-destructive">{title}</p>
+      <p className="text-sm break-keep text-muted-foreground">{description}</p>
       {onRetry && (
         // size="lg"(36px)에 h-11을 덧씌워 44px로 만든다: 손가락으로 누르기 쉽게(Task 026 검수, Task 037에서 사용자 화면 버튼 높이를 44px로 통일). components/ui는 고치지 않는다
         <Button type="button" size="lg" onClick={onRetry} className="mt-1 h-11">

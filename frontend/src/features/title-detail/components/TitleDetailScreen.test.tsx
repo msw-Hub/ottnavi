@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -186,6 +186,8 @@ describe('작품 상세 화면', () => {
     await screen.findByRole('heading', { level: 1, name: '오징어 게임' })
 
     // 시즌 2를 찜한다. 우선순위를 묻지 않고 기본값 "보고 싶음"으로 들어간다
+    // 서버 찜 목록을 받기 전에는 버튼이 눌리지 않으므로(찜 여부를 모른 채 추가하지 않기 위함) 활성화를 기다린다
+    await waitFor(() => expect(screen.getByRole('button', { name: '시즌 2 찜하기' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '시즌 2 찜하기' }))
     const savedButton = await screen.findByRole('button', { name: '시즌 2 찜함 · 보고 싶음' })
     // 다른 시즌은 영향 없이 그대로다
@@ -212,6 +214,8 @@ describe('작품 상세 화면', () => {
     renderDetailOf('오징어 게임', 'tv')
     await screen.findByRole('heading', { level: 1, name: '오징어 게임' })
 
+    // 서버 찜 목록을 받기 전에는 버튼이 눌리지 않으므로(찜 여부를 모른 채 추가하지 않기 위함) 활성화를 기다린다
+    await waitFor(() => expect(screen.getByRole('button', { name: '시즌 2 찜하기' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: '시즌 2 찜하기' }))
     expect(
       await screen.findByRole('button', { name: '시즌 2 찜함 · 보고 싶음' }),
@@ -310,7 +314,9 @@ describe('작품 상세 화면', () => {
       </Providers>,
     )
 
-    expect(await screen.findByText('작품을 찾을 수 없습니다.')).toBeInTheDocument()
+    expect(
+      await screen.findByText(/작품을 찾을 수 없습니다. 아직 수집되지 않은/),
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '작품 검색으로 돌아가기' })).toBeInTheDocument()
   })
 })

@@ -474,3 +474,202 @@ describe('수집 실행·이력', () => {
     expect(window.sessionStorage.getItem('ottnavi:mock-admin-collect')).toBeNull()
   })
 })
+
+/*
+ * Task 061: 서버(AdminProductService·AdminProviderService·CollectExecutionService)와 같은 검사 순서·문구인지 본다.
+ * 서버는 요청 본문 검사(400) → 존재 확인(404) → 규칙(409) 순서이고, 400의 detail은 고정 문구, 필드별 안내는 fieldErrors다.
+ */
+describe('서버 검사 순서와 오류 모양', () => {
+  // 실패한 요청의 ApiError를 돌려준다. 성공하면 테스트가 잘못된 것이라 바로 실패시킨다
+  async function errorOf(config: Parameters<typeof customInstance>[0]) {
+    try {
+      await customInstance(config)
+    } catch (error) {
+      if (isApiError(error)) return error
+      throw error
+    }
+    throw new Error('요청이 성공했다(실패해야 한다)')
+  }
+
+  it('소수 금액은 400이고 fieldErrors에 형식 오류가 담긴다(버림으로 통과하지 않는다)', async () => {
+    const error = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices`,
+      method: 'POST',
+      data: { monthlyPrice: 9900.5, effectiveFrom: addDays(TODAY, 400) },
+    })
+    expect(error).toMatchObject({ status: 400, errorCode: 'VALIDATION_FAILED' })
+    expect(error.detail).toBe('요청 값이 올바르지 않습니다.')
+    expect(error.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '형식이 올바르지 않습니다.' },
+    ])
+  })
+
+  it('금액 범위 오류는 필드별 문구로 모두 알린다(0 미만 / 100만 초과 / 시작일 누락)', async () => {
+    const tooLow = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices`,
+      method: 'POST',
+      data: { monthlyPrice: -1 },
+    })
+    expect(tooLow.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '0 이상이어야 합니다.' },
+      { field: 'effectiveFrom', message: '적용 시작일은 필수입니다.' },
+    ])
+    const tooHigh = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices`,
+      method: 'POST',
+      data: { monthlyPrice: 1_000_001, effectiveFrom: addDays(TODAY, 400) },
+    })
+    expect(tooHigh.fieldErrors).toEqual([
+      { field: 'monthlyPrice', message: '1,000,000 이하여야 합니다.' },
+    ])
+  })
+
+  it('본문 오류(400)가 존재 확인(404)과 규칙 위반(409)보다 먼저다', async () => {
+    // 없는 상품 + 잘못된 본문 → 404가 아니라 400
+    expect(
+      (
+        await errorOf({
+          url: '/admin/products/99999/prices',
+          method: 'POST',
+          data: { monthlyPrice: 9900.5, effectiveFrom: TODAY },
+        })
+      ).status,
+    ).toBe(400)
+
+    // 가장 최근 줄이 아닌 줄 + 잘못된 본문 → PRICE_NOT_LATEST(409)가 아니라 400
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
+    expect(
+      (
+        await errorOf({
+          url: `/admin/products/${NETFLIX_ID}/prices/${netflix.prices[0].priceId}`,
+          method: 'PATCH',
+          data: { monthlyPrice: 9900.5, effectiveFrom: TODAY },
+        })
+      ).status,
+    ).toBe(400)
+  })
+
+  it('없는 상품·없는 요금 줄은 404 RESOURCE_NOT_FOUND이고 문구가 서버와 같다', async () => {
+    const noProduct = await errorOf({
+      url: '/admin/products/99999/prices/1',
+      method: 'DELETE',
+    })
+    expect(noProduct).toMatchObject({ status: 404, errorCode: 'RESOURCE_NOT_FOUND' })
+    expect(noProduct.detail).toBe('해당 구독상품을 찾을 수 없습니다.')
+
+    const noPrice = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices/99999`,
+      method: 'DELETE',
+    })
+    expect(noPrice.detail).toBe('해당 월 구독요금을 찾을 수 없습니다.')
+  })
+
+  it('PRICE_* 409의 문구가 서버 ErrorCode와 같다', async () => {
+    const netflix = (await listProducts()).find((p) => p.productId === NETFLIX_ID)!
+    const lastStart = netflix.prices[netflix.prices.length - 1].effectiveFrom
+    const notAfter = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices`,
+      method: 'POST',
+      data: { monthlyPrice: 15000, effectiveFrom: addDays(lastStart, -1) },
+    })
+    expect(notAfter.detail).toBe('적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다.')
+
+    const notLatest = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}/prices/${netflix.prices[0].priceId}`,
+      method: 'DELETE',
+    })
+    expect(notLatest).toMatchObject({ status: 409, errorCode: 'PRICE_NOT_LATEST' })
+    expect(notLatest.detail).toBe('가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.')
+  })
+
+  it('상품 수정은 이름·판매 상태가 모두 없으면 400(request), 이름이 100자를 넘으면 400(name)이다', async () => {
+    const empty = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}`,
+      method: 'PATCH',
+      data: {},
+    })
+    expect(empty.fieldErrors).toEqual([
+      { field: 'request', message: 'name 또는 isActive 중 하나는 보내야 합니다.' },
+    ])
+    const tooLong = await errorOf({
+      url: `/admin/products/${NETFLIX_ID}`,
+      method: 'PATCH',
+      data: { name: 'ㄱ'.repeat(101) },
+    })
+    expect(tooLong.fieldErrors).toEqual([
+      { field: 'name', message: '이름은 100자 이하여야 합니다.' },
+    ])
+    // 400이 404보다 먼저다
+    expect(
+      (await errorOf({ url: '/admin/products/99999', method: 'PATCH', data: {} })).status,
+    ).toBe(400)
+  })
+
+  it('상품 등록의 서비스 계층 검사: 번들은 productType, 없는 서비스는 ottServiceId 필드로 알린다', async () => {
+    const base = { name: '새 상품', monthlyPrice: 10000, effectiveFrom: TODAY }
+    const bundle = await errorOf({
+      url: '/admin/products',
+      method: 'POST',
+      data: { ...base, productType: 'BUNDLE', ottServiceId: 1 },
+    })
+    expect(bundle.fieldErrors).toEqual([
+      { field: 'productType', message: '단품(SINGLE)만 등록할 수 있습니다.' },
+    ])
+    const noService = await errorOf({
+      url: '/admin/products',
+      method: 'POST',
+      data: { ...base, productType: 'SINGLE', ottServiceId: 99 },
+    })
+    expect(noService.fieldErrors).toEqual([
+      { field: 'ottServiceId', message: '존재하지 않는 서비스입니다.' },
+    ])
+  })
+
+  it('제공처 저장은 상태·서비스 불일치(400)가 404보다 먼저이고, 없는 제공처는 404 문구가 서버와 같다', async () => {
+    const mismatch = await errorOf({
+      url: '/admin/providers/99999',
+      method: 'PATCH',
+      data: { mappingState: 'MAPPED', ottServiceId: null, tier: 'STANDARD' },
+    })
+    expect(mismatch.status).toBe(400)
+    expect(mismatch.fieldErrors).toEqual([
+      { field: 'ottServiceId', message: 'MAPPED이면 서비스를 선택해야 합니다.' },
+    ])
+    const notFound = await errorOf({
+      url: '/admin/providers/99999',
+      method: 'PATCH',
+      data: { mappingState: 'IGNORED', ottServiceId: null, tier: 'STANDARD' },
+    })
+    expect(notFound.detail).toBe('해당 제공처를 찾을 수 없습니다.')
+  })
+
+  it('쪽 번호 오류는 어긋난 필드마다 fieldErrors로 알리고, 변경 작품 조회에서는 404보다 먼저다', async () => {
+    const error = await errorOf({
+      url: '/admin/collect/executions/99999/changes',
+      method: 'GET',
+      params: { page: -1, size: 101 },
+    })
+    expect(error.status).toBe(400)
+    expect(error.fieldErrors).toEqual([
+      { field: 'page', message: '0 이상이어야 합니다.' },
+      { field: 'size', message: '100 이하여야 합니다.' },
+    ])
+    const notFound = await errorOf({
+      url: '/admin/collect/executions/99999/changes',
+      method: 'GET',
+    })
+    expect(notFound.detail).toBe('해당 수집 실행을 찾을 수 없습니다.')
+  })
+
+  it('수집 실행 검사 순서: 범위(tier)가 날짜보다 먼저다', async () => {
+    const error = await errorOf({
+      url: '/admin/collect/executions',
+      method: 'POST',
+      data: { targetDate: addDays(TODAY, 5), tier: 'DAILY' },
+    })
+    expect(error.fieldErrors).toEqual([
+      { field: 'tier', message: 'MVP는 ALL만 실행할 수 있습니다.' },
+    ])
+    expect(error.detail).toBe('요청 값이 올바르지 않습니다.')
+  })
+})

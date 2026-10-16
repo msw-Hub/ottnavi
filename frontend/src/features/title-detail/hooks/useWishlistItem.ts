@@ -1,8 +1,9 @@
-import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import {
   useAddWishlistItem,
+  useListWishlistItems,
   useRemoveWishlistItem,
   useUpdateWishlistItem,
 } from '@/api/generated/wishlist/wishlist'
@@ -16,23 +17,13 @@ import { getMockRequestParams } from '@/lib/mockScenario'
 // 우선순위를 묻지 않고 찜할 때 쓰는 기본값(보고 싶음)
 const DEFAULT_WISHLIST_PRIORITY: WishlistPriority = 'WANT'
 
-// 이 세션에서 찜한 항목을 보관하는 캐시 키. 다른 기능 폴더(features/*)의 같은 이름 훅과 키 문자열이 같아야 화면 사이에 상태가 공유된다
-const WISHLIST_STATE_KEY = ['mock-wishlist-state'] as const
-
-interface WishlistEntry {
-  wishlistItemId: number // 찜 항목 ID(우선순위 변경·해제 요청의 주소에 쓴다)
-  priority: WishlistPriority // 지금 우선순위
-}
-
-// 찜 항목 키("movie:496243:all", "tv:93405:2") → 항목
-type WishlistState = Record<string, WishlistEntry>
-
 interface WishlistTarget {
   mediaType: MediaType // 작품 구분
   tmdbId: number // TMDB ID
   seasonNumber: number | null // 시즌 단위 찜이면 시즌 번호, 영화는 null
 }
 
+// 찜 추가 팝업이 같은 작품(시즌)을 구분하는 키("movie:496243:all", "tv:93405:2")
 function toEntryKey({ mediaType, tmdbId, seasonNumber }: WishlistTarget): string {
   return `${mediaType}:${tmdbId}:${seasonNumber ?? 'all'}`
 }
@@ -54,6 +45,11 @@ const UNAUTHORIZED_STATUS = 401
 // 활성 찜이 20개일 때 새 찜을 추가하면 서버가 409로 알리는 오류 코드(docs/api/error-codes.md)
 const WISHLIST_LIMIT_EXCEEDED_ERROR_CODE = 'WISHLIST_LIMIT_EXCEEDED'
 
+// 찜 목록 쿼리 키(생성 훅 useListWishlistItems의 기본 키와 같다). 변경 뒤 이 키를 무효화해 목록을 다시 받는다
+const WISHLIST_LIST_QUERY_KEY = ['/me/wishlist-items'] as const
+// 플랜 초안 쿼리 키(features/plan이 쓰는 키). 기능 폴더끼리 import하지 않으려고 문자열로 직접 적는다
+const PLAN_DRAFTS_QUERY_KEY = ['/me/plan-drafts'] as const
+
 /**
  * 작품(영화) 또는 시즌(드라마) 하나의 찜 상태와 찜 추가·우선순위 변경·해제를 돌려준다.
  *
@@ -61,14 +57,19 @@ const WISHLIST_LIMIT_EXCEEDED_ERROR_CODE = 'WISHLIST_LIMIT_EXCEEDED'
  * - 추가:   POST   /me/wishlist-items          (우선순위는 묻지 않고 기본값 WANT로 추가)
  * - 변경:   PATCH  /me/wishlist-items/{id}
  * - 해제:   DELETE /me/wishlist-items/{id}
- * 변경·해제는 찜 항목 ID가 있어야 보낼 수 있다. 캐시에 항목이 없으면(찜하지 않은 상태) 요청을 보내지 않는다.
- * 찜 상태를 TanStack Query 캐시에 두는 이유: 검색 카드·상세 화면은 찜 목록 조회(listWishlistItems)를 따로 부르지 않는다. 요청이 성공할 때마다 캐시를 고쳐
- * 새로고침 전까지 화면(검색 카드, 상세)이 같은 상태를 보이게 한다. 실제 백엔드를 연결하면 서버 목록 기반으로 바꾼다. 캐시는 QueryClient(앱 전체) 하나에 있어 화면을 옮겨도 남는다.
- * queryFn을 skipToken으로 둔 이유: 서버에서 가져올 값이 없고 initialData(빈 객체)가 시작값이라 요청을 보내지 않기 위함이다.
- * 비로그인이면 오류 토스트 대신 로그인 화면(/login)으로 보내고, 지금 화면을 from으로 넘겨 로그인이 끝나면 이 작품 상세로 돌아오게 한다(Task 027).
- * 판단은 두 겹이다. ① 요청 전: 공통 훅 useIsLoggedIn이 비로그인이면 추가·우선순위 변경·해제 모두 요청을 보내지 않고 바로 이동한다(401은 브라우저 콘솔에 오류로 남기 때문).
- * ② 요청 후: 서버가 401을 주면(로그인이 만료된 경우 등) 같은 이동을 한다. 목업 역할(mockSession)을 직접 보지 않고 공통 훅을 쓰므로
- * features가 목업 모듈에 의존하지 않고, Task 057에서 훅 내부만 authStore로 바꾸면 된다.
+ *
+ * 찜 상태는 서버의 찜 목록(GET /me/wishlist-items, 계약 listWishlistItems)에서 이 작품(시즌)에 해당하는 항목을 찾아 얻는다(Task 058).
+ * 예전에는 "이 세션에서 찜한 것"을 캐시에 따로 적어 두었는데, 새로고침하면 사라지고 다른 기기에서 찜한 것을 몰라
+ * 이미 찜한 작품이 "찜하기"로 보였다(실제 서버에서는 추가가 200으로 기존 항목을 돌려줘 우선순위가 화면과 어긋난다). 서버 목록을 기준으로 하면 새로고침·다른 기기에서도 같다.
+ * 찜 목록 화면(features/wishlist)과 같은 쿼리 키라 요청 하나를 같이 쓰고, 한쪽에서 바꾸면 다른 쪽도 갱신된다.
+ * 변경 요청이 성공하면 목록을 다시 받고(무효화), 다시 받는 동안은 mutation이 끝나지 않은 것으로 두어(onSuccess가 Promise를 돌려줌)
+ * 화면에 낡은 상태가 번쩍이지 않게 한다. 계산 대상이 달라지므로 플랜 초안 캐시도 무효화한다.
+ * "다 봤음" 항목도 목록에 있으므로 찜한 것으로 본다(추가 요청은 200으로 기존 항목을 돌려주고 아무것도 바꾸지 않는다).
+ *
+ * 비로그인이면 추가·우선순위 변경·해제 모두 요청을 보내지 않고 로그인 화면(/login)으로 보낸다(from 포함, Task 027). 서버가 401을 줘도 같다.
+ * ① 요청 전: 공통 훅 useIsLoggedIn이 비로그인이면 바로 이동한다(401은 브라우저 콘솔에 오류로 남기 때문).
+ * ② 요청 후: 로그인이 만료된 경우 등 서버가 401을 주면 같은 이동을 한다.
+ * 비로그인이면 찜 목록도 요청하지 않는다(enabled: false). 어차피 401이라 콘솔에 오류만 남기 때문이다.
  * 화면 가드(RequireAuth)와 달리 찜은 공개 화면 안의 동작이라, 막는 쪽이 아니라 "로그인을 권하는" 쪽으로 처리한다.
  * mutation은 TanStack Query 기본값이 재시도 0번이라 같은 요청이 두 번 저장되지 않는다.
  * features/search에도 같은 훅이 있는 이유: 기능 폴더끼리는 서로 import하지 않기 때문이다.
@@ -122,22 +123,28 @@ export function useWishlistItem(
     return (...args: Args) => (isLoggedIn ? action(...args) : redirectToLogin())
   }
 
-  const { data: state } = useQuery<WishlistState>({
-    queryKey: WISHLIST_STATE_KEY,
-    queryFn: skipToken,
-    initialData: {},
-    staleTime: Infinity,
-    gcTime: Infinity,
+  // 서버의 찜 목록. 비로그인이면 요청하지 않는다
+  const wishlist = useListWishlistItems({
+    query: { enabled: isLoggedIn, select: (res) => res.data },
   })
 
-  // 캐시의 한 항목을 바꾼다. entry가 null이면 지운다
-  function writeEntry(entry: WishlistEntry | null) {
-    queryClient.setQueryData<WishlistState>(WISHLIST_STATE_KEY, (current = {}) => {
-      const next = { ...current }
-      if (entry === null) delete next[entryKey]
-      else next[entryKey] = entry
-      return next
-    })
+  // 이 작품(시즌)에 해당하는 찜 항목. 상태로 따로 두지 않고 매 렌더에서 목록에서 찾는다(파생 값)
+  const entry =
+    isLoggedIn && wishlist.data
+      ? (wishlist.data.items.find(
+          (item) =>
+            item.mediaType === target.mediaType &&
+            item.tmdbId === target.tmdbId &&
+            item.seasonNumber === target.seasonNumber,
+        ) ?? null)
+      : null
+
+  // 변경 성공 뒤 목록·플랜 초안 캐시를 새로 받는다. Promise를 돌려주어 mutation이 갱신이 끝난 뒤에 완료되게 한다
+  function refreshWishlistQueries() {
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: WISHLIST_LIST_QUERY_KEY }),
+      queryClient.invalidateQueries({ queryKey: PLAN_DRAFTS_QUERY_KEY }),
+    ])
   }
 
   // 찜 추가(계약 addWishlistItem). 새로 추가면 201, 이미 찜한 작품(시즌)이면 200으로 같은 모양의 응답({ wishlistItemId })이 온다.
@@ -145,13 +152,12 @@ export function useWishlistItem(
   // handleError가 userMessage(errorMessages.ts의 getErrorMessage 결과)를 토스트로 알린다.
   const add = useAddWishlistItem({
     mutation: {
-      onSuccess: (res) => {
-        writeEntry({
-          wishlistItemId: res.data.wishlistItemId,
-          priority: DEFAULT_WISHLIST_PRIORITY,
-        })
+      onSuccess: async (response) => {
+        await refreshWishlistQueries()
         showWishlistAddedDialog({
           entryKey,
+          // 팝업이 이 항목의 우선순위를 바로 바꿀 수 있도록 응답의 찜 항목 ID를 넘긴다(CommonResponse 래퍼 안의 data)
+          wishlistItemId: response.data.wishlistItemId,
           name: popup?.name ?? targetName,
           posterUrl: popup?.posterUrl ?? null,
         })
@@ -160,15 +166,10 @@ export function useWishlistItem(
     },
   })
 
-  // 비로그인이면 캐시에 이전 찜이 남아 있어도 "찜하지 않음"으로 본다.
-  // 상태로 따로 두지 않고 매 렌더에서 파생하는 이유: 로그아웃·역할 전환 때 따로 동기화할 곳이 없어야 낡은 "찜함"이 남지 않는다.
-  // 로그인 판단은 useIsLoggedIn 한 곳만 거치므로 Task 057에서 훅 내부를 authStore로 바꾸면 이 가드도 그대로 따라간다.
-  const entry = isLoggedIn ? (state?.[entryKey] ?? null) : null
-
   const changePriority = useUpdateWishlistItem({
     mutation: {
-      onSuccess: (_res, { data }) => {
-        if (entry && data.priority) writeEntry({ ...entry, priority: data.priority })
+      onSuccess: async () => {
+        await refreshWishlistQueries()
       },
       onError: handleError,
     },
@@ -176,8 +177,8 @@ export function useWishlistItem(
 
   const remove = useRemoveWishlistItem({
     mutation: {
-      onSuccess: () => {
-        writeEntry(null)
+      onSuccess: async () => {
+        await refreshWishlistQueries()
         toast.success(`${targetName} 찜을 해제했습니다.`)
       },
       onError: handleError,
@@ -186,7 +187,12 @@ export function useWishlistItem(
 
   return {
     priority: entry?.priority ?? null, // 찜하지 않았으면 null
-    isPending: add.isPending || changePriority.isPending || remove.isPending,
+    // 목록을 처음 받는 중에도 눌리지 않게 한다(찜 여부를 모르는 채 추가하면 기존 찜을 건드릴 수 있다)
+    isPending:
+      add.isPending ||
+      changePriority.isPending ||
+      remove.isPending ||
+      (isLoggedIn && wishlist.isPending),
     onAdd: requireLogin(() =>
       add.mutate({ data: { ...target, priority: DEFAULT_WISHLIST_PRIORITY } }),
     ),

@@ -1,3 +1,4 @@
+import { http as mswHttp, HttpResponse } from 'msw'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
@@ -85,5 +86,46 @@ describe('내 설정 저장 후 이동', () => {
     await fillBudgetAndSave(user)
 
     expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+  })
+})
+
+describe('내 설정 저장 검증(Task 058)', () => {
+  it('월 예산을 비운 채 저장하면 서버에 보내지 않고 칸 아래에 안내가 보인다', async () => {
+    // jsdom에는 scrollIntoView가 없어 오류 칸으로 화면을 옮기는 코드가 실패하므로 빈 함수로 대신한다
+    Element.prototype.scrollIntoView = vi.fn()
+    const user = userEvent.setup()
+    const router = renderSettings()
+    await screen.findByRole('heading', { level: 1, name: '시작하기' })
+
+    await user.click(screen.getByRole('button', { name: '저장하기' }))
+
+    expect(await screen.findByText('월 예산을 입력해 주세요.')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/settings')
+  })
+
+  it('서버가 400 VALIDATION_FAILED로 거절하면 저장 실패 안내와 필드별 이유가 보이고 화면에 머문다', async () => {
+    server.use(
+      mswHttp.put('/api/me/settings', () =>
+        HttpResponse.json(
+          {
+            title: 'Bad Request',
+            status: 400,
+            detail: '요청 값이 올바르지 않습니다.',
+            instance: '/api/me/settings',
+            errorCode: 'VALIDATION_FAILED',
+            fieldErrors: [{ field: 'monthlyBudget', message: '0 이상의 정수여야 합니다.' }],
+          },
+          { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    const router = renderSettings()
+
+    await fillBudgetAndSave(user)
+
+    expect(await screen.findByText('저장하지 못했어요')).toBeInTheDocument()
+    expect(screen.getByText(/월 예산: 0 이상의 정수여야 합니다./)).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/settings')
   })
 })

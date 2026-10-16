@@ -3,7 +3,9 @@ import type { CommonResponsePlanDraftList, PlanDraft, SavedPlan } from '@/api/ge
 import {
   createPlan,
   createPlanDrafts,
+  getGetCurrentPlanQueryKey,
   getListPlanDraftsQueryKey,
+  useGetCurrentPlan,
   useListPlanDrafts,
 } from '@/api/generated/plan/plan'
 import { isApiError, type ApiError } from '@/api/http'
@@ -34,6 +36,15 @@ export function usePlanDrafts() {
   return useListPlanDrafts({
     query: { queryKey: getDraftsQueryKey(), select: (res) => res.data.drafts },
   })
+}
+
+/**
+ * 저장해 둔 현재 플랜(ACTIVE)을 불러온다(계약 getCurrentPlan, GET /me/plans/current).
+ * 저장한 플랜이 없으면 서버가 404가 아니라 200 { plan: null }을 주므로 select 결과가 null이면 "아직 저장 전"이다 → 화면은 계산 안내를 보인다.
+ * 초안과 달리 새로고침·재방문에도 서버가 같은 값을 주므로, 화면은 클라이언트 캐시가 아니라 이 응답을 기준으로 그린다.
+ */
+export function useCurrentPlan() {
+  return useGetCurrentPlan({ query: { select: (res) => res.data.plan } })
 }
 
 /**
@@ -91,7 +102,7 @@ export function useSavePlan() {
         throw error
       }
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.kind === 'recalculated') {
         queryClient.setQueryData<CommonResponsePlanDraftList>(getDraftsQueryKey(), {
           success: true,
@@ -99,8 +110,20 @@ export function useSavePlan() {
         })
         return
       }
-      // 저장하면 초안은 사라진다(나머지 DRAFT 삭제). 낡은 초안이 화면에 남지 않도록 다시 불러온다
-      void queryClient.invalidateQueries({ queryKey: ['/me/plan-drafts'] })
+      // 저장하면 초안은 사라지고(나머지 DRAFT 삭제) 현재 플랜이 생긴다. 두 쿼리를 모두 다시 불러온다.
+      // await로 기다리는 이유: 이 함수가 끝나야 mutation이 성공으로 끝나므로, 화면의 성공 콜백이 불릴 때는 이미
+      // "초안 없음 + 현재 플랜 있음"으로 갱신돼 있다(기다리지 않으면 낡은 초안 화면이 잠깐 비치거나 빈 상태가 먼저 보인다)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getListPlanDraftsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getGetCurrentPlanQueryKey() }),
+      ])
+    },
+    onError: (error) => {
+      // 404 PLAN_DRAFT_NOT_FOUND: 화면이 가진 초안이 서버와 어긋났다(다시 계산돼 지워졌거나 이미 저장됨). 서버 상태로 다시 맞춘다
+      if (isApiError(error) && error.status === 404) {
+        void queryClient.invalidateQueries({ queryKey: getListPlanDraftsQueryKey() })
+        void queryClient.invalidateQueries({ queryKey: getGetCurrentPlanQueryKey() })
+      }
     },
   })
 }

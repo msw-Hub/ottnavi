@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 // react-router/dom의 RouterProvider는 react-dom의 flushSync를 자동으로 연결해 준다(React Router 문서 RouterProvider 항목)
 import { RouterProvider } from 'react-router/dom'
+import { restoreSession } from '@/api/http'
 import { Providers } from '@/app/providers'
 import { createAppRouter } from '@/app/router'
 import './index.css'
@@ -24,6 +25,10 @@ async function enableMocking(): Promise<boolean> {
 
 enableMocking().then((isReloading) => {
   if (isReloading) return
+
+  // 새로고침해도 로그인이 유지되도록 쿠키의 Refresh Token으로 Access Token을 다시 받는다(메모리에만 두므로 새로고침마다 비어 있다).
+  // 기다리지 않고(화면을 막지 않고) 시작한다. 결과가 오기 전에는 가드·머리글이 "확인 중" 상태를 보인다. 목업 모드에서는 아무것도 하지 않는다.
+  void restoreSession()
 
   // 라우터는 목업 준비가 끝난 뒤, React 렌더링 바깥에서 한 번만 만든다(렌더링마다 새로 만들면 화면 상태가 초기화된다)
   const router = createAppRouter()

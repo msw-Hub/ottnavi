@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 31개다. 구현된 것은 8개(`listOttServices`, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개)이고, 나머지 23개는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+ * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -158,13 +158,13 @@ export function useListOttServices<TData = Awaited<ReturnType<typeof listOttServ
 
 
 /**
- * **제안(Task 031, 미구현).** 서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
- * 판매 중인 상품만 주며, 줄마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다.
- * 기본 월 요금은 오늘 적용 중인 월 구독요금 줄이다. 계산은 달마다 사용자 결제일에 적용 중인 줄을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
+ * 서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
+ * 판매 중인 상품만 주며, 항목마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다. 판매 중이어도 현재 적용 중인 요금이 없는 상품(첫 요금 이력이 미래 등)은 목록에서 빠지며, 그 상품의 수정·삭제는 404 `SERVICE_PRICE_NOT_FOUND`다.
+ * 기본 월 요금은 오늘 적용 중인 월 구독요금 이력이다. 계산은 달마다 사용자 결제일에 적용 중인 요금을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
  * 내가 고친 금액은 상품 단위로 저장된다(ERD `user_price_override`). 관리자가 상품을 판매 종료하고 새 상품을 등록하면 고친 금액은 새 상품에 이어지지 않는다.
  * 마지막 확인일이 90일을 넘으면 화면이 "요금이 달라졌을 수 있어요" 안내를 붙인다(PRD 11절 41번).
  * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
- * @summary 내 서비스별 월 요금 조회 (제안)
+ * @summary 내 서비스별 월 요금 조회
  */
 export const listMyServicePrices = (
 
@@ -235,7 +235,7 @@ export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyS
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary 내 서비스별 월 요금 조회 (제안)
+ * @summary 내 서비스별 월 요금 조회
  */
 
 export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
@@ -256,10 +256,10 @@ export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyS
 
 
 /**
- * **제안(Task 031, 미구현).** 이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
+ * 이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
  * 상품 ID로 대상을 정하므로 한 서비스에 상품이 여러 개 생기는 2단계(광고형·번들)에도 이 주소는 바뀌지 않는다.
- * 오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료), `INTERNAL_ERROR`(500).
- * @summary 내 월 요금 설정 (제안)
+ * 오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+ * @summary 내 월 요금 설정
  */
 export const setMyServicePrice = (
     productId: number,
@@ -314,7 +314,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SetMyServicePriceMutationVariables = {productId: number;data: BodyType<SetMyServicePriceRequest>}
 
     /**
- * @summary 내 월 요금 설정 (제안)
+ * @summary 내 월 요금 설정
  */
 export const useSetMyServicePrice = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMyServicePrice>>, TError,SetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -327,9 +327,9 @@ export const useSetMyServicePrice = <TError = ErrorType<BadRequestResponse | Una
       return useMutation(getSetMyServicePriceMutationOptions(options), queryClient);
     }
     /**
- * **제안(Task 031, 미구현).** 내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
- * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료), `INTERNAL_ERROR`(500).
- * @summary 내 월 요금 지우기(기본 요금으로 복귀) (제안)
+ * 내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
+ * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+ * @summary 내 월 요금 지우기(기본 요금으로 복귀)
  */
 export const resetMyServicePrice = (
     productId: number,
@@ -381,7 +381,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ResetMyServicePriceMutationVariables = {productId: number}
 
     /**
- * @summary 내 월 요금 지우기(기본 요금으로 복귀) (제안)
+ * @summary 내 월 요금 지우기(기본 요금으로 복귀)
  */
 export const useResetMyServicePrice = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetMyServicePrice>>, TError,ResetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}

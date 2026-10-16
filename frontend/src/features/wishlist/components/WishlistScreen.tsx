@@ -9,6 +9,13 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
+import {
+  WISHLIST_PRIORITY_DESCRIPTIONS,
+  WISHLIST_PRIORITY_LABELS,
+  WISHLIST_PRIORITY_OPTIONS,
+  type WishlistPriority,
+} from '@/components/common/displayTypes'
+import { PriorityBadge, PriorityIcon } from '@/components/common/WishlistPriority'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { WishlistRow, type WishlistRowCardProps } from '@/features/wishlist/components/WishlistRow'
@@ -19,6 +26,13 @@ import {
 } from '@/features/wishlist/hooks/useWishlist'
 import { useOttServices } from '@/hooks/useOttServices'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
+
+// 우선순위 묶음이 비었을 때의 안내. 꼭 볼 작품이 비면 무엇을 하면 좋은지까지 알린다(계산이 가장 먼저 챙기는 단계라서)
+const EMPTY_GROUP_MESSAGES: Record<WishlistPriority, string> = {
+  MUST: "아직 없어요. 꼭 끝까지 보고 싶은 작품은 카드에서 '꼭 볼 작품'을 눌러 주세요.",
+  WANT: '아직 없어요.',
+  MAYBE: '아직 없어요.',
+}
 
 // 변경 요청이 실패했을 때 토스트로 알린다. 서버 문장(userMessage)이 있으면 그것을, 없으면 기본 문장을 쓴다
 function notifyFailure(error: unknown) {
@@ -118,6 +132,16 @@ function WishlistContent({ list, services }: WishlistContentProps) {
   // 다 본 작품은 계산에서 빠지므로(PRD FR-09) 구역을 나눈다. 같은 목록에서 걸러내는 값이라 상태로 두지 않고 계산한다
   const activeItems = list.items.filter((item) => item.watchedAt === null)
   const watchedItems = list.items.filter((item) => item.watchedAt !== null)
+  // 계산에 쓸 작품을 우선순위 단계별로 나눈 묶음(화면 표시용). 서버 순서(최근 찜한 순)는 묶음 안에서 그대로 유지된다.
+  // 위 activeItems와 같은 "이미 받은 목록 걸러내기"라 상태로 두지 않고 렌더링 중에 계산한다
+  const activeGroups = WISHLIST_PRIORITY_OPTIONS.map((option) => ({
+    priority: option.value,
+    items: activeItems.filter((item) => item.priority === option.value),
+  }))
+  // 활성 찜이 2개 이상인데 모두 같은 단계인지. 이때만 "우선순위를 나누면…" 권유를 보인다(1개는 나눌 수 없고, 이미 나눴으면 권유가 필요 없다)
+  const isAllSamePriority =
+    activeItems.length >= 2 &&
+    activeItems.every((item) => item.priority === activeItems[0].priority)
   // 상한(20개)에 닿았는지. 서버가 센 개수와 상한을 그대로 비교한다(화면이 다시 세지 않는다)
   const isFull = list.activeItemCount >= list.maxActiveItemCount
   // 계산에 쓸 작품 중 같은 드라마의 시즌이 둘 이상인지. 다 본 시즌은 계산에서 빠져 순서 제약이 없으므로 세지 않는다
@@ -213,9 +237,10 @@ function WishlistContent({ list, services }: WishlistContentProps) {
         )}
       </div>
 
-      {/* 20개에 닿으면 상단 안내 띠(확정 문구, PRD SCR-08). 상한 숫자는 서버가 준 값이다 */}
+      {/* 20개에 닿으면 상단 안내 띠(확정 문구, PRD SCR-08). 상한 숫자는 서버가 준 값이다.
+          role="status": shadcn Alert의 기본 role="alert"는 낭독기가 하던 말을 끊고 즉시 읽는다. 상한 안내는 오류가 아닌 참고 정보라 한 단계 낮춘다(058 검수 제안 6) */}
       {isFull && (
-        <Alert className="border-info bg-info-bg text-info">
+        <Alert role="status" className="border-info bg-info-bg text-info">
           <InfoIcon aria-hidden="true" />
           <AlertDescription className="text-info">
             찜은 {list.maxActiveItemCount}개까지 담을 수 있어요. 다 본 작품을 &apos;다
@@ -236,12 +261,66 @@ function WishlistContent({ list, services }: WishlistContentProps) {
           계산에 쓸 작품
         </h2>
         {activeItems.length > 0 ? (
-          <CardList
-            items={activeItems}
-            getCardProps={getCardProps}
-            expandedId={expandedId}
-            onToggleExpanded={toggleExpanded}
-          />
+          <>
+            {/* 우선순위 분포 요약: 세 단계에 몇 개씩 들어 있는지 배지로 보이고, 계산이 단계를 어떤 순서로 챙기는지 한 줄로 알린다.
+                앞 문장은 늘 보이는 고정 안내, "우선순위를 나누면…" 권유는 모두 같은 단계일 때만 보인다 */}
+            <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
+              <ul aria-label="우선순위별 작품 수" className="flex flex-wrap gap-2">
+                {activeGroups.map((group) => (
+                  <li key={group.priority}>
+                    <PriorityBadge priority={group.priority} count={group.items.length} />
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm break-keep text-muted-foreground">
+                계산은 꼭 볼 작품을 가장 먼저 챙기고, 그다음 보고 싶음, 여유될 때 순으로 넣어요.
+                {/* 권유 문장은 모두 같은 단계일 때만 보인다(이미 나눴다면 불필요한 잔소리라서) */}
+                {isAllSamePriority && ' 우선순위를 나누면 계산이 더 의미 있어져요.'}
+              </p>
+            </div>
+
+            {/* 우선순위 묶음(꼭 볼 작품 → 보고 싶음 → 여유될 때). 계산이 챙기는 순서와 같은 순서로 위에서 아래로 쌓는다 */}
+            {activeGroups.map((group) => {
+              const headingId = `wishlist-group-${group.priority}`
+              return (
+                <div
+                  key={group.priority}
+                  role="group"
+                  aria-labelledby={headingId}
+                  className="grid gap-2"
+                >
+                  <div className="grid gap-0.5">
+                    <h3
+                      id={headingId}
+                      className="inline-flex items-center gap-1.5 text-base font-bold"
+                    >
+                      <PriorityIcon priority={group.priority} className="size-5" />
+                      {WISHLIST_PRIORITY_LABELS[group.priority]}
+                      <span className="font-semibold text-muted-foreground tabular-nums">
+                        {group.items.length}개
+                      </span>
+                    </h3>
+                    <p className="text-sm break-keep text-muted-foreground">
+                      {WISHLIST_PRIORITY_DESCRIPTIONS[group.priority]}
+                    </p>
+                  </div>
+                  {group.items.length > 0 ? (
+                    <CardList
+                      items={group.items}
+                      getCardProps={getCardProps}
+                      expandedId={expandedId}
+                      onToggleExpanded={toggleExpanded}
+                    />
+                  ) : (
+                    // 빈 묶음도 제목을 남겨 세 단계가 있다는 것을 늘 보이고, 비었다는 사실은 점선 상자 + 글자로 알린다
+                    <p className="rounded-lg border border-dashed border-border px-3 py-2.5 text-sm break-keep text-muted-foreground">
+                      {EMPTY_GROUP_MESSAGES[group.priority]}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </>
         ) : (
           <EmptyState
             title="계산할 작품이 없어요"

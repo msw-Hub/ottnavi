@@ -6,27 +6,25 @@ import {
   LoaderCircleIcon,
   RefreshCwIcon,
   SaveIcon,
+  TriangleAlertIcon,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
-import { DataAsOf } from '@/components/common/DataAsOf'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
-import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { PlanMonthCard } from '@/features/plan/components/PlanMonthCard'
-import { PlanSummary } from '@/features/plan/components/PlanSummary'
+import { PlanDetail } from '@/features/plan/components/PlanDetail'
 import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
-import { UnscheduledList } from '@/features/plan/components/UnscheduledList'
-import { useCalculatePlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
+import { useCalculatePlan, useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
-import type { PlanDraft, PlanType } from '@/api/generated/model'
-import { hasSeveralSeasonsOfOneSeries, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
+import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
+import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
+import { formatDateTimeKorean } from '@/lib/format'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
 function getFailureMessage(error: unknown): string {
@@ -36,12 +34,14 @@ function getFailureMessage(error: unknown): string {
 /**
  * SCR-10 플랜 결과 화면의 본문이다. pages/PlanPage는 이 컴포넌트를 연결만 한다(pages는 얇게, frontend.md).
  *
- * 로딩·오류·빈 상태("아직 계산한 플랜이 없어요")를 먼저 가르고, 초안이 있으면 PlanResult를 그린다.
- * 저장에 성공하면 초안이 서버에서 사라져(나머지 DRAFT 삭제) 목록이 비게 되는데, 그때 "아직 계산한 플랜이 없어요"가 보이면
- * 방금 한 저장이 실패한 것처럼 오해하므로 저장 완료 안내를 우선해서 보인다.
+ * 화면은 항상 서버 상태(초안 GET, 현재 플랜 GET)를 기준으로 그린다. 새로고침·재방문해도 같은 결과가 복원되는 이유다.
+ * 위에서 아래로 가르는 순서: 로딩 → 오류 → 초안이 있으면 결과(PlanResult) → 초안이 없고 현재 플랜이 있으면 "내 현재 플랜" → 둘 다 없으면 계산 안내.
+ * 저장에 성공하면 초안은 서버에서 사라지고(나머지 DRAFT 삭제) 현재 플랜이 생기므로, 저장 직후에는 자연스럽게 "내 현재 플랜"으로 바뀐다.
+ * 이때 "아직 계산한 플랜이 없어요"가 보이면 저장이 실패한 것처럼 오해하므로, 저장 직후에는 완료 안내 띠를 맨 위에 함께 보인다.
  */
 export function PlanScreen() {
   const drafts = usePlanDrafts()
+  const currentPlan = useCurrentPlan()
   const services = useOttServices()
   const calculate = useCalculatePlan()
   const save = useSavePlan()
@@ -51,38 +51,74 @@ export function PlanScreen() {
   const [savedPlanType, setSavedPlanType] = useState<PlanType | null>(null)
   // 저장 중 데이터가 바뀌어 자동으로 다시 계산했는지. true면 결과 위에 안내 띠를 보인다
   const [hasRecalculatedNotice, setHasRecalculatedNotice] = useState(false)
+  // 저장하려던 초안이 서버에 없었는지(404). 훅이 초안을 다시 불러오므로 안내만 띄운다
+  const [hasNotFoundNotice, setHasNotFoundNotice] = useState(false)
 
   let content: ReactNode
-  if (savedPlanType) {
-    content = (
-      <Alert className="border-primary">
-        <CircleCheckIcon aria-hidden="true" />
-        <AlertTitle className="text-base font-bold">
-          {PLAN_TYPE_LABELS[savedPlanType]} 플랜을 저장했어요
-        </AlertTitle>
-        <AlertDescription className="grid gap-3">
-          <p>저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.</p>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild className="h-11">
-              <Link to={`/${location.search}`}>작품 찾아보기</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11">
-              <Link to={`/wishlist${location.search}`}>찜 목록 보기</Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11">
-              <Link to={`/pricing${location.search}`}>다시 계산하기</Link>
-            </Button>
-          </div>
-        </AlertDescription>
-      </Alert>
-    )
-  } else if (drafts.isPending || services.isPending) {
+  if (drafts.isPending || currentPlan.isPending || services.isPending) {
     content = <LoadingState message="플랜을 불러오고 있어요" />
   } else if (drafts.isError) {
     content = <ErrorState error={drafts.error} onRetry={() => drafts.refetch()} />
+  } else if (currentPlan.isError) {
+    content = <ErrorState error={currentPlan.error} onRetry={() => currentPlan.refetch()} />
   } else if (services.isError) {
     content = <ErrorState error={services.error} onRetry={() => services.refetch()} />
-  } else if (drafts.data.length === 0) {
+  } else if (drafts.data.length > 0) {
+    content = (
+      <PlanResult
+        drafts={drafts.data}
+        services={services.data}
+        hasCurrentPlan={currentPlan.data != null}
+        isCalculating={calculate.isPending}
+        isSaving={save.isPending}
+        calculateError={calculate.isError ? calculate.error : null}
+        saveError={save.isError && !hasNotFoundNotice ? save.error : null}
+        hasRecalculatedNotice={hasRecalculatedNotice}
+        onRecalculate={() =>
+          calculate.mutate(undefined, {
+            onSuccess: () => {
+              setHasRecalculatedNotice(false)
+              setHasNotFoundNotice(false)
+            },
+          })
+        }
+        onSave={(planId) => {
+          setHasNotFoundNotice(false)
+          save.mutate(
+            { planId },
+            {
+              onSuccess: (result) => {
+                if (result.kind === 'saved') {
+                  setSavedPlanType(result.plan.planType)
+                  setHasRecalculatedNotice(false)
+                  toast.success('플랜을 저장했어요')
+                  window.scrollTo({ top: 0 })
+                } else {
+                  // 저장 중 409(데이터 갱신) → 훅이 이미 다시 계산했다. 사용자가 새 결과를 확인하고 다시 저장해야 한다
+                  setHasRecalculatedNotice(true)
+                  toast.info('데이터가 바뀌어 다시 계산했어요')
+                  window.scrollTo({ top: 0 })
+                }
+              },
+              onError: (error) => {
+                // 404 PLAN_DRAFT_NOT_FOUND: 훅이 초안을 다시 불러온다. 사용자에게는 다시 계산·선택을 안내한다
+                if (isApiError(error) && error.status === 404) setHasNotFoundNotice(true)
+              },
+            },
+          )
+        }}
+      />
+    )
+  } else if (currentPlan.data != null) {
+    content = (
+      <CurrentPlanView
+        plan={currentPlan.data}
+        services={services.data}
+        search={location.search}
+        isJustSaved={savedPlanType !== null}
+      />
+    )
+  } else {
     content = (
       <EmptyState
         title="아직 계산한 플랜이 없어요"
@@ -97,52 +133,84 @@ export function PlanScreen() {
         }
       />
     )
-  } else {
-    content = (
-      <PlanResult
-        drafts={drafts.data}
-        services={services.data}
-        isCalculating={calculate.isPending}
-        isSaving={save.isPending}
-        calculateError={calculate.isError ? calculate.error : null}
-        saveError={save.isError ? save.error : null}
-        hasRecalculatedNotice={hasRecalculatedNotice}
-        onRecalculate={() =>
-          calculate.mutate(undefined, { onSuccess: () => setHasRecalculatedNotice(false) })
-        }
-        onSave={(planId) =>
-          save.mutate(
-            { planId },
-            {
-              onSuccess: (result) => {
-                if (result.kind === 'saved') {
-                  setSavedPlanType(result.plan.planType)
-                  toast.success('플랜을 저장했어요')
-                } else {
-                  // 저장 중 409(데이터 갱신) → 훅이 이미 다시 계산했다. 사용자가 새 결과를 확인하고 다시 저장해야 한다
-                  setHasRecalculatedNotice(true)
-                  toast.info('데이터가 바뀌어 다시 계산했어요')
-                  window.scrollTo({ top: 0 })
-                }
-              },
-            },
-          )
-        }
-      />
-    )
   }
 
   return (
     <section className="flex flex-col gap-5">
       <h1 className="text-2xl font-semibold">플랜 결과</h1>
+      {/* 404: 저장하려던 플랜이 서버에 없다(다시 계산해 지워졌거나 이미 저장됨). 서버 문구 대신 다음 행동을 안내한다 */}
+      {hasNotFoundNotice && (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>저장하려던 플랜을 찾지 못했어요</AlertTitle>
+          <AlertDescription className="text-destructive/90">
+            다시 계산했거나 이미 저장된 플랜일 수 있어요. 목록을 새로 불러왔으니 플랜을 다시 골라
+            저장하거나, 다시 계산해 주세요.
+          </AlertDescription>
+        </Alert>
+      )}
       {content}
     </section>
+  )
+}
+
+interface CurrentPlanViewProps {
+  plan: ActivePlan // 서버의 현재 플랜(ACTIVE). 초안 필드를 모두 담고 저장 시각이 더해진다
+  services: OttService[] // 서비스 목록 API의 7개 서비스(이름 표시용)
+  search: string // 목업 확인용 주소 파라미터(?mock…)를 이동 링크에 이어 붙이기 위한 값
+  isJustSaved: boolean // 방금 저장해서 이 화면으로 넘어왔는지(완료 안내 띠를 보일지)
+}
+
+// 저장해 둔 "내 현재 플랜". 초안 결과와 같은 내용 컴포넌트(PlanDetail)를 읽기 전용으로 재사용한다
+function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanViewProps) {
+  const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
+  const typeName = PLAN_TYPE_LABELS[plan.planType]
+  // 서비스 화면의 다른 날짜("2026년 10월 9일")와 같은 말투로 맞춘 저장 시각(관리자용 숫자 형식 formatDateTime은 쓰지 않는다)
+  const savedAt = formatDateTimeKorean(plan.activatedAt)
+
+  return (
+    <div className="flex flex-col gap-6">
+      {isJustSaved && (
+        // 저장 완료는 오류가 아니라 안내라 role="status"로 덮어쓴다. shadcn Alert의 기본값 role="alert"는 낭독기가 하던 말을 끊고 급하게 읽는다
+        <Alert role="status" className="border-primary">
+          <CircleCheckIcon aria-hidden="true" />
+          <AlertTitle className="text-base font-bold">{typeName} 플랜을 저장했어요</AlertTitle>
+          <AlertDescription>
+            저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-1">
+        <h2 className="text-xl font-semibold">내 현재 플랜 · {typeName}</h2>
+        {savedAt && <p className="text-sm text-muted-foreground tabular-nums">{savedAt}에 저장</p>}
+      </div>
+
+      <div className="grid gap-6">
+        <PlanDetail draft={plan} typeNames={typeName} serviceNames={serviceNames} />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button asChild className="h-11">
+          <Link to={`/pricing${search}`}>
+            <RefreshCwIcon aria-hidden="true" />
+            다시 계산하기
+          </Link>
+        </Button>
+        <Button asChild variant="outline" className="h-11">
+          <Link to={`/wishlist${search}`}>찜 목록 보기</Link>
+        </Button>
+        <Button asChild variant="outline" className="h-11">
+          <Link to={`/${search}`}>작품 찾아보기</Link>
+        </Button>
+      </div>
+    </div>
   )
 }
 
 interface PlanResultProps {
   drafts: PlanDraft[] // 플랜 유형 3종 초안(선택이 같은 것도 3개 그대로 온다)
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름 표시용)
+  hasCurrentPlan: boolean // 이미 저장한 현재 플랜이 있는지(있으면 새로 저장할 때 바뀐다는 안내를 보인다)
   isCalculating: boolean // 다시 계산 중인지
   isSaving: boolean // 저장 중인지(저장 도중 자동 재계산도 포함)
   calculateError: unknown // 다시 계산 실패 원인. 없으면 null
@@ -156,6 +224,7 @@ interface PlanResultProps {
 function PlanResult({
   drafts,
   services,
+  hasCurrentPlan,
   isCalculating,
   isSaving,
   calculateError,
@@ -175,14 +244,14 @@ function PlanResult({
   const isBusy = isCalculating || isSaving
 
   const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
-  // 3개월 중 연도가 바뀌는 달이 있으면 달 이름에 연도를 붙인다(예: 2026년 12월 → 2027년 1월)
-  const withYear = new Set(draft.months.map((month) => month.month.slice(0, 4))).size > 1
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground">
           찜한 작품과 예산·시청 시간으로 계산한 3개월 플랜 3가지예요. 하나를 골라 저장하세요.
+          {/* 바뀐다는 안내는 저장 버튼 바로 위 안내 띠로 옮겼다(누르기 직전에 읽히게, 067 검수 제안 1) */}
+          {/* {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'} */}
         </p>
         <Button
           type="button"
@@ -217,20 +286,23 @@ function PlanResult({
       </div>
 
       {/* 저장 중 데이터가 바뀌어 다시 계산한 경우: 결과가 달라졌을 수 있어 확인 후 다시 저장하게 안내한다 */}
-      {hasRecalculatedNotice && (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info"
-        >
-          <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-          <span className="font-semibold">
-            데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
-          </span>
-        </p>
-      )}
+      {/* role="status" 영역은 항상 DOM에 두고 안의 내용만 바꾼다. 조건부로 영역째 새로 만들면 낭독기가 "나중에 생긴 영역"의 글자를 읽지 않는 경우가 많다.
+          비어 있을 때는 높이가 없어 레이아웃에 영향이 없다(flex gap은 빈 요소도 칸을 차지하므로 empty:hidden으로 감춘다) */}
+      <div role="status" className="empty:hidden">
+        {hasRecalculatedNotice && (
+          <p className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info">
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+            <span className="font-semibold">
+              데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
+            </span>
+          </p>
+        )}
+      </div>
 
       {calculateError != null && (
+        // 경고 아이콘을 넣어 공통 오류 화면(ErrorState)과 같은 모양으로 맞춘다. 색만으로 오류임을 알리지 않는다(067 검수 제안 5)
         <Alert variant="destructive">
+          <TriangleAlertIcon aria-hidden="true" />
           <AlertTitle>플랜을 다시 계산하지 못했어요</AlertTitle>
           <AlertDescription className="text-destructive/90">
             {getFailureMessage(calculateError)}
@@ -249,53 +321,25 @@ function PlanResult({
         className={isBusy ? 'grid gap-6 opacity-60 transition-opacity' : 'grid gap-6'}
         aria-busy={isBusy}
       >
-        <PlanSummary
-          draft={draft}
-          typeNames={typeNames}
-          serviceNames={serviceNames}
-          withYear={withYear}
-        />
-
-        <section aria-labelledby="plan-months-heading" className="grid gap-3">
-          <h2 id="plan-months-heading" className="text-lg font-semibold">
-            달별 구독과 볼 작품
-          </h2>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {draft.months.map((month) => (
-              <PlanMonthCard
-                key={month.month}
-                month={month}
-                serviceNames={serviceNames}
-                withYear={withYear}
-              />
-            ))}
-          </div>
-        </section>
-
-        <UnscheduledList items={draft.unscheduled} />
-
-        {/* 제공처 정보가 보이는 화면이라 출처와 기준일을 둔다. 새로 가입한 서비스의 해지 예약 안내도 여기에 둔다 */}
-        <div className="grid gap-1.5 border-t border-border pt-4">
-          <SourceAttribution />
-          <DataAsOf value={draft.dataAsOf} />
-          {/* 계산 기준 안내: 같은 드라마의 시즌이 둘 이상 들어 있으면 순서 규칙을 한 줄로 알린다(확정 문구, PRD SCR-08·11절 37번) */}
-          {hasSeveralSeasonsOfOneSeries(draft) && (
-            <p className="text-sm text-muted-foreground">
-              같은 드라마는 앞 시즌부터 보는 순서로 계산해요.
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            제공 여부와 요금은 확인된 범위이며, 실제와 다를 수 있습니다. 새로 가입한 서비스는 가입
-            직후 해지 예약을 해 두면 다음 달 자동 결제를 피할 수 있는지 서비스에서 확인해 보세요.
-          </p>
-        </div>
+        <PlanDetail draft={draft} typeNames={typeNames} serviceNames={serviceNames} />
       </div>
 
-      {/* 저장 구역. 모바일에서는 화면 아래에 고정해 긴 결과를 훑은 뒤에도 바로 저장할 수 있게 한다 */}
+      {/* 저장 구역. 모바일·데스크톱 모두 화면 아래에 고정해 긴 결과를 훑은 뒤에도 바로 저장할 수 있게 한다(067 검수 제안 2: 데스크톱도 고정).
+          main의 좌우 여백(px-4)만큼 -mx-4로 넓혀 막대가 본문 폭을 꽉 채운다. 내용 끝에서는 푸터를 가리지 않고 함께 스크롤된다(sticky).
+          데스크톱은 버튼을 오른쪽에 둔다(md:justify-items-end).
+          이전(모바일만 고정): className="grid gap-2 max-md:sticky max-md:bottom-0 max-md:-mx-4 max-md:z-20 max-md:border-t max-md:border-border max-md:bg-card max-md:px-4 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end" */}
       <section
         aria-label="플랜 저장"
-        className="grid gap-2 max-md:sticky max-md:bottom-0 max-md:-mx-4 max-md:z-20 max-md:border-t max-md:border-border max-md:bg-card max-md:px-4 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end"
+        className="sticky bottom-0 z-20 -mx-4 grid gap-2 border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end"
       >
+        {/* 이미 저장한 플랜이 있으면 누르기 직전에 "바뀐다"는 사실을 아이콘+글자 안내 띠로 알린다(067 검수 제안 1).
+            경고(빨강·노랑)가 아니라 참고 안내라 info 색을 쓴다. 데스크톱에서도 버튼 폭이 아니라 막대 폭을 꽉 채운다(justify-self-stretch) */}
+        {hasCurrentPlan && (
+          <p className="flex items-start gap-2 justify-self-stretch rounded-lg border border-info bg-info-bg px-3 py-2 text-sm text-info">
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span className="break-keep">저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.</span>
+          </p>
+        )}
         {saveError != null && !isSaving && (
           <p role="alert" className="text-sm text-destructive">
             저장하지 못했어요. {getFailureMessage(saveError)}
