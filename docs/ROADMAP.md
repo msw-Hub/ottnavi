@@ -43,7 +43,7 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR 병합 전) |
+| 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 0/3 | 🔄 진행 중 (106 화면 1차안 PR 전) |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
@@ -1088,7 +1088,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] RTL 테스트: 검색 흐름
 - 완료 기준
   - V-FS: 비로그인으로 검색 → 상세가 실제 데이터로 동작하고 상태 배지가 DB 값과 같다. (실서버 확인은 사용자 몫, 아래 결과 참고)
-- 결과(2026-10-16, PR 전): 검색·상세·서비스 목록 화면은 이미 생성 훅만 쓰고 있어서 모드 분기는 `VITE_USE_MOCK` 하나로 둔다(임시 분기를 만들지 않았다). 목업에 요청 제한(429) 시나리오와 상세 경로값 400 검증을 추가했고, 검색 빈 결과에 "아직 수집되지 않은 작품은 검색되지 않을 수 있습니다", 상세 404 문구를 보강했다. **확인하지 못한 것**: 실서버 데이터로 본 검색·상세(정상 경로의 브라우저 확인은 RTL 테스트로만 했다), TMDB 승인 로고(사용자가 파일을 준비하면 `AboutScreen` 자리표시를 교체, Task 003 238행 조건 미확인). **서버 측 이월**: 단건 수집이 없어 `isExternalCollectFailed`가 항상 false이므로 외부 수집 실패 배너는 실서버에서 뜨지 않는다.
+- 결과(2026-10-16, PR #74 병합): 검색·상세·서비스 목록 화면은 이미 생성 훅만 쓰고 있어서 모드 분기는 `VITE_USE_MOCK` 하나로 둔다(임시 분기를 만들지 않았다). 목업에 요청 제한(429) 시나리오와 상세 경로값 400 검증을 추가했고, 검색 빈 결과에 "아직 수집되지 않은 작품은 검색되지 않을 수 있습니다", 상세 404 문구를 보강했다. **확인하지 못한 것**: 실서버 데이터로 본 검색·상세(정상 경로의 브라우저 확인은 RTL 테스트로만 했다), TMDB 승인 로고(사용자가 파일을 준비하면 `AboutScreen` 자리표시를 교체, Task 003 238행 조건 미확인). **서버 측 이월**: 단건 수집이 없어 `isExternalCollectFailed`가 항상 false이므로 외부 수집 실패 배너는 실서버에서 뜨지 않는다.
 
 #### Task 053: Google OAuth2 로그인·JWT 발급·AT 검증 구현으로 회원 인증 확보 ✅
 - 태그: [B] · PRD: B5, FR-06, TECH 4절, T-7 · 선행: 034, 023 · 브랜치: `feature/b5-oauth-login`
@@ -1111,7 +1111,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: RT 회전(이전 RT 거부, 이미 쓴 RT 재사용 시 계열 무효화), Origin 불일치 거부, USER 토큰으로 `/api/admin/providers`·`/api/admin/collect/executions` 호출 시 403(Task 045·046 이관분) 테스트가 통과한다.
   - V-API: refresh·logout 호출을 확인했다.
-- 기록(053·054, 2026-10-16, 한 브랜치 `feature/b5-auth`, PR 전): 구현 완료. 결정 요약: 로그인 실패는 오류 코드가 아니라 `/auth/callback?error=login_failed` 리다이렉트, 인가 요청은 HMAC 서명 쿠키 `oauth2_auth_request`(180초, 콜백에서 즉시 삭제), Google 토큰은 저장하지 않음(STATELESS), AT 30분은 프론트 메모리에만·RT는 `{familyId}.{secret}` 불투명 토큰의 SHA-256 해시를 Redis에 저장(`Path=/api/auth`, SameSite=Lax), 회전마다 TTL 14일 갱신·직전 토큰 10초 유예·재사용이면 계열 삭제(Lua 원자 판정), 로그아웃은 현재 기기 계열만 폐기, 재발급·로그아웃은 `Origin` 검사(불일치 403), Redis 장애는 재발급 500(401 아님), 재발급 응답에 `role` 포함(역할 변경은 다음 재발급에 반영), 오류 코드 세분화는 보류, 이메일 미검증(`email_verified`≠true) 계정은 로그인 거부(D1), 관리자 지정은 DB 직접 수정(R-5), 배치 토큰은 Security 체인 안 `BatchTokenAuthenticationFilter`로 옮겨 `hasAnyRole(ADMIN,BATCH)`(JWT와 OR). 테스트: 전체 `.\gradlew.bat build --rerun-tasks` 752건 실패 0·오류 0·건너뜀 1(기존), 계약 대조 `OpenApiContractTest` 통과. 계약은 operation 12개 구현·19개 `x-planned`. **사용자 확인 대기**: 완료 기준의 브라우저 항목(Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착·RT 쿠키 생성)은 사용자가 2026-10-16에 확인했다(`rt` 쿠키 HttpOnly·Secure·SameSite=Lax·Path=/api/auth, 재발급 연속 3회 200, 로그아웃 204 후 401). 단 프론트 `/auth/callback` 화면은 Task 057 전이라 목업이 아닌 환경에서 항상 "로그인 실패"로 보인다. 이월: Redis Cloud 무료 플랜 Lua 실호출 확인(배포 스모크), 운영 환경 변수·Google 운영 리디렉션 URI(Task 092), 프론트 057 연동 항목(`api:generate`, 콜백·401 재시도·single-flight·500 처리·AT 폐기·`credentials`), Lettuce 예외 메시지의 키 노출 확인, `AuthUser.role`(enum)이 `global.security`→`user` 참조인 점의 계층 결정(상세는 HANDOFF 4절).
+- 기록(053·054, 2026-10-16, 한 브랜치 `feature/b5-auth`, PR #67 병합): 구현 완료. 결정 요약: 로그인 실패는 오류 코드가 아니라 `/auth/callback?error=login_failed` 리다이렉트, 인가 요청은 HMAC 서명 쿠키 `oauth2_auth_request`(180초, 콜백에서 즉시 삭제), Google 토큰은 저장하지 않음(STATELESS), AT 30분은 프론트 메모리에만·RT는 `{familyId}.{secret}` 불투명 토큰의 SHA-256 해시를 Redis에 저장(`Path=/api/auth`, SameSite=Lax), 회전마다 TTL 14일 갱신·직전 토큰 10초 유예·재사용이면 계열 삭제(Lua 원자 판정), 로그아웃은 현재 기기 계열만 폐기, 재발급·로그아웃은 `Origin` 검사(불일치 403), Redis 장애는 재발급 500(401 아님), 재발급 응답에 `role` 포함(역할 변경은 다음 재발급에 반영), 오류 코드 세분화는 보류, 이메일 미검증(`email_verified`≠true) 계정은 로그인 거부(D1), 관리자 지정은 DB 직접 수정(R-5), 배치 토큰은 Security 체인 안 `BatchTokenAuthenticationFilter`로 옮겨 `hasAnyRole(ADMIN,BATCH)`(JWT와 OR). 테스트: 전체 `.\gradlew.bat build --rerun-tasks` 752건 실패 0·오류 0·건너뜀 1(기존), 계약 대조 `OpenApiContractTest` 통과. 계약은 operation 12개 구현·19개 `x-planned`. **사용자 확인 대기**: 완료 기준의 브라우저 항목(Vite 프록시 경유 Google 로그인 → `/auth/callback` 도착·RT 쿠키 생성)은 사용자가 2026-10-16에 확인했다(`rt` 쿠키 HttpOnly·Secure·SameSite=Lax·Path=/api/auth, 재발급 연속 3회 200, 로그아웃 204 후 401). 단 프론트 `/auth/callback` 화면은 Task 057 전이라 목업이 아닌 환경에서 항상 "로그인 실패"로 보인다. 이월: Redis Cloud 무료 플랜 Lua 실호출 확인(배포 스모크), 운영 환경 변수·Google 운영 리디렉션 URI(Task 092), 프론트 057 연동 항목(`api:generate`, 콜백·401 재시도·single-flight·500 처리·AT 폐기·`credentials`), Lettuce 예외 메시지의 키 노출 확인, `AuthUser.role`(enum)이 `global.security`→`user` 참조인 점의 계층 결정(상세는 HANDOFF 4절).
 
 #### Task 055: 내 설정·구독 상태 API 구현으로 계산 조건 저장 ✅
 - 태그: [B] · PRD: B5, FR-08, 10, SCR-07, R11-18 · 선행: 053, 031 · 브랜치: `feature/b5-user-settings`
@@ -1122,7 +1122,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 온보딩 완료 판정 기준: `user_setting` 행이 있으면 `isOnboardingDone: true`(계약에 명시됨, Task 032 안내서 4.6)
 - 완료 기준
   - V-B: 사용자 격리, 필수값 400, 비로그인 401 테스트가 통과한다. V-API: 저장 후 조회가 일치한다.
-- 결과(2026-10-16, PR 전): `user` 패키지에 `UserSetting`·`UserSubscription`과 설정 API 2개를 구현했다. PUT은 검증·정규화 → 사용자 행 잠금 → 구독 벌크 삭제 → 설정 upsert → 구독 INSERT 순서의 전체 교체이고, 같은 사용자의 이중 PUT은 잠금으로 직렬화한다(첫 설정 저장 경합 해소). 구독 중이 아닌데 요금제 이름·결제일을 보내면 400이다(계약 설명에 반영, 프론트 목업은 Task 058에서 맞춘다).
+- 결과(2026-10-16, PR #68 병합): `user` 패키지에 `UserSetting`·`UserSubscription`과 설정 API 2개를 구현했다. PUT은 검증·정규화 → 사용자 행 잠금 → 구독 벌크 삭제 → 설정 upsert → 구독 INSERT 순서의 전체 교체이고, 같은 사용자의 이중 PUT은 잠금으로 직렬화한다(첫 설정 저장 경합 해소). 구독 중이 아닌데 요금제 이름·결제일을 보내면 400이다(계약 설명에 반영, 프론트 목업은 Task 058에서 맞춘다).
 
 #### Task 056: 찜·우선순위·시청 체크 API 구현으로 계산 대상 관리 ✅
 - 태그: [B] · PRD: B5, FR-09, R11-19 · 선행: 055, 051 · 찜 상한 20개 확정(2026-10-10, PRD 11절 36번. 2026-10-09의 잠정값 30을 대체) · 브랜치: `feature/b5-wishlist`
@@ -1132,7 +1132,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 찜 상한(**20개 확정**, 2026-10-10 사용자 결정, PRD 11절 36번. 찜 항목 단위로 세어 영화 1편·드라마 시즌 1개가 각각 1개이고 "다 봤음"으로 옮긴 항목은 세지 않는다. 설정 키로 두되 DB 제약은 두지 않는 애플리케이션 규칙이다, ERD) 21번째 추가는 막고 `WISHLIST_LIMIT_EXCEEDED`(제안, 코드는 R-9 절차와 Task 031로 등록)로 응답한다. 이미 있는 항목의 중복 추가는 상한과 무관하게 기존대로 무시한다. 같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화(예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다))로 검사·저장하며 방식은 이 Task 구현에서 정한다. 엔진의 `MAX_PRODUCT_COUNT = 20`은 별개의 값(후보 상품 수)이라 바꾸지 않는다. `refresh_tier` 갱신은 Task 077에서 한다
 - 완료 기준
   - V-B: 다른 사용자 찜 차단, 중복 무시, 상한 테스트. V-API: 시즌 찜과 다 봤음 토글.
-- 결과(2026-10-16, PR 전): 찜 API 4개를 `wishlist` 패키지로 구현했다. 상한 20은 `WishlistService.MAX_ACTIVE_ITEM_COUNT`에 두고, 새 찜 추가와 "다 봤음" 되돌리기는 사용자 행 `FOR UPDATE`(`UserQueryService.lockUser`, MANDATORY)로 직렬화한 뒤 개수를 판정한다(동시 추가 테스트 포함). 목록은 시청 단위·제공 상태를 일괄 조회한다. 목업(`handlers.ts`)과 서버의 차이(PATCH 빈 요청 400, 경로 ID 형식 오류 400)는 Task 058 연결 때 맞춘다. 설명은 `docs/guides/USER_SETTINGS_WISHLIST_GUIDE.md`.
+- 결과(2026-10-16, PR #68 병합): 찜 API 4개를 `wishlist` 패키지로 구현했다. 상한 20은 `WishlistService.MAX_ACTIVE_ITEM_COUNT`에 두고, 새 찜 추가와 "다 봤음" 되돌리기는 사용자 행 `FOR UPDATE`(`UserQueryService.lockUser`, MANDATORY)로 직렬화한 뒤 개수를 판정한다(동시 추가 테스트 포함). 목록은 시청 단위·제공 상태를 일괄 조회한다. 목업(`handlers.ts`)과 서버의 차이(PATCH 빈 요청 400, 경로 ID 형식 오류 400)는 Task 058 연결 때 맞춘다. 설명은 `docs/guides/USER_SETTINGS_WISHLIST_GUIDE.md`.
 
 #### Task 057: 인증 연동(토큰 메모리 보관·재발급·라우트 가드) 구현으로 프론트 로그인 완성 ✅
 - 태그: [F] · PRD: F4, FR-06, 17 · 선행: 054, 031 · 브랜치: `feature/f4-auth`
@@ -1145,7 +1145,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 결정(2026-10-09): Task 018의 `RequireAuth`·`RequireAdmin`은 지금 통과만 하는 골격이고 `TODO(Task 057)` 주석에 들어올 동작을 적어 두었다. 이 Task에서 그 주석을 실제 동작으로 바꾼다.
 - 완료 기준
   - V-FS: 로그인 → 새로고침 유지 → 로그아웃 → 보호 화면 접근 시 로그인 → 원래 화면 복귀, 일반 사용자 관리자 화면 차단. 짧은 AT TTL(local)로 401 → 재발급 1회 → 재시도를 확인했다. (아래 결과의 "확인하지 못한 것" 참고: 실서버 확인 전)
-- 결과(2026-10-16, PR 전): 구현은 끝났고 단위·RTL 테스트로 검증했다. 결정: 관리자 권한이 없으면 안내 화면과 홈 링크(홈 자동 이동은 채택하지 않음), 재발급 요청은 인터셉터 없는 별도 axios(`REFRESH_CLIENT`)로 보내 재귀를 막고 생성 훅 대신 `http.ts`에서 직접 호출(순환 의존 방지), 재발급이 500이거나 네트워크 오류면 로그인 화면으로 보내지 않고 `ApiError`를 전달하며 앱 시작 때는 error 상태 + "다시 시도", 토큰 없는 요청의 401은 재발급하지 않고 이미 갱신된 토큰이면 재발급 없이 재시도, 로그아웃은 `POST /auth/logout` 뒤 첫 화면으로 이동하고 AT·캐시를 폐기(서버 실패여도 로컬은 폐기하고 경고 토스트), `returnTo`는 경로만 sessionStorage에 둔다(토큰 아님). **확인하지 못한 것**: 실서버·실제 Google 로그인으로 본 로그인·새로고침 유지·401 → 재발급 1회·로그아웃·USER의 관리자 차단·Redis 끊김 시 500 처리(아침에 사용자가 확인, HANDOFF 3절). **이월**: 비로그인 방문자도 앱 시작 때 refresh를 1회 호출해 콘솔에 401 로그가 남는다(추천: 그대로 둠, "로그인한 적 있음" 표식은 규칙 판단이 필요), 헤더 내 메뉴·`MockRoleSwitcher`/푸터 개발용 이동 정리 시점은 사용자 UI 결정이다.
+- 결과(2026-10-16, PR #74 병합): 구현은 끝났고 단위·RTL 테스트로 검증했다. 결정: 관리자 권한이 없으면 안내 화면과 홈 링크(홈 자동 이동은 채택하지 않음), 재발급 요청은 인터셉터 없는 별도 axios(`REFRESH_CLIENT`)로 보내 재귀를 막고 생성 훅 대신 `http.ts`에서 직접 호출(순환 의존 방지), 재발급이 500이거나 네트워크 오류면 로그인 화면으로 보내지 않고 `ApiError`를 전달하며 앱 시작 때는 error 상태 + "다시 시도", 토큰 없는 요청의 401은 재발급하지 않고 이미 갱신된 토큰이면 재발급 없이 재시도, 로그아웃은 `POST /auth/logout` 뒤 첫 화면으로 이동하고 AT·캐시를 폐기(서버 실패여도 로컬은 폐기하고 경고 토스트), `returnTo`는 경로만 sessionStorage에 둔다(토큰 아님). **확인하지 못한 것**: 실서버·실제 Google 로그인으로 본 로그인·새로고침 유지·401 → 재발급 1회·로그아웃·USER의 관리자 차단·Redis 끊김 시 500 처리(아침에 사용자가 확인, HANDOFF 3절). **이월**: 비로그인 방문자도 앱 시작 때 refresh를 1회 호출해 콘솔에 401 로그가 남는다(추천: 그대로 둠, "로그인한 적 있음" 표식은 규칙 판단이 필요), 헤더 내 메뉴·`MockRoleSwitcher`/푸터 개발용 이동 정리 시점은 사용자 UI 결정이다.
 
 #### Task 058: 온보딩·찜 화면 실제 API 연결로 사용자 입력 흐름 완성 ✅
 - 태그: [F] · PRD: F5, FR-08~10, MVP 완료 기준 ① · 선행: 055, 056, 057 · 브랜치: `feature/f5-onboarding-wishlist`
@@ -1155,7 +1155,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] RTL 테스트: 찜 추가·우선순위 변경
 - 완료 기준
   - V-FS: 신규 로그인 → 온보딩 저장 → 시즌 찜 → 우선순위 변경·다 봤음까지 실제 값이 반영되고 새로고침 후 유지된다. (실서버 확인 전)
-- 결과(2026-10-16, PR 전): 화면을 서버 상태 기준으로 연결하고 목업을 서버 규칙에 맞췄다(검증 순서는 서버 가이드 2.3~2.4와 같고 PATCH는 경로 ID → 본문 → 404). 결정: 상세 화면의 찜 상태는 임시 캐시가 아니라 서버 찜 목록에서 파생하고 목록 수신 전에는 버튼을 비활성, 변경 성공 뒤 목록 무효화를 기다린 다음 토스트, 첫 로그인 분기는 `getMySettings`의 `isOnboardingDone=false`면 `/settings`로 보낸다(조회 실패면 원래 화면, `AuthCallbackScreen.resolveLoginDestination` 신규, **사용자 검토 대상**). **확인하지 못한 것**: 실서버 연결, 형식이 어긋난 JSON 서버 응답, V-F 브라우저 확인. 설정 서버 400의 `fieldErrors` 필드명은 목업 추측이고 화면은 영문 필드명을 그대로 목록으로 보인다(한글 이름표는 사용자 UI 결정 대기). ui-designer 검수는 057과 묶어 HANDOFF 4절에 정리했다.
+- 결과(2026-10-16, PR #74 병합): 화면을 서버 상태 기준으로 연결하고 목업을 서버 규칙에 맞췄다(검증 순서는 서버 가이드 2.3~2.4와 같고 PATCH는 경로 ID → 본문 → 404). 결정: 상세 화면의 찜 상태는 임시 캐시가 아니라 서버 찜 목록에서 파생하고 목록 수신 전에는 버튼을 비활성, 변경 성공 뒤 목록 무효화를 기다린 다음 토스트, 첫 로그인 분기는 `getMySettings`의 `isOnboardingDone=false`면 `/settings`로 보낸다(조회 실패면 원래 화면, `AuthCallbackScreen.resolveLoginDestination` 신규, **사용자 검토 대상**). **확인하지 못한 것**: 실서버 연결, 형식이 어긋난 JSON 서버 응답, V-F 브라우저 확인. 설정 서버 400의 `fieldErrors` 필드명은 목업 추측이고 화면은 영문 필드명을 그대로 목록으로 보인다(한글 이름표는 사용자 UI 결정 대기). ui-designer 검수는 057과 묶어 HANDOFF 4절에 정리했다.
 
 #### Task 059: 관리자 상품·가격 API(단품) 구현으로 요금표 관리 ✅
 - 태그: [B] · PRD: B6, FR-19(단품), SCR-14 · 선행: 035, 054 · 브랜치: `feature/b6-admin-products`
@@ -1165,7 +1165,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 기준일 유효 가격 선택 서비스 메서드(계산·요금 확인 공용)
 - 완료 기준
   - V-B: 겹침 거부·기준일별 선택 테스트. V-API: ADMIN 성공, USER 403.
-- 결과(2026-10-16, PR 전): 관리자 상품·월 구독요금 API 7개를 `product`에 구현했다. 요금 이력 규칙은 순수 클래스 `ProductPriceRules`로 분리했고(추가=가장 최근 요금 이력보다 늦게, 수정·삭제=가장 최근 요금 이력만, 첫 요금 이력은 오늘 이하), 기준일 유효 가격 선택은 `ProductPriceQueryService.priceOn`으로 제공해 060·063이 재사용한다. 주입 가능한 KST `Clock`(`ClockConfig`)을 추가했고 `PRICE_*` 오류 코드 6개를 등록했다. 한 서비스에 판매 중 단품 여러 개는 막지 않는다(2026-10-16 결정, ERD 기록).
+- 결과(2026-10-16, PR #69 병합): 관리자 상품·월 구독요금 API 7개를 `product`에 구현했다. 요금 이력 규칙은 순수 클래스 `ProductPriceRules`로 분리했고(추가=가장 최근 요금 이력보다 늦게, 수정·삭제=가장 최근 요금 이력만, 첫 요금 이력은 오늘 이하), 기준일 유효 가격 선택은 `ProductPriceQueryService.priceOn`으로 제공해 060·063이 재사용한다. 주입 가능한 KST `Clock`(`ClockConfig`)을 추가했고 `PRICE_*` 오류 코드 6개를 등록했다. 한 서비스에 판매 중 단품 여러 개는 막지 않는다(2026-10-16 결정, ERD 기록).
 
 #### Task 060: 사용자 금액 수정과 적용 가격 결정 구현으로 실제 지불 금액 반영 ✅
 - 태그: [B] · PRD: B6, FR-11, SCR-09 · 선행: 059, 055, 031 · 브랜치: `feature/b6-price-override`
@@ -1174,7 +1174,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 적용 가격: `USER_OVERRIDE` / `ADMIN` / `ALREADY_PAID`(SUBSCRIBED 이번 달) / `FREE`
 - 완료 기준
   - V-B: 가격 출처 4종 테스트. V-API: 수정 후 조회에 반영되고 관리자 가격은 그대로다.
-- 결과(2026-10-16, PR 전): 내 서비스 요금 API 3개를 구현했다. 응답의 가격 출처는 ADMIN·USER_OVERRIDE만 만들고 ALREADY_PAID·FREE 결정은 Task 063에서 한다. 현재 적용 중인 요금이 없는 판매 중 상품은 목록에서 빠지고 PUT·DELETE는 404 `SERVICE_PRICE_NOT_FOUND`다. 같은 사용자의 동시 PUT은 사용자 행 잠금으로 직렬화한다. 실측으로 정수 필드에 소수(9900.5)가 버림 통과하는 것을 발견해 `spring.jackson.deserialization.accept-float-as-int: false`를 전역으로 적용했다(소수는 400 `VALIDATION_FAILED`). 프론트 목업과 서버의 차이(오류 우선순위·문구·소수 400)는 Task 061 연결 때 맞춘다.
+- 결과(2026-10-16, PR #69 병합): 내 서비스 요금 API 3개를 구현했다. 응답의 가격 출처는 ADMIN·USER_OVERRIDE만 만들고 ALREADY_PAID·FREE 결정은 Task 063에서 한다. 현재 적용 중인 요금이 없는 판매 중 상품은 목록에서 빠지고 PUT·DELETE는 404 `SERVICE_PRICE_NOT_FOUND`다. 같은 사용자의 동시 PUT은 사용자 행 잠금으로 직렬화한다. 실측으로 정수 필드에 소수(9900.5)가 버림 통과하는 것을 발견해 `spring.jackson.deserialization.accept-float-as-int: false`를 전역으로 적용했다(소수는 400 `VALIDATION_FAILED`). 프론트 목업과 서버의 차이(오류 우선순위·문구·소수 400)는 Task 061 연결 때 맞춘다.
 
 #### Task 061: 관리자 화면(MVP) 실제 API 연결로 운영 화면 완성 ✅
 - 태그: [F] · PRD: F6, FR-18~20 · 선행: 045, 046, 059, 057 · 기한 전제: R11-23, R11-24(2026-10-22) · 브랜치: `feature/f6-admin-screens`
@@ -1183,7 +1183,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] SCR-16 FR-20: 실행별 "변경된 작품" 목록(Task 045 조회)을 표시한다. "재계산 대상 플랜 수"와 알림 상태는 "2단계부터" 안내 자리로 두고, 실제 값 연결은 Task 070(재계산 대상 플랜 수)·074(알림 상태)에서 한다
 - 완료 기준
   - V-FS: ADMIN 계정으로 상품·가격 등록, 매핑, 수집 실행·이력·변경된 작품이 실제 값으로 동작하고 USER는 차단된다. (실서버 확인 전)
-- 결과(2026-10-16, PR 전): 관리자 화면 코드는 이미 생성 훅을 쓰고 있어서 컴포넌트는 고치지 않고 목업을 서버 규칙에 맞췄다. 검사 순서는 400 → 404 → 409, 400 응답은 고정 detail + `fieldErrors`, 소수 금액은 400(`monthlyPrice`), 문구는 서버 `ErrorCode`와 같게 했다(화면은 `errorCode`로 문구를 고른다). **확인하지 못한 것**: 실서버의 관리자 시나리오 8개(요금 이력 겹침·최근 이력만 수정, 제공처 매핑 유지, 수집 202/409, 변경 작품, USER 차단)는 아침에 사용자가 확인한다. **이월**: 내 서비스 요금 목업과 관리자 상품의 연결(사용자 결정 유지), 가격 폼에 서버 `fieldErrors`를 보이는 방식(시각 판단 필요, ui-designer).
+- 결과(2026-10-16, PR #74 병합): 관리자 화면 코드는 이미 생성 훅을 쓰고 있어서 컴포넌트는 고치지 않고 목업을 서버 규칙에 맞췄다. 검사 순서는 400 → 404 → 409, 400 응답은 고정 detail + `fieldErrors`, 소수 금액은 400(`monthlyPrice`), 문구는 서버 `ErrorCode`와 같게 했다(화면은 `errorCode`로 문구를 고른다). **확인하지 못한 것**: 실서버의 관리자 시나리오 8개(요금 이력 겹침·최근 이력만 수정, 제공처 매핑 유지, 수집 202/409, 변경 작품, USER 차단)는 아침에 사용자가 확인한다. **이월**: 내 서비스 요금 목업과 관리자 상품의 연결(사용자 결정 유지), 가격 폼에 서버 `fieldErrors`를 보이는 방식(시각 판단 필요, ui-designer).
 
 #### Task 062: 플랜 영역 엔티티와 리포지토리 작성으로 플랜 저장 모델 마련 ✅
 - 태그: [B] · PRD: B7 · 선행: 034, 035 · 브랜치: `feature/b7-plan-entities`
@@ -1270,7 +1270,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6(결정: 066에서는 만들지 않고 Task 073에서 추가한다)
 - 완료 기준
   - V-B: 저장 후 ACTIVE 1·ARCHIVED 1(유니크 위반 없음)이고 나머지 유형 DRAFT는 삭제됨, 수집이 더 늦으면 409, 다른 사용자 DRAFT 404. V-API: 계산 → 저장 → 조회.
-- 기록: 2026-10-16 구현(PR 전, 브랜치 `feature/b7-plan-activate`). `plan`에 `PlanActivateService`(저장), `PlanQueryService`·`PlanViewLoader`(초안·현재 플랜 조회, DB에서 재구성)를 구현하고 계약 `openapi.yaml`의 `listPlanDrafts`·`getCurrentPlan`·`createPlan`에서 `x-planned`를 지웠다(남은 `x-planned` operation은 0개, 전체 33개). 잠금은 DRAFT 행이 아니라 `users` 행이다(설정·찜·요금·계산 쓰기와 같은 행을 잠가 교착을 막는다). 현재 플랜이 없으면 404가 아니라 200이고 `plan`이 `null`이다. 오래된 판정은 `plan.data_as_of`가 최신 수집 완료 시각(`CollectDataVersionService.findDataAsOf`)보다 이르면 409, 같거나 완료된 수집이 없으면 통과다. SUBSCRIBE_GUIDE outbox 행은 만들지 않는다(R-6 추천안 채택, Task 073에서 추가). 오류 코드 `PLAN_DRAFT_NOT_FOUND`·`PLAN_DRAFT_STALE`을 `error-codes.md`와 `ErrorCode`에 추가했다. 프론트 실제 연결은 Task 067.
+- 기록: 2026-10-16 구현(PR #73 병합, 브랜치 `feature/b7-plan-activate`). `plan`에 `PlanActivateService`(저장), `PlanQueryService`·`PlanViewLoader`(초안·현재 플랜 조회, DB에서 재구성)를 구현하고 계약 `openapi.yaml`의 `listPlanDrafts`·`getCurrentPlan`·`createPlan`에서 `x-planned`를 지웠다(남은 `x-planned` operation은 0개, 전체 33개). 잠금은 DRAFT 행이 아니라 `users` 행이다(설정·찜·요금·계산 쓰기와 같은 행을 잠가 교착을 막는다). 현재 플랜이 없으면 404가 아니라 200이고 `plan`이 `null`이다. 오래된 판정은 `plan.data_as_of`가 최신 수집 완료 시각(`CollectDataVersionService.findDataAsOf`)보다 이르면 409, 같거나 완료된 수집이 없으면 통과다. SUBSCRIBE_GUIDE outbox 행은 만들지 않는다(R-6 추천안 채택, Task 073에서 추가). 오류 코드 `PLAN_DRAFT_NOT_FOUND`·`PLAN_DRAFT_STALE`을 `error-codes.md`와 `ErrorCode`에 추가했다. 프론트 실제 연결은 Task 067.
 
 #### Task 067: 요금 확인·계산·결과 흐름 실제 API 연결로 핵심 흐름 완성 ✅
 - 태그: [F] · PRD: F7, FR-11, 12, 14, MVP 완료 기준 ① · 선행: 064, 066, 058, 060, 045 · 브랜치: `feature/f7-plan-flow`
@@ -1281,7 +1281,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: 로그인 → 설정 → 찜 → 요금 수정 → 계산 → 결과 → 저장을 실제 값으로 재현했고, 화면 금액이 API 응답과 같다. (실서버 확인 전)
   - 409 재현: 계산 후 local 프로필에서 `targetDate`를 다른 날짜로 지정해 수집을 다시 실행하고(Task 045, 같은 날 409 회피) 완료를 기다린 뒤 저장하면 409 `PLAN_DRAFT_STALE` → 자동 재계산 → 안내가 동작한다. (실서버 확인 전)
-- 결과(2026-10-16, PR 전): 화면은 서버 상태(초안 조회, 현재 플랜 조회)만 기준으로 그린다. 초안이 있으면 결과, 없고 현재 플랜이 있으면 `/plan` 안의 "내 현재 플랜", 둘 다 없으면 계산 안내다. 저장 성공 뒤 두 쿼리를 무효화하고 기다린 다음 성공 처리하며, 404는 안내 + 재조회(자동 재계산 안 함), 409는 자동 재계산 + 안내다. 목업은 초안 스냅샷 유지, `POST /plans` 판정 400 → 404 → 409, `GET /plans/current` 추가, 새로고침 복원(sessionStorage)을 갖췄다. **확인하지 못한 것**: 실서버 전체 흐름과 409·404 재현, 404 안내·진행 중 화면·저장 실패 문구(목업 시나리오 없음). **사용자 결정 대기**: 현재 플랜 표시 방식, 해지 예약 권장 달별 판정, 요금 수정 뒤 옛 초안 안내 문구(HANDOFF 4절).
+- 결과(2026-10-16, PR #74 병합): 화면은 서버 상태(초안 조회, 현재 플랜 조회)만 기준으로 그린다. 초안이 있으면 결과, 없고 현재 플랜이 있으면 `/plan` 안의 "내 현재 플랜", 둘 다 없으면 계산 안내다. 저장 성공 뒤 두 쿼리를 무효화하고 기다린 다음 성공 처리하며, 404는 안내 + 재조회(자동 재계산 안 함), 409는 자동 재계산 + 안내다. 목업은 초안 스냅샷 유지, `POST /plans` 판정 400 → 404 → 409, `GET /plans/current` 추가, 새로고침 복원(sessionStorage)을 갖췄다. **확인하지 못한 것**: 실서버 전체 흐름과 409·404 재현, 404 안내·진행 중 화면·저장 실패 문구(목업 시나리오 없음). **사용자 결정 대기**: 현재 플랜 표시 방식, 해지 예약 권장 달별 판정, 요금 수정 뒤 옛 초안 안내 문구(HANDOFF 4절).
 
 ---
 
