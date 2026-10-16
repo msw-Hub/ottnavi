@@ -102,11 +102,11 @@ function StateLayout({ children }: { children: ReactNode }) {
   )
 }
 
-// 검색 화면으로 돌아가는 링크 버튼
+// 검색 화면으로 돌아가는 링크 버튼. 검색 화면 주소가 `/`에서 `/search`로 바뀌어(홈 1차안) 목적지를 맞췄다(이전: to="/")
 function BackToSearchLink() {
   return (
     <Button asChild variant="outline" className="h-11 w-fit">
-      <Link to="/">작품 검색으로 돌아가기</Link>
+      <Link to="/search">작품 검색으로 돌아가기</Link>
     </Button>
   )
 }
