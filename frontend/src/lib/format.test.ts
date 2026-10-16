@@ -4,6 +4,7 @@ import {
   formatDataAsOf,
   formatDate,
   formatDateTime,
+  formatDateTimeKorean,
   formatElapsed,
   formatIsoDate,
   formatMinutes,
@@ -115,6 +116,19 @@ describe('formatDateTime', () => {
     expect(formatDateTime(null)).toBeNull()
     expect(formatDateTime('abc')).toBeNull()
     expect(formatDateTime('2026-10-10')).toBeNull()
+  })
+})
+
+describe('formatDateTimeKorean', () => {
+  it('한국 시간 기준 "YYYY년 M월 D일 HH:mm"으로 바꾼다', () => {
+    expect(formatDateTimeKorean('2026-10-16T13:33:00+09:00')).toBe('2026년 10월 16일 13:33')
+    // UTC 18:30은 한국 시간으로 다음 날 03:30, 월·일의 앞자리 0은 뗀다
+    expect(formatDateTimeKorean('2026-10-08T18:30:00Z')).toBe('2026년 10월 9일 03:30')
+  })
+
+  it('해석할 수 없거나 시각이 없는 값은 null', () => {
+    expect(formatDateTimeKorean(null)).toBeNull()
+    expect(formatDateTimeKorean('2026-10-10')).toBeNull()
   })
 })
 

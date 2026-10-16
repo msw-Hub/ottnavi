@@ -138,6 +138,10 @@ function WishlistContent({ list, services }: WishlistContentProps) {
     priority: option.value,
     items: activeItems.filter((item) => item.priority === option.value),
   }))
+  // 활성 찜이 2개 이상인데 모두 같은 단계인지. 이때만 "우선순위를 나누면…" 권유를 보인다(1개는 나눌 수 없고, 이미 나눴으면 권유가 필요 없다)
+  const isAllSamePriority =
+    activeItems.length >= 2 &&
+    activeItems.every((item) => item.priority === activeItems[0].priority)
   // 상한(20개)에 닿았는지. 서버가 센 개수와 상한을 그대로 비교한다(화면이 다시 세지 않는다)
   const isFull = list.activeItemCount >= list.maxActiveItemCount
   // 계산에 쓸 작품 중 같은 드라마의 시즌이 둘 이상인지. 다 본 시즌은 계산에서 빠져 순서 제약이 없으므로 세지 않는다
@@ -259,7 +263,7 @@ function WishlistContent({ list, services }: WishlistContentProps) {
         {activeItems.length > 0 ? (
           <>
             {/* 우선순위 분포 요약: 세 단계에 몇 개씩 들어 있는지 배지로 보이고, 계산이 단계를 어떤 순서로 챙기는지 한 줄로 알린다.
-                "우선순위를 나누면…" 문장은 늘 보이는 일반 안내다(모두 같은 단계일 때만 띄우는 조건 판단은 하지 않는다) */}
+                앞 문장은 늘 보이는 고정 안내, "우선순위를 나누면…" 권유는 모두 같은 단계일 때만 보인다 */}
             <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
               <ul aria-label="우선순위별 작품 수" className="flex flex-wrap gap-2">
                 {activeGroups.map((group) => (
@@ -270,7 +274,8 @@ function WishlistContent({ list, services }: WishlistContentProps) {
               </ul>
               <p className="text-sm break-keep text-muted-foreground">
                 계산은 꼭 볼 작품을 가장 먼저 챙기고, 그다음 보고 싶음, 여유될 때 순으로 넣어요.
-                우선순위를 나누면 계산이 더 의미 있어져요.
+                {/* 권유 문장은 모두 같은 단계일 때만 보인다(이미 나눴다면 불필요한 잔소리라서) */}
+                {isAllSamePriority && ' 우선순위를 나누면 계산이 더 의미 있어져요.'}
               </p>
             </div>
 

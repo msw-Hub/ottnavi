@@ -190,6 +190,23 @@ export function formatDateTime(value: string | Date | null | undefined): string 
 }
 
 /**
+ * 일시를 한국 시간 기준 "2026년 10월 16일 13:33" 형식으로 바꾼다. 해석할 수 없으면 null을 돌려준다.
+ *
+ * 서비스(회원) 화면 전용이다. 다른 날짜 표기(formatDate의 "2026년 10월 9일")와 말투를 맞추려고 따로 뒀다.
+ * 관리자 표의 숫자 형식(formatDateTime)은 자리 수를 고정해 훑어 보기 좋게 한 것이라 그대로 둔다.
+ * 월·일은 "10월 9일"처럼 앞에 0을 붙이지 않고(formatDate와 같음), 시·분만 두 자리로 맞춘다.
+ */
+export function formatDateTimeKorean(value: string | Date | null | undefined): string | null {
+  // 1. 숫자 형식 함수가 한국 시간 기준으로 읽어 낸 "YYYY-MM-DD HH:mm"을 재사용한다(없는 값·시각 없는 값은 여기서 null)
+  const numeric = formatDateTime(value)
+  if (numeric === null) return null
+  // 2. 연·월·일과 시·분으로 나눠 "년 월 일"을 붙인다. Number()로 월·일의 앞자리 0을 뗀다
+  const [datePart, timePart] = numeric.split(' ')
+  const [year, month, day] = datePart.split('-')
+  return `${year}년 ${Number(month)}월 ${Number(day)}일 ${timePart}`
+}
+
+/**
  * 시작·종료 시각 사이를 "24분", "1시간 5분" 형식으로 바꾼다(분 표기는 formatMinutes를 재사용한다).
  *
  * - 1분 미만이면 "1분 미만": "0분"은 실행이 안 된 것처럼 읽혀서다.

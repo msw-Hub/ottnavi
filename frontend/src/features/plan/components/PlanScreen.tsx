@@ -24,7 +24,7 @@ import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
 import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
-import { formatDateTime } from '@/lib/format'
+import { formatDateTimeKorean } from '@/lib/format'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
 function getFailureMessage(error: unknown): string {
@@ -164,7 +164,8 @@ interface CurrentPlanViewProps {
 function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanViewProps) {
   const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
   const typeName = PLAN_TYPE_LABELS[plan.planType]
-  const savedAt = formatDateTime(plan.activatedAt)
+  // 서비스 화면의 다른 날짜("2026년 10월 9일")와 같은 말투로 맞춘 저장 시각(관리자용 숫자 형식 formatDateTime은 쓰지 않는다)
+  const savedAt = formatDateTimeKorean(plan.activatedAt)
 
   return (
     <div className="flex flex-col gap-6">
@@ -285,17 +286,18 @@ function PlanResult({
       </div>
 
       {/* 저장 중 데이터가 바뀌어 다시 계산한 경우: 결과가 달라졌을 수 있어 확인 후 다시 저장하게 안내한다 */}
-      {hasRecalculatedNotice && (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info"
-        >
-          <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-          <span className="font-semibold">
-            데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
-          </span>
-        </p>
-      )}
+      {/* role="status" 영역은 항상 DOM에 두고 안의 내용만 바꾼다. 조건부로 영역째 새로 만들면 낭독기가 "나중에 생긴 영역"의 글자를 읽지 않는 경우가 많다.
+          비어 있을 때는 높이가 없어 레이아웃에 영향이 없다(flex gap은 빈 요소도 칸을 차지하므로 empty:hidden으로 감춘다) */}
+      <div role="status" className="empty:hidden">
+        {hasRecalculatedNotice && (
+          <p className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info">
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+            <span className="font-semibold">
+              데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
+            </span>
+          </p>
+        )}
+      </div>
 
       {calculateError != null && (
         // 경고 아이콘을 넣어 공통 오류 화면(ErrorState)과 같은 모양으로 맞춘다. 색만으로 오류임을 알리지 않는다(067 검수 제안 5)

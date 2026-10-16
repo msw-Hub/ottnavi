@@ -132,6 +132,46 @@ function fillActiveWishlist(count: number) {
   }
 }
 
+// 우선순위 나누기 권유 문장 (활성 찜 2개 이상 + 모두 같은 단계일 때만)
+const SPLIT_HINT = /우선순위를 나누면 계산이 더 의미 있어져요/
+
+async function addMovie(tmdbId: number, priority: 'MUST' | 'WANT' | 'MAYBE') {
+  await customInstance({
+    url: '/me/wishlist-items',
+    method: 'POST',
+    data: { mediaType: 'movie', tmdbId, seasonNumber: null, priority },
+  })
+}
+
+describe('우선순위 나누기 권유', () => {
+  it('찜이 2개 이상이고 모두 같은 단계면 권유가 보인다', async () => {
+    await addMovie(524, 'WANT')
+    await addMovie(496243, 'WANT')
+    renderWishlist()
+
+    expect(await screen.findByText(SPLIT_HINT)).toBeInTheDocument()
+    // 고정 문구는 그대로 있다
+    expect(screen.getByText(/계산은 꼭 볼 작품을 가장 먼저 챙기고/)).toBeInTheDocument()
+  })
+
+  it('단계가 섞여 있으면 권유는 없고 고정 문구만 남는다', async () => {
+    await addMovie(524, 'MUST')
+    await addMovie(496243, 'WANT')
+    renderWishlist()
+
+    expect(await screen.findByText(/계산은 꼭 볼 작품을 가장 먼저 챙기고/)).toBeInTheDocument()
+    expect(screen.queryByText(SPLIT_HINT)).not.toBeInTheDocument()
+  })
+
+  it('찜이 1개뿐이면 나눌 수 없으므로 권유가 없다', async () => {
+    await addMovie(524, 'WANT')
+    renderWishlist()
+
+    expect(await screen.findByText(/계산은 꼭 볼 작품을 가장 먼저 챙기고/)).toBeInTheDocument()
+    expect(screen.queryByText(SPLIT_HINT)).not.toBeInTheDocument()
+  })
+})
+
 describe('찜 개수와 안내(Task 030 확정 문구)', () => {
   it('개수 줄은 "찜 N/20"이고 20개 전에는 안내 띠가 없다', async () => {
     await addFourMovies()

@@ -125,7 +125,7 @@ describe('내 설정 저장 검증(Task 058)', () => {
     await fillBudgetAndSave(user)
 
     expect(await screen.findByText('저장하지 못했어요')).toBeInTheDocument()
-    expect(screen.getByText(/monthlyBudget: 0 이상의 정수여야 합니다./)).toBeInTheDocument()
+    expect(screen.getByText(/월 예산: 0 이상의 정수여야 합니다./)).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/settings')
   })
 })

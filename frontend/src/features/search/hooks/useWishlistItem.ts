@@ -153,10 +153,12 @@ export function useWishlistItem(
   // handleError가 userMessage(errorMessages.ts의 getErrorMessage 결과)를 토스트로 알린다.
   const add = useAddWishlistItem({
     mutation: {
-      onSuccess: async () => {
+      onSuccess: async (response) => {
         await refreshWishlistQueries()
         showWishlistAddedDialog({
           entryKey,
+          // 팝업이 이 항목의 우선순위를 바로 바꿀 수 있도록 응답의 찜 항목 ID를 넘긴다(CommonResponse 래퍼 안의 data)
+          wishlistItemId: response.data.wishlistItemId,
           name: popup?.name ?? targetName,
           posterUrl: popup?.posterUrl ?? null,
         })
