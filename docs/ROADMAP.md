@@ -43,10 +43,10 @@
 |---|---|---|---|
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
-| 3 | 핵심 기능 개발 | 24/30 | 🔄 진행 중 |
+| 3 | 핵심 기능 개발 | 25/30 | 🔄 진행 중 |
 | 4 | 추가 기능 개발 | 0/24 | ⬜ 대기 |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 60/105 | |
+| 합계 | | 61/105 | |
 
 - Task 023(공통 응답·예외 처리)은 Task 019의 선행이라 2026-10-04 사용자 결정으로 Phase 2에서 Phase 1로 옮겼다(번호는 그대로). 그래서 Phase 1은 23개, Phase 2는 14개다.
 
@@ -817,7 +817,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7. Phase 3 — 핵심 기능 개발 · 24/30
+## 7. Phase 3 — 핵심 기능 개발 · 25/30
 
 **목표.**
 - MVP 핵심 가치(3개월 롤링 플랜 계산, 데이터 수집, 공개 조회, 인증·사용자 데이터, 단품 요금)를 실제로 동작시키고 목업을 실제 API로 교체한다.
@@ -1196,7 +1196,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: 동시 계산 2건 직렬화(유니크 위반 없음), 재계산 후 이전 DRAFT 하위 행 0행이고 유형마다 DRAFT 1개(최대 3개), 설정 누락 400.
   - V-API: 결과가 정답 세트 한 케이스와 일치하고 `calc_run`에 선택된 알고리즘 1행이 남는다.
-- 기록: 2026-10-16 구현(PR 번호 ). `POST /api/me/plan-drafts`를 `plan`에 구현했다. 비트랜잭션 `PlanCalculateService`가 읽기 조립(`PlanInputService`) → 엔진(`PlanSolveService`, `planCalc` 캐시 키 `e1:`+입력 해시, 엔진 규칙이 바뀌면 버전을 올린다) → 쓰기(`PlanDraftWriter`: `users` 행 잠금, 기존 DRAFT 벌크 삭제, DRAFT 3건·하위 행·`calc_run` 저장)를 잇고, 응답은 저장 직후 ID와 계산 결과로 조립한다(`PlanDraftViewAssembler`, DB 재조회 없음). `data_as_of`는 입력 조립 시점 값을 저장하고 동시 계산은 나중 요청이 덮어쓴다. 계약 `openapi.yaml`의 `x-planned`를 제거했고 응답 필드는 바꾸지 않았다.
+- 기록: 2026-10-16 구현(병합: PR #71). `POST /api/me/plan-drafts`를 `plan`에 구현했다. 비트랜잭션 `PlanCalculateService`가 읽기 조립(`PlanInputService`) → 엔진(`PlanSolveService`, `planCalc` 캐시 키 `e1:`+입력 해시, 엔진 규칙이 바뀌면 버전을 올린다) → 쓰기(`PlanDraftWriter`: `users` 행 잠금, 기존 DRAFT 벌크 삭제, DRAFT 3건·하위 행·`calc_run` 저장)를 잇고, 응답은 저장 직후 ID와 계산 결과로 조립한다(`PlanDraftViewAssembler`, DB 재조회 없음). `data_as_of`는 입력 조립 시점 값을 저장하고 동시 계산은 나중 요청이 덮어쓴다. 계약 `openapi.yaml`의 `x-planned`를 제거했고 응답 필드는 바꾸지 않았다.
 
 #### Task 065: FR-13 비교 측정 경로 구현으로 완전탐색·그리디 비교 기록 확보 ✅
 - 태그: [B] · PRD: B2·B7, FR-13, MVP 완료 기준 ③ · 선행: 062, 040, 054 · 브랜치: `feature/b7-algorithm-benchmark`
@@ -1206,7 +1206,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] 결과 요약(점수 차, 비용 차, 시간 중앙값) 응답
 - 완료 기준
   - V-API: ADMIN으로 호출 후 `calc_run`에 같은 `input_hash`의 EXACT·GREEDY 행이 남는다(MVP ③ 충족). 결과표를 `기록:`에 남겼다.
-- 기록: 2026-10-16 구현(PR 전, 브랜치 `feature/b7-algorithm-benchmark`). `plan/service/benchmark`와 `AdminPlanBenchmarkController`로 `POST /api/admin/plan-benchmarks`(201, ADMIN만)를 만들었고 계약 `openapi.yaml`의 operation을 추가했다. 정답 세트 21케이스로 EXACT·GREEDY를 측정해 `calc_run`에 저장한다. 로컬 통합 테스트로 EXACT·GREEDY 행과 응답을 확인했다. **운영 호출은 배포 뒤 사용자가 V-API로 한다(Q7).**
+- 기록: 2026-10-16 구현(병합: PR #72, 브랜치 `feature/b7-algorithm-benchmark`). `plan/service/benchmark`와 `AdminPlanBenchmarkController`로 `POST /api/admin/plan-benchmarks`(201, ADMIN만)를 만들었고 계약 `openapi.yaml`의 operation을 추가했다. 정답 세트 21케이스로 EXACT·GREEDY를 측정해 `calc_run`에 저장한다. 로컬 통합 테스트로 EXACT·GREEDY 행과 응답을 확인했다. **운영 호출은 배포 뒤 사용자가 V-API로 한다(Q7).**
   - 결정(Q1~Q7): Q1 정답 세트 로더를 테스트 소스에서 main(`plan/service/benchmark`)으로 옮겨 테스트와 운영 측정이 같은 세트를 쓴다. Q2 경로는 `plan-benchmarks`(제안 문구 `plans/benchmark`를 바로잡음). Q3 `calc_run`은 케이스×알고리즘당 1행, 3회 중앙값, 한 번 호출에 42행(21×2). Q4 `calc_run`의 시간은 ms 내림으로 저장하고 응답에는 `elapsedMicros`를 따로 준다. Q5 측정 행을 식별하는 컬럼은 두지 않는다(`plan_id` NULL이 측정 행). Q6 GREEDY 행의 후보 수는 완전탐색 기준 값을 적는다. Q7 운영 호출은 배포 뒤 사용자가 한다.
   - 로더 방식: `engine-benchmark/index.txt`에 케이스 이름을 한 줄씩 적은 목록 파일을 읽는다. 운영 jar 안에서는 클래스패스 와일드카드(`classpath*:...*.json`) 탐색이 환경에 따라 달라 쓰지 않았고, 목록 파일은 순서도 고정한다.
   - 측정 방식: 케이스·알고리즘마다 워밍업 1회 후 3회 측정의 중앙값, 추천형만, `ExactSolver`·`GreedySolver`를 직접 호출한다(`SolverSelector`·운영 캐시를 거치지 않는다).
@@ -1237,15 +1237,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
     | 21 long-season-after-prev | 18 | 46 | 20 | -1/0/-18000 | 2→2 |
   - 해석: 그리디가 완전탐색보다 나쁜 케이스는 06·07·21이다(꼭 시청 완료 수가 줄거나 점수가 낮다. 06은 점수가 오르지만 꼭 시청 완료 수가 1 줄어 추천형 기준으로는 나쁘다). 비용이 더 큰 09·11·12·14는 꼭 시청 완료 수·점수가 같고 비용만 다르다. 후보 수가 가장 큰 케이스 11은 389,017조합에서 완전탐색 약 164ms로 R11-30 상한의 실측점이고 나머지는 약 2ms 이하다. 한계: 케이스 앞쪽이 덜 데워진 JIT 편향이 있고(워밍업 1회뿐), Cloudtype(1GB)에서는 측정하지 않았다. 운영 값은 배포 뒤 호출로 추가한다(Task 100의 R11-30 참고값).
 
-#### Task 066: 플랜 저장·현재 플랜 조회 API 구현으로 ACTIVE 플랜 관리 ⬜
+#### Task 066: 플랜 저장·현재 플랜 조회 API 구현으로 ACTIVE 플랜 관리 ✅
 - 태그: [B] · PRD: B7, FR-14(MVP 저장) · 선행: 064, 045 · 기한 전제: R-6(2026-10-29) · 브랜치: `feature/b7-plan-activate`
 - 구현 사항
-  - [ ] `POST /api/me/plans`(`createPlan`, 본문 `planId`): 고른 유형의 DRAFT 잠금·소유자 확인(없으면 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집보다 이르면 409 `PLAN_DRAFT_STALE`
-  - [ ] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`. 저장 후 같은 사용자의 나머지 DRAFT는 벌크 삭제한다(PRD 11절 35번)
-  - [ ] `listPlanDrafts`(GET) 응답 조립(DB에서 재구성)을 이 Task에서 한다(결정 Q4-A, Task 064는 POST 응답만 저장 직후 값으로 조립)
-  - [ ] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6
+  - [x] `POST /api/me/plans`(`createPlan`, 본문 `planId`): `users` 행 `FOR UPDATE`(`UserQueryService.lockUser`, Task 064와 같은 잠금) 뒤 본인의 DRAFT만 조회(없음·남의 것·DRAFT 아님은 모두 404 `PLAN_DRAFT_NOT_FOUND`), `data_as_of`가 최신 수집 완료 시각보다 이르면 409 `PLAN_DRAFT_STALE`
+  - [x] 기존 ACTIVE → ARCHIVED → **명시적 flush** → DRAFT → ACTIVE, `previous_plan_id`. 저장 후 같은 사용자의 나머지 DRAFT는 벌크 삭제한다(PRD 11절 35번)
+  - [x] `listPlanDrafts`(GET) 응답 조립(DB에서 재구성)을 이 Task에서 한다(결정 Q4-A, Task 064는 POST 응답만 저장 직후 값으로 조립)
+  - [x] `getCurrentPlan`. SUBSCRIBE_GUIDE outbox 행 생성 여부는 R-6(결정: 066에서는 만들지 않고 Task 073에서 추가한다)
 - 완료 기준
   - V-B: 저장 후 ACTIVE 1·ARCHIVED 1(유니크 위반 없음)이고 나머지 유형 DRAFT는 삭제됨, 수집이 더 늦으면 409, 다른 사용자 DRAFT 404. V-API: 계산 → 저장 → 조회.
+- 기록: 2026-10-16 구현(PR 전, 브랜치 `feature/b7-plan-activate`). `plan`에 `PlanActivateService`(저장), `PlanQueryService`·`PlanViewLoader`(초안·현재 플랜 조회, DB에서 재구성)를 구현하고 계약 `openapi.yaml`의 `listPlanDrafts`·`getCurrentPlan`·`createPlan`에서 `x-planned`를 지웠다(남은 `x-planned` operation은 0개, 전체 33개). 잠금은 DRAFT 행이 아니라 `users` 행이다(설정·찜·요금·계산 쓰기와 같은 행을 잠가 교착을 막는다). 현재 플랜이 없으면 404가 아니라 200이고 `plan`이 `null`이다. 오래된 판정은 `plan.data_as_of`가 최신 수집 완료 시각(`CollectDataVersionService.findDataAsOf`)보다 이르면 409, 같거나 완료된 수집이 없으면 통과다. SUBSCRIBE_GUIDE outbox 행은 만들지 않는다(R-6 추천안 채택, Task 073에서 추가). 오류 코드 `PLAN_DRAFT_NOT_FOUND`·`PLAN_DRAFT_STALE`을 `error-codes.md`와 `ErrorCode`에 추가했다. 프론트 실제 연결은 Task 067.
 
 #### Task 067: 요금 확인·계산·결과 흐름 실제 API 연결로 핵심 흐름 완성 ⬜
 - 태그: [F] · PRD: F7, FR-11, 12, 14, MVP 완료 기준 ① · 선행: 064, 066, 058, 060, 045 · 브랜치: `feature/f7-plan-flow`
@@ -1318,7 +1319,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: O2, FR-15, 16 · 선행: 071, 072, 069, 045 · 기한 전제: R11-17, R11-22(2026-11-05) · 브랜치: `feature/o2-notification-api`
 - 구현 사항
   - [ ] 계약 추가(Task 071 변경안), 알림 설정·이력 API(`/api/me/...`, tag `notification`)
-  - [ ] SUBSCRIBE_GUIDE: 저장 커밋 후 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`, ①·③ `REQUIRES_NEW`(R-6 결정이 "MVP 미생성"이면 여기서 저장 흐름에 추가)
+  - [ ] SUBSCRIBE_GUIDE: 저장 커밋 후 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`, ①·③ `REQUIRES_NEW`(R-6 결정: MVP 미생성, 066은 outbox 행을 만들지 않았으므로 여기서 저장 흐름 `PlanActivateService`에 추가)
   - [ ] MONTHLY 생성(`dedupe_key`)은 월초 재계산 Job 완료 뒤 백엔드가 이어서 실행한다(R-21 확정, 재계산 Job의 완료 리스너). 실패 복구용 관리자 수동 재실행 API는 제안. PLAN_CHANGE(이번 달 확정 플랜 작품이 빠질 때만), `notification_enabled = false`면 미생성
   - [ ] 월초 알림용 GitHub Actions 워크플로는 만들지 않는다(수집 cron 하나가 시작점)
 - 완료 기준
@@ -1596,7 +1597,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 | 항목 | 내용 | 기한 | 막히는 Task |
 |---|---|---|---|
 | R11-13 | 쿠팡플레이를 계산 입력에 포함할지(입력 단계 필터, TECH 1절) | **2026-10-29** (계산 입력 전) | 063 |
-| R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **2026-10-29** | 066, 073 |
+| R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부 | **해소(2026-10-16)** | 066, 073 |
 
 해소되어 이 표에서 뺀 항목: R-12(Cloudtype 배포 방식: 저장소 연결 + 콘솔 수동 배포, Task 020 기록), R11-12(비로그인 요청 한도: 일반 IP당 분당 60회·단건 수집 검색 IP당 분당 10회, 2026-10-09 사용자 결정), R11-30의 찜 상한(20개, 2026-10-10 사용자 결정, PRD 11절 36번. 옛 잠정값 30개는 대체됨. 나머지 상한은 Task 040 측정으로 잠정 확정, Cloudtype 재확인 필요, 10.2), PRD 11절 37번(같은 시리즈 시즌 순서 규칙, 2026-10-10 사용자 결정, Task 040 후속 항목 S에서 구현 완료), 11절 38번(절감액 기준 `all_subscribe_cost`, 2026-10-10 사용자 결정, 구현은 Task 063·064), R-16(MVP 일괄 수집의 `tier`는 새 값 `ALL`, TECH 3절 설명 참고, 2026-10-09), R11-21(Refresh Token은 Redis TTL에 해시로 저장·회전·재사용 감지, 2026-10-09), R-5(운영 ADMIN은 가입 후 DB에서 `users.role` 직접 수정, 2026-10-09), R-14(첫 수집은 로컬, 운영 적재는 Task 095), R-15(일회성 Cloudtype 서비스로 SMTP 시험), R-20(`x-planned` 방식), R-21(수집 → 재계산 → 월초 알림을 백엔드에서 연결), R11-27(7개 서비스 해지 예약 정책, Task 003에서 확정), R11-11(Cloudtype SMTP 발신 가능 여부, 2026-10-09 Task 022 시험 성공으로 SMTP(Gmail) 채택 확정), R-17(Vercel `vercel.json` 미리보기 배포 성공, Task 014에서 확인), R11-14(SCR-06·07 현재 구성 유지, 18개 화면, 2026-10-12 사용자 결정), R11-18(환산 입력은 분만 `monthly_watch_minutes`에 저장하고 `watch_preset = CUSTOM`, ERD 변경 없음, 2026-10-12 사용자 결정 A안), R11-19(드라마 찜은 시즌 단위, 2026-10-12 사용자 결정), R11-20(시즌 0 미수집 화면 안내는 두지 않음, 2026-10-12 사용자 결정), R11-13(쿠팡플레이는 현행 유지: "모름"은 시청 가능 아님, "데이터 부족" 표시, 2026-10-12 사용자 결정). 10.3 참고.
 
@@ -1631,7 +1632,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-3 | 오리진 비밀 헤더 주입 방법 | **해소(2026-10-03)**: `vercel.json` `routes[].transforms`(TECH T-8 ①). 적용 순서 실측은 Task 021 `기록:` | TECH T-8 | — |
 | R-4 | cron이 백엔드에 닿는 경로 | **해소(2026-10-03)**: Cloudtype 직접 호출 + `x-origin-secret`·`ADMIN_BATCH_TOKEN`(TECH 3절). Task 047 | TECH 3절 | — |
 | R-5 | 운영 ADMIN 역할 지정 방법이 문서에 없다. 추천안(미확정): 관리자 1명이므로 첫 로그인 후 DB에서 `users.role`을 직접 수정하고 SQL을 README에 기록. 대안: 환경 변수 관리자 이메일 목록으로 로그인 시 부여. 로컬·테스트는 DB 직접 수정으로 진행(Task 054). Task 095 ②단계에서 적용 | **해소(2026-10-09, 사용자 결정)**: DB 직접 수정으로 확정(운영 관리자는 2명: 본인 계정과 포트폴리오 평가용 계정). 환경 변수 이메일 목록은 만들지 않는다. 절차와 주의는 Task 095 ② | FR-17, ERD `users.role` | 2026-11-04 (Task 095 전) |
-| R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부(TECH 2절 4번 vs PRD 9절 알림 미룸). 추천안(미확정): MVP에서는 만들지 않고 Task 073에서 추가. 발송기 없이 쌓인 행이 2단계 배포 때 한꺼번에 나가는 것을 막기 위함 | 미결 | TECH 2절 vs PRD 9절 | 2026-10-29 |
+| R-6 | MVP 저장 시 SUBSCRIBE_GUIDE outbox 행 생성 여부(TECH 2절 4번 vs PRD 9절 알림 미룸). 발송기 없이 쌓인 행이 2단계 배포 때 한꺼번에 나가는 것을 막기 위함. **결정(2026-10-16, Task 066 구현): MVP(066)에서는 outbox 행을 만들지 않고 Task 073에서 저장 흐름에 추가한다** | 해소 | TECH 2절 vs PRD 9절 | 2026-10-29 |
 | R-7 | api-contract.md `tags`에 인증·알림 태그 없음 | **해소**: `auth`, `notification` 추가됨 | api-contract.md | — |
 | R-8 | 인증 경로가 backend.md 3분류에 걸림 | **해소**: backend.md·api-contract.md가 인증 경로를 3분류의 예외로 명시 | backend.md, api-contract.md | — |
 | R-9 | 관리자 가격 겹침, 찜 상한 초과(`WISHLIST_LIMIT_EXCEEDED` 제안, 2026-10-10) 등 TECH·rules에 없는 오류 코드가 필요. `error-codes.md`에 제안 등록 후 사용자 승인 | 미결 | FR-19, R11-30 | 해당 Task |

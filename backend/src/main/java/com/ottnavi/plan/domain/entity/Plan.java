@@ -107,13 +107,17 @@ public class Plan extends BaseTimeEntity {
 		return plan;
 	}
 
-	/** DRAFT를 ACTIVE로 바꾼다. 기존 ACTIVE는 먼저 archive하고 flush한 뒤 호출해야 부분 유니크를 위반하지 않는다(TECH 2절) */
-	public void activate(Instant now) {
+	/**
+	 * DRAFT를 ACTIVE로 바꾼다. 기존 ACTIVE는 먼저 archive하고 flush한 뒤 호출해야 부분 유니크를 위반하지 않는다(TECH 2절).
+	 * previousPlanId는 방금 보관한 ACTIVE의 ID로 덮어쓴다(없으면 null). 계산 시점의 값을 저장 시점 기준으로 바로잡는다.
+	 */
+	public void activate(Instant now, Long previousPlanId) {
 		if (status != PlanStatus.DRAFT) {
 			throw new IllegalStateException("DRAFT만 저장할 수 있다: " + status);
 		}
 		this.status = PlanStatus.ACTIVE;
 		this.activatedAt = now;
+		this.previousPlanId = previousPlanId;
 	}
 
 	/** ACTIVE를 보관 상태로 바꾼다. 저장 시각(activatedAt)은 유지한다 */

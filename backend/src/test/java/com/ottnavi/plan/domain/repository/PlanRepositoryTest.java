@@ -98,10 +98,10 @@ class PlanRepositoryTest extends IntegrationTestSupport {
     void ACTIVE_2개는_DB가_거부한다() {
         long userId = insertUser();
         Plan first = newPlan(userId, PlanType.RECOMMENDED);
-        first.activate(Instant.now());
+        first.activate(Instant.now(), null);
         planRepository.saveAndFlush(first);
         Plan second = newPlan(userId, PlanType.SAVER);
-        second.activate(Instant.now());
+        second.activate(Instant.now(), null);
 
         assertThatThrownBy(() -> planRepository.saveAndFlush(second))
                 .isInstanceOf(DataIntegrityViolationException.class);
