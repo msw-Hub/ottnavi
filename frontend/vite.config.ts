@@ -23,5 +23,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     // 테스트는 소스 옆(*.test.ts(x))이나 src/test에 둔다. 생성물·산출물은 대상에서 뺀다
     include: ['src/**/*.test.{ts,tsx}'],
+    // 화면 테스트는 비동기 대기가 이어지고 CI가 느리면 기본 5초를 넘기므로, RTL 대기(5초)보다 길게 둔다
+    testTimeout: 15000,
   },
 })
