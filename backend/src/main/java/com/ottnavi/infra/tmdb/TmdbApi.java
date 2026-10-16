@@ -100,6 +100,12 @@ public interface TmdbApi {
             @PathVariable("seasonNumber") int seasonNumber
     );
 
+    // 9-1. 드라마(작품 단위) 시청 제공처. 시즌 단위 KR 정보가 비었을 때 대신 쓴다
+    @GetMapping("/tv/{tvId}/watch/providers")
+    TmdbWatchProvidersResponse getTvWatchProviders(
+            @PathVariable("tvId") long tvId
+    );
+
     // 10. 제공처 전체 목록 (mediaType은 "movie" 또는 "tv"). 7곳 외 제공처 발견용이라 거르지 않고 받는다
     @GetMapping("/watch/providers/{mediaType}")
     TmdbProviderListResponse listProviders(

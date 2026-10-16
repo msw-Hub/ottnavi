@@ -107,6 +107,7 @@ public class DetailStepConfig {
                 .processor(processor)
                 .writer(writer)
                 .listener(writer) // beforeStep에서 jobExecutionId를 받는다
+                .listener(processor) // beforeStep에서 작품 단위 임시 저장을 비우고 afterStep에서 대체 판정 횟수를 남긴다
                 .build();
     }
 
