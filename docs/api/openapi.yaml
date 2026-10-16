@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 31개다. 구현된 것은 29개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산 1개)이고, 나머지 2개(플랜 초안 조회·저장)는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
+    - operation은 32개다. 구현된 것은 30개(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산 1개, 비교 측정 1개)이고, 나머지 2개(플랜 초안 조회·저장)는 화면 목업에서 뽑은 제안이라 `x-planned: true`를 달고 description에 "제안"을 표시했다(Task 031). 백엔드 구현이 끝나는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -949,6 +949,34 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/plan-benchmarks:
+    post:
+      tags:
+        - admin
+      operationId: createPlanBenchmark
+      security:
+        - bearerAuth: []
+      summary: 완전탐색·그리디 비교 측정 실행
+      description: |
+        정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.
+        요청 본문은 없다. 같은 입력으로 다시 호출하면 행이 더 쌓이고, 같은 `inputHash`에 EXACT·GREEDY 두 행이 함께 있다. 기록의 `plan_id`는 NULL, 플랜 유형은 추천형이다.
+        ADMIN만 호출할 수 있고 배치 토큰은 허용하지 않는다. 수 초 걸리는 CPU 작업이라 응답이 느리다.
+        완전탐색이 후보 조합 수 상한을 넘어 건너뛰어진 케이스는 저장하지 않고 `skippedCaseNames`에 이름을 담는다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500, 정답 세트를 못 읽음·반복 결과가 서로 다름).
+      responses:
+        '201':
+          description: 측정 결과(저장된 calc_run 행 포함)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanBenchmark'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -2884,6 +2912,139 @@ components:
           isActive: true
           prices:
             - { priceId: 1031, monthlyPrice: 6500, effectiveFrom: '2025-12-16', lastVerifiedAt: '2026-10-12T09:00:00+09:00' }
+    PlanBenchmarkMeasurement:
+      type: object
+      description: 알고리즘 하나의 측정 결과(3회 중앙값)
+      required:
+        - calcRunId
+        - mustCompleted
+        - score
+        - totalCost
+        - elapsedMicros
+        - elapsedMs
+        - matchesExpected
+      properties:
+        calcRunId:
+          type: integer
+          format: int64
+          description: 저장된 `calc_run` 행의 ID
+        mustCompleted:
+          type: integer
+          format: int32
+          description: 시청을 끝내는 꼭 볼 작품 수
+        score:
+          type: integer
+          format: int32
+          description: 시청 완료 점수 합(보고 싶음 2점, 여유될 때 1점)
+        totalCost:
+          type: integer
+          format: int32
+          description: 3개월 총비용(원)
+        elapsedMicros:
+          type: integer
+          format: int64
+          description: 소요 시간 중앙값(마이크로초). 1ms 미만의 풀이를 구분하려고 따로 준다
+        elapsedMs:
+          type: integer
+          format: int64
+          description: 소요 시간 중앙값(ms, 내림). `calc_run.elapsed_ms`에 저장되는 값이다. ms 내림은 0일 수 있어 `elapsedMicros`를 함께 준다
+        matchesExpected:
+          type: boolean
+          description: 정답 세트의 기대 결과(꼭 시청 완료 수·점수·총비용)와 같은지
+    PlanBenchmarkCase:
+      type: object
+      description: 정답 세트 케이스 하나의 비교 결과. 차이 값은 모두 그리디 − 완전탐색이다
+      required:
+        - caseName
+        - inputHash
+        - candidateCount
+        - exact
+        - greedy
+        - mustDiff
+        - scoreDiff
+        - costDiff
+      properties:
+        caseName:
+          type: string
+          description: 케이스 이름
+        inputHash:
+          type: string
+          description: 입력 해시(SHA-256 16진수 64자). `calc_run`에서 이 케이스의 두 행을 찾는 키다
+        candidateCount:
+          type: integer
+          format: int32
+          description: 완전탐색 기준 후보 조합 수. 그리디 행에도 같은 값을 기록한다
+        exact:
+          $ref: '#/components/schemas/PlanBenchmarkMeasurement'
+        greedy:
+          $ref: '#/components/schemas/PlanBenchmarkMeasurement'
+        mustDiff:
+          type: integer
+          format: int32
+          description: 꼭 시청 완료 수 차이(그리디 − 완전탐색)
+        scoreDiff:
+          type: integer
+          format: int32
+          description: 점수 차이(그리디 − 완전탐색)
+        costDiff:
+          type: integer
+          format: int32
+          description: 총비용 차이(원, 그리디 − 완전탐색)
+    PlanBenchmark:
+      type: object
+      description: 완전탐색·그리디 비교 측정 결과
+      required:
+        - measuredRuns
+        - warmupRuns
+        - caseCount
+        - cases
+        - skippedCaseNames
+      properties:
+        measuredRuns:
+          type: integer
+          format: int32
+          description: 알고리즘마다 측정한 횟수
+        warmupRuns:
+          type: integer
+          format: int32
+          description: 알고리즘마다 버린 워밍업 횟수
+        caseCount:
+          type: integer
+          format: int32
+          description: 저장된 케이스 수
+        cases:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanBenchmarkCase'
+        skippedCaseNames:
+          type: array
+          items:
+            type: string
+          description: 완전탐색이 후보 수 상한을 넘어 건너뛰어진 케이스 이름(저장하지 않는다). 없으면 빈 배열
+      example:
+        measuredRuns: 3
+        warmupRuns: 1
+        caseCount: 1
+        cases:
+          - caseName: case-07-greedy-trap
+            inputHash: 9f2c000000000000000000000000000000000000000000000000000000000000
+            candidateCount: 27
+            exact: { calcRunId: 101, mustCompleted: 1, score: 4, totalCost: 28000, elapsedMicros: 21, elapsedMs: 0, matchesExpected: true }
+            greedy: { calcRunId: 102, mustCompleted: 1, score: 2, totalCost: 8000, elapsedMicros: 9, elapsedMs: 0, matchesExpected: true }
+            mustDiff: 0
+            scoreDiff: -2
+            costDiff: -20000
+        skippedCaseNames: []
+    CommonResponsePlanBenchmark:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanBenchmark'
     CreateAdminProductRequest:
       type: object
       description: OTT 구독상품 등록 요청(첫 월 구독요금 포함)

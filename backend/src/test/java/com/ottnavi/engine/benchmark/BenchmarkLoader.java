@@ -1,8 +1,9 @@
 package com.ottnavi.engine.benchmark;
 
-import com.ottnavi.engine.benchmark.BenchmarkCase.ExpectedPlan;
-import com.ottnavi.engine.benchmark.BenchmarkCase.ProductSpec;
-import com.ottnavi.engine.benchmark.BenchmarkCase.UnitSpec;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase.ExpectedPlan;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase.ProductSpec;
+import com.ottnavi.plan.service.benchmark.BenchmarkCase.UnitSpec;
 import com.ottnavi.engine.model.Evaluation;
 import com.ottnavi.engine.model.OttProduct;
 import com.ottnavi.engine.model.PlanInput;
