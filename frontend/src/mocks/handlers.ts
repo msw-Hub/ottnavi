@@ -40,6 +40,24 @@ const WISHLIST_ACTIVE_LIMIT = 20
 // 우선순위 값(계약 WishlistPriority). 이 밖의 값은 400이다
 const WISHLIST_PRIORITIES: readonly string[] = ['MUST', 'WANT', 'MAYBE']
 
+// 요청 제한(429) 응답. 백엔드 ProblemDetail과 같은 모양(docs/api/error-codes.md)이고 Retry-After(초) 헤더도 싣는다(서버 규칙).
+// 생성 타입(ProblemDetail)으로 검사해 계약과 어긋나지 않게 한다
+function rateLimitResponse(request: Request) {
+  const body: ProblemDetail = {
+    title: 'Too Many Requests',
+    status: 429,
+    detail: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
+    instance: new URL(request.url).pathname,
+    errorCode: 'RATE_LIMIT_EXCEEDED',
+  }
+  // HttpResponse.json은 기본 Content-Type이 application/json이다. 실제 백엔드처럼 problem+json으로 명시해야
+  // 인터셉터(api/http.ts)가 ProblemDetail로 인식한다
+  return HttpResponse.json(body, {
+    status: 429,
+    headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '30' },
+  })
+}
+
 /*
  * 시나리오 핸들러. 생성 핸들러(getProductMock)보다 배열 앞에 둔다.
  * MSW는 배열 앞에서부터 주소가 맞는 핸들러를 찾고, 핸들러가 아무것도 돌려주지 않으면(undefined) 다음 핸들러로 넘어간다.
@@ -47,24 +65,11 @@ const WISHLIST_PRIORITIES: readonly string[] = ['MUST', 'WANT', 'MAYBE']
  * 시나리오는 계약에 없는 화면 검토용 값이라 쿼리 파라미터가 아니라 요청 헤더(X-Mock-Scenario)로 받는다(src/lib/mockScenario.ts).
  */
 const scenarioHandlers: RequestHandler[] = [
-  // rate-limit: 서비스 목록(listOttServices)이 429 요청 제한 오류를 돌려준다(Task 025, 429 토스트 확인용)
+  // rate-limit: 서비스 목록(listOttServices)이 429 요청 제한 오류를 돌려준다(Task 025, 429 토스트 확인용).
+  // 작품 검색·상세의 429는 아래 공개 화면 핸들러가 같은 시나리오로 돌려준다(Task 052)
   http.get('/api/public/ott-services', ({ request }) => {
     if (!hasMockScenario(request, 'rate-limit')) return
-
-    // 백엔드 ProblemDetail과 같은 모양(docs/api/error-codes.md). 생성 타입으로 검사해 계약과 어긋나지 않게 한다
-    const body: ProblemDetail = {
-      title: 'Too Many Requests',
-      status: 429,
-      detail: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
-      instance: '/api/public/ott-services',
-      errorCode: 'RATE_LIMIT_EXCEEDED',
-    }
-    // HttpResponse.json은 기본 Content-Type이 application/json이다. 실제 백엔드처럼 problem+json으로 명시해야
-    // 인터셉터(api/http.ts)가 ProblemDetail로 인식한다
-    return HttpResponse.json(body, {
-      status: 429,
-      headers: { 'Content-Type': 'application/problem+json' },
-    })
+    return rateLimitResponse(request)
   }),
 ]
 
@@ -79,7 +84,7 @@ const scenarioHandlers: RequestHandler[] = [
  * - 찜 추가:   POST   /api/me/wishlist-items      새로 추가 201, 이미 찜한 작품(시즌)이면 200(PRD FR-09). 활성 찜이 20개일 때 새 항목은 409 WISHLIST_LIMIT_EXCEEDED
  * - 찜 변경:   PATCH  /api/me/wishlist-items/{id} ({ priority?, isWatched? } 보낸 것만 바꾼다). "다 봤음"을 되돌릴 때 활성 찜이 20개면 409
  * - 찜 삭제:   DELETE /api/me/wishlist-items/{id} 204 (이미 없어도 204)
- * 시나리오(X-Mock-Scenario 헤더): collect-failed(검색, 외부 수집 실패 → DB 결과만), error(검색·상세, 500 오류),
+ * 시나리오(X-Mock-Scenario 헤더): collect-failed(검색, 외부 수집 실패 → DB 결과만), error(검색·상세, 500 오류), rate-limit(검색·상세, 429 요청 제한),
  * wishlist-full(찜 추가·되돌리기가 "활성 찜 20개"로 간주해 409를 확인한다).
  */
 
@@ -124,6 +129,7 @@ const publicScreenHandlers: RequestHandler[] = [
   // 작품 검색: 제목(한국어·원제)에 검색어가 들어 있으면 결과에 넣는다(대소문자 무시)
   http.get('/api/public/titles', async ({ request }) => {
     await delay() // 로딩 상태가 눈에 보이도록 실제 서버처럼 잠깐 걸린다(테스트(Node)에서는 거의 즉시)
+    if (hasMockScenario(request, 'rate-limit')) return rateLimitResponse(request)
     if (hasMockScenario(request, 'error')) {
       return problemResponse(
         request,
@@ -188,6 +194,7 @@ const publicScreenHandlers: RequestHandler[] = [
   // 작품 상세: mediaType과 tmdbId가 모두 맞는 작품을 찾는다(동명 영화·드라마를 구분하려고 둘 다 본다)
   http.get('/api/public/titles/:mediaType/:tmdbId', async ({ request, params }) => {
     await delay()
+    if (hasMockScenario(request, 'rate-limit')) return rateLimitResponse(request)
     if (hasMockScenario(request, 'error')) {
       return problemResponse(
         request,
@@ -195,6 +202,30 @@ const publicScreenHandlers: RequestHandler[] = [
         'Internal Server Error',
         'INTERNAL_ERROR',
         '일시적인 오류가 발생했습니다.',
+      )
+    }
+
+    // 경로 값 검증(서버 TitleController): mediaType은 소문자 movie·tv만, tmdbId는 1~2147483647 정수만 받는다.
+    // 어긋나면 404가 아니라 400 VALIDATION_FAILED다
+    if (params.mediaType !== 'movie' && params.mediaType !== 'tv') {
+      return problemResponse(
+        request,
+        400,
+        'Bad Request',
+        'VALIDATION_FAILED',
+        '요청 값이 올바르지 않습니다.',
+        [{ field: 'mediaType', message: 'movie 또는 tv여야 합니다.' }],
+      )
+    }
+    const tmdbId = /^\d{1,10}$/.test(String(params.tmdbId)) ? Number(params.tmdbId) : NaN
+    if (!(tmdbId >= 1 && tmdbId <= 2147483647)) {
+      return problemResponse(
+        request,
+        400,
+        'Bad Request',
+        'VALIDATION_FAILED',
+        '요청 값이 올바르지 않습니다.',
+        [{ field: 'tmdbId', message: '1 이상 2147483647 이하의 정수여야 합니다.' }],
       )
     }
 

@@ -314,7 +314,9 @@ describe('작품 상세 화면', () => {
       </Providers>,
     )
 
-    expect(await screen.findByText('작품을 찾을 수 없습니다.')).toBeInTheDocument()
+    expect(
+      await screen.findByText(/작품을 찾을 수 없습니다. 아직 수집되지 않은/),
+    ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '작품 검색으로 돌아가기' })).toBeInTheDocument()
   })
 })
