@@ -36,7 +36,16 @@ function AdminRoleGate() {
       <section className="mx-auto flex w-full max-w-md flex-col gap-3">
         <h1 className="text-2xl font-semibold">접근 권한이 없습니다</h1>
         <p className="text-muted-foreground">이 화면은 관리자만 볼 수 있습니다.</p>
-        <Link to="/" className="underline underline-offset-4">
+        {/*
+         * 링크 크기 보정(Task 057·058 시각 검수): 이전에는 글자 높이(약 24px)만큼만 눌렸고, 세로 flex의 기본 늘이기(stretch) 때문에
+         * 누르는 영역이 줄 전체 너비로 퍼져 있었다. min-h-11(44px)로 사용자 화면 버튼 높이(Task 037)와 맞추고,
+         * self-start로 누르는 영역을 글자 폭에 맞춘다. 겉모양(밑줄 링크)은 그대로다.
+         * 이전 값: className="underline underline-offset-4"
+         */}
+        <Link
+          to="/"
+          className="inline-flex min-h-11 items-center self-start underline underline-offset-4"
+        >
           홈으로 이동
         </Link>
       </section>
