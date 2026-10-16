@@ -37,7 +37,8 @@ function renderAppAt(url: string) {
       {
         element: <RootLayout />,
         children: [
-          { path: '/', element: <SearchScreen /> },
+          // 홈 1차안: 검색 화면 주소가 `/`에서 `/search`로 바뀌어 맞췄다(이전: path: '/')
+          { path: '/search', element: <SearchScreen /> },
           { path: '/titles/:mediaType/:tmdbId', element: <TitleDetailScreen /> },
         ],
       },
@@ -67,7 +68,7 @@ function rateLimited() {
 describe('비로그인 검색 → 상세 흐름', () => {
   it('헤더 검색창에 제목을 입력하면 결과가 나오고, 결과를 누르면 그 작품의 상세가 열린다', async () => {
     const user = userEvent.setup()
-    renderAppAt('/')
+    renderAppAt('/search')
 
     // 1. 검색어를 입력하고 제출한다
     await user.type(await screen.findByRole('searchbox', { name: '작품 제목 검색' }), '기생충')
@@ -86,7 +87,7 @@ describe('비로그인 검색 → 상세 흐름', () => {
   })
 
   it('검색 결과가 없으면 아직 수집되지 않은 작품은 검색되지 않을 수 있다는 안내가 보인다', async () => {
-    renderAppAt(`/?q=${encodeURIComponent('없는작품제목')}`)
+    renderAppAt(`/search?q=${encodeURIComponent('없는작품제목')}`)
 
     expect(
       await screen.findByText(/아직 수집되지 않은 작품은 검색되지 않을 수 있습니다/),
@@ -107,7 +108,7 @@ describe('요청 제한(429) 안내', () => {
         }
       }),
     )
-    renderAppAt(`/?q=${encodeURIComponent('기생충')}`)
+    renderAppAt(`/search?q=${encodeURIComponent('기생충')}`)
 
     const alert = await screen.findByRole('alert')
     expect(

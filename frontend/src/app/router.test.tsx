@@ -13,7 +13,11 @@ import { resetMockSession, setMockRole } from '@/mocks/mockSession'
  * 라우터에서 경로를 빠뜨리면 ① 등록 경로 비교가 실패하고 ② 그 주소가 404 화면으로 가서 제목 확인도 실패한다.
  */
 const ROUTE_TABLE = [
-  { pattern: '/', url: '/', heading: '작품 검색' }, // SCR-01
+  // 홈 1차안: `/`는 홈, 검색(SCR-01)은 `/search`로 옮겼다. 랭킹·탐색은 홈 "더보기" 목적지다
+  { pattern: '/', url: '/', heading: '찜한 작품, 어느 달에 어디서 볼지 계산해 드려요' }, // 홈
+  { pattern: '/search', url: '/search', heading: '작품 검색' }, // SCR-01
+  { pattern: '/ranking', url: '/ranking', heading: '랭킹' }, // 홈 1차안
+  { pattern: '/explore', url: '/explore', heading: '탐색' }, // 홈 1차안
   { pattern: '/titles/:mediaType/:tmdbId', url: '/titles/movie/550', heading: '작품 상세' }, // SCR-02
   { pattern: '/exclusives', url: '/exclusives', heading: '독점 작품 목록' }, // SCR-03
   { pattern: '/about', url: '/about', heading: 'OTT내비 소개' }, // SCR-04
@@ -44,6 +48,19 @@ const DEV_ROUTE_TABLE = [
   { pattern: '/__dev/components', url: '/__dev/components', heading: '공통 컴포넌트 확인' }, // Task 026
 ]
 
+/*
+ * 다른 주소로 보내기만 하는 라우트(홈 1차안: `/admin` → `/admin/collect`). 화면 경로표와 나눠 적는다.
+ * 위 표처럼 주소를 열어 확인하지 않는 이유: 보내진 주소(`/admin/collect`)는 위 표에서 이미 한 번 열려, 같은 routes로 다시 열면
+ * lazy 라우트 객체가 고쳐진 탓에 "No route matches"가 난다(아래 주석의 관찰과 같다). 그래서 라우트 설정의 보내는 곳을 직접 확인한다.
+ */
+const REDIRECT_TABLE = [{ pattern: '/admin', to: '/admin/collect' }]
+
+// 경로 비교용 전체 패턴(화면 + 보내기)
+const EXPECTED_PATTERNS = [
+  ...(import.meta.env.DEV ? [...ROUTE_TABLE, ...DEV_ROUTE_TABLE] : ROUTE_TABLE),
+  ...REDIRECT_TABLE,
+].map((row) => row.pattern)
+
 const EXPECTED_ROUTE_TABLE = import.meta.env.DEV
   ? [...ROUTE_TABLE, ...DEV_ROUTE_TABLE]
   : ROUTE_TABLE
@@ -60,6 +77,28 @@ function collectLeafPatterns(routeObjects: RouteObject[], parentPath = ''): stri
     if (route.children?.length) return collectLeafPatterns(route.children, fullPath)
     return [fullPath || '/']
   })
+}
+
+// 전체 경로 패턴(collectLeafPatterns와 같은 규칙)이 pattern인 끝 라우트를 찾는다
+function findRouteByPattern(
+  routeObjects: RouteObject[],
+  pattern: string,
+  parentPath = '',
+): RouteObject | undefined {
+  for (const route of routeObjects) {
+    const fullPath = route.path
+      ? route.path.startsWith('/')
+        ? route.path
+        : `${parentPath.replace(/\/$/, '')}/${route.path}`
+      : parentPath
+    if (route.children?.length) {
+      const found = findRouteByPattern(route.children, pattern, fullPath)
+      if (found) return found
+    } else if ((fullPath || '/') === pattern) {
+      return route
+    }
+  }
+  return undefined
 }
 
 // 메모리 라우터(브라우저 주소 대신 메모리에 주소를 두는 라우터)로 지정한 주소를 연다. 실제 앱과 같은 Providers로 감싼다.
@@ -84,9 +123,13 @@ afterEach(() => {
 
 describe('라우터 경로표', () => {
   it('라우터에 등록된 화면 경로가 경로표와 정확히 같다', () => {
-    expect(collectLeafPatterns(routes).sort()).toEqual(
-      EXPECTED_ROUTE_TABLE.map((row) => row.pattern).sort(),
-    )
+    expect(collectLeafPatterns(routes).sort()).toEqual([...EXPECTED_PATTERNS].sort())
+  })
+
+  it.each(REDIRECT_TABLE)('$pattern 주소는 $to로 보낸다', ({ pattern, to }) => {
+    const element = findRouteByPattern(routes, pattern)?.element as
+      { props?: { to?: string; replace?: boolean } } | undefined
+    expect(element?.props).toMatchObject({ to, replace: true })
   })
 
   it.each(EXPECTED_ROUTE_TABLE)(

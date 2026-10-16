@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from 'react-router'
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router'
 import { AdminLayout } from '@/app/AdminLayout'
 import { RequireAdmin } from '@/app/guards/RequireAdmin'
 import { RequireAuth } from '@/app/guards/RequireAuth'
@@ -55,8 +55,20 @@ export const routes: RouteObject[] = [
         children: [
           // 공개 화면
           {
-            index: true, // SCR-01 검색 (`/`, 검색어는 ?q=)
+            index: true, // 홈 (`/`, 홈 1차안). 이전에는 이 자리가 SCR-01 검색이었다
+            lazy: { Component: () => import('@/pages/HomePage').then((m) => m.HomePage) },
+          },
+          {
+            path: 'search', // SCR-01 검색 (`/search`, 검색어는 ?q=). 홈이 `/`를 쓰게 되어 옮겼다(홈 1차안)
             lazy: { Component: () => import('@/pages/SearchPage').then((m) => m.SearchPage) },
+          },
+          {
+            path: 'ranking', // 랭킹 (홈 1차안, 홈 "더보기" 목적지. 화면 번호는 아직 없다)
+            lazy: { Component: () => import('@/pages/RankingPage').then((m) => m.RankingPage) },
+          },
+          {
+            path: 'explore', // 탐색 (홈 1차안, 홈 "더보기" 목적지. 화면 번호는 아직 없다)
+            lazy: { Component: () => import('@/pages/ExplorePage').then((m) => m.ExplorePage) },
           },
           {
             path: 'titles/:mediaType/:tmdbId', // SCR-02 작품 상세
@@ -144,6 +156,14 @@ export const routes: RouteObject[] = [
           {
             Component: RequireAdmin,
             children: [
+              {
+                // `/admin`만 입력하면 수집 화면으로 보낸다(홈 1차안, 머리글 "관리" 링크의 목적지와 같다).
+                // 가드(RequireAdmin) 안에 둔 이유: 관리자가 아니면 보내기 전에 가드가 먼저 "권한 없음"을 보인다.
+                // replace: 뒤로 가기를 눌렀을 때 `/admin`으로 돌아와 다시 보내지는 반복을 막는다.
+                // (아래 옛 주석의 "`/admin`은 404" 설명은 이 라우트로 바뀌었다)
+                path: 'admin',
+                element: <Navigate to="/admin/collect" replace />,
+              },
               {
                 // 경로 없는 레이아웃 라우트(Task 029): 관리자 화면 위에 관리자 메뉴(AdminNav)를 공통으로 둔다.
                 // 가드 안쪽에 둔 이유: 관리자가 아니면 메뉴도 그려지지 않아야 하고, 화면을 옮겨 다녀도 메뉴는 다시 만들어지지 않는다.

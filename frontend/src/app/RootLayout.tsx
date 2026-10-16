@@ -1,16 +1,12 @@
-import type { FormEvent } from 'react'
-import {
-  createSearchParams,
-  Link,
-  Outlet,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from 'react-router'
+import { Link, Outlet, useLocation } from 'react-router'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
+import { HeaderPrimaryNav } from '@/app/HeaderPrimaryNav'
+import { TitleSearchForm } from '@/components/common/TitleSearchForm'
 import { WishlistAddedDialog } from '@/components/common/WishlistAddedDialog'
-import { Button } from '@/components/ui/button'
 import { isMockMode } from '@/lib/mockScenario'
+
+// 이전(홈 1차안 첫 판): 본문에 큰 검색창이 있는 화면에서 머리글 검색창을 숨기던 목록. 검색창을 머리글로 통일하며 쓰지 않는다
+// const PAGES_WITH_OWN_SEARCH = ['/', '/search']
 
 /**
  * 모든 화면이 공유하는 바깥 틀(헤더 · 본문 · 푸터)이다.
@@ -35,16 +31,41 @@ export function RootLayout() {
       {/*
         bg-card: 본문 바탕보다 한 단계 밝은 면으로 머리글을 구분한다(Task 026 검수).
         min-h-(--header-height): 토스트 위치(app/providers.tsx)와 같은 CSS 변수(styles/tokens.css)를 최소 높이로 써서,
-        머리글 높이와 "토스트가 시작하는 높이"가 한 값으로 묶이게 한다(Task 037). 내용 높이(65px/103px)와 같은 값이라 겉모습은 그대로다.
+        머리글 높이와 "토스트가 시작하는 높이"가 한 값으로 묶이게 한다(Task 037). 홈 1차안에서 줄 구성이 바뀌어 값을 다시 쟀다(tokens.css).
+
+        배치(홈 1차안 피드백 반영: 검색창은 모든 화면에서 머리글 하나로 통일했다. 홈·검색 본문의 큰 검색창은 없앴다):
+        - 640px 이상: 한 줄 [로고][홈·랭킹·탐색] ... [검색창][계정]
+        - 640px 미만: [로고][홈·랭킹·탐색] / [검색창 ...][계정] (계정이 검색창 옆에 들어가지 않으면 셋째 줄로 내려간다)
+          돋보기를 눌러 펼치는 방식 대신 검색창을 늘 보이게 한 이유: 한 번 더 누르지 않고 바로 입력할 수 있고(사용자 요청 "바로 검색"),
+          펼침 버튼의 열림 상태·포커스 이동을 따로 관리하지 않아도 되며, 입력창·버튼이 모두 40px 높이라 손가락으로 누르기 쉽다.
+          대신 머리글이 한 줄(약 48px) 높아진다.
+        - 보이는 순서 = HTML 순서 = Tab 순서(로고 → 메뉴 → 검색창 → 계정)를 모든 폭에서 지킨다. CSS order로 줄을 바꾸지 않고
+          flex-wrap의 자연스러운 줄바꿈만 쓴다(WCAG 2.4.3 포커스 순서). 모바일에서 검색창은 최소 폭 12rem(min-w-48)이라 로고·메뉴 줄에
+          들어가지 못하고 둘째 줄로 내려가며, 남는 폭을 모두 차지한다(flex-1).
+          이전(order 사용): 모바일 [로고 ... 계정] / [검색창] / [메뉴] — 계정이 보이는 위치(윗줄)보다 Tab 순서에서 늦게 잡혔다.
       */}
       <header className="min-h-(--header-height) border-b bg-card">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3 px-4 py-3">
-          <Link to="/" className="font-semibold">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:gap-x-4">
+          <Link
+            to="/"
+            className="-my-2 inline-flex min-h-10 shrink-0 items-center text-lg font-bold tracking-tight"
+          >
             OTT내비
           </Link>
-          <HeaderSearchForm />
-          {/* 계정 영역(로그인 링크 / 사용자 표시·로그아웃 / 목업 모드의 개발용 전환). 상태별 표시는 HeaderAccountNav가 맡는다 */}
-          <HeaderAccountNav />
+          {/* 이전: className="max-sm:order-2 max-sm:basis-full"(모바일 셋째 줄로 내림). 지금은 모바일에서도 로고 바로 옆이다 */}
+          <HeaderPrimaryNav />
+          {/* 모바일: 둘째 줄에서 남는 폭 전부(flex-1, 최소 12rem) / 넓은 화면: 메뉴와 계정 사이 남는 폭(최대 24rem)
+              이전: className="max-sm:order-1 max-sm:basis-full sm:ml-auto sm:max-w-sm sm:flex-1" */}
+          <TitleSearchForm variant="compact" className="min-w-48 flex-1 sm:ml-auto sm:max-w-sm" />
+          {/* 계정 영역(로그인 링크 / 찜 목록·관리·로그아웃 / 목업 모드의 개발용 전환). 상태별 표시는 HeaderAccountNav가 맡는다.
+              모바일에서 검색창 옆 폭이 모자라면 셋째 줄 오른쪽 끝으로 내려간다(ml-auto). 이전: <div className="max-sm:ml-auto"> */}
+          <div className="ml-auto shrink-0 sm:ml-0">
+            <HeaderAccountNav />
+          </div>
+          {/*
+            이전(홈 1차안 첫 판): 홈·검색 화면에서는 작은 검색창을 숨기고 돋보기 링크(/search)만 두었다. 사용자 피드백으로 취소했다.
+            <Link to="/search" aria-label="작품 검색" className="-my-2 ml-auto inline-flex size-10 ..."><SearchIcon /></Link>
+          */}
         </div>
       </header>
 
@@ -111,51 +132,26 @@ export function RootLayout() {
   )
 }
 
-/**
- * 헤더의 작품 검색창이다. 제출하면 검색 화면 주소(`/?q=검색어`)로 이동만 하고, 결과 표시는 검색 화면(Task 027)이 맡는다.
+/*
+ * 이전 머리글 검색창(HeaderSearchForm). 홈 1차안에서 components/common/TitleSearchForm으로 옮기며
+ * 이동 주소를 `/?q=`에서 `/search?q=`로 바꿨다. 참고용으로 남긴다.
  *
- * 검색어를 상태(state)가 아니라 URL에 두는 이유: 새로고침·뒤로 가기·주소 공유 때도 같은 검색 결과가 보여야 하기 때문이다(frontend.md 상태 관리 원칙).
+ * function HeaderSearchForm() {
+ *   const navigate = useNavigate()
+ *   const [searchParams] = useSearchParams()
+ *   const currentQuery = searchParams.get('q') ?? ''
+ *   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+ *     event.preventDefault()
+ *     const query = String(new FormData(event.currentTarget).get('q') ?? '').trim()
+ *     navigate(query ? { pathname: '/', search: `?${createSearchParams({ q: query })}` } : '/')
+ *   }
+ *   return (
+ *     <form role="search" onSubmit={handleSubmit}
+ *       className="flex min-w-0 flex-1 items-center gap-2 max-sm:order-1 max-sm:basis-full">
+ *       <input key={currentQuery} type="search" name="q" defaultValue={currentQuery}
+ *         aria-label="작품 제목 검색" placeholder="작품 제목 검색" className="h-10 ..." />
+ *       <Button type="submit" variant="outline" className="h-10 border-input bg-transparent">검색</Button>
+ *     </form>
+ *   )
+ * }
  */
-function HeaderSearchForm() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const currentQuery = searchParams.get('q') ?? ''
-
-  // 제출 시 입력값을 읽어 검색 화면으로 이동한다.
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    // 기본 form 제출은 페이지 전체를 새로 불러오므로 막고, 라우터 이동으로 바꾼다
-    event.preventDefault()
-    const query = String(new FormData(event.currentTarget).get('q') ?? '').trim()
-    // 빈 검색어는 ?q= 를 붙이지 않고 검색 홈으로 보낸다.
-    // createSearchParams가 한글·특수문자를 주소에 맞게 인코딩한다(직접 문자열을 이어 붙이면 & 같은 문자에서 깨진다)
-    navigate(query ? { pathname: '/', search: `?${createSearchParams({ q: query })}` } : '/')
-  }
-
-  return (
-    // 모바일(sm 미만): 로고·로그인은 윗줄, 검색창은 아랫줄 전체 폭(order-1 + basis-full). 좁은 폭에서 검색창이 찌그러지지 않게 한다
-    <form
-      role="search"
-      onSubmit={handleSubmit}
-      className="flex min-w-0 flex-1 items-center gap-2 max-sm:order-1 max-sm:basis-full"
-    >
-      {/*
-        입력창을 제어 컴포넌트(useState) 대신 defaultValue로 두고 key에 현재 검색어를 넣었다.
-        단순히 useState로 두면 뒤로 가기로 주소의 검색어가 바뀌어도 입력창 글자는 그대로 남는다.
-        key가 바뀌면 React가 입력창을 새로 만들어 주소의 검색어로 다시 채우므로 둘이 어긋나지 않는다.
-      */}
-      <input
-        key={currentQuery}
-        type="search"
-        name="q"
-        defaultValue={currentQuery}
-        aria-label="작품 제목 검색"
-        placeholder="작품 제목 검색"
-        className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-2.5 text-sm placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-      />
-      {/* h-10: 터치 크기 40px. border-input bg-transparent: 어두운 테마에서 outline 버튼 테두리가 흐려 입력창과 같은 테두리색을 쓴다 */}
-      <Button type="submit" variant="outline" className="h-10 border-input bg-transparent">
-        검색
-      </Button>
-    </form>
-  )
-}

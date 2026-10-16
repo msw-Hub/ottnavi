@@ -33,8 +33,10 @@ export function HeaderAccountNav() {
   // 링크·버튼은 min-h-10(40px)·좌우 px-1로 누르는 영역을 넓혔다(Task 037 ⑫). -my-2(위아래 -8px)는 넓힌 높이가 레이아웃 높이에는 안 잡히게 하는 장치다:
   // 그냥 40px로 두면 모바일 머리글 윗줄(로고 26px)이 40px로 커져 머리글이 103px → 117px이 되고 토스트 위치(--header-height)와 어긋난다.
   // gap-1 + px-1 x 2 = 12px로 항목 사이 간격은 이전(gap-3)과 같아, 좁은 폭에서 줄바꿈이 새로 생기지 않는다
+  // ml-auto를 뺀 이유(홈 1차안): 바로 앞의 돋보기 링크(RootLayout)가 ml-auto로 오른쪽에 붙고, 계정 영역은 그 뒤에 이어 붙는다.
+  // 이전: className="ml-auto flex items-center gap-1"
   return (
-    <nav aria-label="계정" className="ml-auto flex items-center gap-1">
+    <nav aria-label="계정" className="flex items-center gap-1">
       <MockRoleSwitcher />
       {session.status === 'checking' ? null : isGuest ? (
         // 지금 보던 화면을 from으로 넘겨, 로그인이 끝나면 이 화면으로 돌아오게 한다(getSafeRedirectPath가 내부 경로만 통과시킨다)
@@ -58,7 +60,21 @@ export function HeaderAccountNav() {
           >
             찜 목록
           </Link>
-          <span className="text-sm text-muted-foreground">
+          {/*
+            관리자(ADMIN)에게만 보이는 관리 화면 진입점(홈 1차안). 역할은 useSession 값을 읽어 표시만 바꾸는 것이고,
+            실제 권한 검사는 백엔드와 라우트 가드(RequireAdmin)가 한다. 링크를 숨긴다고 관리자 화면이 막히는 것은 아니다.
+          */}
+          {session.role === 'ADMIN' && (
+            <Link
+              to="/admin/collect"
+              className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
+            >
+              관리
+            </Link>
+          )}
+          {/* 역할 표시. 640px 미만에서는 화면에서 숨기고 낭독기에만 남긴다(max-sm:sr-only):
+              375px 윗줄에 로고·돋보기·개발용 전환·찜 목록·관리·로그아웃이 모두 들어가야 해서 글자 하나를 덜어 냈다 */}
+          <span className="text-sm text-muted-foreground max-sm:sr-only">
             {session.role === 'ADMIN' ? '관리자' : '회원'}
           </span>
           <button
