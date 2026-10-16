@@ -51,5 +51,9 @@ export function useWishlistAddedPriority(wishlistItemId: number | null) {
     update.mutate({ wishlistItemId, data: { priority: next } })
   }
 
-  return { priority, changePriority, isPending: update.isPending }
+  // 찜 목록을 처음 받는 동안은 실제 단계를 모르고 기본값(보고 싶음)만 보이므로 선택을 막는다.
+  // (이때 이미 '꼭 볼 작품'인 항목에서 '보고 싶음'을 고르면 표시값과 같아 요청이 나가지 않는 문제를 막는다. 목록 조회가 실패하면 isPending이 풀려 영구히 막히지 않는다)
+  const isListLoading = wishlistItemId !== null && wishlist.isPending
+
+  return { priority, changePriority, isPending: update.isPending || isListLoading }
 }
