@@ -93,9 +93,9 @@ export function ExploreScreen() {
               type="search"
               name="q"
               defaultValue={query}
-              aria-label="작품 제목 또는 인물 이름"
+              aria-label="작품 제목"
               aria-describedby="explore-search-hint"
-              placeholder="작품 제목 또는 인물 이름"
+              placeholder="작품 제목"
               className="h-12 w-full min-w-0 rounded-lg border border-input bg-background pr-3 pl-10 text-base placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             />
           </div>
