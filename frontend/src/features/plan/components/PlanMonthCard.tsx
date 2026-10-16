@@ -49,9 +49,9 @@ function SegmentBadge({ assignment }: SegmentBadgeProps) {
 }
 
 /**
- * 플랜의 한 달 카드다(SCR-10). 달 이름과 "이번 달 확정" / "예상" 표시, 그 달 비용, 구독할 상품, 볼 작품 순서로 쌓인다.
+ * 플랜의 한 달 카드다(SCR-10). 달 이름과 "이번 달 결제" / "예상" 표시, 그 달 비용, 구독할 상품, 볼 작품 순서로 쌓인다.
  *
- * 이번 달만 "확정"이라고 부르는 이유: 이번 달은 곧 결제하므로 바뀔 수 없는 기준이지만, 나머지 두 달은 다음 달 데이터 갱신에 따라
+ * 이번 달만 따로 표시하는 이유: 이번 달은 곧 결제하므로 바뀔 수 없는 기준이지만, 나머지 두 달은 다음 달 데이터 갱신에 따라
  * 달라질 수 있어 "예상"이다. 두 표시는 색이 아니라 실선/점선 테두리와 아이콘(체크/달력)·글자로 구분한다.
  * 구독할 상품이 없는 달은 "구독하지 않아도 돼요"를 글자로 알려, 카드가 비어 보이지 않게 한다.
  */
@@ -65,7 +65,7 @@ export function PlanMonthCard({ month, serviceNames, withYear }: PlanMonthCardPr
           <h3 className="text-xl font-extrabold">{formatMonthLabel(month.month, withYear)}</h3>
           <span
             className={cn(
-              // shrink-0·whitespace-nowrap: 연도가 붙은 달 이름(예: 2026년 12월)과 한 줄에 놓여 좁은 화면(375px)에서 배지 글자가 "이번 달 / 확정"으로 쪼개지지 않게 한다
+              // shrink-0·whitespace-nowrap: 연도가 붙은 달 이름(예: 2026년 12월)과 한 줄에 놓여 좁은 화면(375px)에서 배지 글자가 "이번 달 / 결제"로 쪼개지지 않게 한다
               'inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold whitespace-nowrap',
               month.isConfirmed
                 ? 'border-2 border-solid border-primary bg-primary text-primary-foreground'
@@ -77,7 +77,9 @@ export function PlanMonthCard({ month, serviceNames, withYear }: PlanMonthCardPr
             ) : (
               <CalendarClockIcon aria-hidden="true" className="size-4" />
             )}
-            {month.isConfirmed ? '이번 달 확정' : '예상'}
+            {/* "확정"은 결과를 단정하는 말이라 피하고(PRD "확인된 범위" 원칙) 이번 달은 곧 결제한다는 사실만 알린다(067 검수 제안 7) */}
+            {/* {month.isConfirmed ? '이번 달 확정' : '예상'} */}
+            {month.isConfirmed ? '이번 달 결제' : '예상'}
           </span>
         </div>
         <p className="flex items-baseline justify-between gap-2">

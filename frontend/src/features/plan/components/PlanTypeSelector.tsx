@@ -124,7 +124,9 @@ export function PlanTypeSelector({
                     <dd className="font-bold tabular-nums">
                       {draft.mustTotal === 0
                         ? '꼭 볼 작품 없음'
-                        : `${draft.mustCompleted} / ${draft.mustTotal}편`}
+                        : // 작품 수 단위는 화면 전체에서 "개"로 맞춘다(요약 문장·찜 개수와 같은 단위, 067 검수 제안 4)
+                          // : `${draft.mustCompleted} / ${draft.mustTotal}편`}
+                          `${draft.mustCompleted} / ${draft.mustTotal}개`}
                     </dd>
                   </div>
                 </dl>

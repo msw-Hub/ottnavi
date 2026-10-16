@@ -17,8 +17,9 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
     <div className="grid content-start justify-items-center gap-2 rounded-lg border border-border bg-background px-4 py-5 text-center">
       <InboxIcon aria-hidden="true" className="size-8 text-muted-foreground" />
-      <p className="font-bold">{title}</p>
-      {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      {/* break-keep: 한글 문장이 글자 중간에서 끊기지 않고 단어 단위로 줄바꿈되게 한다(좁은 폭에서 읽기 쉽게) */}
+      <p className="font-bold break-keep">{title}</p>
+      {description && <p className="text-sm break-keep text-muted-foreground">{description}</p>}
       {action}
     </div>
   )

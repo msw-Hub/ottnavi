@@ -57,6 +57,19 @@ export const WISHLIST_PRIORITY_LABELS: Record<WishlistPriority, string> = {
   MAYBE: '여유될 때',
 }
 
+/*
+ * 우선순위별 한 줄 설명. 계산이 이 단계를 어떻게 다루는지 쉬운 말로 알린다(PRD 5.4·11절 35번).
+ * - 꼭 볼 작품: 모든 플랜 유형이 "꼭 볼 작품 시청 완료 수"를 가장 먼저 최대화한다
+ * - 보고 싶음: 그다음 점수(보고 싶음 2점)로 챙긴다
+ * - 여유될 때: 점수 1점이라 예산·시간이 남을 때 들어간다
+ * 결과를 약속하는 말("반드시 보게 해요")은 쓰지 않고 "최대한"·"남으면"처럼 수위를 낮춘다(frontend.md 표현 수위).
+ */
+export const WISHLIST_PRIORITY_DESCRIPTIONS: Record<WishlistPriority, string> = {
+  MUST: '계산이 가장 먼저 챙겨요. 예산·시간 안에서 최대한 끝까지 보게 짜요.',
+  WANT: '꼭 볼 작품 다음으로 챙겨요.',
+  MAYBE: '예산과 시간이 남으면 넣어요.',
+}
+
 // 온보딩에서 사용자가 서비스마다 고르는 이용 상태. 확정 계약의 생성 타입을 그대로 쓴다(Task 031 6-4).
 // - SUBSCRIBED: 구독 중(요금제·결제일을 입력) / FREE: 가족 공유 등으로 무료 이용 중 / NOT_SUBSCRIBED: 미구독 / UNKNOWN: 아직 모르겠음
 export type { ServiceSubscriptionStatus }

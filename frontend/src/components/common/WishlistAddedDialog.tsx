@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalculatorIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { PosterImage } from '@/components/common/PosterImage'
+import { PriorityGuideList } from '@/components/common/WishlistPriority'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import {
@@ -61,11 +62,19 @@ export function WishlistAddedDialog() {
               {/* 조사는 작품 이름의 받침에 맞춘다(기생충을 / 더 글로리를) */}
               {withJosa(info?.name ?? '', '을/를')} 찜했어요
             </DialogTitle>
-            <DialogDescription>
-              찜 목록에서 우선순위를 정하고 구독 플랜을 계산해 볼 수 있어요.
+            {/* 이전 문구: 찜 목록에서 우선순위를 정하고 구독 플랜을 계산해 볼 수 있어요.
+                바꾼 이유: 기본값으로 담겼다는 사실과 "꼭 볼 작품"으로 바꾸면 무엇이 달라지는지를 찜한 순간에 알려, 우선순위를 나눠 넣게 돕는다 */}
+            <DialogDescription className="break-keep">
+              &apos;보고 싶음&apos;으로 담았어요. 꼭 챙길 작품이면 찜 버튼이나 찜 목록에서 바꿔
+              주세요.
             </DialogDescription>
           </div>
         </div>
+
+        {/* 세 단계가 계산에서 어떻게 다뤄지는지 한눈에 보는 안내(읽기 전용).
+            찜할 때는 우선순위를 묻지 않고 기본값(보고 싶음)으로 담기므로 그 줄에 "지금 이 단계"를 붙인다(hooks의 기본값 WANT와 맞춘 문구).
+            이 팝업에서 바로 고르게 하려면 팝업이 찜 항목 정보와 변경 요청을 받아야 해서(로직) frontend-dev 몫으로 남겼다 */}
+        <PriorityGuideList highlight="WANT" />
 
         <div className="grid gap-2 sm:grid-cols-2">
           {/* 모바일은 주 버튼이 위(엄지 가까이), 데스크톱은 왼쪽에 닫기·오른쪽에 주 버튼이 오는 일반적인 순서 */}

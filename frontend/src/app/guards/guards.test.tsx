@@ -229,7 +229,7 @@ describe('로그인 콜백(실제 환경)', () => {
   it('?error=login_failed면 재발급하지 않고 실패 안내를 보인다', async () => {
     renderAt('/auth/callback?error=login_failed')
 
-    expect(await screen.findByText('로그인에 실패했습니다')).toBeInTheDocument()
+    expect(await screen.findByText('다시 로그인해 주세요')).toBeInTheDocument()
     expect(useAuthStore.getState().status).toBe('guest')
   })
 
@@ -250,6 +250,6 @@ describe('로그인 콜백(실제 환경)', () => {
     )
     renderAt('/auth/callback')
 
-    expect(await screen.findByText('로그인에 실패했습니다')).toBeInTheDocument()
+    expect(await screen.findByText('다시 로그인해 주세요')).toBeInTheDocument()
   })
 })

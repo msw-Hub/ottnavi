@@ -35,19 +35,21 @@ export function RequireAuth({ children }: RequireAuthProps) {
   const location = useLocation()
   const isSigningOut = useAuthStore((state) => state.isSigningOut)
 
-  // 1.
+  // 1. (화면 제목 h1을 둔다: 낭독기 사용자가 제목으로 이동했을 때 지금 어떤 화면인지 알 수 있게 한다. 로그인 콜백 화면과 같은 모양, 057 검수 제안 4)
   if (session.status === 'checking') {
     return (
-      <section className="mx-auto w-full max-w-md">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <h1 className="text-2xl font-semibold">로그인 확인 중</h1>
         <LoadingState message="로그인 상태를 확인하는 중입니다" />
       </section>
     )
   }
 
-  // 2.
+  // 2. (제목은 아래 오류 상자 제목과 같은 말을 되풀이하지 않게 짧은 화면 이름만 쓴다)
   if (session.status === 'error') {
     return (
-      <section className="mx-auto w-full max-w-md">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <h1 className="text-2xl font-semibold">로그인 확인</h1>
         <ErrorState
           title="로그인 상태를 확인하지 못했습니다"
           message="서버와 연결하지 못했습니다. 잠시 후 다시 시도해 주세요."

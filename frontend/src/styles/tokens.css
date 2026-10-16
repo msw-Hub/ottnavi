@@ -107,6 +107,29 @@
    */
   --success: oklch(0.15 0.035 264); /* 글자·아이콘 */
   --success-bg: oklch(0.8 0.12 160); /* 바탕(채움) */
+
+  /*
+   * 찜 우선순위 3단계(꼭 볼 작품 MUST / 보고 싶음 WANT / 여유될 때 MAYBE) 표시 색(우선순위 차이 체감 개선, 2026-10-17).
+   * 플랜 계산은 "꼭 볼 작품"을 끝까지 보는 수를 가장 먼저 챙기고 그다음 점수(보고 싶음 2, 여유될 때 1)를 보므로(PRD 5.4·11절 35번),
+   * 화면에서도 단계의 무게가 위에서 아래로 줄어드는 것이 보이게 "꽉 채움 → 실선 테두리 → 점선 테두리" 순으로 힘을 뺀다.
+   * 색만으로 구분하지 않는다: 단계마다 아이콘(별 / 북마크 / 시계)과 글자가 항상 함께 있고, 모양(채움·실선·점선)도 다르다.
+   * - 꼭 볼 작품: 금빛 바탕(0.83) 위 짙은 남색 글자(0.15), 대비 약 10:1. 경고용 노랑(--attention-bg, 색조 85)과 섞이지 않게 주황 쪽(색조 70)으로 옮겼다
+   * - 보고 싶음: 강조색 계열 하늘색 글자(0.88)·테두리 + 옅은 남색 바탕(0.27), 대비 약 9:1
+   * - 여유될 때: 옅은 바탕(0.23) + 슬레이트 점선 테두리(0.62, 카드 위 3:1 이상) + 밝은 글자(0.9), 대비 약 11:1
+   */
+  --priority-must-fg: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --priority-must-bg: oklch(0.83 0.13 70); /* 바탕(채움) */
+  --priority-must-border: var(--priority-must-bg); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+  --priority-want-fg: oklch(0.88 0.07 230);
+  --priority-want-bg: oklch(0.27 0.05 235);
+  --priority-want-border: oklch(0.88 0.07 230); /* 실선 테두리 */
+  --priority-maybe-fg: oklch(0.9 0.012 258);
+  --priority-maybe-bg: oklch(
+    0.23 0.02 260
+  ); /* 카드 바탕(0.175)보다 한 단계 밝게 채워, 선택된 칸이 선택 안 된 칸(바탕 없음)과 구분되게 한다 */
+  --priority-maybe-border: oklch(
+    0.62 0.025 258
+  ); /* 점선 테두리(점선 모양은 컴포넌트의 border-dashed가 정한다) */
 }
 
 /*
@@ -168,4 +191,13 @@
   --color-attention-border: var(--attention-border);
   --color-success: var(--success);
   --color-success-bg: var(--success-bg);
+  --color-priority-must-fg: var(--priority-must-fg);
+  --color-priority-must-bg: var(--priority-must-bg);
+  --color-priority-must-border: var(--priority-must-border);
+  --color-priority-want-fg: var(--priority-want-fg);
+  --color-priority-want-bg: var(--priority-want-bg);
+  --color-priority-want-border: var(--priority-want-border);
+  --color-priority-maybe-fg: var(--priority-maybe-fg);
+  --color-priority-maybe-bg: var(--priority-maybe-bg);
+  --color-priority-maybe-border: var(--priority-maybe-border);
 }

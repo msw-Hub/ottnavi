@@ -112,7 +112,7 @@ describe('로그인 콜백 화면', () => {
     const user = userEvent.setup()
     renderAt('/auth/callback?mockScenario=login-failed')
 
-    expect(await screen.findByText('로그인에 실패했습니다', undefined, WAIT)).toBeInTheDocument()
+    expect(await screen.findByText('다시 로그인해 주세요', undefined, WAIT)).toBeInTheDocument()
     expect(getMockRole()).toBe('GUEST')
     await user.click(screen.getByRole('button', { name: '다시 시도' }))
     expect(await screen.findByRole('heading', { level: 1, name: '로그인' })).toBeInTheDocument()

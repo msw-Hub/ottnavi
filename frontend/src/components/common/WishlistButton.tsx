@@ -2,11 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDownIcon, HeartIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import {
-  WISHLIST_PRIORITY_LABELS,
-  WISHLIST_PRIORITY_OPTIONS,
-  type WishlistPriority,
-} from '@/components/common/displayTypes'
+import { WISHLIST_PRIORITY_LABELS, type WishlistPriority } from '@/components/common/displayTypes'
+import { PriorityIcon, PriorityRadioCards } from '@/components/common/WishlistPriority'
 
 interface WishlistButtonProps {
   targetName: string // 무엇을 찜하는지 이름(예: "기생충", "시즌 2"). 화면 낭독기가 여러 찜 버튼을 구분하는 데 쓴다
@@ -102,7 +99,10 @@ export function WishlistButton({
         <HeartIcon aria-hidden="true" className={cn('fill-current', isIcon && 'size-5')} />
         {!isIcon && (
           <>
-            찜함 · {WISHLIST_PRIORITY_LABELS[priority]}
+            찜함 ·
+            {/* 지금 단계의 아이콘(별/북마크/시계)을 이름 앞에 둬 단계가 버튼에서도 보이게 한다(이름은 aria-label이 읽는다) */}
+            <PriorityIcon priority={priority} />
+            {WISHLIST_PRIORITY_LABELS[priority]}
             <ChevronDownIcon aria-hidden="true" />
           </>
         )}
@@ -113,33 +113,22 @@ export function WishlistButton({
           id={panelId}
           role="group"
           aria-label={`${targetName} 찜 설정`}
+          // w-72(288px): 단계마다 한 줄 설명이 들어가 이전 w-56(224px)보다 넓혔다. 375px 화면의 본문 폭(343px) 안에 들어간다
           className={cn(
-            'absolute z-20 mt-1 grid w-56 gap-1 rounded-lg border border-border bg-card p-2 shadow-lg',
+            'absolute z-20 mt-1 grid w-72 max-w-[calc(100vw-2rem)] gap-1 rounded-lg border border-border bg-card p-2 shadow-lg',
             panelAlign === 'end' ? 'right-0' : 'left-0',
           )}
         >
-          <fieldset className="grid gap-0.5">
-            <legend className="px-2 pb-1 text-xs text-muted-foreground">우선순위</legend>
-            {WISHLIST_PRIORITY_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-2 text-sm hover:bg-muted has-focus-visible:outline-2 has-focus-visible:outline-ring"
-              >
-                <input
-                  type="radio"
-                  name={`${baseId}-priority`}
-                  value={option.value}
-                  checked={priority === option.value}
-                  onChange={() => {
-                    onChangePriority(option.value)
-                    setIsOpen(false)
-                  }}
-                  className="size-4 accent-primary"
-                />
-                {option.label}
-              </label>
-            ))}
-          </fieldset>
+          {/* 이전: 이름만 있는 라디오 3줄(모양이 같아 단계 차이를 느끼기 어려웠다). 지금: 아이콘·모양·한 줄 설명이 있는 라디오 카드 3장 */}
+          {/* <fieldset className="grid gap-0.5"> ... WISHLIST_PRIORITY_OPTIONS.map(라디오 + 이름) ... </fieldset> */}
+          <PriorityRadioCards
+            legend="우선순위 · 계산이 챙기는 순서"
+            value={priority}
+            onChange={(nextPriority) => {
+              onChangePriority(nextPriority)
+              setIsOpen(false)
+            }}
+          />
           <Button
             type="button"
             variant="ghost"

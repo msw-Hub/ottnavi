@@ -6,6 +6,7 @@ import {
   LoaderCircleIcon,
   RefreshCwIcon,
   SaveIcon,
+  TriangleAlertIcon,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
@@ -248,7 +249,8 @@ function PlanResult({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground">
           찜한 작품과 예산·시청 시간으로 계산한 3개월 플랜 3가지예요. 하나를 골라 저장하세요.
-          {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'}
+          {/* 바뀐다는 안내는 저장 버튼 바로 위 안내 띠로 옮겼다(누르기 직전에 읽히게, 067 검수 제안 1) */}
+          {/* {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'} */}
         </p>
         <Button
           type="button"
@@ -296,7 +298,9 @@ function PlanResult({
       )}
 
       {calculateError != null && (
+        // 경고 아이콘을 넣어 공통 오류 화면(ErrorState)과 같은 모양으로 맞춘다. 색만으로 오류임을 알리지 않는다(067 검수 제안 5)
         <Alert variant="destructive">
+          <TriangleAlertIcon aria-hidden="true" />
           <AlertTitle>플랜을 다시 계산하지 못했어요</AlertTitle>
           <AlertDescription className="text-destructive/90">
             {getFailureMessage(calculateError)}
@@ -318,11 +322,22 @@ function PlanResult({
         <PlanDetail draft={draft} typeNames={typeNames} serviceNames={serviceNames} />
       </div>
 
-      {/* 저장 구역. 모바일에서는 화면 아래에 고정해 긴 결과를 훑은 뒤에도 바로 저장할 수 있게 한다 */}
+      {/* 저장 구역. 모바일·데스크톱 모두 화면 아래에 고정해 긴 결과를 훑은 뒤에도 바로 저장할 수 있게 한다(067 검수 제안 2: 데스크톱도 고정).
+          main의 좌우 여백(px-4)만큼 -mx-4로 넓혀 막대가 본문 폭을 꽉 채운다. 내용 끝에서는 푸터를 가리지 않고 함께 스크롤된다(sticky).
+          데스크톱은 버튼을 오른쪽에 둔다(md:justify-items-end).
+          이전(모바일만 고정): className="grid gap-2 max-md:sticky max-md:bottom-0 max-md:-mx-4 max-md:z-20 max-md:border-t max-md:border-border max-md:bg-card max-md:px-4 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end" */}
       <section
         aria-label="플랜 저장"
-        className="grid gap-2 max-md:sticky max-md:bottom-0 max-md:-mx-4 max-md:z-20 max-md:border-t max-md:border-border max-md:bg-card max-md:px-4 max-md:pt-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end"
+        className="sticky bottom-0 z-20 -mx-4 grid gap-2 border-t border-border bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:justify-items-end"
       >
+        {/* 이미 저장한 플랜이 있으면 누르기 직전에 "바뀐다"는 사실을 아이콘+글자 안내 띠로 알린다(067 검수 제안 1).
+            경고(빨강·노랑)가 아니라 참고 안내라 info 색을 쓴다. 데스크톱에서도 버튼 폭이 아니라 막대 폭을 꽉 채운다(justify-self-stretch) */}
+        {hasCurrentPlan && (
+          <p className="flex items-start gap-2 justify-self-stretch rounded-lg border border-info bg-info-bg px-3 py-2 text-sm text-info">
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span className="break-keep">저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.</span>
+          </p>
+        )}
         {saveError != null && !isSaving && (
           <p role="alert" className="text-sm text-destructive">
             저장하지 못했어요. {getFailureMessage(saveError)}

@@ -130,8 +130,9 @@ export function AuthCallbackScreen() {
     return (
       <section className="mx-auto flex w-full max-w-md flex-col gap-4">
         <h1 className="text-2xl font-semibold">로그인하지 못했습니다</h1>
+        {/* 상자 제목은 화면 제목(h1 "로그인하지 못했습니다")과 같은 말을 되풀이하지 않고 다음에 할 일을 말한다(057 검수 제안 1) */}
         <ErrorState
-          title="로그인에 실패했습니다"
+          title="다시 로그인해 주세요"
           message="로그인을 마치지 못했습니다. 잠시 후 다시 시도해 주세요."
           onRetry={handleRetry}
         />

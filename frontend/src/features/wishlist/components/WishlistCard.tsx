@@ -1,22 +1,12 @@
 import { CheckCheckIcon, ChevronDownIcon, MonitorPlayIcon, Undo2Icon, XIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { EstimatedTag } from '@/components/common/EstimatedTag'
-import {
-  WISHLIST_PRIORITY_LABELS,
-  WISHLIST_PRIORITY_OPTIONS,
-  type WishlistPriority,
-} from '@/components/common/displayTypes'
+import { type WishlistPriority } from '@/components/common/displayTypes'
 import { PosterImage } from '@/components/common/PosterImage'
 import type { ServiceStatusEntry } from '@/components/common/ServiceStatusRow'
+import { PriorityBadge, PrioritySegmented } from '@/components/common/WishlistPriority'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import type { WishlistItem } from '@/api/generated/model'
 import { formatDate, formatMinutes } from '@/lib/format'
 import { getTmdbImageUrl } from '@/lib/tmdbImage'
@@ -62,8 +52,8 @@ function buildSummaryText(entries: ServiceStatusEntry[]): string {
  * 찜 목록의 컴팩트 카드다(SCR-08). 접힌 채 항상 같은 구조라서 같은 행의 두 카드는 높이가 같다.
  *
  * - 왼쪽: 포스터(모바일 96px, sm 이상 112px). 오른쪽 정보 열의 높이만큼 늘어나 두 열이 거의 같은 높이가 된다.
- * - 오른쪽: 제목·시즌(+ 우상단 X) → 필요 시간(+추정, "이미 시청 가능") → [우선순위][다 봤음] 한 줄 →
- *   서비스 요약(두 줄까지, 줄임표 없이 높이를 두 줄로 고정) → "자세히 보기".
+ * - 오른쪽: 제목·시즌(+ 우상단 X) → 필요 시간(+추정, "이미 시청 가능") → 우선순위 3칸 세그먼트 →
+ *   서비스 요약(두 줄까지, 줄임표 없이 높이를 두 줄로 고정) → ["자세히 보기"][다 봤음] 한 줄.
  *
  * 펼침 내용(있음/없음/모름 세 묶음)은 카드 안에 넣지 않는다. 카드 안에 넣으면 한쪽만 커져 옆 카드와 정렬이 깨지므로,
  * 행 컴포넌트(WishlistRow)가 그 카드가 속한 행 아래 전체 폭 패널로 그린다. 이 카드는 펼침 상태일 때 강조 테두리만 보인다.
@@ -117,8 +107,9 @@ export function WishlistCard({
       </Link>
 
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        {/* pr-8: 오른쪽 위 X 버튼(44px)과 제목이 겹치지 않게 비워 둔다. 제목은 두 줄까지 보이고 넘치면 줄임표 */}
-        <h3 className="line-clamp-2 pr-8 text-base leading-snug font-bold">
+        {/* pr-8: 오른쪽 위 X 버튼(44px)과 제목이 겹치지 않게 비워 둔다. 제목은 두 줄까지 보이고 넘치면 줄임표.
+            h4: 찜 목록이 "계산에 쓸 작품(h2) → 우선순위 묶음(h3) → 카드(h4)"로 쌓여 한 단계 내렸다(이전 h3) */}
+        <h4 className="line-clamp-2 pr-8 text-base leading-snug font-bold">
           <Link
             to={detailPath}
             className={cn(
@@ -133,7 +124,7 @@ export function WishlistCard({
               {item.seasonName}
             </span>
           )}
-        </h3>
+        </h4>
 
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground tabular-nums">
           <span>필요 시간 {formatMinutes(item.requiredMin)}</span>
@@ -147,40 +138,55 @@ export function WishlistCard({
           )}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {isWatched ? (
-            // 다 봤음: 우선순위를 바꿀 일이 없어 선택 상자 대신 글자로만 보이고, 되돌리기 버튼이 옆에 온다
-            <>
-              <span className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-muted-foreground">
-                <CheckCheckIcon aria-hidden="true" className="size-4" />다 봤음 ·{' '}
-                {formatDate(item.watchedAt)}
-                <span className="font-normal">· {WISHLIST_PRIORITY_LABELS[item.priority]}</span>
-              </span>
-            </>
-          ) : (
-            // 아래로 열리게 하는 이유: 기본값(item-aligned)은 고른 항목이 트리거 위에 겹치도록 가운데로 열려서
-            // 바로 위의 "필요 시간" 줄을 가렸다. popper + side=bottom + align=start로 트리거 바로 아래에 왼쪽을 맞춰 연다.
-            // avoidCollisions(기본 true): 아래 공간이 모자라면(모바일 아래쪽 카드) 자동으로 위로 뒤집혀 화면 밖으로 나가지 않는다
-            <Select
-              value={item.priority}
-              disabled={isBusy}
-              onValueChange={(value) => onChangePriority(value as WishlistPriority)}
-            >
-              <SelectTrigger
-                aria-label={`${displayTitle} 우선순위`}
-                className="data-[size=default]:h-11 min-w-28"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>
-                {WISHLIST_PRIORITY_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value} className="min-h-11">
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+        {/*
+          우선순위 줄. 이전에는 "보고 싶음"이 적힌 선택 상자(Select)라 세 단계가 같은 모양이었고, 눌러서 열어 봐야 다른 단계가 보였다.
+          지금은 세 칸을 늘 펼쳐 둔 세그먼트라 지금 단계와 다른 단계가 한눈에 보이고 한 번에 바꾼다(아이콘·채움·굵기로 구분, 색만으로 구분하지 않음).
+          이전 Select 코드:
+          <Select value={item.priority} disabled={isBusy} onValueChange={(value) => onChangePriority(value as WishlistPriority)}>
+            <SelectTrigger aria-label={`${displayTitle} 우선순위`} className="data-[size=default]:h-11 min-w-28"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>... SelectItem ...</SelectContent>
+          </Select>
+        */}
+        {isWatched ? (
+          // 다 봤음: 우선순위를 바꿀 일이 없어 고르는 칸 대신 읽기 전용 배지로 보인다
+          <p className="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <CheckCheckIcon aria-hidden="true" className="size-4" />다 봤음 ·{' '}
+              {formatDate(item.watchedAt)}
+            </span>
+            <PriorityBadge priority={item.priority} className="text-xs" />
+          </p>
+        ) : (
+          <PrioritySegmented
+            legend={`${displayTitle} 우선순위`}
+            value={item.priority}
+            disabled={isBusy}
+            onChange={onChangePriority}
+          />
+        )}
+
+        {/* 서비스 요약: 두 줄까지 보이고 높이를 두 줄(min-h-10 = 20px x 2)로 고정해 요약이 짧든 길든 카드 높이가 같다 */}
+        <p className="line-clamp-2 min-h-10 text-sm leading-5 text-foreground">{summaryText}</p>
+
+        {/* 아래 줄: 자세히 보기(왼쪽) + 다 봤음(오른쪽). 다 봤음은 우선순위 줄에 세그먼트가 들어가 이 줄로 내려왔다 */}
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={isExpanded}
+            aria-controls={panelId}
+            onClick={onToggleExpanded}
+            className="-ml-2.5 h-11 w-fit px-2.5 text-sm"
+          >
+            자세히 {isExpanded ? '접기' : '보기'}
+            <ChevronDownIcon
+              aria-hidden="true"
+              className={cn(
+                'size-4 transition-transform motion-reduce:transition-none',
+                isExpanded && 'rotate-180',
+              )}
+            />
+          </Button>
 
           <Button
             type="button"
@@ -201,27 +207,6 @@ export function WishlistCard({
             )}
           </Button>
         </div>
-
-        {/* 서비스 요약: 두 줄까지 보이고 높이를 두 줄(min-h-10 = 20px x 2)로 고정해 요약이 짧든 길든 카드 높이가 같다 */}
-        <p className="line-clamp-2 min-h-10 text-sm leading-5 text-foreground">{summaryText}</p>
-
-        <Button
-          type="button"
-          variant="ghost"
-          aria-expanded={isExpanded}
-          aria-controls={panelId}
-          onClick={onToggleExpanded}
-          className="-ml-2.5 h-11 w-fit px-2.5 text-sm"
-        >
-          자세히 {isExpanded ? '접기' : '보기'}
-          <ChevronDownIcon
-            aria-hidden="true"
-            className={cn(
-              'size-4 transition-transform motion-reduce:transition-none',
-              isExpanded && 'rotate-180',
-            )}
-          />
-        </Button>
       </div>
 
       {/* 찜 해제 X: 카드 오른쪽 위에 겹쳐 둔다. 44px 정사각형 터치 영역(size-11), 아이콘은 20px */}
