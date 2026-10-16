@@ -65,7 +65,8 @@ export function PlanMonthCard({ month, serviceNames, withYear }: PlanMonthCardPr
           <h3 className="text-xl font-extrabold">{formatMonthLabel(month.month, withYear)}</h3>
           <span
             className={cn(
-              'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold',
+              // shrink-0·whitespace-nowrap: 연도가 붙은 달 이름(예: 2026년 12월)과 한 줄에 놓여 좁은 화면(375px)에서 배지 글자가 "이번 달 / 확정"으로 쪼개지지 않게 한다
+              'inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-sm font-bold whitespace-nowrap',
               month.isConfirmed
                 ? 'border-2 border-solid border-primary bg-primary text-primary-foreground'
                 : 'border-2 border-dashed border-input text-foreground',

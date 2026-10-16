@@ -63,7 +63,10 @@ export function PlanTypeSelector({
                 onChange={() => onSelect(first)}
                 className="peer sr-only"
               />
-              <div className="grid h-full content-start gap-3 rounded-xl border-2 border-border bg-card p-4 transition-colors group-hover/plan:bg-muted peer-checked:border-plan-selected-border peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:cursor-not-allowed">
+              {/* 세로 flex로 쌓고 아래 금액 묶음(dl)에 mt-auto를 줘서, 설명 줄 수가 카드마다 달라도 총비용·시청 완료 숫자가 같은 높이에 맞는다.
+                  이전(grid content-start)은 설명이 두 줄인 카드만 숫자가 한 줄 아래로 밀려 카드끼리 비교하기 어려웠다(Task 067 시각 검수) */}
+              {/* <div className="grid h-full content-start gap-3 rounded-xl border-2 ..."> */}
+              <div className="flex h-full flex-col gap-3 rounded-xl border-2 border-border bg-card p-4 transition-colors group-hover/plan:bg-muted peer-checked:border-plan-selected-border peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 peer-disabled:cursor-not-allowed">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-lg leading-snug font-bold">
                     {group.planTypes.map((planType) => PLAN_TYPE_LABELS[planType]).join(' · ')}
@@ -109,7 +112,7 @@ export function PlanTypeSelector({
                   ))}
                 </ul>
 
-                <dl className="grid gap-1.5 border-t border-border pt-3 text-sm">
+                <dl className="mt-auto grid gap-1.5 border-t border-border pt-3 text-sm">
                   <div className="flex items-baseline justify-between gap-2">
                     <dt className="text-muted-foreground">3개월 총비용</dt>
                     <dd className="text-lg font-extrabold tabular-nums">

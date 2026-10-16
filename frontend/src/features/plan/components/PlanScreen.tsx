@@ -168,7 +168,8 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
   return (
     <div className="flex flex-col gap-6">
       {isJustSaved && (
-        <Alert className="border-primary">
+        // 저장 완료는 오류가 아니라 안내라 role="status"로 덮어쓴다. shadcn Alert의 기본값 role="alert"는 낭독기가 하던 말을 끊고 급하게 읽는다
+        <Alert role="status" className="border-primary">
           <CircleCheckIcon aria-hidden="true" />
           <AlertTitle className="text-base font-bold">{typeName} 플랜을 저장했어요</AlertTitle>
           <AlertDescription>
