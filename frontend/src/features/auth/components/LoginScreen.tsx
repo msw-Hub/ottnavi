@@ -1,8 +1,12 @@
 import { CalendarRangeIcon, HeartIcon, SaveIcon } from 'lucide-react'
 import { createSearchParams, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { saveLoginReturnTo } from '@/lib/loginReturn'
 import { isMockMode, MOCK_SCENARIO_PARAM } from '@/lib/mockScenario'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
+
+// 백엔드가 Google 로그인을 시작하는 경로(TECH 4절). 프론트 화면 주소가 아니라 서버 주소라 router가 아닌 브라우저 이동으로 간다
+const GOOGLE_AUTHORIZATION_PATH = '/api/oauth2/authorization/google'
 
 // 로그인하면 쓸 수 있는 기능 안내(PRD SCR-06 "로그인 혜택 안내")
 const LOGIN_BENEFITS = [
@@ -17,15 +21,14 @@ const LOGIN_BENEFITS = [
 /**
  * SCR-06 로그인 화면이다. "Google로 로그인" 버튼과 로그인 혜택을 안내한다.
  *
- * 돌아갈 곳(from)은 router state로 받는다. 찜 버튼이나 머리글 "로그인" 링크가 지금 화면을 from에 담아 보낸다.
+ * 돌아갈 곳(from)은 router state로 받는다. 찜 버튼이나 머리글 "로그인" 링크, 로그인 가드(RequireAuth)가 지금 화면을 from에 담아 보낸다.
  * 사용자가 바꿀 수 있는 값이라 getSafeRedirectPath로 이 사이트 안의 경로만 통과시킨다(오픈 리다이렉트 방지).
  *
- * 목업 단계: 버튼은 실제 Google로 가지 않고 /auth/callback으로 이동만 한다(from도 같이 넘긴다).
- * TODO(Task 057): 실제 연동은 브라우저를 GET /api/oauth2/authorization/google(TECH 4절)로 보낸다.
- *   그 경우 페이지가 통째로 바뀌어 router state가 사라지므로, from은 이동 전에 sessionStorage에 임시로 담았다가
- *   콜백에서 꺼내 getSafeRedirectPath로 다시 검사하는 방식으로 옮긴다(from은 토큰이 아니라 단순 경로라 저장해도 안전하다).
- *   토큰은 주소나 sessionStorage에 두지 않는다.
- * 목업이 아닌 환경에서는 실제 연동이 없으므로 버튼을 비활성으로 두고 이유를 알린다.
+ * 실제 환경: 버튼은 브라우저를 GET /api/oauth2/authorization/google(TECH 4절)로 보낸다. 페이지가 통째로 바뀌어
+ *   router state가 사라지므로 from은 이동 전에 경로만 sessionStorage에 임시 보관하고(lib/loginReturn),
+ *   콜백 화면이 꺼내 다시 검사한다(from은 토큰이 아니라 단순 경로라 저장해도 안전하다). 토큰은 어디에도 담지 않는다.
+ *   Google 로그인을 마치면 백엔드가 Refresh Token을 HttpOnly 쿠키로 심고 /auth/callback으로 보낸다.
+ * 목업 모드: 버튼은 실제 Google로 가지 않고 /auth/callback으로 이동만 한다(from도 같이 넘긴다).
  */
 export function LoginScreen() {
   const navigate = useNavigate()
@@ -38,13 +41,19 @@ export function LoginScreen() {
   const mockScenario = new URLSearchParams(location.search).get(MOCK_SCENARIO_PARAM)
 
   function handleLogin() {
+    // 1. 실제 환경: 돌아갈 곳을 보관하고 Google 로그인으로 보낸다
+    if (!isMock) {
+      saveLoginReturnTo(from)
+      window.location.assign(GOOGLE_AUTHORIZATION_PATH)
+      return
+    }
+    // 2. 목업 모드: 콜백 화면으로 이동만 한다
     navigate(
       {
         pathname: '/auth/callback',
-        search:
-          isMock && mockScenario
-            ? `?${createSearchParams({ [MOCK_SCENARIO_PARAM]: mockScenario })}`
-            : '',
+        search: mockScenario
+          ? `?${createSearchParams({ [MOCK_SCENARIO_PARAM]: mockScenario })}`
+          : '',
       },
       { state: { from } },
     )
@@ -74,21 +83,10 @@ export function LoginScreen() {
       </ul>
 
       <div className="grid gap-2">
-        <Button
-          type="button"
-          size="lg"
-          className="h-11"
-          onClick={handleLogin}
-          disabled={!isMock}
-          aria-describedby={isMock ? undefined : 'login-unavailable'}
-        >
+        {/* 이전 배치(실제 연동 전): 목업이 아닌 환경에서는 버튼을 끄고 "로그인 연동은 아직 준비 중입니다."를 안내했다. 참고용 기록 */}
+        <Button type="button" size="lg" className="h-11" onClick={handleLogin}>
           Google로 로그인
         </Button>
-        {!isMock && (
-          <p id="login-unavailable" className="text-sm text-muted-foreground">
-            로그인 연동은 아직 준비 중입니다.
-          </p>
-        )}
       </div>
     </section>
   )

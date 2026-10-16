@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/providers'
 import { routes } from '@/app/router'
+import { resetMockSession, setMockRole } from '@/mocks/mockSession'
 
 /*
  * 화면 주소표를 테스트 쪽에 따로 적어 두고 실제 라우터 설정과 맞춰 본다.
@@ -70,6 +71,16 @@ function renderAt(url: string) {
     </Providers>,
   )
 }
+
+// 보호·관리자 화면까지 그려지는지 보려고 목업 모드의 관리자로 연다(가드 동작 자체는 guards/guards.test.tsx가 확인한다)
+beforeEach(() => {
+  vi.stubEnv('VITE_USE_MOCK', 'true')
+  setMockRole('ADMIN')
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
+  resetMockSession()
+})
 
 describe('라우터 경로표', () => {
   it('라우터에 등록된 화면 경로가 경로표와 정확히 같다', () => {

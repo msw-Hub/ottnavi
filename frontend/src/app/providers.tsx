@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { isApiError } from '@/api/http'
 import { Toaster } from '@/components/ui/sonner'
+import { useAuthStore } from '@/stores/authStore'
 
 interface ProvidersProps {
   children: ReactNode // 전역 Provider 안에 그릴 앱(지금은 RouterProvider)
@@ -101,6 +102,18 @@ export function Providers({ children }: ProvidersProps) {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: shouldRetryQuery } } }),
   )
+
+  /*
+   * 로그인 상태가 "로그인함 → 로그아웃"으로 바뀌면 쿼리 캐시를 모두 비운다.
+   * 로그아웃 버튼(hooks/useLogout)뿐 아니라 재발급이 401로 끝나 강제로 로그아웃된 경우(api/http.ts)도 같은 곳에서 처리하려는 것이다.
+   * 비우지 않으면 이전 사용자의 찜·플랜 데이터가 같은 브라우저에서 다음 사용자 화면에 잠깐 보일 수 있다.
+   * 의존성: queryClient는 처음 한 번만 만들어져 바뀌지 않는다. 정리 함수(subscribe가 돌려주는 구독 해제)로 중복 구독을 막는다.
+   */
+  useEffect(() => {
+    return useAuthStore.subscribe((state, previous) => {
+      if (previous.status === 'authenticated' && state.status === 'guest') queryClient.clear()
+    })
+  }, [queryClient])
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,32 +1,33 @@
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { MockRoleSwitcher } from '@/app/MockRoleSwitcher'
-import { useMockRole } from '@/hooks/useMockRole'
-import { getMockRequestParams, isMockMode } from '@/lib/mockScenario'
-import { setMockRole } from '@/mocks/mockSession'
+import { useLogout } from '@/hooks/useLogout'
+import { useSession } from '@/hooks/useSession'
+import { getMockRequestParams } from '@/lib/mockScenario'
 
 /**
  * 머리글 오른쪽의 계정 영역이다. 비로그인이면 "로그인" 링크, 로그인했으면 사용자 표시와 "로그아웃"을 보인다.
  *
- * 지금은 목업 단계라 로그인 상태를 mocks/mockSession에서 읽는다. 운영(목업 아님)에서는 항상 비로그인으로 그린다.
- * TODO(Task 057): 실제 인증 상태(stores/authStore)를 읽고, 로그아웃은 POST /api/auth/logout을 부르며, 로그인 상태면 내 메뉴(설정·찜)를 보인다.
+ * 로그인 상태는 hooks/useSession이 준다(실제 환경은 authStore, 목업 모드는 개발용 전환 토글의 역할).
+ * 재발급을 확인하는 중(checking)에는 계정 영역을 비워 둔다(로그인한 사용자에게 "로그인" 링크가 잠깐 보였다 사라지는 깜빡임을 피한다).
+ * 로그아웃은 POST /api/auth/logout을 부른다(hooks/useLogout).
+ * TODO(Task 058): 로그인 상태면 내 메뉴(설정·찜·요금·플랜)를 보인다. 지금은 찜 목록 링크만 둔다.
  *
  * 머리글 높이를 키우지 않으려고 모두 text-sm 한 줄이고 개발용 전환은 h-6이다(토스트 시작 위치가 머리글 높이에 맞춰져 있다).
  */
 export function HeaderAccountNav() {
-  const role = useMockRole()
+  const session = useSession()
   const location = useLocation()
-  const navigate = useNavigate()
-  // 운영에서는 목업 역할을 믿지 않는다(역할 값이 남아 있어도 비로그인으로 본다)
-  const effectiveRole = isMockMode() ? role : 'GUEST'
+  const logout = useLogout()
+  // 비로그인으로 그릴 상태: guest, 그리고 재발급 오류(error: 로그인 여부를 몰라 로그인 링크를 남겨 둔다)
+  const isGuest = session.status === 'guest' || session.status === 'error'
 
   // 찜 목록 링크에 이어 붙일 목업 확인용 파라미터(없으면 빈 문자열). 운영(목업 아님)에서는 빈 객체라 아무것도 붙지 않는다
   const mockParams = new URLSearchParams(getMockRequestParams()).toString()
   const wishlistSearch = mockParams ? `?${mockParams}` : ''
 
-  // 목업 로그아웃: 역할을 비로그인으로 되돌리고 첫 화면으로 보낸다. 서버·토큰이 없어 이 한 줄이 전부다
+  // 로그아웃: 서버에 폐기를 요청하고, 메모리의 토큰·쿼리 캐시를 비운 뒤 첫 화면으로 보낸다(hooks/useLogout)
   function handleLogout() {
-    setMockRole('GUEST')
-    navigate('/')
+    void logout()
   }
 
   // 링크·버튼은 min-h-10(40px)·좌우 px-1로 누르는 영역을 넓혔다(Task 037 ⑫). -my-2(위아래 -8px)는 넓힌 높이가 레이아웃 높이에는 안 잡히게 하는 장치다:
@@ -35,7 +36,7 @@ export function HeaderAccountNav() {
   return (
     <nav aria-label="계정" className="ml-auto flex items-center gap-1">
       <MockRoleSwitcher />
-      {effectiveRole === 'GUEST' ? (
+      {session.status === 'checking' ? null : isGuest ? (
         // 지금 보던 화면을 from으로 넘겨, 로그인이 끝나면 이 화면으로 돌아오게 한다(getSafeRedirectPath가 내부 경로만 통과시킨다)
         <Link
           to="/login"
@@ -58,7 +59,7 @@ export function HeaderAccountNav() {
             찜 목록
           </Link>
           <span className="text-sm text-muted-foreground">
-            {effectiveRole === 'ADMIN' ? '관리자' : '회원'}
+            {session.role === 'ADMIN' ? '관리자' : '회원'}
           </span>
           <button
             type="button"

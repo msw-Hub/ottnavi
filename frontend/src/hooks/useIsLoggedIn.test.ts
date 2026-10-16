@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { setMockRole } from '@/mocks/mockSession'
+import { useAuthStore } from '@/stores/authStore'
 
 /*
  * 로그인 여부 판단 테스트. 머리글(HeaderAccountNav)과 같은 기준(목업 모드일 때만 목업 역할을 믿는다)인지 확인한다.
@@ -28,5 +29,15 @@ describe('useIsLoggedIn', () => {
     setMockRole('USER')
 
     expect(renderHook(() => useIsLoggedIn()).result.current).toBe(false)
+  })
+
+  it('목업 모드가 아니면 authStore의 로그인 상태를 따른다(확인 중·비로그인은 false, 로그인은 true)', () => {
+    vi.stubEnv('VITE_USE_MOCK', 'false')
+
+    useAuthStore.setState({ status: 'checking', accessToken: null, role: null })
+    expect(renderHook(() => useIsLoggedIn()).result.current).toBe(false)
+
+    useAuthStore.getState().setSession('token', 'USER')
+    expect(renderHook(() => useIsLoggedIn()).result.current).toBe(true)
   })
 })
