@@ -312,7 +312,7 @@ class WishlistApiTest extends IntegrationTestSupport {
 		List<SubscriptionState> states = new ArrayList<>();
 		states.add(new SubscriptionState(services.get(0).getId(), ServiceSubscriptionStatus.SUBSCRIBED, "스탠다드", 1));
 		states.add(new SubscriptionState(services.get(2).getId(), ServiceSubscriptionStatus.UNKNOWN, null, null));
-		userSettingService.updateSettings(user.getId(), 20000, 900, WatchPreset.NORMAL, states);
+		userSettingService.updateSettings(user.getId(), 20000, 900, WatchPreset.NORMAL, false, states);
 		String bearer = new TestTokens(jwtTokenProvider).bearer(user.getId(), UserRole.USER);
 		addAndGetId(bearer, movieBody(BASE_TMDB_ID + 7, "MUST"), 201);
 		addAndGetId(bearer, movieBody(BASE_TMDB_ID + 8, "MUST"), 201);

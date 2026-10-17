@@ -3,25 +3,36 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
  * OpenAPI spec version: 0.1.0
  */
 import type { PriceSource } from './priceSource';
+import type { ProductType } from './productType';
 import type { ServiceSubscriptionStatus } from './serviceSubscriptionStatus';
 
 /**
- * 서비스 하나의 월 요금 이력(SCR-09)
+ * 상품 하나의 월 요금(SCR-09). 단품과 번들이 함께 오며, 단품(서비스 ID 순) 다음에 번들 순서다. `subscriptionStatus`는 단품이 속한 서비스의 이용 상태이고 번들은 구독 입력이 없어 항상 NOT_SUBSCRIBED다
  */
 export interface ServicePrice {
-  /** 서비스 내부 ID. 서비스 이름을 찾는 데 쓴다 */
-  ottServiceId: number;
+  /**
+     * 단품이 속한 서비스 내부 ID. 서비스 이름을 찾는 데 쓴다. 번들이면 null(`ottServiceIds`를 쓴다)
+     * @nullable
+     */
+  ottServiceId: number | null;
   /** OTT 구독상품 ID. 수정·되돌리기 경로에 쓴다(사용자 금액은 상품 단위로 저장된다) */
   productId: number;
   /** 상품(요금제) 이름. 예 "넷플릭스 스탠다드" */
   productName: string;
+  productType: ProductType;
+  /** 상품이 포함하는 서비스 ID 목록(오름차순). 단품은 1개, 번들은 2개 이상 */
+  ottServiceIds: number[];
+  /** 저가형(광고형·베이직 등) 요금 분류. false면 표준. 가격 선택에만 쓰고 볼 수 있는 작품 범위와는 무관하다 */
+  isLowCost: boolean;
+  /** 내 설정의 모드(`isLowestPriceMode`) 기준으로 이 상품이 플랜 계산 후보인지. 서비스마다 단품은 1개만 후보이고 번들은 모드에 따라 걸러진다 */
+  isCalcCandidate: boolean;
   /** 관리자가 등록한 기본 월 요금 중 현재 적용 중인 요금의 금액(원) */
   adminPrice: number;
   /**

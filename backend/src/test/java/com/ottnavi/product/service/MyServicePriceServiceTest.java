@@ -66,7 +66,7 @@ class MyServicePriceServiceTest {
 		service = new MyServicePriceService(productRepository, componentRepository, priceRepository,
 				overrideRepository, userQueryService, CLOCK);
 
-		product = SubscriptionProduct.create("넷플릭스 스탠다드", ProductType.SINGLE);
+		product = SubscriptionProduct.create("넷플릭스 스탠다드", ProductType.SINGLE, false);
 		ReflectionTestUtils.setField(product, "id", PRODUCT_ID);
 		ProductComponent component = mock(ProductComponent.class);
 		when(component.getId()).thenReturn(new ProductComponentId(PRODUCT_ID, SERVICE_ID));
@@ -199,6 +199,7 @@ class MyServicePriceServiceTest {
 		// given
 		when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
 		givenPrices();
+		givenActiveProductListed();
 		when(overrideRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.empty());
 
 		// when
@@ -214,6 +215,7 @@ class MyServicePriceServiceTest {
 		// given
 		when(productRepository.findById(PRODUCT_ID)).thenReturn(Optional.of(product));
 		givenPrices();
+		givenActiveProductListed();
 		UserPriceOverride existing = UserPriceOverride.create(USER_ID, PRODUCT_ID, 9900);
 		when(overrideRepository.findByUserIdAndProductId(USER_ID, PRODUCT_ID)).thenReturn(Optional.of(existing));
 

@@ -28,6 +28,7 @@ function run(
     endedAt: null,
     processedCount: 0,
     changedCount: 0,
+    recalcTargetCount: null,
     failureReason: null,
     canRecover: false,
     canRestart: false,

@@ -17,15 +17,17 @@ import java.util.stream.Collectors;
  * 순수 Java이며 상태가 없다.
  *
  * <p>정규화 문자열 형식(구분자 고정, 앞에 버전 {@value #FORMAT_VERSION}):
- * {@code v2|budget=…|minutes=…|asOf=…|products=id:price:condition;…|units=id:priority:minutes:watchableIds:unknown:titleId:seasonNumber;…}
+ * {@code v3|budget=…|minutes=…|asOf=…|products=id:price:condition:serviceIds;…|units=id:priority:minutes:watchableIds:unknown:titleId:seasonNumber;…}
  * 시청 단위는 id 오름차순, 상품은 id 오름차순, 시청 가능 상품 ID는 오름차순으로 정렬해 잇는다.
  * titleId·seasonNumber는 시즌 순서(PRD 5.4)가 배정 결과를 바꾸므로 v2에서 넣었다. 영화는 둘 다 '-'다.
+ * serviceIds(구성 서비스 ID, 오름차순, 쉼표)는 서비스 겹침 금지(PRD 11절 33번)가 선택지를 바꾸므로 v3에서 넣었다. 서비스 정보가 없는 상품은 '-'다.
+ * v3로 올리면서 v2로 만든 기존 저장 플랜의 해시와는 달라진다(같은 입력이어도 재계산 시 새 해시로 취급).
  * 참고: 이 해시를 저장하는 곳(plan.input_hash 등)이 아직 없어 v1 해시와의 호환 문제는 없다. 저장을 도입한 뒤에는 형식을 바꾸면 기존 값이 무효가 된다.
  * 형식을 바꾸면 기존 해시가 모두 달라지므로 {@code FORMAT_VERSION}을 올린다.
  */
 public final class InputHasher {
 
-	private static final String FORMAT_VERSION = "v2"; // 정규화 형식 버전. 형식을 바꾸면 올린다
+	private static final String FORMAT_VERSION = "v3"; // 정규화 형식 버전. 형식을 바꾸면 올린다
 
 	private InputHasher() {
 	}
@@ -52,7 +54,7 @@ public final class InputHasher {
 		// 2. 상품을 id 순으로 정렬해 문자열로 잇는다
 		String products = input.products().stream()
 				.sorted(Comparator.comparingLong(OttProduct::id))
-				.map(product -> product.id() + ":" + product.monthlyPrice() + ":" + product.condition().name())
+				.map(InputHasher::canonicalize)
 				.collect(Collectors.joining(";"));
 		// 3. 버전·예산·시청 시간·기준일·상품·단위를 구분자로 이어 붙인다
 		return FORMAT_VERSION
@@ -61,6 +63,15 @@ public final class InputHasher {
 				+ "|asOf=" + dataAsOf // LocalDate.toString()은 ISO-8601(yyyy-MM-dd)
 				+ "|products=" + products
 				+ "|units=" + units;
+	}
+
+	/** 상품 하나를 id:가격:구독 상태:구성 서비스 ID(오름차순, 쉼표; 없으면 -) 로 바꾼다. */
+	private static String canonicalize(OttProduct product) {
+		String serviceIds = product.ottServiceIds().stream().map(String::valueOf).collect(Collectors.joining(","));
+		if (serviceIds.isEmpty()) {
+			serviceIds = "-";
+		}
+		return product.id() + ":" + product.monthlyPrice() + ":" + product.condition().name() + ":" + serviceIds;
 	}
 
 	/** 시청 단위 하나를 id:우선순위:필요 분:시청 가능 상품 ID(오름차순, 쉼표):모름 여부:titleId:시즌 번호(영화는 -) 로 바꾼다. */

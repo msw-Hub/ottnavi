@@ -39,21 +39,28 @@ public class UserSetting extends BaseTimeEntity {
 	@Column(nullable = false)
 	private boolean notificationEnabled; // 알림 수신 여부. 기본 꺼짐(D6)
 
+	@Column(nullable = false)
+	private boolean lowestPriceMode; // "가장 저렴한 요금제로 계산할래요". 기본 꺼짐. API에서는 isLowestPriceMode
+
 	/** 첫 설정 저장 때 만든다. 알림은 꺼진 상태로 시작한다 */
-	public static UserSetting create(Long userId, int monthlyBudget, int monthlyWatchMinutes, WatchPreset watchPreset) {
+	public static UserSetting create(Long userId, int monthlyBudget, int monthlyWatchMinutes, WatchPreset watchPreset,
+			boolean lowestPriceMode) {
 		UserSetting setting = new UserSetting();
 		setting.userId = userId;
 		setting.monthlyBudget = monthlyBudget;
 		setting.monthlyWatchMinutes = monthlyWatchMinutes;
 		setting.watchPreset = watchPreset;
+		setting.lowestPriceMode = lowestPriceMode;
 		setting.notificationEnabled = false;
 		return setting;
 	}
 
 	/** 계산 조건을 바꾼다(더티 체킹으로 저장) */
-	public void updateCondition(int monthlyBudget, int monthlyWatchMinutes, WatchPreset watchPreset) {
+	public void updateCondition(int monthlyBudget, int monthlyWatchMinutes, WatchPreset watchPreset,
+			boolean lowestPriceMode) {
 		this.monthlyBudget = monthlyBudget;
 		this.monthlyWatchMinutes = monthlyWatchMinutes;
 		this.watchPreset = watchPreset;
+		this.lowestPriceMode = lowestPriceMode;
 	}
 }

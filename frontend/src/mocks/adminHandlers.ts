@@ -93,7 +93,12 @@ function wait() {
  * 그래서 기본 목록은 매번 "오늘" 기준으로 build*에서 다시 만들고, 사용자가 건드린(수정·등록한) OTT 구독상품만 저장해 그 위에 얹는다.
  * 건드린 상품은 그 시점의 날짜가 그대로 굳는다. sessionStorage를 못 쓰면 메모리만으로 동작한다(writeMockJson이 삼킨다).
  */
-const STORAGE_KEY = 'ottnavi:mock-admin-products'
+// 이전 키: 'ottnavi:mock-admin-products'. Task 076에서 상품 모양이 바뀌어(ottServiceId → ottServiceIds, isLowCost 추가)
+// 예전 모양으로 저장된 값을 읽으면 화면이 깨지므로 키를 바꿔 새로 시작한다
+const STORAGE_KEY = 'ottnavi:mock-admin-products:v2'
+
+// 판매 중 번들 상한(계약 createAdminProduct·updateAdminProduct: 판매 중 번들은 최대 13개)
+const MAX_ACTIVE_BUNDLES = 13
 
 const FIRST_NEW_PRODUCT_ID = 201 // 기본 상품 ID(101~107)와 겹치지 않는 시작 번호
 const FIRST_NEW_PRICE_ID = 5000 // 기본 월 구독요금 줄 ID(1011~1073)와 겹치지 않는 시작 번호
@@ -352,6 +357,7 @@ function startRun(request: Request, targetDate: string, tier: CollectTier) {
     failureReason: null,
     canRecover: false, // 버튼 값은 목록을 꺼낼 때 다시 계산한다(getAllExecutions)
     canRestart: false,
+    recalcTargetCount: null, // 재계산은 수집이 끝난 뒤에 돈다
   }
   simulatedReads[String(execution.executionId)] = 0
   saveExecution(execution)
@@ -636,23 +642,46 @@ export const adminHandlers: RequestHandler[] = [
     if (raw.productType == null) {
       bodyErrors.push({ field: 'productType', message: '상품 종류는 필수입니다.' })
     }
-    if (raw.ottServiceId == null) {
-      bodyErrors.push({ field: 'ottServiceId', message: '서비스는 필수입니다.' })
-    } else if (!Number.isInteger(raw.ottServiceId) || raw.ottServiceId < 1) {
-      bodyErrors.push({ field: 'ottServiceId', message: POSITIVE_MESSAGE })
+    // 이전(Task 076 전): ottServiceId 하나만 받았다
+    if (!Array.isArray(raw.ottServiceIds) || raw.ottServiceIds.length === 0) {
+      bodyErrors.push({ field: 'ottServiceIds', message: '서비스는 필수입니다.' })
+    } else if (raw.ottServiceIds.some((id) => !Number.isInteger(id) || id < 1)) {
+      bodyErrors.push({ field: 'ottServiceIds', message: POSITIVE_MESSAGE })
+    }
+    if (typeof raw.isLowCost !== 'boolean') {
+      bodyErrors.push({ field: 'isLowCost', message: '저가형 여부는 필수입니다.' })
     }
     if (bodyErrors.length > 0) return validationFailed(request, bodyErrors)
     // 위 검사로 필수 값이 모두 채워졌음이 확인됐다
     const body = raw as CreateAdminProductRequest
 
-    // 2. 서비스 계층 검사 순서(서버 createProduct): 단품만 → 이름 길이 → 서비스 존재 → 첫 요금 시작일(409)
-    if (body.productType !== 'SINGLE') {
-      return fieldValidationError(request, 'productType', '단품(SINGLE)만 등록할 수 있습니다.')
-    }
+    // 2. 서비스 계층 검사 순서(목업): 이름 길이 → 구성 개수·중복 → 서비스 존재 → 판매 중 번들 상한 → 첫 요금 시작일(409)
+    //    서버의 정확한 순서는 확인하지 않았다(목업은 화면 확인용)
     const normalized = normalizeProductName(body.name)
     if ('error' in normalized) return validationFailed(request, [normalized.error])
-    if (!MOCK_PRODUCTS.some((p) => p.ottServiceId === body.ottServiceId)) {
-      return fieldValidationError(request, 'ottServiceId', '존재하지 않는 서비스입니다.')
+    const serviceIds = [...new Set(body.ottServiceIds)].sort((a, b) => a - b)
+    if (serviceIds.length !== body.ottServiceIds.length) {
+      return fieldValidationError(request, 'ottServiceIds', '같은 서비스를 두 번 넣을 수 없습니다.')
+    }
+    if (body.productType === 'SINGLE' && serviceIds.length !== 1) {
+      return fieldValidationError(request, 'ottServiceIds', '단품은 서비스 1개만 넣을 수 있습니다.')
+    }
+    if (body.productType === 'BUNDLE' && serviceIds.length < 2) {
+      return fieldValidationError(request, 'ottServiceIds', '번들은 서비스 2개 이상이 필요합니다.')
+    }
+    if (!serviceIds.every((id) => MOCK_PRODUCTS.some((p) => p.ottServiceId === id))) {
+      return fieldValidationError(request, 'ottServiceIds', '존재하지 않는 서비스입니다.')
+    }
+    // 판매 중 번들 상한. 화면 확인용 시나리오 ?mockScenario=bundle-limit이면 이미 13개가 찬 것으로 본다
+    const activeBundleCount = hasMockScenario(request, 'bundle-limit')
+      ? MAX_ACTIVE_BUNDLES
+      : getAllProducts().filter((p) => p.productType === 'BUNDLE' && p.isActive).length
+    if (body.productType === 'BUNDLE' && activeBundleCount >= MAX_ACTIVE_BUNDLES) {
+      return fieldValidationError(
+        request,
+        'productType',
+        `판매 중인 번들은 ${MAX_ACTIVE_BUNDLES}개까지 등록할 수 있습니다.`,
+      )
     }
     const today = getTodayDateString()
     const dateProblem = startDateProblem(
@@ -664,8 +693,9 @@ export const adminHandlers: RequestHandler[] = [
     const product: AdminProduct = {
       productId: nextProductId++,
       name: normalized.name,
-      productType: 'SINGLE',
-      ottServiceId: body.ottServiceId,
+      productType: body.productType,
+      ottServiceIds: serviceIds,
+      isLowCost: body.isLowCost,
       isActive: true,
       prices: [
         {
@@ -689,8 +719,15 @@ export const adminHandlers: RequestHandler[] = [
     if (body.isActive != null && typeof body.isActive !== 'boolean') {
       return fieldValidationError(request, 'isActive', TYPE_MISMATCH_MESSAGE)
     }
-    if (body.name == null && body.isActive == null) {
-      return fieldValidationError(request, 'request', 'name 또는 isActive 중 하나는 보내야 합니다.')
+    if (body.isLowCost != null && typeof body.isLowCost !== 'boolean') {
+      return fieldValidationError(request, 'isLowCost', TYPE_MISMATCH_MESSAGE)
+    }
+    if (body.name == null && body.isActive == null && body.isLowCost == null) {
+      return fieldValidationError(
+        request,
+        'request',
+        'name, isActive, isLowCost 중 하나는 보내야 합니다.',
+      )
     }
     let newName: string | undefined
     if (body.name != null) {
@@ -702,11 +739,26 @@ export const adminHandlers: RequestHandler[] = [
     // 2. 상품을 찾아 바꾼다
     const product = getAllProducts().find((p) => p.productId === Number(params.productId))
     if (!product) return notFound(request, PRODUCT_NOT_FOUND)
+    // 3. 판매 종료된 번들을 다시 판매하려는데 판매 중 번들이 이미 13개면 거절한다(계약 updateAdminProduct).
+    //    화면 확인용 시나리오 ?mockScenario=bundle-limit이면 이미 13개가 찬 것으로 본다
+    const isReactivatingBundle =
+      product.productType === 'BUNDLE' && !product.isActive && body.isActive === true
+    const activeBundleCount = hasMockScenario(request, 'bundle-limit')
+      ? MAX_ACTIVE_BUNDLES
+      : getAllProducts().filter((p) => p.productType === 'BUNDLE' && p.isActive).length
+    if (isReactivatingBundle && activeBundleCount >= MAX_ACTIVE_BUNDLES) {
+      return fieldValidationError(
+        request,
+        'isActive',
+        `판매 중인 번들은 ${MAX_ACTIVE_BUNDLES}개까지 둘 수 있습니다.`,
+      )
+    }
     return okProduct(
       saveProduct({
         ...product,
         name: newName ?? product.name,
         isActive: body.isActive ?? product.isActive,
+        isLowCost: body.isLowCost ?? product.isLowCost,
       }),
     )
   }),

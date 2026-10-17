@@ -37,9 +37,9 @@ class PlanDraftMapperTest {
 
 	private PlanInputBundle bundle() {
 		Map<Long, ProductPriceInfo> prices = Map.of(
-				P_SUBSCRIBED, new ProductPriceInfo(P_SUBSCRIBED, "구독 중", 11L, 10_000, PriceSource.ALREADY_PAID, PriceSource.ADMIN),
-				P_FREE, new ProductPriceInfo(P_FREE, "무료", 12L, 5_000, PriceSource.FREE, PriceSource.USER_OVERRIDE),
-				P_NEW, new ProductPriceInfo(P_NEW, "신규", 13L, 8_000, PriceSource.ADMIN, PriceSource.ADMIN));
+				P_SUBSCRIBED, new ProductPriceInfo(P_SUBSCRIBED, "구독 중", List.of(11L), 10_000, PriceSource.ALREADY_PAID, PriceSource.ADMIN),
+				P_FREE, new ProductPriceInfo(P_FREE, "무료", List.of(12L), 5_000, PriceSource.FREE, PriceSource.USER_OVERRIDE),
+				P_NEW, new ProductPriceInfo(P_NEW, "신규", List.of(13L), 8_000, PriceSource.ADMIN, PriceSource.ADMIN));
 		List<OttProduct> products = List.of(
 				new OttProduct(P_SUBSCRIBED, 10_000, OttProductCondition.SUBSCRIBED),
 				new OttProduct(P_FREE, 5_000, OttProductCondition.FREE),
@@ -124,6 +124,24 @@ class PlanDraftMapperTest {
 		assertThat(PlanDraftMapper.segmentOf(single, 1)).isEqualTo(new Segment(1, 1));
 		assertThat(PlanDraftMapper.segmentOf(single, 1).isContinuation()).isFalse();
 		assertThatThrownBy(() -> PlanDraftMapper.segmentOf(single, 0)).isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void 번들의_배정_서비스는_작품이_제공되는_구성_서비스_중_ID가_가장_작은_것이다() {
+		// given: 번들(서비스 5·7·9)
+		ProductPriceInfo bundleInfo = new ProductPriceInfo(50L, "번들", List.of(5L, 7L, 9L), 16_000, PriceSource.ADMIN, PriceSource.ADMIN);
+
+		// when
+		// then: 작품이 7·9에서만 제공되면 7, 5에서도 제공되면 5, 구성 밖(11)에서만 제공되면(교집합이 비면) 구성 중 가장 작은 5
+		assertThat(PlanDraftMapper.assignedServiceId(bundleInfo, Set.of(9L, 7L))).isEqualTo(7L);
+		assertThat(PlanDraftMapper.assignedServiceId(bundleInfo, Set.of(5L, 7L, 9L, 11L))).isEqualTo(5L);
+		assertThat(PlanDraftMapper.assignedServiceId(bundleInfo, Set.of(11L))).isEqualTo(5L);
+	}
+
+	@Test
+	void 단품의_배정_서비스는_자기_서비스다() {
+		ProductPriceInfo single = new ProductPriceInfo(1L, "단품", List.of(11L), 10_000, PriceSource.ADMIN, PriceSource.ADMIN);
+		assertThat(PlanDraftMapper.assignedServiceId(single, Set.of(11L, 12L))).isEqualTo(11L);
 	}
 
 	@Test

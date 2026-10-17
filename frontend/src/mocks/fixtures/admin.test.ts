@@ -6,6 +6,7 @@ import {
   buildMockAdminProviders,
   buildMockCollectChanges,
   buildMockCollectExecutions,
+  MOCK_EXTRA_PRODUCTS,
   MOCK_PRODUCTS,
 } from '@/mocks/fixtures/admin'
 
@@ -16,7 +17,10 @@ describe('관리자 목업 fixture', () => {
   it('OTT 구독상품의 지금 적용 중인 월 구독요금이 SCR-09 기본 요금(MOCK_PRODUCTS)과 같다', () => {
     for (const product of buildMockAdminProducts(TODAY)) {
       const current = product.prices.filter((p) => p.effectiveFrom <= TODAY).at(-1)
-      const expected = MOCK_PRODUCTS.find((m) => m.productId === product.productId)?.adminPrice
+      // 기본 7개 단품(MOCK_PRODUCTS)과 Task 076에서 덧붙인 저가형·번들(MOCK_EXTRA_PRODUCTS 108~112)을 함께 찾는다
+      const expected = [...MOCK_PRODUCTS, ...MOCK_EXTRA_PRODUCTS].find(
+        (m) => m.productId === product.productId,
+      )?.adminPrice
       expect(current?.monthlyPrice).toBe(expected)
     }
   })

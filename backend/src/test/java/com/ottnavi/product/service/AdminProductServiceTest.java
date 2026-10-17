@@ -18,6 +18,7 @@ import com.ottnavi.product.domain.repository.ProductPriceRepository;
 import com.ottnavi.product.domain.repository.SubscriptionProductRepository;
 import com.ottnavi.product.exception.ProductPriceConflictException;
 import com.ottnavi.product.service.model.AdminProductView;
+import com.ottnavi.provider.domain.entity.OttService;
 import com.ottnavi.provider.service.OttServiceQueryService;
 import java.time.Clock;
 import java.time.Instant;
@@ -44,7 +45,7 @@ class AdminProductServiceTest {
 			priceRepository, ottServiceQueryService, priceQueryService, CLOCK);
 
 	private SubscriptionProduct product() {
-		SubscriptionProduct product = SubscriptionProduct.create("넷플릭스 스탠다드", ProductType.SINGLE);
+		SubscriptionProduct product = SubscriptionProduct.create("넷플릭스 스탠다드", ProductType.SINGLE, false);
 		ReflectionTestUtils.setField(product, "id", 10L);
 		return product;
 	}
@@ -79,7 +80,7 @@ class AdminProductServiceTest {
 
 		// then
 		assertThat(prices.get(1).getLastVerifiedAt()).isEqualTo(Instant.parse("2026-10-16T03:00:00Z"));
-		assertThat(view.ottServiceId()).isEqualTo(1L);
+		assertThat(view.ottServiceIds()).containsExactly(1L);
 	}
 
 	@Test
@@ -123,7 +124,7 @@ class AdminProductServiceTest {
 
 		// when
 		// then
-		assertThatThrownBy(() -> service.updateProduct(404L, "새 이름", null))
+		assertThatThrownBy(() -> service.updateProduct(404L, "새 이름", null, null))
 				.isInstanceOf(ResourceNotFoundException.class);
 	}
 
@@ -132,7 +133,7 @@ class AdminProductServiceTest {
 		// given
 		// when
 		// then
-		assertThatThrownBy(() -> service.updateProduct(10L, null, null))
+		assertThatThrownBy(() -> service.updateProduct(10L, null, null, null))
 				.isInstanceOf(FieldValidationException.class);
 	}
 
@@ -141,31 +142,133 @@ class AdminProductServiceTest {
 		// given
 		// when
 		// then
-		assertThatThrownBy(() -> service.updateProduct(10L, "   ", null))
+		assertThatThrownBy(() -> service.updateProduct(10L, "   ", null, null))
 				.isInstanceOf(FieldValidationException.class)
 				.extracting("field").isEqualTo("name");
 	}
 
 	@Test
-	void 등록은_단품이_아니면_productType_필드_오류다() {
+	void 번들은_서비스가_1개면_ottServiceIds_필드_오류다() {
 		// given
+		List<Long> serviceIds = List.of(1L);
+
 		// when
 		// then
-		assertThatThrownBy(() -> service.createProduct("번들", ProductType.BUNDLE, 1L, 1000, LocalDate.of(2026, 10, 1)))
+		assertThatThrownBy(() -> service.createProduct("번들", ProductType.BUNDLE, serviceIds, false, 1000,
+				LocalDate.of(2026, 10, 1)))
+				.isInstanceOf(FieldValidationException.class)
+				.extracting("field").isEqualTo("ottServiceIds");
+	}
+
+	@Test
+	void 단품은_서비스가_2개면_ottServiceIds_필드_오류다() {
+		// given
+		List<Long> serviceIds = List.of(1L, 2L);
+
+		// when
+		// then
+		assertThatThrownBy(() -> service.createProduct("단품", ProductType.SINGLE, serviceIds, false, 1000,
+				LocalDate.of(2026, 10, 1)))
+				.isInstanceOf(FieldValidationException.class)
+				.extracting("field").isEqualTo("ottServiceIds");
+	}
+
+	@Test
+	void 번들_구성에_같은_서비스가_중복되면_ottServiceIds_필드_오류다() {
+		// given
+		List<Long> serviceIds = List.of(1L, 1L);
+
+		// when
+		// then
+		assertThatThrownBy(() -> service.createProduct("번들", ProductType.BUNDLE, serviceIds, false, 1000,
+				LocalDate.of(2026, 10, 1)))
+				.isInstanceOf(FieldValidationException.class)
+				.extracting("field").isEqualTo("ottServiceIds");
+	}
+
+	@Test
+	void 등록은_없는_서비스면_ottServiceIds_필드_오류다() {
+		// given
+		when(ottServiceQueryService.findById(99L)).thenReturn(Optional.empty());
+		List<Long> serviceIds = List.of(99L);
+
+		// when
+		// then
+		assertThatThrownBy(() -> service.createProduct("상품", ProductType.SINGLE, serviceIds, false, 1000,
+				LocalDate.of(2026, 10, 1)))
+				.isInstanceOf(FieldValidationException.class)
+				.extracting("field").isEqualTo("ottServiceIds");
+	}
+
+	@Test
+	void 판매_중_번들이_13개면_번들_등록은_productType_필드_오류다() {
+		// given
+		OttService first = ottService(1L);
+		OttService second = ottService(2L);
+		when(ottServiceQueryService.findById(1L)).thenReturn(Optional.of(first));
+		when(ottServiceQueryService.findById(2L)).thenReturn(Optional.of(second));
+		when(productRepository.countByProductTypeAndActiveTrue(ProductType.BUNDLE)).thenReturn(13L);
+		List<Long> serviceIds = List.of(1L, 2L);
+
+		// when
+		// then
+		assertThatThrownBy(() -> service.createProduct("번들", ProductType.BUNDLE, serviceIds, false, 1000,
+				LocalDate.of(2026, 10, 1)))
 				.isInstanceOf(FieldValidationException.class)
 				.extracting("field").isEqualTo("productType");
 	}
 
 	@Test
-	void 등록은_없는_서비스면_ottServiceId_필드_오류다() {
+	void 판매_중_번들이_13개일_때_판매_종료_번들의_재개는_isActive_필드_오류다() {
 		// given
-		when(ottServiceQueryService.findById(99L)).thenReturn(Optional.empty());
+		SubscriptionProduct bundle = SubscriptionProduct.create("번들", ProductType.BUNDLE, false);
+		ReflectionTestUtils.setField(bundle, "id", 20L);
+		bundle.deactivate();
+		when(productRepository.findById(20L)).thenReturn(Optional.of(bundle));
+		when(productRepository.countByProductTypeAndActiveTrue(ProductType.BUNDLE)).thenReturn(13L);
 
 		// when
 		// then
-		assertThatThrownBy(() -> service.createProduct("상품", ProductType.SINGLE, 99L, 1000, LocalDate.of(2026, 10, 1)))
+		assertThatThrownBy(() -> service.updateProduct(20L, null, true, null))
 				.isInstanceOf(FieldValidationException.class)
-				.extracting("field").isEqualTo("ottServiceId");
+				.extracting("field").isEqualTo("isActive");
+	}
+
+	@Test
+	void 번들_등록은_구성_서비스_목록과_저가형_분류를_저장한다() {
+		// given
+		OttService second = ottService(2L);
+		OttService first = ottService(1L);
+		when(ottServiceQueryService.findById(2L)).thenReturn(Optional.of(second));
+		when(ottServiceQueryService.findById(1L)).thenReturn(Optional.of(first));
+		when(productRepository.countByProductTypeAndActiveTrue(ProductType.BUNDLE)).thenReturn(12L);
+		when(productRepository.save(org.mockito.ArgumentMatchers.any(SubscriptionProduct.class)))
+				.thenAnswer(invocation -> {
+					SubscriptionProduct saved = invocation.getArgument(0);
+					ReflectionTestUtils.setField(saved, "id", 30L);
+					return saved;
+				});
+		when(priceRepository.save(org.mockito.ArgumentMatchers.any(ProductPrice.class)))
+				.thenAnswer(invocation -> {
+					ProductPrice saved = invocation.getArgument(0);
+					ReflectionTestUtils.setField(saved, "id", 300L);
+					return saved;
+				});
+
+		// when
+		AdminProductView view = service.createProduct("티빙+웨이브", ProductType.BUNDLE, List.of(2L, 1L), true, 16000,
+				LocalDate.of(2026, 10, 1));
+
+		// then
+		assertThat(view.productType()).isEqualTo(ProductType.BUNDLE);
+		assertThat(view.ottServiceIds()).containsExactly(1L, 2L);
+		assertThat(view.isLowCost()).isTrue();
+	}
+
+	private OttService ottService(long id) {
+		OttService ottService = mock(OttService.class);
+		when(ottService.getId()).thenReturn(id);
+		return ottService;
 	}
 
 }

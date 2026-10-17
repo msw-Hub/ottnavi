@@ -35,11 +35,15 @@ public class SubscriptionProduct extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean active; // false면 판매 종료. API에서는 isActive
 
+    @Column(nullable = false)
+    private boolean lowCost; // 저가형(광고형·베이직 등) 요금 분류. false면 표준. 가격 선택에만 쓴다. API에서는 isLowCost
+
     /** 판매 중인 상품을 만든다 */
-    public static SubscriptionProduct create(String name, ProductType productType) {
+    public static SubscriptionProduct create(String name, ProductType productType, boolean lowCost) {
         SubscriptionProduct product = new SubscriptionProduct();
         product.name = name;
         product.productType = productType;
+        product.lowCost = lowCost;
         product.active = true; // DB 기본값과 같다. Hibernate는 DB 기본값을 쓰지 않으므로 직접 채운다
         return product;
     }
@@ -57,5 +61,10 @@ public class SubscriptionProduct extends BaseTimeEntity {
     /** 이름을 바꾼다. 공백 제거와 길이 검증은 호출하는 서비스가 한다 */
     public void rename(String name) {
         this.name = name;
+    }
+
+    /** 저가형 분류를 바꾼다 */
+    public void changeLowCost(boolean lowCost) {
+        this.lowCost = lowCost;
     }
 }

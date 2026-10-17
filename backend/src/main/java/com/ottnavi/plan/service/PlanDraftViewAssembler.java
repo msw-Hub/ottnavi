@@ -62,7 +62,7 @@ public final class PlanDraftViewAssembler {
 			for (MonthProduct product : monthDraft.products()) {
 				ProductPriceInfo info = bundle.productPrices().get(product.productId());
 				products.add(new PlanDraftView.Product(product.productId(), info.productName(),
-						List.of(info.ottServiceId()), product.appliedPrice(), product.priceSource()));
+						info.ottServiceIds(), product.appliedPrice(), product.priceSource()));
 			}
 			List<PlanDraftView.Assignment> assignments = new ArrayList<>();
 			for (WatchUnit input : bundle.planInput().units()) {
@@ -122,8 +122,9 @@ public final class PlanDraftViewAssembler {
 			throw new IllegalStateException("배정 상품의 가격 정보가 없다: productId=" + slot.productId());
 		}
 		Segment segment = PlanDraftMapper.segmentOf(unit, slot.monthIndex());
+		long assignedServiceId = PlanDraftMapper.assignedServiceId(info, PlanDraftMapper.availableServiceIds(summary));
 		return new PlanDraftView.Assignment(draft.planItemIdByUnit().get(input.id()), summary.mediaType(),
-				summary.tmdbId(), summary.title(), summary.seasonNumber(), input.priority(), info.ottServiceId(),
+				summary.tmdbId(), summary.title(), summary.seasonNumber(), input.priority(), assignedServiceId,
 				slot.minutes(), segment.index(), segment.count(), segment.isContinuation());
 	}
 

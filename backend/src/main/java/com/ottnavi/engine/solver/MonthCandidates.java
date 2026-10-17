@@ -29,7 +29,7 @@ final class MonthCandidates {
 	}
 
 	/**
-	 * 달별 예산 이하 부분집합 목록을 만든다(S1 예산, S2 빈 달 허용, S6 후보 상품 제외, S9 한도).
+	 * 달별 예산 이하 부분집합 목록을 만든다(S1 예산, S1b 서비스 겹침 금지, S2 빈 달 허용, S6 후보 상품 제외, S9 한도).
 	 * 결과는 길이 3이고 각 달 목록의 첫 번째는 항상 빈 집합이다. 후보 상품이 MAX_PRODUCT_COUNT를 넘는 달이 있으면 IllegalArgumentException.
 	 */
 	static List<List<Set<Long>>> budgetSubsets(PlanInput input) {
@@ -42,11 +42,18 @@ final class MonthCandidates {
 		// 2. 상품을 ID 오름차순으로 놓는다(결과 순서가 항상 같아진다)
 		List<OttProduct> sortedProducts = new ArrayList<>(input.products());
 		sortedProducts.sort(Comparator.comparingLong(OttProduct::id));
+		// S6 확장: 이번 달(0번째 달) 구독 중인 서비스 ID. 이 서비스와 구성이 겹치는 번들은 0번째 달 후보에서 뺀다
+		Set<Long> subscribedServiceIds = new HashSet<>();
+		for (OttProduct product : input.products()) {
+			if (product.condition() == OttProductCondition.SUBSCRIBED) {
+				subscribedServiceIds.addAll(product.ottServiceIds());
+			}
+		}
 
 		// 3. 0번째 달과 1·2번째 달의 예산 이하 부분집합을 각각 만든다
-		List<Set<Long>> month0 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, input.monthlyBudget(), 0), input.monthlyBudget());
+		List<Set<Long>> month0 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, subscribedServiceIds, input.monthlyBudget(), 0), input.monthlyBudget());
 		// 1·2번째 달은 후보 상품 규칙이 같아(SUBSCRIBED 제외는 0번째 달만) 같은 목록을 함께 쓴다(불변 목록이라 공유해도 안전)
-		List<Set<Long>> month1 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, input.monthlyBudget(), 1), input.monthlyBudget());
+		List<Set<Long>> month1 = subsetsOf(candidateProducts(sortedProducts, watchableProductIds, subscribedServiceIds, input.monthlyBudget(), 1), input.monthlyBudget());
 		return List.of(month0, month1, month1);
 	}
 
@@ -124,14 +131,20 @@ final class MonthCandidates {
 	 * month번째 달의 후보 상품(ID 오름차순)을 고른다(S6).
 	 * 제외: FREE(선택 없이도 항상 볼 수 있음), 0번째 달의 SUBSCRIBED(선택 없이도 0원으로 볼 수 있음),
 	 * 어떤 시청 단위도 볼 수 없는 상품, 혼자서도 예산을 넘는 상품.
+	 * S6 확장(PRD 11절 33번): 0번째 달에는 이미 구독 중인 서비스와 구성이 겹치는 번들도 뺀다(같은 서비스를 두 번 결제하게 되므로).
+	 * 무료 이용(FREE) 서비스는 제외 근거로 쓰지 않는다.
 	 */
-	private static List<OttProduct> candidateProducts(List<OttProduct> sortedProducts, Set<Long> watchableProductIds, int monthlyBudget, int month) {
+	private static List<OttProduct> candidateProducts(List<OttProduct> sortedProducts, Set<Long> watchableProductIds,
+			Set<Long> subscribedServiceIds, int monthlyBudget, int month) {
 		List<OttProduct> candidates = new ArrayList<>();
 		for (OttProduct product : sortedProducts) {
 			if (product.condition() == OttProductCondition.FREE) {
 				continue;
 			}
 			if (month == 0 && product.condition() == OttProductCondition.SUBSCRIBED) {
+				continue;
+			}
+			if (month == 0 && product.isBundle() && overlaps(product.ottServiceIds(), subscribedServiceIds)) {
 				continue;
 			}
 			if (!watchableProductIds.contains(product.id())) {
@@ -150,8 +163,19 @@ final class MonthCandidates {
 		return candidates;
 	}
 
+	/** 서비스 ID 목록 중 하나라도 기준 집합에 있으면 true. */
+	private static boolean overlaps(List<Long> serviceIds, Set<Long> reference) {
+		for (Long serviceId : serviceIds) {
+			if (reference.contains(serviceId)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/**
-	 * 후보 상품의 부분집합 중 비용 합이 예산 이하인 것을 비트마스크 오름차순으로 만든다(S1·S2).
+	 * 후보 상품의 부분집합 중 비용 합이 예산 이하인 것을 비트마스크 오름차순으로 만든다(S1·S1b·S2).
+	 * S1b(PRD 11절 33번): 구성 서비스가 겹치는 상품 쌍이 함께 든 모양은 버린다(예: 티빙+웨이브 번들과 티빙 단품).
 	 * 마스크 0(빈 집합)은 비용이 0이라 항상 첫 번째로 들어간다.
 	 * 집합은 여기서 한 번만 만들고 Solver가 수백만 번 재사용한다(조합마다 새로 만들지 않기 위함).
 	 * 정렬된 불변 집합(SortedIdSet)으로 만들어, Selection이 조합마다 달별 집합을 다시 정렬 복사하지 않게 한다(Task 040 이월 최적화 ②).
@@ -163,10 +187,23 @@ final class MonthCandidates {
 		for (int bit = 0; bit < productCount; bit++) {
 			boxedIds[bit] = candidates.get(bit).id();
 		}
-		// 2. 켜고 끄는 모양(비트마스크)을 전부 훑는다
+		// 2. 상품마다 서비스가 겹치는 다른 상품의 비트를 미리 모아 둔다(S1b)
+		int[] conflictMasks = new int[productCount];
+		for (int bit = 0; bit < productCount; bit++) {
+			for (int other = 0; other < productCount; other++) {
+				if (other != bit && overlaps(candidates.get(bit).ottServiceIds(), Set.copyOf(candidates.get(other).ottServiceIds()))) {
+					conflictMasks[bit] |= 1 << other;
+				}
+			}
+		}
+		// 3. 켜고 끄는 모양(비트마스크)을 전부 훑는다
 		List<Set<Long>> subsets = new ArrayList<>();
 		for (int mask = 0; mask < (1 << productCount); mask++) {
-			// 3. 이 모양의 비용 합과 상품 ID 목록을 만든다
+			// 4. S1b: 서비스가 겹치는 상품이 함께 켜진 모양은 버린다
+			if (hasConflict(mask, conflictMasks)) {
+				continue;
+			}
+			// 5. 이 모양의 비용 합과 상품 ID 목록을 만든다
 			int cost = 0;
 			List<Long> ids = new ArrayList<>(Integer.bitCount(mask));
 			for (int bit = 0; bit < productCount; bit++) {
@@ -175,13 +212,23 @@ final class MonthCandidates {
 					ids.add(boxedIds[bit]);
 				}
 			}
-			// 4. 예산 이하인 모양만 후보로 담는다
+			// 6. 예산 이하인 모양만 후보로 담는다
 			// S1: 달별 예산은 달마다 따로 적용한다(3개월 합산 한도 없음)
 			if (cost <= monthlyBudget) {
 				subsets.add(SortedIdSet.of(ids));
 			}
 		}
 		return List.copyOf(subsets);
+	}
+
+	/** mask에 켜진 상품 중 서로 서비스가 겹치는 쌍이 있으면 true. */
+	private static boolean hasConflict(int mask, int[] conflictMasks) {
+		for (int bit = 0; bit < conflictMasks.length; bit++) {
+			if ((mask & (1 << bit)) != 0 && (mask & conflictMasks[bit]) != 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

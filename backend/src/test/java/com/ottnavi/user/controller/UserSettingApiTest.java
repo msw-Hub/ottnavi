@@ -81,7 +81,8 @@ class UserSettingApiTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.data.subscriptions").isEmpty())
 				.andExpect(jsonPath("$.data.monthlyBudget").doesNotExist())
 				.andExpect(jsonPath("$.data.monthlyWatchMinutes").doesNotExist())
-				.andExpect(jsonPath("$.data.watchPreset").doesNotExist());
+				.andExpect(jsonPath("$.data.watchPreset").doesNotExist())
+				.andExpect(jsonPath("$.data.isLowestPriceMode").value(false));
 	}
 
 	@Test
@@ -125,7 +126,7 @@ class UserSettingApiTest extends IntegrationTestSupport {
 		// when: 이번에는 다른 서비스만 FREE로 보낸다
 		String body = """
 				{"subscriptions":[{"ottServiceId":%d,"status":"FREE","planName":null,"billingDay":null}],
-				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"CUSTOM"}
+				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"CUSTOM","isLowestPriceMode":true}
 				""".formatted(ids.get(1));
 		mockMvc.perform(put(PATH).header(HttpHeaders.AUTHORIZATION, bearer)
 						.contentType(MediaType.APPLICATION_JSON).content(body))
@@ -135,6 +136,7 @@ class UserSettingApiTest extends IntegrationTestSupport {
 		mockMvc.perform(get(PATH).header(HttpHeaders.AUTHORIZATION, bearer))
 				.andExpect(jsonPath("$.data.monthlyBudget").value(0))
 				.andExpect(jsonPath("$.data.watchPreset").value("CUSTOM"))
+				.andExpect(jsonPath("$.data.isLowestPriceMode").value(true))
 				.andExpect(jsonPath("$.data.subscriptions[0].status").value("NOT_SUBSCRIBED"))
 				.andExpect(jsonPath("$.data.subscriptions[1].status").value("FREE"));
 	}
@@ -185,7 +187,7 @@ class UserSettingApiTest extends IntegrationTestSupport {
 				{"subscriptions":[
 				  {"ottServiceId":%d,"status":"FREE","planName":null,"billingDay":null},
 				  {"ottServiceId":%d,"status":"UNKNOWN","planName":null,"billingDay":null}],
-				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"LIGHT"}
+				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"LIGHT","isLowestPriceMode":false}
 				""".formatted(id, id);
 
 		// when & then
@@ -202,7 +204,7 @@ class UserSettingApiTest extends IntegrationTestSupport {
 		// given
 		String body = """
 				{"subscriptions":[{"ottServiceId":%d,"status":"SUBSCRIBED","planName":null,"billingDay":15}],
-				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"LIGHT"}
+				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"LIGHT","isLowestPriceMode":false}
 				""".formatted(serviceIds().get(0));
 
 		// when & then
@@ -230,7 +232,7 @@ class UserSettingApiTest extends IntegrationTestSupport {
 				for (int t = 0; t < 2; t++) {
 					futures.add(pool.submit(() -> {
 						start.await();
-						return userSettingService.updateSettings(user.getId(), 10000, 600, WatchPreset.NORMAL, states);
+						return userSettingService.updateSettings(user.getId(), 10000, 600, WatchPreset.NORMAL, false, states);
 					}));
 				}
 
@@ -267,7 +269,8 @@ class UserSettingApiTest extends IntegrationTestSupport {
 				  ],
 				  "monthlyBudget": 20000,
 				  "monthlyWatchMinutes": 900,
-				  "watchPreset": "NORMAL"
+				  "watchPreset": "NORMAL",
+				  "isLowestPriceMode": false
 				}
 				""".formatted(ottServiceId);
 	}

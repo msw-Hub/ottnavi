@@ -62,7 +62,7 @@ class AdminProductApiTest extends IntegrationTestSupport {
 	}
 
 	private String createBody(String name, String productType, long serviceId, long monthlyPrice, LocalDate from) {
-		return "{\"name\":\"" + name + "\",\"productType\":\"" + productType + "\",\"ottServiceId\":" + serviceId
+		return "{\"name\":\"" + name + "\",\"productType\":\"" + productType + "\",\"ottServiceIds\":[" + serviceId + "],\"isLowCost\":false"
 				+ ",\"monthlyPrice\":" + monthlyPrice + ",\"effectiveFrom\":\"" + from + "\"}";
 	}
 
@@ -284,6 +284,39 @@ class AdminProductApiTest extends IntegrationTestSupport {
 						.contentType(MediaType.APPLICATION_JSON).content("{\"isActive\":true}"))
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+	}
+
+	@Test
+	void 번들을_등록하고_저가형_분류를_바꾸며_서비스가_1개인_번들은_거절한다() throws Exception {
+		// given
+		java.util.List<Long> serviceIds = jdbcTemplate.queryForList(
+				"SELECT id FROM ott_service ORDER BY id LIMIT 2", Long.class);
+		String bundleBody = "{\"name\":\"" + NAME_PREFIX + "번들\",\"productType\":\"BUNDLE\",\"ottServiceIds\":["
+				+ serviceIds.get(1) + "," + serviceIds.get(0) + "],\"isLowCost\":true,\"monthlyPrice\":16000,"
+				+ "\"effectiveFrom\":\"" + TODAY + "\"}";
+		String oneServiceBody = "{\"name\":\"" + NAME_PREFIX + "번들1\",\"productType\":\"BUNDLE\",\"ottServiceIds\":["
+				+ serviceIds.get(0) + "],\"isLowCost\":false,\"monthlyPrice\":16000,\"effectiveFrom\":\"" + TODAY + "\"}";
+
+		// when
+		String created = mockMvc.perform(post(URL).header(HttpHeaders.AUTHORIZATION, adminBearer())
+						.contentType(MediaType.APPLICATION_JSON).content(bundleBody))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.data.productType").value("BUNDLE"))
+				.andExpect(jsonPath("$.data.ottServiceIds[0]").value(serviceIds.get(0)))
+				.andExpect(jsonPath("$.data.ottServiceIds[1]").value(serviceIds.get(1)))
+				.andExpect(jsonPath("$.data.isLowCost").value(true))
+				.andReturn().getResponse().getContentAsString();
+		long productId = JsonPath.parse(created).read("$.data.productId", Long.class);
+
+		// then
+		mockMvc.perform(patch(URL + "/" + productId).header(HttpHeaders.AUTHORIZATION, adminBearer())
+						.contentType(MediaType.APPLICATION_JSON).content("{\"isLowCost\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.isLowCost").value(false));
+		mockMvc.perform(post(URL).header(HttpHeaders.AUTHORIZATION, adminBearer())
+						.contentType(MediaType.APPLICATION_JSON).content(oneServiceBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
 	}
 
 	@Test

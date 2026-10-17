@@ -21,16 +21,19 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 관리자의 OTT 구독상품·월 구독요금 관리(Task 059, 단품만).
+ * 관리자의 OTT 구독상품·월 구독요금 관리(Task 059 단품, Task 076 번들·저가형 분류).
  * 요금 이력의 허용·거부 규칙은 {@link ProductPriceRules}가 판단하고, 이 서비스는 조회·저장·트랜잭션을 맡는다.
  * 날짜는 모두 한국(KST) 기준이며 시계는 {@link Clock}으로 주입한다.
  */
@@ -40,6 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminProductService {
 
 	private static final int NAME_MAX_LENGTH = 100; // subscription_product.name 길이
+	private static final int BUNDLE_MIN_SERVICES = 2; // 번들 구성 서비스 최소 개수
+	private static final long MAX_ACTIVE_BUNDLES = 13; // 판매 중 번들 상한(후보 조합 수가 커지는 것을 막는다, 사용자 결정)
 
 	private final SubscriptionProductRepository subscriptionProductRepository;
 	private final ProductComponentRepository productComponentRepository;
@@ -62,10 +67,7 @@ public class AdminProductService {
 		}
 
 		// 2. 구성(서비스 ID)과 요금 이력을 상품 ID별로 묶는다(상품마다 조회하지 않고 한 번씩만 읽는다)
-		Map<Long, Long> ottServiceIdByProduct = new HashMap<>();
-		for (ProductComponent component : productComponentRepository.findByProductIds(productIds)) {
-			ottServiceIdByProduct.put(component.getId().getProductId(), component.getId().getOttServiceId());
-		}
+		Map<Long, List<Long>> ottServiceIdsByProduct = groupServiceIds(productComponentRepository.findByProductIds(productIds));
 		Map<Long, List<ProductPrice>> pricesByProduct = new HashMap<>();
 		for (ProductPrice price : productPriceRepository.findByProductIdsOrderByEffectiveFromAsc(productIds)) {
 			Long productId = price.getProduct().getId();
@@ -79,65 +81,88 @@ public class AdminProductService {
 
 		// 3. 상품마다 응답용 값 묶음을 만든다
 		for (SubscriptionProduct product : products) {
-			Long ottServiceId = ottServiceIdByProduct.get(product.getId());
+			List<Long> ottServiceIds = ottServiceIdsByProduct.get(product.getId());
 			List<ProductPrice> prices = pricesByProduct.get(product.getId());
 			if (prices == null) {
 				prices = new ArrayList<>();
 			}
-			views.add(toView(product, ottServiceId, prices));
+			views.add(toView(product, ottServiceIds, prices));
 		}
 		return views;
 	}
 
 	/**
-	 * 단품 상품을 첫 월 구독요금과 함께 등록한다. 상품·구성(STANDARD)·첫 요금 이력을 한 트랜잭션으로 만든다.
-	 * 첫 요금 이력의 마지막 확인 일시는 현재 시각이고, 시작일은 오늘 이하여야 한다.
+	 * 단품 또는 번들 상품을 첫 월 구독요금과 함께 등록한다. 상품·구성(STANDARD)·첫 요금 이력을 한 트랜잭션으로 만든다.
+	 * 단품은 서비스 1개, 번들은 서로 다른 서비스 2개 이상이며 판매 중 번들은 최대 13개다.
+	 * 번들 구성은 등록할 때만 정한다(편집 API 없음). 첫 요금 이력의 마지막 확인 일시는 현재 시각이고, 시작일은 오늘 이하여야 한다.
 	 */
 	@Transactional
-	public AdminProductView createProduct(
-			String name, ProductType productType, long ottServiceId, int monthlyPrice, LocalDate effectiveFrom) {
-		// 1. 단품만 받는다(번들은 2단계)
-		if (productType != ProductType.SINGLE) {
-			throw new FieldValidationException("productType", "단품(SINGLE)만 등록할 수 있습니다.");
-		}
+	public AdminProductView createProduct(String name, ProductType productType, List<Long> ottServiceIds,
+			boolean isLowCost, int monthlyPrice, LocalDate effectiveFrom) {
+		// 1. 서비스 목록이 종류에 맞는지 확인한다(단품 1개, 번들 서로 다른 2개 이상)
+		validateServiceIds(productType, ottServiceIds);
 
 		// 2. 이름과 서비스를 확인한다
 		String trimmedName = normalizeName(name);
-		Optional<OttService> found = ottServiceQueryService.findById(ottServiceId);
-		if (found.isEmpty()) {
-			throw new FieldValidationException("ottServiceId", "존재하지 않는 서비스입니다.");
+		List<OttService> services = new ArrayList<>();
+		for (Long ottServiceId : ottServiceIds) {
+			Optional<OttService> found = ottServiceQueryService.findById(ottServiceId);
+			if (found.isEmpty()) {
+				throw new FieldValidationException("ottServiceIds", "존재하지 않는 서비스입니다: " + ottServiceId);
+			}
+			services.add(found.get());
 		}
 
-		// 3. 첫 요금 이력의 시작일이 오늘 이하인지 저장 전에 확인한다
+		// 3. 번들이면 판매 중 번들이 상한(13개)을 넘지 않는지 확인한다
+		if (productType == ProductType.BUNDLE) {
+			validateBundleCapacity("productType");
+		}
+
+		// 4. 첫 요금 이력의 시작일이 오늘 이하인지 저장 전에 확인한다
 		LocalDate today = LocalDate.now(clock);
 		ProductPriceRules.validateStartDate(null, effectiveFrom, today);
 
-		// 4. 상품 → 구성 → 첫 요금 이력 순으로 저장한다(구성은 상품 ID가 필요하다)
+		// 5. 상품 → 구성 → 첫 요금 이력 순으로 저장한다(구성은 상품 ID가 필요하다)
 		SubscriptionProduct product = subscriptionProductRepository.save(
-				SubscriptionProduct.create(trimmedName, productType));
-		productComponentRepository.save(ProductComponent.create(product, found.get(), ProviderTier.STANDARD));
+				SubscriptionProduct.create(trimmedName, productType, isLowCost));
+		List<Long> savedServiceIds = new ArrayList<>();
+		for (OttService service : services) {
+			productComponentRepository.save(ProductComponent.create(product, service, ProviderTier.STANDARD));
+			savedServiceIds.add(service.getId());
+		}
+		Collections.sort(savedServiceIds);
 		ProductPrice firstPrice = productPriceRepository.save(
 				ProductPrice.create(product, monthlyPrice, effectiveFrom, Instant.now(clock)));
 
 		List<ProductPrice> prices = new ArrayList<>();
 		prices.add(firstPrice);
-		return toView(product, ottServiceId, prices);
+		return toView(product, savedServiceIds, prices);
 	}
 
-	/** 상품의 이름·판매 여부를 바꾼다. 보낸 값(null이 아닌 값)만 바꾸며 둘 다 없으면 오류다 */
+	/**
+	 * 상품의 이름·판매 여부·저가형 분류를 바꾼다. 보낸 값(null이 아닌 값)만 바꾸며 모두 없으면 오류다.
+	 * 번들의 판매를 다시 시작할 때도 판매 중 번들은 최대 13개다.
+	 */
 	@Transactional
-	public AdminProductView updateProduct(long productId, String name, Boolean isActive) {
+	public AdminProductView updateProduct(long productId, String name, Boolean isActive, Boolean isLowCost) {
 		// 1. 바꿀 값이 하나는 있어야 한다
-		if (name == null && isActive == null) {
-			throw new FieldValidationException("request", "name 또는 isActive 중 하나는 보내야 합니다.");
+		if (name == null && isActive == null && isLowCost == null) {
+			throw new FieldValidationException("request", "name, isActive, isLowCost 중 하나는 보내야 합니다.");
 		}
 		String trimmedName = null;
 		if (name != null) {
 			trimmedName = normalizeName(name);
 		}
 
-		// 2. 상품을 찾아 바꾼다(영속 상태라 더티 체킹으로 커밋 때 UPDATE 된다)
+		// 2. 상품을 찾는다
 		SubscriptionProduct product = findProduct(productId);
+
+		// 3. 판매 중이 아닌 번들을 다시 팔려면 번들 상한(13개)을 넘지 않는지 확인한다
+		if (isActive != null && isActive && !product.isActive() && product.getProductType() == ProductType.BUNDLE) {
+			validateBundleCapacity("isActive");
+		}
+
+		// 4. 값을 바꾼다(영속 상태라 더티 체킹으로 커밋 때 UPDATE 된다)
 		if (trimmedName != null) {
 			product.rename(trimmedName);
 		}
@@ -147,6 +172,9 @@ public class AdminProductService {
 			} else {
 				product.deactivate();
 			}
+		}
+		if (isLowCost != null) {
+			product.changeLowCost(isLowCost);
 		}
 		return loadView(product);
 	}
@@ -255,17 +283,57 @@ public class AdminProductService {
 	private AdminProductView loadView(SubscriptionProduct product) {
 		List<Long> productIds = new ArrayList<>();
 		productIds.add(product.getId());
-		Long ottServiceId = null;
-		for (ProductComponent component : productComponentRepository.findByProductIds(productIds)) {
-			ottServiceId = component.getId().getOttServiceId();
-		}
+		Map<Long, List<Long>> ottServiceIdsByProduct = groupServiceIds(productComponentRepository.findByProductIds(productIds));
 		List<ProductPrice> prices = productPriceRepository.findByProductIdOrderByEffectiveFromAsc(product.getId());
-		return toView(product, ottServiceId, prices);
+		return toView(product, ottServiceIdsByProduct.get(product.getId()), prices);
 	}
 
-	private AdminProductView toView(SubscriptionProduct product, Long ottServiceId, List<ProductPrice> prices) {
-		if (ottServiceId == null) {
-			// 단품은 구성이 반드시 1행이다. 없으면 데이터가 깨진 것이라 조용히 넘기지 않는다
+	/** 구성 행을 상품 ID별 서비스 ID 목록(오름차순)으로 묶는다 */
+	private Map<Long, List<Long>> groupServiceIds(List<ProductComponent> components) {
+		Map<Long, List<Long>> result = new HashMap<>();
+		for (ProductComponent component : components) {
+			Long productId = component.getId().getProductId();
+			List<Long> group = result.get(productId);
+			if (group == null) {
+				group = new ArrayList<>();
+				result.put(productId, group);
+			}
+			group.add(component.getId().getOttServiceId());
+		}
+		for (List<Long> group : result.values()) {
+			Collections.sort(group);
+		}
+		return result;
+	}
+
+	/**
+	 * 서비스 목록이 상품 종류에 맞는지 확인한다. 단품은 정확히 1개, 번들은 서로 다른 서비스 2개 이상이다.
+	 * 단품에 서비스를 여러 개 보내면 거절한다(번들로 등록해야 한다).
+	 */
+	private void validateServiceIds(ProductType productType, List<Long> ottServiceIds) {
+		Set<Long> distinct = new HashSet<>(ottServiceIds);
+		if (distinct.size() != ottServiceIds.size()) {
+			throw new FieldValidationException("ottServiceIds", "같은 서비스를 중복해서 보낼 수 없습니다.");
+		}
+		if (productType == ProductType.SINGLE && ottServiceIds.size() != 1) {
+			throw new FieldValidationException("ottServiceIds", "단품은 서비스를 정확히 1개 보내야 합니다.");
+		}
+		if (productType == ProductType.BUNDLE && ottServiceIds.size() < BUNDLE_MIN_SERVICES) {
+			throw new FieldValidationException("ottServiceIds", "번들은 서로 다른 서비스를 2개 이상 보내야 합니다.");
+		}
+	}
+
+	/** 판매 중 번들이 상한(13개)에 이미 닿았으면 새로 등록하거나 판매를 재개할 수 없다(VALIDATION_FAILED) */
+	private void validateBundleCapacity(String field) {
+		long activeBundles = subscriptionProductRepository.countByProductTypeAndActiveTrue(ProductType.BUNDLE);
+		if (activeBundles >= MAX_ACTIVE_BUNDLES) {
+			throw new FieldValidationException(field, "판매 중인 번들은 최대 " + MAX_ACTIVE_BUNDLES + "개입니다.");
+		}
+	}
+
+	private AdminProductView toView(SubscriptionProduct product, List<Long> ottServiceIds, List<ProductPrice> prices) {
+		if (ottServiceIds == null || ottServiceIds.isEmpty()) {
+			// 상품은 구성이 반드시 1행 이상이다. 없으면 데이터가 깨진 것이라 조용히 넘기지 않는다
 			throw new IllegalStateException("상품에 구성 서비스가 없다: productId=" + product.getId());
 		}
 		List<ProductPriceView> priceViews = new ArrayList<>();
@@ -273,6 +341,6 @@ public class AdminProductService {
 			priceViews.add(ProductPriceView.from(price));
 		}
 		return new AdminProductView(product.getId(), product.getName(), product.getProductType(),
-				ottServiceId, product.isActive(), priceViews);
+				ottServiceIds, product.isLowCost(), product.isActive(), priceViews);
 	}
 }

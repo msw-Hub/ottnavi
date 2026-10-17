@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -19,6 +19,7 @@ import type {
 
 import type {
   CommonResponseCurrentPlan,
+  CommonResponsePlanChangeHistoryList,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan
 } from '../model';
@@ -31,6 +32,8 @@ export const getListPlanDraftsResponseMock = (): CommonResponsePlanDraftList => 
 export const getGetCurrentPlanResponseMock = (): CommonResponseCurrentPlan => ({"success":true,"data":{"plan":null}})
 
 export const getCreatePlanResponseMock = (): CommonResponseSavedPlan => ({"success":true,"data":{"planId":301,"planType":"RECOMMENDED","status":"ACTIVE","activatedAt":"2026-10-12T21:05:00+09:00"}})
+
+export const getListPlanChangesResponseMock = (): CommonResponsePlanChangeHistoryList => ({"success":true,"data":{"items":[{"changeId":312,"changedAt":"2026-11-01T03:50:00+09:00","planType":"RECOMMENDED","summary":"11월 구독이 넷플릭스에서 디즈니+로 바뀌었어요","reasons":[{"reasonType":"TITLE_LEFT_SERVICE","description":"'카지노 시즌 1'이 넷플릭스에서 빠진 것으로 확인됐어요"}],"monthChanges":[{"month":"2026-11","isConfirmed":true,"previousProducts":[{"productId":1,"ottServiceIds":[1],"productName":"넷플릭스 스탠다드"}],"currentProducts":[{"productId":6,"ottServiceIds":[5],"productName":"디즈니+ 스탠다드"}],"previousCost":13500,"currentCost":9900},{"month":"2027-01","isConfirmed":false,"previousProducts":[],"currentProducts":[],"previousCost":null,"currentCost":0}],"titleChanges":[{"changeType":"CHANGED_SERVICE","title":"카지노","seasonNumber":1,"previous":{"month":"2026-11","ottServiceId":1},"current":{"month":"2026-11","ottServiceId":5}}],"dataAsOf":"2026-11-01"}]}})
 
 
 export const getCreatePlanDraftsMockHandler = (overrideResponse?: CommonResponsePlanDraftList | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanDraftList> | CommonResponsePlanDraftList), options?: RequestHandlerOptions) => {
@@ -80,9 +83,22 @@ export const getCreatePlanMockHandler = (overrideResponse?: CommonResponseSavedP
       })
   }, options)
 }
+
+export const getListPlanChangesMockHandler = (overrideResponse?: CommonResponsePlanChangeHistoryList | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponsePlanChangeHistoryList> | CommonResponsePlanChangeHistoryList), options?: RequestHandlerOptions) => {
+  return http.get('/api/me/plan-changes', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListPlanChangesResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getPlanMock = () => [
   getCreatePlanDraftsMockHandler(),
   getListPlanDraftsMockHandler(),
   getGetCurrentPlanMockHandler(),
-  getCreatePlanMockHandler()
+  getCreatePlanMockHandler(),
+  getListPlanChangesMockHandler()
 ]

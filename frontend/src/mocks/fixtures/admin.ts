@@ -56,6 +56,60 @@ export const MOCK_PRODUCTS: MockProduct[] = [
   { ottServiceId: 7, productId: 107, productName: '쿠팡플레이', adminPrice: 7890 },
 ]
 
+/*
+ * 저가형 단품·번들 목업 상품(Task 076). 위 MOCK_PRODUCTS(서비스마다 표준 단품 1개)는 플랜 계산 목업이 서비스 ID로 찾아 쓰므로 그대로 두고,
+ * 요금 화면(SCR-09)과 관리자 상품 화면(SCR-14)에만 이 상품들을 덧붙인다. 플랜 계산 목업은 번들·저가형을 계산하지 않는다(1차안 한계).
+ * 구성은 docs/guides/BUNDLE_PRICE_MODE_FLOW.md의 예시(넷플릭스 광고형 7,000원, 티빙+웨이브 번들 16,000원)를 따랐고, 나머지는 화면 확인용 예시다.
+ */
+export interface MockExtraProduct {
+  productId: number // 상품 ID(단품 108~110, 번들 111~112. 새로 등록한 상품은 201부터라 겹치지 않는다)
+  productName: string // 상품(요금제) 이름
+  ottServiceIds: number[] // 포함 서비스 ID(오름차순). 단품 1개, 번들 2개 이상
+  isLowCost: boolean // 저가형(광고형·베이직 등)인지
+  adminPrice: number // 관리자 기본 월 요금(원)
+}
+
+export const MOCK_EXTRA_PRODUCTS: MockExtraProduct[] = [
+  // 저가형 단품: 모드를 켜면 넷플릭스·티빙은 이 상품이 계산에 쓰인다
+  {
+    productId: 108,
+    productName: '넷플릭스 광고형 스탠다드',
+    ottServiceIds: [1],
+    isLowCost: true,
+    adminPrice: 7000,
+  },
+  {
+    productId: 109,
+    productName: '티빙 광고형 스탠다드',
+    ottServiceIds: [4],
+    isLowCost: true,
+    adminPrice: 5500,
+  },
+  // 표준이지만 더 비싼 단품: 모드와 관계없이 계산에 쓰지 않는다
+  {
+    productId: 110,
+    productName: '디즈니+ 프리미엄',
+    ottServiceIds: [2],
+    isLowCost: false,
+    adminPrice: 13900,
+  },
+  // 번들: 표준 번들은 항상, 저가형 번들은 모드를 켰을 때만 계산에 쓴다
+  {
+    productId: 111,
+    productName: '티빙·웨이브 더블 이용권',
+    ottServiceIds: [4, 5],
+    isLowCost: false,
+    adminPrice: 16000,
+  },
+  {
+    productId: 112,
+    productName: '디즈니+·티빙 광고형 번들',
+    ottServiceIds: [2, 4],
+    isLowCost: true,
+    adminPrice: 11900,
+  },
+]
+
 // 판매 종료로 둔 목업 상품(왓챠 베이직). 관리자 화면의 종료 상품 표시 확인용이고, 회원 요금 목록에는 나오지 않는다
 const SUSPENDED_PRODUCT_IDS = [106]
 
@@ -102,7 +156,7 @@ function priceRow(
  * 지금 적용 중인 줄의 금액은 위 MOCK_PRODUCTS(SCR-09)의 기본 월 요금과 같다.
  */
 export function buildMockAdminProducts(today: string): AdminProduct[] {
-  return MOCK_PRODUCTS.map((product): AdminProduct => {
+  const singles = MOCK_PRODUCTS.map((product): AdminProduct => {
     const { productId, productName, ottServiceId, adminPrice } = product
     let prices: AdminProductPrice[]
     let isActive = true
@@ -126,11 +180,25 @@ export function buildMockAdminProducts(today: string): AdminProduct[] {
       productId: productId,
       name: productName,
       productType: 'SINGLE',
-      ottServiceId,
+      ottServiceIds: [ottServiceId],
+      isLowCost: false, // 기본 7개는 모두 표준 단품이다
       isActive,
       prices,
     }
   })
+  // 저가형 단품·번들(Task 076)은 줄 하나, 최근에 확인함
+  const extras = MOCK_EXTRA_PRODUCTS.map((product): AdminProduct => ({
+    productId: product.productId,
+    name: product.productName,
+    productType: product.ottServiceIds.length > 1 ? 'BUNDLE' : 'SINGLE',
+    ottServiceIds: product.ottServiceIds,
+    isLowCost: product.isLowCost,
+    isActive: true,
+    prices: [
+      priceRow(product.productId, 1, product.adminPrice, addDays(today, -60), addDays(today, -3)),
+    ],
+  }))
+  return [...singles, ...extras]
 }
 
 /* ===== 제공처 매핑 (SCR-15) ===== */
@@ -264,6 +332,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
+      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
     },
     {
       executionId: 4,
@@ -277,6 +346,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
+      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
     },
     {
       executionId: 3,
@@ -290,6 +360,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: true, // 중단됨이라 복구할 수 있다
       canRestart: false,
+      recalcTargetCount: null,
     },
     {
       executionId: 2,
@@ -303,6 +374,7 @@ export function buildMockCollectExecutions(
       failureReason: 'TMDB 응답 지연(연속 3회 시간 초과)으로 중단했습니다.',
       canRecover: false,
       canRestart: true, // 같은 날짜·범위의 최신 실패이고 실행 중인 수집이 없다
+      recalcTargetCount: null,
     },
     {
       executionId: 1,
@@ -316,6 +388,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
+      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
     },
   ]
 }

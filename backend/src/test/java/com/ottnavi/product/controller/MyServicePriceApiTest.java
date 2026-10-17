@@ -284,13 +284,43 @@ class MyServicePriceApiTest extends IntegrationTestSupport {
 		List<SubscriptionState> states = new ArrayList<>();
 		states.add(new SubscriptionState(services.get(0).getId(), ServiceSubscriptionStatus.SUBSCRIBED, "스탠다드", 1));
 		states.add(new SubscriptionState(services.get(1).getId(), ServiceSubscriptionStatus.UNKNOWN, null, null));
-		userSettingService.updateSettings(user.getId(), 20000, 900, WatchPreset.NORMAL, states);
+		userSettingService.updateSettings(user.getId(), 20000, 900, WatchPreset.NORMAL, false, states);
 		String bearer = new TestTokens(jwtTokenProvider).bearer(user.getId(), UserRole.USER);
 
 		// when & then
 		assertThat(readLine(bearer, first).get("subscriptionStatus")).isEqualTo("SUBSCRIBED");
 		assertThat(readLine(bearer, second).get("subscriptionStatus")).isEqualTo("UNKNOWN");
 		assertThat(readLine(bearer, third).get("subscriptionStatus")).isEqualTo("NOT_SUBSCRIBED");
+	}
+
+	@Test
+	void 모드에_따라_계산_후보가_달라지고_번들은_서비스_목록과_미구독으로_나온다() throws Exception {
+		// given: 첫 서비스에 표준 단품(12000)과 저가형 단품(7000), 첫째·둘째 서비스를 묶은 표준 번들(16000)
+		long standard = saveProduct("표준", services.get(0), true, TODAY.minusDays(3), 12000, null, 0);
+		long lowCost = saveProduct("저가", services.get(0), true, TODAY.minusDays(3), 7000, null, 0, true);
+		long bundle = saveBundle("번들", services.get(0), services.get(1), false, 16000);
+		User offUser = createUser();
+		userSettingService.updateSettings(offUser.getId(), 20000, 900, WatchPreset.NORMAL, false, new ArrayList<>());
+		User onUser = createUser();
+		userSettingService.updateSettings(onUser.getId(), 20000, 900, WatchPreset.NORMAL, true, new ArrayList<>());
+		String offBearer = new TestTokens(jwtTokenProvider).bearer(offUser.getId(), UserRole.USER);
+		String onBearer = new TestTokens(jwtTokenProvider).bearer(onUser.getId(), UserRole.USER);
+
+		// when & then 1: 모드 끔은 표준 단품과 표준 번들이 후보다
+		assertThat(readLine(offBearer, standard).get("isCalcCandidate")).isEqualTo(true);
+		assertThat(readLine(offBearer, lowCost).get("isCalcCandidate")).isEqualTo(false);
+		assertThat(readLine(offBearer, lowCost).get("isLowCost")).isEqualTo(true);
+		Map<String, Object> bundleLine = readLine(offBearer, bundle);
+		assertThat(bundleLine.get("isCalcCandidate")).isEqualTo(true);
+		assertThat(bundleLine.get("productType")).isEqualTo("BUNDLE");
+		assertThat(bundleLine.get("ottServiceId")).isNull();
+		assertThat(bundleLine.get("ottServiceIds")).isEqualTo(
+				List.of(services.get(0).getId().intValue(), services.get(1).getId().intValue()));
+		assertThat(bundleLine.get("subscriptionStatus")).isEqualTo("NOT_SUBSCRIBED");
+
+		// when & then 2: 모드 켬은 가장 싼 저가형 단품이 후보다
+		assertThat(readLine(onBearer, standard).get("isCalcCandidate")).isEqualTo(false);
+		assertThat(readLine(onBearer, lowCost).get("isCalcCandidate")).isEqualTo(true);
 	}
 
 	@Test
@@ -350,7 +380,22 @@ class MyServicePriceApiTest extends IntegrationTestSupport {
 	 */
 	private long saveProduct(String name, OttService service, boolean isActive, LocalDate firstFrom, int firstPrice,
 			LocalDate secondFrom, int secondPrice) {
-		SubscriptionProduct product = SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE);
+		return saveProduct(name, service, isActive, firstFrom, firstPrice, secondFrom, secondPrice, false);
+	}
+
+	/** 번들 상품과 구성(서비스 둘), 오늘부터 적용되는 요금 이력 하나를 저장하고 상품 ID를 돌려준다 */
+	private long saveBundle(String name, OttService first, OttService second, boolean isLowCost, int price) {
+		SubscriptionProduct product = subscriptionProductRepository.save(
+				SubscriptionProduct.create(NAME_PREFIX + name, ProductType.BUNDLE, isLowCost));
+		productComponentRepository.save(ProductComponent.create(product, first, ProviderTier.STANDARD));
+		productComponentRepository.save(ProductComponent.create(product, second, ProviderTier.STANDARD));
+		productPriceRepository.save(ProductPrice.create(product, price, TODAY.minusDays(3), Instant.now()));
+		return product.getId();
+	}
+
+	private long saveProduct(String name, OttService service, boolean isActive, LocalDate firstFrom, int firstPrice,
+			LocalDate secondFrom, int secondPrice, boolean isLowCost) {
+		SubscriptionProduct product = SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE, isLowCost);
 		if (!isActive) {
 			product.deactivate();
 		}

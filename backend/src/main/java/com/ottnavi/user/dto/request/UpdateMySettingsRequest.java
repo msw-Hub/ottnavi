@@ -16,6 +16,7 @@ import java.util.List;
  * @param monthlyBudget       월 예산(원). 0 이상
  * @param monthlyWatchMinutes 월 시청 시간(분). 120~44640
  * @param watchPreset         시청 시간을 고른 방식
+ * @param isLowestPriceMode   "가장 저렴한 요금제로 계산할래요" 체크 여부. 끄면 서비스마다 표준 요금제로 계산한다
  */
 public record UpdateMySettingsRequest(
 		@NotNull(message = "서비스별 이용 상태는 필수입니다.")
@@ -31,5 +32,7 @@ public record UpdateMySettingsRequest(
 		@Max(value = 44640, message = "월 시청 시간은 44640분 이하여야 합니다.")
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "900") Integer monthlyWatchMinutes,
 		@NotNull(message = "시청 시간 방식은 필수입니다.")
-		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "NORMAL") WatchPreset watchPreset) {
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "NORMAL") WatchPreset watchPreset,
+		@NotNull(message = "가장 저렴한 요금제 모드는 필수입니다.")
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "false") Boolean isLowestPriceMode) {
 }

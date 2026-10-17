@@ -7,11 +7,7 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import {
-  BUNDLE_SAMPLE_PRODUCTS,
-  getProductComposition,
-  SAMPLE_COMPOSITIONS,
-} from '@/features/admin/bundleSampleData'
+import { MAX_ACTIVE_BUNDLES } from '@/features/admin/bundleRules'
 import { PriceHistoryPanel } from '@/features/admin/components/products/PriceHistoryPanel'
 import {
   ProductFormDialog,
@@ -21,14 +17,12 @@ import { ProductTable } from '@/features/admin/components/products/ProductTable'
 import { useAdminProducts } from '@/features/admin/hooks/useAdminProducts'
 import { useOttServices } from '@/hooks/useOttServices'
 import { getTodayDateString } from '@/lib/dateUtils'
-import { isMockMode } from '@/lib/mockScenario'
 
 // 고른 OTT 구독상품을 담는 주소 검색 파라미터 이름. 예: /admin/products?product=101
 const SELECTED_PRODUCT_PARAM = 'product'
 
-// 번들·광고형 1차안(Task 075)을 보는 주소 파라미터(?productsPreview=bundle). 목업 모드에서만 읽는다(변경 내역 화면의 ?historyPreview=와 같은 방식)
-const PRODUCTS_PREVIEW_PARAM = 'productsPreview'
-const BUNDLE_PREVIEW_VALUE = 'bundle'
+// 이전(Task 075 1차안): 목업 모드 + ?productsPreview=bundle일 때만 샘플 번들·광고형 상품을 덧붙였다.
+// Task 076에서 계약에 번들·저가형이 생겨 API 응답을 그대로 그린다(미리보기 파라미터와 샘플 제거)
 
 /**
  * SCR-14 OTT 구독상품·월 구독요금 관리 화면의 본문이다(Task 029).
@@ -48,14 +42,6 @@ export function ProductsScreen() {
   const [dialogState, setDialogState] = useState<ProductDialogState>(null)
   const dialogOpenerRef = useRef<HTMLElement | null>(null) // 대화상자를 연 버튼. 닫힐 때 포커스를 돌려줄 곳
 
-  // ===== 번들·광고형 1차안(Task 075) =====
-  // 목업 모드 + ?productsPreview=bundle일 때만 켠다. 운영에서는 파라미터를 읽지 않아 지금 화면 그대로다
-  const isBundlePreview =
-    isMockMode() && searchParams.get(PRODUCTS_PREVIEW_PARAM) === BUNDLE_PREVIEW_VALUE
-  // 상품 ID → 구성(샘플 고정값). 번들 구성은 등록할 때만 정하고 등록 뒤에는 바꾸지 않으므로(2026-10-17 사용자 확정) 상태로 두지 않는다.
-  // 이전: useState로 두고 [구성 편집] 대화상자에서 바꿨다(구성 편집 UI 제거)
-  const compositions = SAMPLE_COMPOSITIONS
-
   // 대화상자를 연다. 누른 버튼을 기억해 두는 것은 닫힐 때 키보드 사용자가 있던 자리로 돌아가게 하려는 것이다
   function openDialog(state: ProductDialogState) {
     dialogOpenerRef.current =
@@ -68,21 +54,18 @@ export function ProductsScreen() {
 
   const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
 
-  // 미리보기면 목업 API 목록 뒤에 번들·광고형 샘플 상품을 덧붙인다
-  const productList: AdminProduct[] | undefined = products.data
-    ? isBundlePreview
-      ? [...products.data.products, ...BUNDLE_SAMPLE_PRODUCTS]
-      : products.data.products
-    : undefined
+  const productList: AdminProduct[] | undefined = products.data?.products
 
   const selectedId = Number(searchParams.get(SELECTED_PRODUCT_PARAM))
   const selectedProduct = productList?.find((p) => p.productId === selectedId) ?? null
 
+  // 판매 중 번들 수. 상한(13개)에 얼마나 가까운지 안내 띠에 보인다
+  const activeBundleCount =
+    productList?.filter((p) => p.productType === 'BUNDLE' && p.isActive).length ?? 0
+
   // 월 구독요금 이력 제목 아래 보조 글자. 번들은 구성 서비스를 "+"로 잇는다(예: "티빙 + 웨이브")
   function productServiceLabel(product: AdminProduct): string {
-    return getProductComposition(product, isBundlePreview ? compositions : undefined)
-      .components.map((c) => serviceNames.get(c.ottServiceId) ?? `서비스 ${c.ottServiceId}`)
-      .join(' + ')
+    return product.ottServiceIds.map((id) => serviceNames.get(id) ?? `서비스 ${id}`).join(' + ')
   }
 
   function selectProduct(productId: number) {
@@ -124,7 +107,6 @@ export function ProductsScreen() {
           today={today}
           onSelect={selectProduct}
           onEdit={(product) => openDialog({ mode: 'edit', product })}
-          compositions={isBundlePreview ? compositions : undefined}
         />
         {selectedProduct ? (
           <PriceHistoryPanel
@@ -156,10 +138,15 @@ export function ProductsScreen() {
       {/* role="note": 기본 role="alert"는 화면을 열 때마다 낭독기가 끊고 읽는다. 이 띠는 급한 알림이 아닌 범위 안내다 */}
       <Alert role="note">
         <InfoIcon aria-hidden="true" />
+        {/* 이전 문장: "MVP는 단품(STANDARD)만 다룹니다. 번들·광고형 OTT 구독상품은 2단계부터 등록할 수 있습니다."(Task 076에서 번들·저가형 등록이 열렸다) */}
+        {/* 문단을 둘로 나누면 AlertDescription의 문단 여백 때문에 사이가 크게 벌어져 한 문단으로 둔다 */}
         <AlertDescription>
-          {isBundlePreview
-            ? '1차안 미리보기: 번들·광고형 샘플 상품 3개를 목록 끝에 덧붙였습니다. 번들 구성은 등록할 때만 정하고, 판매 종료는 각 행의 [수정]에서 합니다. 등록은 서버에 저장되지 않습니다.'
-            : 'MVP는 단품(STANDARD)만 다룹니다. 번들·광고형 OTT 구독상품은 2단계부터 등록할 수 있습니다.'}
+          번들은 서비스 2곳 이상을 한 번에 결제하는 상품입니다. 구성은 등록할 때만 정하고, 바꾸려면
+          새로 등록한 뒤 기존 상품을 판매 종료하세요. 판매 중인 번들은{' '}
+          <strong className="font-semibold text-foreground tabular-nums">
+            {activeBundleCount}/{MAX_ACTIVE_BUNDLES}개
+          </strong>
+          입니다.
         </AlertDescription>
       </Alert>
 
@@ -175,7 +162,6 @@ export function ProductsScreen() {
         onClose={() => setDialogState(null)}
         onCreated={selectProduct}
         openerRef={dialogOpenerRef}
-        isBundlePreview={isBundlePreview}
       />
     </section>
   )

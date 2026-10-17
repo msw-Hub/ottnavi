@@ -322,7 +322,7 @@ class PlanRecalcIntegrationTest extends IntegrationTestSupport {
 	private User createScenarioUser(int index) {
 		String sub = UUID.randomUUID().toString().replace("-", "");
 		User user = userRepository.save(User.create(EMAIL_PREFIX + sub + "@example.com", "테스터", OAuthProvider.GOOGLE, sub));
-		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, new ArrayList<>());
+		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
 		int base = BASE_TMDB_ID + index * 10;
 		WatchUnit must = saveMovie(base + 1, 120);
 		WatchUnit want = saveMovie(base + 2, 200);
@@ -338,7 +338,7 @@ class PlanRecalcIntegrationTest extends IntegrationTestSupport {
 
 	private void saveProduct(String name, OttService service, int price) {
 		SubscriptionProduct product = subscriptionProductRepository
-				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE));
+				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE, false));
 		productComponentRepository.save(ProductComponent.create(product, service, ProviderTier.STANDARD));
 		productPriceRepository.save(ProductPrice.create(product, price, LocalDate.now(KST).minusDays(30), Instant.now()));
 	}

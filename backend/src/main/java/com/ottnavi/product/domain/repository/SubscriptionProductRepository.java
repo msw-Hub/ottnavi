@@ -1,6 +1,7 @@
 package com.ottnavi.product.domain.repository;
 
 import com.ottnavi.product.domain.entity.SubscriptionProduct;
+import com.ottnavi.product.domain.enums.ProductType;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,4 +12,7 @@ public interface SubscriptionProductRepository extends JpaRepository<Subscriptio
 
 	/** 판매 중(active=true)인 상품만 ID 순으로 조회한다 */
 	List<SubscriptionProduct> findAllByActiveTrueOrderByIdAsc();
+
+	/** 판매 중인 해당 종류 상품의 수를 센다(번들 판매 중 상한 확인용) */
+	long countByProductTypeAndActiveTrue(ProductType productType);
 }

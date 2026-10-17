@@ -50,6 +50,6 @@ public class UserSettingController {
 		}
 		return CommonResponse.success(UserSettingsResponse.from(userSettingService.updateSettings(
 				authUser.userId(), request.monthlyBudget(), request.monthlyWatchMinutes(),
-				request.watchPreset(), subscriptions)));
+				request.watchPreset(), request.isLowestPriceMode(), subscriptions)));
 	}
 }

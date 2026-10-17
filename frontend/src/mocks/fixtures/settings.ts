@@ -25,6 +25,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   monthlyBudget: 20000,
   monthlyWatchMinutes: 900,
   watchPreset: 'NORMAL',
+  isLowestPriceMode: false, // 기본은 끔(표준 요금제로 계산)
 }
 
 // 온보딩을 아직 하지 않은 회원에게 돌려주는 빈 설정. 화면은 모든 칸을 기본값으로 채워 보인다
@@ -34,4 +35,5 @@ export const EMPTY_USER_SETTINGS: UserSettings = {
   monthlyBudget: null,
   monthlyWatchMinutes: null,
   watchPreset: null,
+  isLowestPriceMode: false,
 }

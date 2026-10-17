@@ -60,11 +60,20 @@ public final class BruteForceOracle {
 		return true;
 	}
 
-	/** 명세 S6: 그 달의 후보 상품. FREE, 0번째 달 SUBSCRIBED, 어떤 단위도 못 보는 상품, 혼자서 그 달 예산을 넘는 상품은 뺀다. */
+	/**
+	 * 명세 S6: 그 달의 후보 상품. FREE, 0번째 달 SUBSCRIBED, 어떤 단위도 못 보는 상품, 혼자서 그 달 예산을 넘는 상품은 뺀다.
+	 * 확장(PRD 11절 33번): 0번째 달에는 구독 중인 서비스와 구성이 겹치는 번들도 뺀다.
+	 */
 	public static List<OttProduct> candidates(PlanInput input, int month) {
 		Set<Long> watchable = new HashSet<>();
 		for (WatchUnit unit : input.units()) {
 			watchable.addAll(unit.watchableProductIds());
+		}
+		Set<Long> subscribedServices = new HashSet<>();
+		for (OttProduct product : input.products()) {
+			if (product.condition() == OttProductCondition.SUBSCRIBED) {
+				subscribedServices.addAll(product.ottServiceIds());
+			}
 		}
 		List<OttProduct> result = new ArrayList<>();
 		for (OttProduct product : input.products()) {
@@ -75,6 +84,9 @@ public final class BruteForceOracle {
 				continue;
 			}
 			if (!watchable.contains(product.id())) {
+				continue;
+			}
+			if (month == 0 && product.ottServiceIds().size() > 1 && !Collections.disjoint(product.ottServiceIds(), subscribedServices)) {
 				continue;
 			}
 			if (monthCost(month, Set.of(product.id()), input.products()) > input.monthlyBudget()) {
@@ -96,11 +108,24 @@ public final class BruteForceOracle {
 					subset.add(candidates.get(bit).id());
 				}
 			}
-			if (monthCost(month, subset, input.products()) <= input.monthlyBudget()) {
+			if (monthCost(month, subset, input.products()) <= input.monthlyBudget() && !hasServiceOverlap(subset, input.products())) {
 				options.add(subset);
 			}
 		}
 		return options;
+	}
+
+	/** S1b(PRD 11절 33번): 고른 상품 중 구성 서비스가 겹치는 쌍이 있는지 확인한다. */
+	public static boolean hasServiceOverlap(Set<Long> productIds, List<OttProduct> products) {
+		Set<Long> seen = new HashSet<>();
+		for (long productId : productIds) {
+			for (Long serviceId : find(productId, products).ottServiceIds()) {
+				if (!seen.add(serviceId)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/** 조합의 모든 달 선택이 그 달의 후보 상품(S6)으로만 이루어졌는지 확인한다(성질 20). */

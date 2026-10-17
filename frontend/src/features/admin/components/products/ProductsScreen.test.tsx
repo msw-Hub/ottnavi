@@ -70,12 +70,12 @@ async function selectProduct(user: ReturnType<typeof userEvent.setup>, name: str
 }
 
 describe('OTT 구독상품 목록', () => {
-  it('7개 OTT 구독상품과 현재 월 구독요금을 보이고, 확인일이 오래된 것엔 주의 태그가 붙는다', async () => {
+  it('OTT 구독상품 12개(단품 7개 + 저가형·번들 추가 5개)와 현재 월 구독요금을 보이고, 확인일이 오래된 것엔 주의 태그가 붙는다', async () => {
     renderProducts()
     const table = await findTable()
 
     const rows = within(table).getAllByRole('row').slice(1) // 첫 줄은 열 제목
-    expect(rows).toHaveLength(7)
+    expect(rows).toHaveLength(12) // 목업은 기본 7개 + Task 076 추가 상품 108~112
 
     const netflix = within(table).getByRole('row', { name: /넷플릭스 스탠다드/ })
     expect(within(netflix).getByText('13,500원')).toBeInTheDocument() // 예정 줄(14,500원)이 아니라 지금 적용 중인 줄
@@ -343,18 +343,28 @@ describe('OTT 구독상품 등록·수정', () => {
     expect(within(dialog).getByText('월 구독요금을 입력해 주세요.')).toBeInTheDocument()
   })
 
-  it('번들 유형은 선택할 수 없고 "2단계부터" 태그가 붙는다', async () => {
+  it('번들 유형을 골라 구성 서비스 2곳을 체크하면 번들 상품으로 등록되고, 대화상자 닫기 버튼은 한국어다', async () => {
     const user = userEvent.setup()
     renderProducts()
     await findTable()
 
     await user.click(screen.getByRole('button', { name: 'OTT 구독상품 등록' }))
     const dialog = await screen.findByRole('dialog', { name: 'OTT 구독상품 등록' })
-    expect(within(dialog).getByRole('radio', { name: '번들' })).toBeDisabled()
-    expect(within(dialog).getByText('2단계부터')).toBeInTheDocument()
+    // Task 076에서 번들 등록이 열렸다(이전: 라디오가 막혀 있고 "2단계부터" 태그가 붙었다)
+    const bundleRadio = within(dialog).getByRole('radio', { name: /^번들/ })
+    expect(bundleRadio).toBeEnabled()
+    await user.click(bundleRadio)
+    await user.type(within(dialog).getByLabelText('이름'), '번들 등록 테스트')
+    await user.click(within(dialog).getByRole('checkbox', { name: '티빙' }))
+    await user.click(within(dialog).getByRole('checkbox', { name: '웨이브' }))
+    await user.type(within(dialog).getByLabelText('첫 월 구독요금(원)'), '16000')
     // 닫기 버튼의 접근 이름은 영어 Close가 아니라 한국어 "닫기"다
     expect(within(dialog).getByRole('button', { name: '닫기' })).toBeInTheDocument()
     expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: '등록' }))
+    expect(
+      await screen.findByRole('region', { name: '번들 등록 테스트 월 구독요금 이력' }),
+    ).toBeInTheDocument()
   })
 
   it('판매 종료로 수정하면 목록에 "판매 종료"로 보인다', async () => {

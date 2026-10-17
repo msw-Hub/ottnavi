@@ -53,6 +53,7 @@ const SETTINGS_REQUEST: UpdateMySettingsRequest = {
   monthlyBudget: 15000,
   monthlyWatchMinutes: 1559,
   watchPreset: 'CUSTOM',
+  isLowestPriceMode: false,
 }
 
 describe('내 설정', () => {
@@ -424,8 +425,8 @@ describe('요금', () => {
       url: '/me/service-prices',
       method: 'GET',
     })
-    // 판매 종료인 왓챠(106)는 빠지고 6개만 나온다
-    expect(res.data.services).toHaveLength(6)
+    // 판매 종료인 왓챠(106)는 빠지고, 기본 단품 6개에 저가형·번들 5개(108~112)가 더해져 11개가 나온다
+    expect(res.data.services).toHaveLength(11)
     expect(res.data.services.map((p) => p.productId)).not.toContain(WATCHA_PRODUCT_ID)
     expect(res.data.services[0]).toMatchObject({
       ottServiceId: 1,

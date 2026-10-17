@@ -83,7 +83,7 @@ class EngineBenchmarkTest {
 			String changed = InputHasher.hash(BenchmarkLoader.toInput(shifted), BenchmarkLoader.dataAsOf(shifted));
 			assertThat(changed).as("%s 시즌 번호만 바꾼 입력의 해시", benchmarkCase.name()).isNotEqualTo(original);
 			assertThat(InputHasher.canonicalize(BenchmarkLoader.toInput(benchmarkCase), BenchmarkLoader.dataAsOf(benchmarkCase)))
-					.as("v2 정규화 문자열에 시즌 정보가 들어간다").startsWith("v2|");
+					.as("v3 정규화 문자열에 시즌 정보가 들어간다").startsWith("v3|");
 		}
 	}
 

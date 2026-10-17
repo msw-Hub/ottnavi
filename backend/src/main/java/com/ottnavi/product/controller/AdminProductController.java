@@ -51,26 +51,28 @@ public class AdminProductController {
 		return CommonResponse.success(new AdminProductListResponse(products));
 	}
 
-	/** 단품 상품을 첫 월 구독요금과 함께 등록한다 */
+	/** 단품 또는 번들 상품을 첫 월 구독요금과 함께 등록한다 */
 	@Operation(operationId = "createAdminProduct", summary = "OTT 구독상품 등록",
-			description = "MVP는 단품(SINGLE)만 받는다. 첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.")
+			description = "단품(SINGLE)은 서비스 1개, 번들(BUNDLE)은 서로 다른 서비스 2개 이상이고 판매 중 번들은 최대 13개다. "
+					+ "번들 구성은 등록할 때만 정한다. 첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.")
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
 	public CommonResponse<AdminProductResponse> createAdminProduct(
 			@Valid @RequestBody CreateAdminProductRequest request) {
 		AdminProductView view = adminProductService.createProduct(request.name(), request.productType(),
-				request.ottServiceId(), request.monthlyPrice(), request.effectiveFrom());
+				request.ottServiceIds(), request.isLowCost(), request.monthlyPrice(), request.effectiveFrom());
 		return CommonResponse.success(AdminProductResponse.from(view));
 	}
 
-	/** 상품의 이름·판매 여부를 바꾼다 */
-	@Operation(operationId = "updateAdminProduct", summary = "OTT 구독상품 이름·판매 여부 수정",
+	/** 상품의 이름·판매 여부·저가형 분류를 바꾼다 */
+	@Operation(operationId = "updateAdminProduct", summary = "OTT 구독상품 이름·판매 여부·저가형 분류 수정",
 			description = "보낸 필드만 바꾼다(하나 이상 필요). 상품은 삭제하지 않는다.")
 	@PatchMapping("/{productId}")
 	public CommonResponse<AdminProductResponse> updateAdminProduct(
 			@Positive(message = "1 이상이어야 합니다.") @PathVariable Long productId,
 			@Valid @RequestBody UpdateAdminProductRequest request) {
-		AdminProductView view = adminProductService.updateProduct(productId, request.name(), request.isActive());
+		AdminProductView view = adminProductService.updateProduct(
+				productId, request.name(), request.isActive(), request.isLowCost());
 		return CommonResponse.success(AdminProductResponse.from(view));
 	}
 

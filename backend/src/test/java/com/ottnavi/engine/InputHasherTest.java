@@ -127,12 +127,12 @@ class InputHasherTest {
 				15_000, 600);
 
 		assertThat(InputHasher.canonicalize(input, AS_OF)).isEqualTo(
-				"v2|budget=15000|minutes=600|asOf=2026-10-01|products=1:9900:SUBSCRIBED;2:7900:NONE"
+				"v3|budget=15000|minutes=600|asOf=2026-10-01|products=1:9900:SUBSCRIBED:-;2:7900:NONE:-"
 						+ "|units=1:MUST:120::true:-:-;2:WANT:480:1,2:false:-:-");
 	}
 
 	@Test
-	@DisplayName("v2 정규화 문자열에 시즌 단위는 titleId와 seasonNumber가 들어가고 영화는 -다")
+	@DisplayName("v3 정규화 문자열에 시즌 단위는 titleId와 seasonNumber가 들어가고 영화는 -다")
 	void 정규화_문자열에_시즌이_들어간다() {
 		PlanInput input = input(List.of(product(1, 9_900)),
 				List.of(season(2, Priority.WANT, 480, 7L, 3), unit(1, Priority.MUST, 120, 1L)), 15_000, 600);
@@ -156,6 +156,33 @@ class InputHasherTest {
 		// 영화(null)와 시즌 단위도 구분된다
 		List<WatchUnit> asMovie = List.of(unit(1, Priority.WANT, 100, 1L), season(2, Priority.WANT, 100, 7L, 2));
 		assertThat(hashOf(input(products, asMovie, 15_000, 600))).isNotEqualTo(base);
+	}
+
+	@Test
+	@DisplayName("v3: 구성 서비스 ID가 정규화 문자열에 들어가고 서비스만 달라도 해시가 달라지며 입력 순서와는 무관하다")
+	void 구성_서비스가_해시에_들어간다() {
+		List<WatchUnit> units = List.of(unit(1, Priority.WANT, 100, 1L));
+		OttProduct single = new OttProduct(1, 9_900, com.ottnavi.engine.model.OttProductCondition.NONE, List.of(5L));
+		OttProduct otherService = new OttProduct(1, 9_900, com.ottnavi.engine.model.OttProductCondition.NONE, List.of(6L));
+		OttProduct bundle = new OttProduct(1, 9_900, com.ottnavi.engine.model.OttProductCondition.NONE, List.of(7L, 5L));
+		OttProduct bundleReordered = new OttProduct(1, 9_900, com.ottnavi.engine.model.OttProductCondition.NONE, List.of(5L, 7L));
+
+		assertThat(InputHasher.canonicalize(input(List.of(bundle), units, 15_000, 600), AS_OF))
+				.startsWith("v3|").contains("products=1:9900:NONE:5,7|");
+		assertThat(hashOf(input(List.of(single), units, 15_000, 600))).isNotEqualTo(hashOf(input(List.of(otherService), units, 15_000, 600)));
+		assertThat(hashOf(input(List.of(single), units, 15_000, 600))).isNotEqualTo(hashOf(input(List.of(bundle), units, 15_000, 600)));
+		assertThat(hashOf(input(List.of(bundle), units, 15_000, 600))).isEqualTo(hashOf(input(List.of(bundleReordered), units, 15_000, 600)));
+	}
+
+	@Test
+	@DisplayName("v3 해시는 같은 입력을 v2 형식으로 만든 기존 해시와 다르다(버전 접두사로 구분)")
+	void v2_해시와_구분된다() throws Exception {
+		PlanInput input = input(List.of(product(1, 9_900)), List.of(unit(1, Priority.WANT, 100, 1L)), 15_000, 600);
+		String legacyCanonical = "v2|budget=15000|minutes=600|asOf=2026-10-01|products=1:9900:NONE|units=1:WANT:100:1:false:-:-";
+		String legacyHash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+				.digest(legacyCanonical.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+		assertThat(hashOf(input)).isNotEqualTo(legacyHash);
 	}
 
 	/** 시즌 단위를 만든다(시청 가능 상품은 상품 1 하나). */

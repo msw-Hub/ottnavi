@@ -11,11 +11,13 @@ import java.util.List;
  * @param monthlyBudget       월 예산(원)
  * @param monthlyWatchMinutes 월 시청 시간(분)
  * @param watchPreset         시청 시간을 고른 방식
+ * @param isLowestPriceMode   "가장 저렴한 요금제로 계산할래요" 체크 여부(온보딩 전에는 false)
  */
 public record UserSettingsState(
 		boolean isOnboardingDone,
 		List<SubscriptionState> subscriptions,
 		Integer monthlyBudget,
 		Integer monthlyWatchMinutes,
-		WatchPreset watchPreset) {
+		WatchPreset watchPreset,
+		boolean isLowestPriceMode) {
 }
