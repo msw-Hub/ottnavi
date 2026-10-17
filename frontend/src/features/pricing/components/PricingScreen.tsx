@@ -8,12 +8,21 @@ import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import {
+  PRICING_BUNDLE_SAMPLE_ROWS,
+  PRICING_SAMPLE_COMPOSITIONS,
+} from '@/features/pricing/bundleSampleData'
 import { PricingRow } from '@/features/pricing/components/PricingRow'
 import { usePricing } from '@/features/pricing/hooks/usePricing'
 import { useOttServices } from '@/hooks/useOttServices'
 import { useCalculatePlan } from '@/hooks/usePlanDrafts'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { formatDataAsOf, formatMinutes, formatWon } from '@/lib/format'
+import { isMockMode } from '@/lib/mockScenario'
+
+// 번들·광고형 표시 1차안(Task 075)을 보는 주소 파라미터(?pricingPreview=bundle). 목업 모드에서만 읽는다
+const PRICING_PREVIEW_PARAM = 'pricingPreview'
+const BUNDLE_PREVIEW_VALUE = 'bundle'
 
 // 화면 안에서 "계산하기" 버튼에 넘기는 계산 진행 상태와 시작 함수
 interface PricingCalculation {
@@ -72,6 +81,10 @@ export function PricingScreen() {
         settings={settings.data}
         services={services.data}
         calculation={calculation}
+        isBundlePreview={
+          isMockMode() &&
+          new URLSearchParams(location.search).get(PRICING_PREVIEW_PARAM) === BUNDLE_PREVIEW_VALUE
+        }
       />
     )
   }
@@ -89,12 +102,58 @@ interface PricingContentProps {
   settings: UserSettings // 내 설정(예산·시청 시간 요약에 쓴다)
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름·데이터 충분도)
   calculation: PricingCalculation
+  isBundlePreview: boolean // 번들·광고형 1차안 미리보기(목업 모드 + ?pricingPreview=bundle). 켜면 샘플 줄을 덧붙인다
 }
 
 // 데이터를 불러온 뒤의 화면
-function PricingContent({ prices, settings, services, calculation }: PricingContentProps) {
+function PricingContent({
+  prices: apiPrices,
+  settings,
+  services,
+  calculation,
+  isBundlePreview,
+}: PricingContentProps) {
   const location = useLocation()
   const serviceById = new Map(services.map((service) => [service.ottServiceId, service]))
+  const serviceNameOf = (ottServiceId: number) =>
+    serviceById.get(ottServiceId)?.name ?? `서비스 ${ottServiceId}`
+
+  // ===== 번들·광고형 1차안(Task 075) =====
+  // 1. 미리보기면 샘플 줄(광고형 단품 1, 번들 2)을 API 목록에 섞는다. 단품(광고형 포함)은 서비스 순으로 같은 서비스끼리 붙이고,
+  //    번들은 여러 서비스에 걸쳐 어느 서비스 칸에도 속하지 않아 아래 "번들 상품" 묶음으로 따로 뺀다
+  const samplePrices = isBundlePreview ? PRICING_BUNDLE_SAMPLE_ROWS.map((row) => row.price) : []
+  const prices = [...apiPrices, ...samplePrices]
+  const compositionOf = (productId: number) =>
+    isBundlePreview ? PRICING_SAMPLE_COMPOSITIONS.get(productId) : undefined
+  // 2. 단품과 번들로 나눈다. sort는 같은 서비스 안에서 원래 순서(API 순 → 샘플)를 지킨다(안정 정렬)
+  const singlePrices = prices
+    .filter((price) => compositionOf(price.productId)?.productType !== 'BUNDLE')
+    .sort((a, b) => a.ottServiceId - b.ottServiceId)
+  const bundlePrices = prices.filter(
+    (price) => compositionOf(price.productId)?.productType === 'BUNDLE',
+  )
+  // 3. 줄 하나를 그린다. 번들은 서비스 이름 자리에 구성 서비스를 "+"로 잇는다(예: "티빙 + 웨이브")
+  const renderRow = (service: ServicePrice) => {
+    const composition = compositionOf(service.productId)
+    const info = serviceById.get(service.ottServiceId)
+    const isBundle = composition?.productType === 'BUNDLE'
+    return (
+      <PricingRow
+        key={service.productId}
+        service={service}
+        serviceName={
+          isBundle
+            ? composition.components.map((c) => serviceNameOf(c.ottServiceId)).join(' + ')
+            : (info?.name ?? service.productName)
+        }
+        // 번들에 데이터 부족 서비스가 들어 있어도 태그는 단품 줄에만 붙인다(번들 줄은 구성 설명에서 서비스 이름이 보인다)
+        isInsufficientData={!isBundle && info?.dataQuality === 'INSUFFICIENT'}
+        isLocked={calculation.isPending}
+        composition={composition}
+        serviceNameOf={serviceNameOf}
+      />
+    )
+  }
   // 예산·시청 시간이 비어 있으면 계산을 시작할 수 없다(서버도 400). 먼저 설정하도록 안내하고 버튼을 막는다
   const isReadyToCalculate =
     settings.monthlyBudget !== null && settings.monthlyWatchMinutes !== null
@@ -172,21 +231,25 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
           <span>내 금액 (바꾸려면 입력)</span>
           <span>계산에 쓰는 금액</span>
         </div>
-        <ul className="grid gap-3">
-          {prices.map((service) => {
-            const info = serviceById.get(service.ottServiceId)
-            return (
-              <PricingRow
-                key={service.productId}
-                service={service}
-                serviceName={info?.name ?? service.productName}
-                isInsufficientData={info?.dataQuality === 'INSUFFICIENT'}
-                isLocked={calculation.isPending}
-              />
-            )
-          })}
-        </ul>
+        {/* 이전: prices.map으로 PricingRow를 바로 그렸다(이름·데이터 부족 판단은 renderRow로 옮겼다) */}
+        <ul className="grid gap-3">{singlePrices.map(renderRow)}</ul>
       </section>
+
+      {/* 번들 상품 묶음(1차안). 번들은 서비스 하나에 속하지 않아 서비스별 목록과 나눴다. 계산은 번들을 상품 하나로 본다(PRD FR-19) */}
+      {bundlePrices.length > 0 && (
+        <section aria-labelledby="pricing-bundle-heading" className="grid gap-3">
+          <div className="grid gap-1">
+            <h2 id="pricing-bundle-heading" className="text-lg font-semibold">
+              번들 상품
+            </h2>
+            <p className="text-sm break-keep text-muted-foreground">
+              여러 서비스를 한 번에 결제하는 상품이에요. 계산은 번들을 상품 하나로 보고 단품과 함께
+              비교해 골라요.
+            </p>
+          </div>
+          <ul className="grid gap-3">{bundlePrices.map(renderRow)}</ul>
+        </section>
+      )}
 
       {/* 플랜 계산 구역. 모바일에서는 화면 아래에 고정하고, 넓은 화면에서는 목록 아래 카드로 둔다 */}
       <section

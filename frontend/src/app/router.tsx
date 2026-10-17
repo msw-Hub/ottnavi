@@ -77,7 +77,7 @@ export const routes: RouteObject[] = [
             },
           },
           {
-            path: 'exclusives', // SCR-03 독점 목록 (2단계, 준비 중)
+            path: 'exclusives', // SCR-03 독점 목록 (Task 075 1차안: 목업 모드에서만 정적 샘플, 운영은 준비 중)
             lazy: {
               Component: () => import('@/pages/ExclusivesPage').then((m) => m.ExclusivesPage),
             },

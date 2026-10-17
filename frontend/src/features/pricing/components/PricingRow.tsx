@@ -9,7 +9,9 @@ import { PriceSourceLabel } from '@/components/common/PriceDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ProductKindTags } from '@/features/pricing/components/ProductKindTags'
 import { useUpdatePricing } from '@/features/pricing/hooks/usePricing'
+import type { PricingComposition } from '@/features/pricing/mockTypes'
 import { getTodayDateString } from '@/lib/dateUtils'
 import { formatDataAsOf, formatWon } from '@/lib/format'
 import { isVerifiedStale } from '@/lib/priceFreshness'
@@ -24,6 +26,10 @@ interface PricingRowProps {
   serviceName: string // 서비스 이름(예: "넷플릭스"). 서비스 목록 API에서 온다
   isInsufficientData: boolean // 데이터 부족 서비스(쿠팡플레이)인지
   isLocked: boolean // 플랜 계산 중이라 금액을 바꾸지 못하게 잠글지(계산 도중 값이 바뀌면 결과가 어긋난다)
+  // 번들·광고형 1차안(Task 075): 상품 구성. 주면 이름 옆에 "번들"·"광고형" 태그와 한 줄 설명이 붙는다. 없으면 지금 모양 그대로다
+  composition?: PricingComposition
+  // 번들 구성 설명에 쓰는 서비스 ID → 이름. composition과 함께 넘긴다
+  serviceNameOf?: (ottServiceId: number) => string
 }
 
 // 숫자 칸에 넣을 글자. 고친 금액이 없으면 비운다(비어 있음 = 기본 요금 사용)
@@ -45,6 +51,8 @@ export function PricingRow({
   serviceName,
   isInsufficientData,
   isLocked,
+  composition,
+  serviceNameOf,
 }: PricingRowProps) {
   const update = useUpdatePricing()
   const {
@@ -102,8 +110,13 @@ export function PricingRow({
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-base font-bold">
           {serviceName}
           {isInsufficientData && <DataInsufficientTag />}
+          {composition && <ProductKindTags composition={composition} />}
         </p>
         <p className="text-sm text-muted-foreground">{service.productName}</p>
+        {/* 번들·광고형이 계산에서 어떻게 쓰이는지 한 줄로 알린다(1차안). 금액만 보고 "왜 싸지?"를 묻지 않게 한다 */}
+        {composition && serviceNameOf && (
+          <CompositionNote composition={composition} serviceNameOf={serviceNameOf} />
+        )}
         {/* 요금 확인일(관리자가 이 요금을 마지막으로 확인한 날, PRD 11절 41번). 90일을 넘으면 안내를 덧붙인다. 계산은 막지 않는다.
             주의는 색만으로 알리지 않고 아이콘과 글자를 함께 쓴다 */}
         {lastVerifiedDate && (
@@ -208,5 +221,35 @@ export function PricingRow({
         <PriceSourceLabel priceSource={service.priceSource} />
       </div>
     </li>
+  )
+}
+
+interface CompositionNoteProps {
+  composition: PricingComposition // 상품 유형과 구성
+  serviceNameOf: (ottServiceId: number) => string // 서비스 ID → 이름
+}
+
+/**
+ * 번들·광고형 상품이 계산에서 어떻게 쓰이는지 알리는 한 줄이다(Task 075 1차안). 일반 단품에는 그리지 않는다.
+ * - 번들: "한 번 결제로 2곳을 모두 볼 수 있어요" → 계산은 번들을 상품 하나로 본다(PRD FR-19). 서비스 이름은 줄 제목에 이미 있어 숫자만 쓴다.
+ * - 광고형: 어느 서비스가 광고형인지 이름을 적고, 광고형으로 제공된다고 확인된 작품만 계산에 넣는다고 알린다
+ *   (ERD product_component.tier = AD → in_ad_tier만 시청 가능). 번들 안에 일반·광고형이 섞일 수 있어 이름이 필요하다.
+ * 이전: "한 번 결제로 볼 수 있는 서비스: 티빙·웨이브"처럼 이름을 다시 적었는데, 줄 제목("티빙 + 웨이브")과 겹쳐 뺐다.
+ */
+function CompositionNote({ composition, serviceNameOf }: CompositionNoteProps) {
+  const isBundle = composition.productType === 'BUNDLE'
+  const adNames = composition.components
+    .filter((component) => component.tier === 'AD')
+    .map((component) => serviceNameOf(component.ottServiceId))
+  if (!isBundle && adNames.length === 0) return null
+
+  return (
+    <p className="text-sm break-keep text-muted-foreground">
+      {isBundle && <>한 번 결제로 {composition.components.length}곳을 모두 볼 수 있어요. </>}
+      {/* 조사(은/는)가 이름 끝 글자에 따라 달라져 "광고형: 이름" 꼴로 써서 조사를 피했다 */}
+      {adNames.length > 0 && (
+        <>광고형({adNames.join('·')})은 광고형으로 제공된다고 확인된 작품만 계산에 넣어요.</>
+      )}
+    </p>
   )
 }

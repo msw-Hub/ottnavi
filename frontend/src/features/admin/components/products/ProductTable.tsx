@@ -11,8 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { getProductComposition } from '@/features/admin/bundleSampleData'
 import { AdminStatusPill } from '@/features/admin/components/AdminStatusPill'
+import { ProductCompositionSummary } from '@/features/admin/components/products/ProductCompositionSummary'
 import { StaleVerifiedTag } from '@/features/admin/components/StaleVerifiedTag'
+import type { ProductCompositionDraft } from '@/features/admin/mockTypes'
 import type { AdminProduct } from '@/api/generated/model'
 import { getCurrentPrice, isVerifiedStale, sortPricesAscending } from '@/features/admin/priceRules'
 import { formatWon } from '@/lib/format'
@@ -24,6 +27,8 @@ interface ProductTableProps {
   today: string // 오늘 날짜('YYYY-MM-DD'). 현재 적용 요금과 "확인일 오래됨" 판정 기준
   onSelect: (productId: number) => void // 이름 버튼을 눌러 OTT 구독상품을 고른다
   onEdit: (product: AdminProduct) => void // [수정]을 눌러 이름·판매 상태 수정 대화상자를 연다
+  // 번들·광고형 1차안(Task 075): 상품 ID → 구성. 없으면 계약 값으로 "단품 · 서비스 1곳 · 일반"을 보인다(getProductComposition)
+  compositions?: Map<number, ProductCompositionDraft>
 }
 
 // 판매 상태 배지. 색만이 아니라 아이콘과 글자, 테두리 모양(실선/점선)으로 구분한다
@@ -66,9 +71,21 @@ export function ProductTable({
   today,
   onSelect,
   onEdit,
+  compositions,
 }: ProductTableProps) {
   const serviceName = (ottServiceId: number) =>
     serviceNames.get(ottServiceId) ?? `서비스 ${ottServiceId}`
+
+  // "구성" 칸(Task 075 1차안). 이전에는 "서비스" 칸에 서비스 이름만 보였다 → <TableCell>{serviceName(product.ottServiceId)}</TableCell>
+  // 번들은 서비스가 여러 곳이라 "유형 + 서비스(+등급)"을 한 칸에 모았다
+  const compositionCell = (product: AdminProduct) => (
+    <ProductCompositionSummary
+      composition={getProductComposition(product, compositions)}
+      serviceName={serviceName}
+    />
+  )
+
+  // 구성은 등록할 때만 정하고 바꾸지 않으므로 행 동작은 [수정](이름·판매 상태)뿐이다. 이전에는 [구성 편집] 버튼이 있었다(2026-10-17 제거)
 
   // 행·카드의 빈 곳을 눌러도 고른다(사용자 요청 2026-10-11). 이름 버튼은 키보드·낭독기용으로 그대로 두고 aria-current도 그쪽 기준이다.
   // 행 안의 버튼([수정], 이름 버튼)을 누른 클릭은 여기서 무시한다: 그 버튼이 자기 동작을 하고, 선택이 겹쳐 두 번 일어나지 않게 한다.
@@ -115,7 +132,7 @@ export function ProductTable({
           <TableHeader>
             <TableRow>
               <TableHead>OTT 구독상품</TableHead>
-              <TableHead>서비스</TableHead>
+              <TableHead>구성</TableHead>
               <TableHead>판매 상태</TableHead>
               <TableHead>현재 월 구독요금</TableHead>
               <TableHead>
@@ -135,14 +152,18 @@ export function ProductTable({
                   className={cn('cursor-pointer', selectedBar, isSelected && 'bg-muted/50')}
                 >
                   <TableCell>{nameButton(product)}</TableCell>
-                  <TableCell>{serviceName(product.ottServiceId)}</TableCell>
+                  <TableCell>{compositionCell(product)}</TableCell>
                   <TableCell>
                     <SalesStatusPill isActive={product.isActive} />
                   </TableCell>
                   <TableCell>
                     <CurrentPriceCell product={product} today={today} />
                   </TableCell>
-                  <TableCell className="text-right">{editButton(product)}</TableCell>
+                  <TableCell className="text-right">
+                    <span className="inline-flex justify-end gap-2 whitespace-nowrap">
+                      {editButton(product)}
+                    </span>
+                  </TableCell>
                 </TableRow>
               )
             })}
@@ -169,13 +190,14 @@ export function ProductTable({
                 {nameButton(product)}
                 <SalesStatusPill isActive={product.isActive} />
               </div>
-              <p className="text-sm text-muted-foreground">{serviceName(product.ottServiceId)}</p>
+              {/* 이전: <p className="text-sm text-muted-foreground">{serviceName(product.ottServiceId)}</p> */}
+              <div className="text-sm">{compositionCell(product)}</div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="grid gap-0.5 text-sm">
                   <span className="text-muted-foreground">현재 월 구독요금</span>
                   <CurrentPriceCell product={product} today={today} />
                 </div>
-                {editButton(product)}
+                <span className="flex flex-wrap gap-2">{editButton(product)}</span>
               </div>
             </li>
           )
