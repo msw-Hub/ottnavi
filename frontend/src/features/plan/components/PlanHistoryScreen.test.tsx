@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlanHistoryScreen } from '@/features/plan/components/PlanHistoryScreen'
+import { PlanHistoryPage } from '@/pages/PlanHistoryPage'
 
 /*
  * 플랜 변경 내역 1차안(Task 068) 렌더링 테스트. 정적 샘플 데이터라 API 대역(MSW)은 쓰지 않는다.
@@ -74,5 +75,37 @@ describe('플랜 변경 내역(1차안)', () => {
     expect(
       screen.getByText('다 봤음으로 체크하면 보다 정확한 구독계산이 가능해요'),
     ).toBeInTheDocument()
+  })
+})
+
+/*
+ * 페이지 연결(CodeRabbit 지적 반영): 운영(목업이 아닌 환경)에서는 변경 내역 API가 아직 없어 정적 샘플을 보이지 않고 준비 중 화면을 보인다.
+ * 막으려는 사고: 운영 사용자에게 지어낸 변경 내역 3건이 나가는 것.
+ */
+describe('플랜 변경 내역 페이지(운영·목업 분기)', () => {
+  function renderPage() {
+    const router = createMemoryRouter([{ path: '/plan/history', element: <PlanHistoryPage /> }], {
+      initialEntries: ['/plan/history'],
+    })
+    render(<RouterProvider router={router} />)
+  }
+
+  it('목업이 아닌 환경에서는 샘플 대신 준비 중 화면이 보인다', () => {
+    vi.stubEnv('VITE_USE_MOCK', 'false')
+    renderPage()
+
+    expect(screen.getByRole('heading', { level: 1, name: '플랜 변경 내역' })).toBeInTheDocument()
+    expect(screen.getByText(/준비 중인 화면입니다/)).toBeInTheDocument()
+    expect(screen.queryByText('다 봤음으로 체크하면 보다 정확한 구독계산이 가능해요')).toBeNull()
+  })
+
+  it('목업 모드에서는 변경 내역 샘플 화면이 보인다', () => {
+    vi.stubEnv('VITE_USE_MOCK', 'true')
+    renderPage()
+
+    expect(
+      screen.getByText('다 봤음으로 체크하면 보다 정확한 구독계산이 가능해요'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/준비 중인 화면입니다/)).toBeNull()
   })
 })

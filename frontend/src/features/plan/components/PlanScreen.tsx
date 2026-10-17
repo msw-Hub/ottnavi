@@ -26,6 +26,7 @@ import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
 import { formatDateTimeKorean } from '@/lib/format'
+import { isMockMode } from '@/lib/mockScenario'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
 function getFailureMessage(error: unknown): string {
@@ -191,13 +192,16 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
             <p className="text-sm text-muted-foreground tabular-nums">{savedAt}에 저장</p>
           )}
         </div>
-        <Link
-          to={`/plan/history${search}`}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          <HistoryIcon aria-hidden="true" className="size-4" />
-          변경 내역 보기
-        </Link>
+        {/* 운영에는 변경 내역 API가 아직 없어 링크를 목업 모드에서만 보인다(CodeRabbit 지적 반영, Task 070에서 조건을 없앤다) */}
+        {isMockMode() && (
+          <Link
+            to={`/plan/history${search}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <HistoryIcon aria-hidden="true" className="size-4" />
+            변경 내역 보기
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-6">
