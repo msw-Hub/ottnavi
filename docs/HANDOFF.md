@@ -39,7 +39,7 @@
 ## 3. 사용자가 직접 할 일 ([H])
 
 - **Task 005 도메인 구매**: Task 092 직전, 2026-11-04 이전. WHOIS 개인정보 보호, 등록업체 2단계 인증, 연장 안내는 링크가 아니라 업체 사이트 직접 접속, 카카오톡 알림(ROADMAP Task 005).
-- **Redis 비밀번호·TMDB 토큰 재설정은 하지 않기로 했다**(2026-10-16 사용자 결정: 채팅에 노출됐지만 대화를 여러 번 압축·초기화했고 중요한 값이 아니라고 판단). 운영 공개 전(Task 092 최종 점검)에 한 번 더 판단한다.
+- **Redis 비밀번호·TMDB 토큰 재설정은 하지 않기로 했다**(2026-10-16 사용자 결정: 채팅에 노출됐지만 대화를 여러 번 압축·초기화했고 중요한 값이 아니라고 판단). 운영 공개 전(Task 092 최종 점검)에 한 번 더 판단한다. **Google 클라이언트 시크릿도 같은 이유로 재발급하지 않기로 했다**(2026-10-17 사용자 결정, 로컬 `.env` 값이 대화 화면에 노출됨). 같은 방침으로 Task 092에서 한 번 더 판단한다.
 - (완료 2026-10-16) **Google OAuth 값 확인**: 클라이언트는 Task 002에서 만들었고, 로컬 `.env`에 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET`이 있고 승인된 리디렉션 URI에 `http://localhost:5173/api/login/oauth2/code/google`이 등록돼 있음을 사용자가 확인했다. 운영 URI는 Task 092 최종 점검 때 추가한다.
 - **TMDB 공식 로고 파일 준비(Task 052 마무리, 선택)**: https://www.themoviedb.org/about/logos-attribution 에서 받아 `frontend/public/`에 둔다. 없으면 About은 자리표시 박스를 유지한다. 파일을 두면 `AboutScreen`의 자리표시를 교체한다(Task 003 238행의 사용 조건은 아직 확인하지 않았다).
 - **아침 실서버 확인 시나리오(프론트 연결 PR 전, 2026-10-16 밤 구현분)**: 에이전트는 실서버·실제 Google 로그인을 확인하지 못했다. 백엔드(local)와 프론트(`VITE_USE_MOCK` 끔)를 띄우고 순서대로 본다.
@@ -108,17 +108,31 @@
 
 **로컬 정리(요청받을 때만)**: 병합된 로컬 브랜치와 옛 워크트리(`feature/f1-*`, `feature/f2-design-tokens`, `feature/b0-*`, `feature/b2-engine-*`, `feature/docs-*` 등), 워크트리 `ottnavi-docs`·`ottnavi-backend-test`는 병합이 끝난 옛 브랜치 상태다.
 
+**시즌 제공처 대체 판정과 재수집 경로(2026-10-17, 브랜치 `fix/season-fallback-and-header-ui`, PRD 11절 43번)**: TMDB가 드라마 시즌 단위 KR 제공처를 비워 두는 작품이 많아(로컬 시즌 20,057개 중 4,203개, 21%가 7개 서비스 전부 `NO_KR_DATA`) 시즌 단위에 KR 키가 없을 때만 작품 단위로 대신 판정하도록 고쳤다(`77d19a5`). 시즌 단위에 KR 정보가 있고 flatrate만 없는 시즌은 대체하지 않고 `NOT_AVAILABLE`로 둔다(사용자 확정). 수집 Job은 대상을 고를 수 없어(전체 약 6시간 17분, TMDB 호출 약 9.6만 회) 판정 Step만 다시 돌리는 `scope=AVAILABILITY_TV`를 실행 API에 더한다(로컬 전용, 운영은 전체만 허용). 재수집은 로컬에서 날짜 지정(`app.collect.allow-target-date-override`, 어제 날짜)으로 실행하며 예상 소요 약 1시간 30분(추정, 실측 아님). **재수집 결과(2026-10-17 측정): 7개 서비스 전부 `NO_KR_DATA`인 드라마 시즌이 4,203개에서 102개로 줄었다**(실행 7번, 07:57~09:15 약 1시간 18분, 변경 29,888건. 남은 102개의 개별 원인은 확인하지 못했다). 배치 토큰은 사용자가 `.env`에서 직접 넣고 에이전트는 `.env`를 읽지 않는다.
+
 ## 5. 환경과 도구 함정 (Windows 11)
 
 - 셸 두 가지가 있다. Bash(Git Bash)와 PowerShell. Bash의 heredoc에 한글·따옴표가 섞이면 깨질 수 있으니 긴 파일은 Write 도구로 쓴다. `python`은 쓸 수 없고 node로 스크립트를 쓴다(줄바꿈 CRLF를 읽고 되돌려 쓸 때 보존한다).
 - `gradlew`: Bash의 `./gradlew`는 된다. PowerShell의 `.\gradlew.bat`에서 한글 테스트 이름 필터는 따옴표로 감싼다. 사용자는 PowerShell에서 `.\gradlew.bat test --tests "..."`를 쓴다(`--tests` 붙여 쓰기).
+- **새 로컬 DB는 OTT 구독상품·월 구독요금이 비어 있다**(요금은 Flyway에 넣지 않고 관리자 화면에서 입력하기로 했다, V3 주석). 요금 확인·플랜 계산을 써 보려면 `infra/dev-seed-products.sql`로 한 번 채운다(ROADMAP Task 004 가격표와 같은 값, 여러 번 실행해도 중복되지 않음, 실행 명령은 파일 맨 위 주석). 운영에는 쓰지 않고 운영 입력은 Task 095 ③이다.
 - Docker: Bash에서 경로 변환을 막으려면 `MSYS_NO_PATHCONV=1`. 통합 테스트(Testcontainers)는 Docker Desktop이 켜져 있어야 한다.
+- **로컬 `bootRun`은 `.env`를 자동으로 읽지 않는다.** `application-local.yml`에 `${GOOGLE_CLIENT_ID:local-dummy}`가 기본값이라 환경 변수가 없으면 구글 로그인이 `401 invalid_client`로 실패한다. 터미널에서 직접 켜려면 PowerShell에서 `$env:GOOGLE_CLIENT_ID`·`$env:GOOGLE_CLIENT_SECRET`을 사용자가 직접 설정한 뒤 `cd backend; .\gradlew.bat bootRun`을 실행한다. 프론트를 실서버로 볼 때는 `cd frontend; $env:VITE_USE_MOCK="false"; npm run dev`(`.env.local`보다 우선).
 - 저장소가 `core.autocrlf=true`라 작업 트리는 CRLF, 커밋은 LF다. `sed`로 대량 치환하면 줄바꿈이 깨질 수 있다(확인 필수).
 - `git mv`로 폴더를 옮기면 **빈 폴더가 디스크에 남는다**(Git은 추적하지 않지만 IDE에 보인다). 이동 직후 빈 폴더를 지운다.
 - 테스트 결과: `backend/build/test-results/test/*.xml`(합계), 보기 쉬운 HTML은 `backend/build/reports/tests/test/index.html`(워크트리마다 따로, 마지막으로 돌린 것만). 빌드가 UP-TO-DATE로 끝나면 `./gradlew test --rerun-tasks`로 새로 돌린다.
 - 커밋 전 `git status --short`에서 `AM`(스테이지 후 수정)·`AD`가 있으면 옛 내용이 커밋된다. `git add backend/src ...`로 경로를 명시해 다시 스테이지하고, 커밋하면 안 되는 안내서(`docs/TASKxxx_GUIDE.md`)는 넣지 않는다.
 - 비밀 값(`.env`, 토큰, 비밀번호)은 읽거나 출력하거나 커밋하지 않는다. 사용자 PC의 프로세스·게임은 조회하지 않는다.
 - MCP(playwright, shadcn, shrimp)가 자주 끊긴다 → 사용자에게 `/mcp` 재연결 요청.
+
+## 5-1. UI 피드백 모음 (1~3번은 fix 브랜치에서 반영 중)
+
+사용자가 화면을 보며 남긴 UI 수정 의견이다. 1~3번은 `fix/season-fallback-and-header-ui`에서 반영 중이고(병합 뒤 상태를 "반영"으로 바꾼다), 새 의견은 다음 프론트 작업(Task 107·108 등)에 병행해 반영한다. 피드백이 생기면 이 표에 계속 추가하고, 반영하면 상태를 바꾼다. 화면 방향(레이아웃·문구·정보 구조)은 사용자 결정이라 반영 전에 `ui-designer`로 1차안을 만들어 보여 준다.
+
+| # | 날짜 | 의견 | 코드 위치 | 반영 시 확인할 것 | 상태 |
+|---|---|---|---|---|---|
+| 1 | 2026-10-17 | 시즌 표기가 어떤 곳은 "Season 1", 어떤 곳은 "시즌 1"로 달라 보인다. 한 가지로 통일한다 | 시즌 이름은 서버가 내려주는 `seasonName`을 그대로 쓴다(`WishlistCard.tsx`, `WishlistRow.tsx`, `WishlistScreen.tsx`의 토스트, 목업은 `mocks/memberHandlers.ts`). 원인 추정: TMDB가 주는 시즌 이름이 작품마다 한국어("시즌 1")·영어("Season 1")로 섞여 있다. **추정이며 실제 응답으로 확인하지 못했다** | 어느 화면에서 영어가 보였는지(찜 목록, 상세, 플랜 결과 등), 계약에 시즌 번호 필드가 있는지 확인. 번호로 "시즌 N"을 직접 만들어 표시하면 데이터와 무관하게 통일된다. **확정(2026-10-17)**: 프론트에서 이름이 정확히 `Season N`일 때만 `시즌 N`으로 바꿔 표시하고 고유 이름은 그대로 둔다(로컬 DB 실측: "시즌 N" 16,038 / "Season N" 2,278 / 고유 이름 1,741) | 반영(fix 브랜치, PR 전) |
+| 2 | 2026-10-17 | 상단바의 "찜 목록" 글자 링크를 **하트(또는 장바구니) 아이콘 + 담은 개수 배지**로 바꾼다 | `app/HeaderAccountNav.tsx`(회원일 때 링크), `app/RootLayout.tsx:107`(비로그인 분기) | 개수는 찜 목록 API의 `activeItemCount`(계산 대상 개수, 상한 20)를 쓸 수 있다. "다 봤음" 항목은 개수에 넣지 않는다는 규칙(PRD 11절 36번)과 맞춘다. 아이콘만 두면 이름이 사라지므로 `aria-label`("찜 목록, 12개")이 필요하다. 375px 헤더 폭(로고·돋보기·관리·로그아웃)에 들어가는지 확인. **확정(2026-10-17)**: 하트 아이콘, 개수 배지는 1개 이상일 때만, 비로그인일 때는 보이지 않게 | 반영(fix 브랜치, PR 전) |
+| 3 | 2026-10-17 | 상단바에 지금 접속한 사람이 **"회원"인지 "관리자"인지 보일 필요가 없다**. 관리자는 "관리" 링크가 보이므로 구분이 된다. 라벨을 없앤다 | `app/HeaderAccountNav.tsx:78`(`session.role === 'ADMIN' ? '관리자' : '회원'`) | 라벨만 지우고 "관리" 링크(ADMIN에게만 표시)는 유지한다. 375px 윗줄 공간이 늘어 모바일 헤더 3줄 가능성(HANDOFF 0절)이 줄어든다. 관련 테스트(라벨 문구를 찾는 곳)도 같이 고친다 | 반영(fix 브랜치, PR 전) |
 
 ## 6. 문서 목록(설명용, 근거 아님)
 
