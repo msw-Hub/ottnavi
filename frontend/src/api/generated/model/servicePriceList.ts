@@ -12,7 +12,7 @@
 import type { ServicePrice } from './servicePrice';
 
 /**
- * 판매 중인 상품의 요금(서비스 ID 순, 같은 서비스는 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
+ * 판매 중인 상품의 요금(단품은 서비스 ID 순, 같은 서비스는 상품 ID 순이고 그다음에 번들이 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
  */
 export interface ServicePriceList {
   services: ServicePrice[];

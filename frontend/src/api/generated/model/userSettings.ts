@@ -13,7 +13,7 @@ import type { UserSubscription } from './userSubscription';
 import type { WatchPreset } from './watchPreset';
 
 /**
- * 내 설정. 온보딩 전이면 subscriptions는 빈 배열, 나머지 값은 null
+ * 내 설정. 온보딩 전이면 subscriptions는 빈 배열, isLowestPriceMode는 false, 나머지 값은 null
  */
 export interface UserSettings {
   /** 온보딩(첫 설정 저장)을 마쳤는지 */
