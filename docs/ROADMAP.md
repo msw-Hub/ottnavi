@@ -45,9 +45,9 @@
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 1/3 | 🔄 진행 중 (106 화면 1차안은 PR #75로 병합, 107·108 대기) |
-| 4 | 추가 기능 개발 | 5/24 | 🔄 진행 중 (068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80 병합. 070 변경 내역 화면 실제 API 연결은 구현 완료·병합 전) |
+| 4 | 추가 기능 개발 | 6/24 | 🔄 진행 중 (068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81 병합. 083 6개월 정리 작업은 구현 완료·병합 전) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 72/108 | |
+| 합계 | | 73/108 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -1324,7 +1324,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 8. Phase 4 — 추가 기능 개발 · 5/24
+## 8. Phase 4 — 추가 기능 개발 · 6/24
 
 **목표.**
 - PRD 2단계(O1~O4)와 3단계 일부(Q3 LLM, Q4 정확도 안내·반응형·접근성)를 4.4 순서(목업 → 계약·백엔드 → 교체)로 구현한다.
@@ -1485,13 +1485,14 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: 탈퇴 후 사용자 데이터 0행(알림 행 포함), `calc_run` 보존·`plan_id` NULL. 탈퇴·outbox 점유 경합 시 미발송은 Task 072로 이월.
 
-#### Task 083: 6개월 갱신 점검과 데이터 정리 작업 구현으로 약관 보관 기한 준수 ⬜ `[v0.1.0 포함]`
-- 태그: [B] · PRD: O4, FR-18, 6절 라이선스 · 선행: 080 · 브랜치: `feature/o4-data-retention`
+#### Task 083: 6개월 갱신 점검과 데이터 정리 작업 구현으로 약관 보관 기한 준수 ✅ `[v0.1.0 포함]`
+- 태그: [B] · PRD: O4, FR-18, 6절 라이선스 · 선행: 080 · 브랜치: `feature/o4-data-retention`(실제 작업 브랜치 `feature/o4-withdraw-cleanup`)
 - 구현 사항
-  - [ ] `fetched_at` 점검 쿼리(5개월 넘은 작품 수)와 별도 정리 Job(주 1회 cron + 관리자 수동 실행 API, 수집·정리 실행 중이면 409). 5개월 가까운 작품은 TMDB에 먼저 다시 묻고 "없다"고 답한 작품만 삭제(찜 제거·플랜 항목 처리·영향 ACTIVE 플랜 재계산). **설계에서 확인할 것: TMDB가 사라진 작품을 알리는 방식(404 여부)과 빈도**(Task 080 결정 a)
-  - [ ] `BATCH_*` 이력 180일 보관 정리, `calc_run`의 플랜과 끊긴 기록 180일 뒤 삭제(Task 080 결정 b·c)
+  - [x] `fetched_at` 점검 쿼리(5개월 넘은 작품 수)와 별도 정리 Job(주 1회 cron + 관리자 수동 실행 API, 수집·정리 실행 중이면 409). 5개월 가까운 작품은 TMDB에 먼저 다시 묻고 "없다"고 답한 작품만 삭제(찜 제거·플랜 항목 처리·영향 ACTIVE 플랜 재계산). **설계에서 확인할 것: TMDB가 사라진 작품을 알리는 방식(404 여부)과 빈도**(Task 080 결정 a)
+  - [x] `BATCH_*` 이력 180일 보관 정리, `calc_run`의 플랜과 끊긴 기록 180일 뒤 삭제(Task 080 결정 b·c)
 - 완료 기준
   - V-B: 기준을 넘긴 데이터만 정리되고, 찜(`wishlist_item`)과 ACTIVE·DRAFT 플랜의 `plan_item`이 참조하는 `watch_unit`은 삭제되지 않는(FK 위반 없음) 테스트가 통과한다.
+- 기록: 2026-10-18 구현·테스트 완료(미커밋, 브랜치 `feature/o4-withdraw-cleanup`). 구현: 새 패키지 `retention`(Job `retentionJob`의 Step 3개 = 작품 점검·배치 이력 정리·계산 기록 정리, 앞 Step이 실패해도 다음 Step 진행), `POST /api/admin/retention/executions`(202·409, ADMIN JWT 또는 배치 토큰, 새 오류 코드 없이 `BATCH_ALREADY_RUNNING` 재사용), `.github/workflows/retention.yml`(`workflow_dispatch`만 켜고 `schedule`은 주석). 정리·재계산·수집은 서로 실행 중이면 시작을 막는다(네 방향 모두 409). 마이그레이션 없음. 사용자 결정 Q1~Q5를 추천안으로 확정(2026-10-18): Q1 사라진 작품이 든 ARCHIVED 플랜은 통째 삭제, Q2 찜이 그 작품뿐이라 재계산할 수 없는 ACTIVE도 삭제, Q3 `calc_run`은 `plan_id` NULL·180일 지난 행을 구분 없이 삭제(비교 측정 행 포함), Q4 한 번에 가장 오래된 순 500건 상한(`app.retention.max-titles-per-run`), Q5 점검 조회 API 없이 로그만. 테스트: retention 관련 통합 18건(작품 점검 6·이력 정리 3·Job과 409 6·API 3)·단위 5건을 추가했고 전체 빌드 `./gradlew.bat build` 958건 중 실패 0·오류 0·건너뜀 1(기존 `EngineBenchmarkGenerator`). TMDB 404는 코드(`TmdbClient`의 404 → `TmdbNotFoundException`)와 일반 문서로만 확인했다: 삭제된 ID의 404와 삭제 빈도는 운영 수집 뒤 `tmdb.call{result=not_found}`로 실측한다. 실서버와 `retention.yml` 실행은 확인하지 못했다(`main` 병합 뒤 확인). 알려진 동작: `.on("*")`로 다음 Step에 넘어가면 실패한 Step의 상태가 ABANDONED로 바뀌지만 종료 코드는 FAILED로 남고 Job은 COMPLETED로 끝난다.
 
 #### Task 084: 탈퇴 화면 실제 API 연결로 O4 완성 ⬜ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O4, SCR-13 · 선행: 082 · 브랜치: `feature/o4-withdrawal-api`
@@ -1730,7 +1731,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-7 | api-contract.md `tags`에 인증·알림 태그 없음 | **해소**: `auth`, `notification` 추가됨 | api-contract.md | — |
 | R-8 | 인증 경로가 backend.md 3분류에 걸림 | **해소**: backend.md·api-contract.md가 인증 경로를 3분류의 예외로 명시 | backend.md, api-contract.md | — |
 | R-9 | 관리자 가격 겹침, 찜 상한 초과(`WISHLIST_LIMIT_EXCEEDED` 제안, 2026-10-10) 등 TECH·rules에 없는 오류 코드가 필요. `error-codes.md`에 제안 등록 후 사용자 승인 | 미결 | FR-19, R11-30 | 해당 Task |
-| R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 확정(2026-10-17, Task 080): 기한에 가까운 작품은 먼저 TMDB에 다시 물어 갱신하고, TMDB가 "없다"고 답한 작품만 플랜·찜을 고려하지 않고 삭제(찜 제거, 플랜 항목 처리, 영향 ACTIVE 플랜 재계산). 사라짐을 알리는 방식(404 여부)·빈도는 Task 083 설계에서 확인 | 확정(Task 080, 083 설계에서 TMDB 응답 확인) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
+| R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 확정(2026-10-17, Task 080): 기한에 가까운 작품은 먼저 TMDB에 다시 물어 갱신하고, TMDB가 "없다"고 답한 작품만 플랜·찜을 고려하지 않고 삭제(찜 제거, 플랜 항목 처리, 영향 ACTIVE 플랜 재계산). 사라짐을 알리는 방식(404 여부)·빈도는 Task 083 설계에서 확인. **Task 083 구현 확정(2026-10-18)**: 작품 단위 상세 조회의 404만 "사라짐"으로 보고(429·5xx·연결 실패는 삭제 근거가 아님), 찜·DRAFT 삭제 → 영향 ACTIVE 재계산 → 남은 플랜(ARCHIVED, 재계산 불가 ACTIVE)은 통째 삭제 → 작품 삭제. 삭제된 ID의 404와 빈도는 운영 수집 뒤 `tmdb.call{result=not_found}`로 실측 | 확정(Task 080, 구현 Task 083) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
 | R-11 | 초기 `main` 직접 커밋 범위. git.md는 "폴더 골격, 문서, CI 골격"까지 허용. 최소 빌드 프로젝트(006·007)와 미커밋 문서 변경을 초기 세팅에 포함한다고 가정 | 가정 | git.md | 2026-10-05 |
 | R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | **해소(2026-10-06, 사용자 결정)**: 저장소 연결 + Cloudtype 콘솔 수동 배포. GitHub Actions 배포와 Cloudtype 토큰은 당분간 쓰지 않는다(Task 020 `기록:`) | git.md | 2026-10-12 |
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |

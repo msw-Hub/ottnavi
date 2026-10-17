@@ -83,7 +83,8 @@ public class SecurityConfig {
 				// 위에서부터 먼저 맞는 규칙이 적용된다
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/public/**", "/api/auth/**", "/api/oauth2/**", "/api/login/**").permitAll()
-						.requestMatchers("/api/admin/collect/**", "/api/admin/plans/monthly/**")
+						.requestMatchers("/api/admin/collect/**", "/api/admin/plans/monthly/**",
+								"/api/admin/retention/**")
 								.hasAnyRole("ADMIN", "BATCH")
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/**").authenticated()

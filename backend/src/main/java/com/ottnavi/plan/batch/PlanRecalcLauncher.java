@@ -6,6 +6,7 @@ import com.ottnavi.collect.job.CollectExecutionRules;
 import com.ottnavi.collect.job.CollectExecutionStatus;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.plan.exception.PlanRecalcAlreadyRunningException;
+import com.ottnavi.retention.job.RetentionExecutionQuery;
 import java.time.Clock;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class PlanRecalcLauncher {
 	private final Job planRecalcJob;
 	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 	private final CollectExecutionQuery collectExecutionQuery;
+	private final RetentionExecutionQuery retentionExecutionQuery;
 	private final ServerBootTime serverBootTime;
 	private final Clock clock;
 
@@ -38,11 +40,12 @@ public class PlanRecalcLauncher {
 
 	public PlanRecalcLauncher(@Qualifier("planRecalcJobOperator") JobOperator operator, Job planRecalcJob,
 			PlanRecalcExecutionQuery planRecalcExecutionQuery, CollectExecutionQuery collectExecutionQuery,
-			ServerBootTime serverBootTime, Clock clock) {
+			RetentionExecutionQuery retentionExecutionQuery, ServerBootTime serverBootTime, Clock clock) {
 		this.operator = operator;
 		this.planRecalcJob = planRecalcJob;
 		this.planRecalcExecutionQuery = planRecalcExecutionQuery;
 		this.collectExecutionQuery = collectExecutionQuery;
+		this.retentionExecutionQuery = retentionExecutionQuery;
 		this.serverBootTime = serverBootTime;
 		this.clock = clock;
 	}
@@ -78,7 +81,12 @@ public class PlanRecalcLauncher {
 				}
 			}
 
-			// 3. 새 실행으로 시작한다
+			// 3. 데이터 정리가 실행 중인지(정리가 플랜을 지우는 중에 재계산이 끼면 안 된다)
+			if (retentionExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
+				throw new PlanRecalcAlreadyRunningException("데이터 정리가 실행 중이라 재계산을 시작할 수 없습니다.");
+			}
+
+			// 4. 새 실행으로 시작한다
 			JobExecution execution = operator.start(planRecalcJob,
 					PlanRecalcJobParameters.of(collectExecutionId, trigger, clock.instant()));
 			log.info("재계산을 시작했다: executionId={}, trigger={}, collectExecutionId={}", execution.getId(), trigger,

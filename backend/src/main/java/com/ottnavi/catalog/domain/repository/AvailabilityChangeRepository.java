@@ -7,10 +7,16 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AvailabilityChangeRepository extends JpaRepository<AvailabilityChange, Long> {
+
+    /** 시청 단위들의 제공 상태 변경 이력을 벌크로 지운다. 작품 삭제 정리가 쓴다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from AvailabilityChange c where c.watchUnit.id in :unitIds")
+    int deleteByWatchUnitIdIn(@Param("unitIds") Collection<Long> unitIds);
 
     /** 시청 단위별 가장 최근 변경 시각. 변경이 없는 단위는 행이 없다. 각 행은 [watchUnitId(Long), 최근 changedAt(Instant)] */
     @Query("select c.watchUnit.id, max(c.changedAt) from AvailabilityChange c "

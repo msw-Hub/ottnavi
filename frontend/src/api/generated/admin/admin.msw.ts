@@ -31,7 +31,8 @@ import type {
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecutionPage,
   CommonResponsePlanBenchmark,
-  CommonResponsePlanRecalcExecutionAccepted
+  CommonResponsePlanRecalcExecutionAccepted,
+  CommonResponseRetentionExecutionAccepted
 } from '../model';
 
 
@@ -62,6 +63,8 @@ export const getRecoverCollectExecutionResponseMock = (): CommonResponseCollectE
 export const getRestartCollectExecutionResponseMock = (): CommonResponseCollectExecutionAccepted => ({"success":true,"data":{"executionId":6}})
 
 export const getCreatePlanRecalcExecutionResponseMock = (): CommonResponsePlanRecalcExecutionAccepted => ({"success":true,"data":{"executionId":14}})
+
+export const getCreateRetentionExecutionResponseMock = (): CommonResponseRetentionExecutionAccepted => ({"success":true,"data":{"executionId":21}})
 
 export const getCreatePlanBenchmarkResponseMock = (overrideResponse: Partial<Extract<CommonResponsePlanBenchmark, object>> = {}): CommonResponsePlanBenchmark => ({success: faker.datatype.boolean(), data: {"measuredRuns":3,"warmupRuns":1,"caseCount":1,"cases":[{"caseName":"case-07-greedy-trap","inputHash":"9f2c000000000000000000000000000000000000000000000000000000000000","candidateCount":27,"exact":{"calcRunId":101,"mustCompleted":1,"score":4,"totalCost":28000,"elapsedMicros":21,"elapsedMs":0,"matchesExpected":true},"greedy":{"calcRunId":102,"mustCompleted":1,"score":2,"totalCost":8000,"elapsedMicros":9,"elapsedMs":0,"matchesExpected":true},"mustDiff":0,"scoreDiff":-2,"costDiff":-20000}],"skippedCaseNames":[]}, ...overrideResponse})
 
@@ -244,6 +247,18 @@ export const getCreatePlanRecalcExecutionMockHandler = (overrideResponse?: Commo
   }, options)
 }
 
+export const getCreateRetentionExecutionMockHandler = (overrideResponse?: CommonResponseRetentionExecutionAccepted | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseRetentionExecutionAccepted> | CommonResponseRetentionExecutionAccepted), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/retention/executions', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getCreateRetentionExecutionResponseMock(),
+      { status: 202
+      })
+  }, options)
+}
+
 export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonResponsePlanBenchmark | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanBenchmark> | CommonResponsePlanBenchmark), options?: RequestHandlerOptions) => {
   return http.post('/api/admin/plan-benchmarks', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -271,5 +286,6 @@ export const getAdminMock = () => [
   getRecoverCollectExecutionMockHandler(),
   getRestartCollectExecutionMockHandler(),
   getCreatePlanRecalcExecutionMockHandler(),
+  getCreateRetentionExecutionMockHandler(),
   getCreatePlanBenchmarkMockHandler()
 ]

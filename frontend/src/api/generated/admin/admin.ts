@@ -41,6 +41,7 @@ import type {
   CommonResponseCollectExecutionPage,
   CommonResponsePlanBenchmark,
   CommonResponsePlanRecalcExecutionAccepted,
+  CommonResponseRetentionExecutionAccepted,
   ConflictResponse,
   CreateAdminProductRequest,
   CreateCollectExecutionRequest,
@@ -857,7 +858,7 @@ export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listC
 /**
  * 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
  * MVP는 `tier: ALL`만 받는다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 설정 키 `app.collect.allow-target-date-override`가 true인 환경(로컬)에서만 허용하고(오늘 이하), 운영에서는 오늘(KST)만 받으며 다른 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
- * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도, 매월 재계산이 실행 중일 때도 `BATCH_ALREADY_RUNNING`(409)이다(재계산이 끝난 뒤 다시 요청). 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
+ * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도, 매월 재계산이나 데이터 정리가 실행 중일 때도 `BATCH_ALREADY_RUNNING`(409)이다(끝난 뒤 다시 요청). 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
  * 선택 값 `scope`(`AVAILABILITY_TV`)를 주면 후보·상세 Step을 건너뛰고 드라마 시즌 제공 상태 판정 Step만 실행한다(이미 모은 데이터에 새 판정 규칙을 다시 적용할 때). `targetDate`처럼 로컬에서만 받고 운영에서는 400(`fieldErrors.scope`)이다. 중복·재시작 판정은 날짜·범위·scope가 같은 실행끼리만 한다(같은 날짜에 전체 수집이 완료돼도 scope 실행은 새로 시작된다).
  * 같은 날짜·범위의 마지막 실행이 실패(`FAILED`)면 새 실행으로 다시 시작해 202다(Spring Batch는 같은 식별 파라미터로 시작하면 실패한 인스턴스를 재시작한다, TECH 3절 "실패한 실행은 같은 파라미터로 restart").
  * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 `tier`·`scope` 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`, 운영에서 `scope`를 지정하면 `fieldErrors.scope`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중이거나 매월 재계산이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
@@ -1169,7 +1170,7 @@ export const useRestartCollectExecution = <TError = ErrorType<BadRequestResponse
     }
     /**
  * 매월 재계산 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 재계산은 수집이 끝나면 자동으로 이어 돌고, 이 API는 자동 실행이 실패했을 때 관리자가 다시 돌리는 복구용이다. 요청 본문은 없다.
- * 재계산이나 수집이 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+ * 재계산·수집·데이터 정리 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
  * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
  * @summary 매월 재계산 수동 실행 요청
  */
@@ -1234,6 +1235,75 @@ export const useCreatePlanRecalcExecution = <TError = ErrorType<UnauthorizedResp
         TContext
       > => {
       return useMutation(getCreatePlanRecalcExecutionMutationOptions(options), queryClient);
+    }
+    /**
+ * 데이터 정리 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. GitHub Actions cron이 주 1회 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
+ * 하는 일은 세 가지다. (1) 마지막 수집이 5개월을 넘은 작품을 TMDB에 다시 물어 있으면 갱신하고, TMDB가 없다고 답한(404) 작품은 찜·플랜과 함께 삭제한다(한 번에 가장 오래된 순 최대 500건, 나머지는 다음 실행). 사라진 작품이 든 현재 플랜은 찜을 뺀 채 다시 계산하고, 저장 전 초안과 보관 플랜은 통째로 지운다. 찜이 그 작품뿐이라 다시 계산할 수 없는 현재 플랜도 지운다. (2) 180일이 지난 배치 실행 이력을 지운다. (3) 180일이 지난, 플랜과 연결이 끊긴 계산 기록(`calc_run`)을 지운다.
+ * 정리·재계산·수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 정리 실행 중에는 수집·재계산 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+ * @summary 데이터 정리 실행 요청
+ */
+export const createRetentionExecution = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseRetentionExecutionAccepted>(
+      {url: `/admin/retention/executions`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateRetentionExecutionMutationKey = () => ['createRetentionExecution'] as const;
+
+export const getCreateRetentionExecutionMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetentionExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRetentionExecution>>, TError,void, TContext> => {
+
+const mutationKey = getCreateRetentionExecutionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRetentionExecution>>, void> = () => {
+
+
+          return  createRetentionExecution(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRetentionExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof createRetentionExecution>>>
+
+    export type CreateRetentionExecutionMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
+
+
+    /**
+ * @summary 데이터 정리 실행 요청
+ */
+export const useCreateRetentionExecution = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRetentionExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createRetentionExecution>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateRetentionExecutionMutationOptions(options), queryClient);
     }
     /**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.

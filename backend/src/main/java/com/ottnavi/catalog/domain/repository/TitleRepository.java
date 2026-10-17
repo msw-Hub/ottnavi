@@ -2,10 +2,13 @@ package com.ottnavi.catalog.domain.repository;
 
 import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.enums.MediaType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,4 +28,15 @@ public interface TitleRepository extends JpaRepository<Title, Long> {
             countQuery = "select count(t) from Title t "
                     + "where t.title ilike :pattern escape :escapeChar or t.originalTitle ilike :pattern escape :escapeChar")
     Page<Title> searchByTitle(@Param("pattern") String pattern, @Param("escapeChar") char escapeChar, Pageable pageable);
+
+    /** 마지막 수집 시각이 기준보다 이른(오래된) 작품 수. 6개월 갱신 점검이 센다 */
+    long countByFetchedAtBefore(Instant cutoff);
+
+    /** 마지막 수집 시각이 기준보다 이른 작품을 가장 오래된 순(같으면 id 순)으로 조회한다. 한 번에 처리할 건수는 Pageable로 자른다 */
+    List<Title> findByFetchedAtBeforeOrderByFetchedAtAscIdAsc(Instant cutoff, Pageable pageable);
+
+    /** 작품 한 행을 벌크로 지운다. 하위 행(시청 단위·장르·출연진)은 호출 전에 먼저 지워야 한다(FK가 막는다) */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from Title t where t.id = :titleId")
+    int deleteByTitleId(@Param("titleId") Long titleId);
 }
