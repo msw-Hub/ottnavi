@@ -8,7 +8,12 @@ import { Providers } from '@/app/providers'
 import { SettingsScreen } from '@/features/onboarding/components/SettingsScreen'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { resetMockMemberState } from '@/mocks/memberHandlers'
-import { getMockRole, resetMockSession, setMockRole } from '@/mocks/mockSession'
+import {
+  getMockRole,
+  resetMockSession,
+  setMockOnboardingDone,
+  setMockRole,
+} from '@/mocks/mockSession'
 
 /*
  * 온보딩·내 설정 화면 테스트(Task 028). 저장에 성공하면 로그인 전에 보던 화면(location.state.from)으로 돌아가고,
@@ -86,6 +91,25 @@ describe('내 설정 저장 후 이동', () => {
     await fillBudgetAndSave(user)
 
     expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+  })
+})
+
+describe('회원 탈퇴 링크(Task 081)', () => {
+  it('가입을 마친 회원의 내 설정 화면 맨 아래에 탈퇴 화면으로 가는 링크가 있다', async () => {
+    setMockOnboardingDone(true) // 목업 서버가 기본 설정(isOnboardingDone=true)을 돌려준다
+    renderSettings()
+    // 제목은 불러오는 중에도 "내 설정"이라, 폼(맨 아래 링크 포함)이 그려질 때까지 링크를 기다린다
+    expect(await screen.findByRole('link', { name: '회원 탈퇴' })).toHaveAttribute(
+      'href',
+      '/settings/withdraw',
+    )
+  })
+
+  it('첫 방문(온보딩) 화면에는 탈퇴 링크가 없다', async () => {
+    renderSettings()
+    await screen.findByRole('heading', { level: 1, name: '시작하기' })
+
+    expect(screen.queryByRole('link', { name: '회원 탈퇴' })).not.toBeInTheDocument()
   })
 })
 
