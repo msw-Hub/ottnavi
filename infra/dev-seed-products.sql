@@ -38,6 +38,10 @@ BEGIN
 		-- 4. 구성 서비스(STANDARD)를 연결한다
 		INSERT INTO product_component (product_id, ott_service_id, tier)
 		SELECT new_product_id, id, 'STANDARD' FROM ott_service WHERE code = seed.service_code;
+		-- 서비스 코드가 없으면 구성 서비스 0행인 상품이 남지 않도록 중단한다(전체가 한 트랜잭션이라 되돌려진다)
+		IF NOT FOUND THEN
+			RAISE EXCEPTION '서비스 코드를 찾을 수 없다: %', seed.service_code;
+		END IF;
 
 		-- 5. 첫 가격 행: 오늘(한국 날짜)부터 적용, 확인 시각은 지금
 		INSERT INTO product_price (product_id, monthly_price, effective_from, last_verified_at)
