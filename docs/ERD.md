@@ -408,6 +408,18 @@ erDiagram
 - **같은 트랜잭션에서 지우고 다시 넣기.** Hibernate는 같은 트랜잭션 안에서 `delete` 뒤 `save`로 같은 유니크 키를 넣으면 INSERT를 DELETE보다 먼저 실행해 유니크 위반이 난다. 대상은 `user_subscription`의 전체 교체(설정 PUT)와 출연진·장르 재수집이다. 벌크 JPQL 삭제를 트랜잭션 첫 동작으로 먼저 하거나, 기존 행과 비교해 갱신한다(TECH 6절).
 - **같은 플랜·같은 사용자 소속은 앱이 보장한다(Task 034 CodeRabbit #54 결정).** `plan_assignment`의 `plan_item_id`와 `plan_month_id`는 각각 존재하는지만 DB가 확인하므로, 서로 다른 플랜의 찜과 달을 한 행으로 묶어도 DB는 막지 않는다. `plan.previous_plan_id`도 다른 사용자의 플랜을 가리킬 수 있다. 쓰는 곳이 plan 서비스 하나뿐이고 계산 결과를 한 트랜잭션으로 통째로 저장하므로 DB 제약(복합 FK, `plan_id` 중복 컬럼)은 두지 않는다. 대신 서비스가 한 플랜의 찜·달만 묶고 `previous_plan_id`는 같은 `user_id`의 플랜만 가리키게 하며, 통합 테스트로 확인한다(Task 064, 069).
 - **삭제 정책.** FK `ON DELETE CASCADE`로 DB가 하위 행을 지운다(확정, TECH T-1). 사용자가 탈퇴하면 `users` 행 하나를 지워 C·D·E 영역의 사용자 행이 함께 삭제되고, DRAFT를 덮어쓸 때도 같은 규칙을 쓴다. calc_run은 통계용으로 남기고 plan_id만 NULL로 바꾼다. JPA 엔티티에는 cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`)를 걸지 않고 plan 삭제는 벌크 JPQL로 한다. FK 동작은 Flyway 스크립트가 기준이고(`ddl-auto=validate`는 FK의 ON DELETE까지 검사하지 않는다), Testcontainers 테스트로 고정한다.
+- **`plan.change_summary` 형식(Task 069, 확정).** 기존 TEXT 컬럼 안의 JSON이다(마이그레이션 없음). 매월 재계산이 이전 플랜과 달라진 점과 그 이유를 기록할 때만 새 ACTIVE 플랜에 남기고, 직접 저장한 플랜과 변화·이유가 없는 재계산은 NULL이다. 변경 내역 API는 이 값이 있는 플랜을 최신순 최대 6건 내려준다(`changeId`=plan.id, `changedAt`=activated_at, `planType`·`dataAsOf`는 plan 열에서 읽는다). 형식:
+  ```json
+  {"v":1,"summary":"11월 구독이 넷플릭스에서 디즈니+로 바뀌었어요 (외 1건)",
+   "reasons":[{"reasonType":"TITLE_LEFT_SERVICE","description":"…","watchUnitId":10,"ottServiceId":1}],
+   "monthChanges":[{"month":"2026-11","isConfirmed":true,
+     "previousProducts":[{"productId":1,"ottServiceIds":[1],"productName":"…"}],"currentProducts":[…],
+     "previousCost":13500,"currentCost":9900}],
+   "titleChanges":[{"changeType":"CHANGED_SERVICE","watchUnitId":10,"title":"카지노","seasonNumber":1,
+     "previous":{"month":"2026-11","ottServiceId":1},"current":{"month":"2026-11","ottServiceId":5}}]}
+  ```
+  - `v`는 형식 버전이다(현재 1). 모르는 버전이나 깨진 JSON은 읽을 때 건너뛴다(목록에서 뺀다). `reasons[].watchUnitId`·`ottServiceId`와 `titleChanges[].watchUnitId`는 내부용이라 응답에서 뺀다. `monthChanges[].previousCost`는 이전 플랜에 없던 달이면 null이고, 새 플랜에만 있는 달도 항상 `monthChanges`에 넣는다. `ottServiceIds`는 상품이 포함하는 서비스 전부이며 단품은 1개다(번들은 Task 076).
+- **ARCHIVED 보관 규칙(Task 069, 결정 2).** 매월 재계산 때마다 변경 기록(`change_summary`)이 있는 플랜(ACTIVE 포함) 최근 6개와 바로 이전 플랜 1개만 남기고 나머지 ARCHIVED를 벌크 JPQL로 지운다(하위 행은 FK CASCADE, `calc_run.plan_id`·`previous_plan_id`는 SET NULL). 직접 저장으로 보관된 ARCHIVED도 이 대상이다.
 
 **FK 삭제 동작**
 

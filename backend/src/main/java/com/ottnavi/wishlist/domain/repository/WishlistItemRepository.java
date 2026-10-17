@@ -1,6 +1,7 @@
 package com.ottnavi.wishlist.domain.repository;
 
 import com.ottnavi.wishlist.domain.entity.WishlistItem;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,9 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItem, Long
 
 	/** "다 봤음"이 아닌 찜만 ID 순으로 조회한다(플랜 계산 입력) */
 	List<WishlistItem> findAllByUserIdAndWatchedAtIsNullOrderByIdAsc(Long userId);
+
+	/** since 이후(초과)에 "다 봤음"으로 표시된 찜(매월 재계산의 시청 체크 이유 판정) */
+	List<WishlistItem> findAllByUserIdAndWatchedAtAfter(Long userId, Instant since);
 
 	/** 사용자가 이미 찜한 시청 단위인지 찾는다(중복 추가 판정) */
 	Optional<WishlistItem> findByUserIdAndWatchUnitId(Long userId, Long watchUnitId);

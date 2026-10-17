@@ -20,6 +20,7 @@ import com.ottnavi.collect.job.CollectTier;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.global.error.FieldValidationException;
 import com.ottnavi.global.error.ResourceNotFoundException;
+import com.ottnavi.plan.batch.PlanRecalcExecutionQuery;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
@@ -52,6 +53,7 @@ public class CollectExecutionService {
 	private final CollectExecutionQueryService collectExecutionQueryService;
 	private final CollectProperties collectProperties;
 	private final ServerBootTime serverBootTime;
+	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 
 	private final ReentrantLock launchLock = new ReentrantLock(); // 사전 검사와 시작 사이에 다른 요청이 끼지 못하게 한다
 
@@ -98,6 +100,7 @@ public class CollectExecutionService {
 			// 8. 판정 결과가 거절이면 예외로 바꾼다
 			LaunchVerdict verdict = CollectExecutionRules.judgeLaunch(latestStatus, otherRunning != null);
 			throwIfRejected(verdict, otherRunning);
+			throwIfRecalcRunning();
 
 			// 9. 실패한 최신 실행이 있으면 재시작, 없으면 새로 시작
 			long executionId;
@@ -147,6 +150,7 @@ public class CollectExecutionService {
 			CollectExecutionRecord otherRunning = context.findRunningOtherThan(latest.instanceId());
 			LaunchVerdict verdict = CollectExecutionRules.judgeLaunch(latestStatus, otherRunning != null);
 			throwIfRejected(verdict, otherRunning);
+			throwIfRecalcRunning();
 
 			// 5. 허용이면 최신 실행을 이어서 새 실행으로 시작한다
 			long newExecutionId = restartLaunch(latest.executionId());
@@ -203,6 +207,13 @@ public class CollectExecutionService {
 		ScopeVerdict verdict = CollectExecutionRules.judgeScope(scope, collectProperties.allowTargetDateOverride());
 		if (verdict == ScopeVerdict.NOT_ALLOWED) {
 			throw new FieldValidationException("scope", "운영 환경에서는 scope를 지정할 수 없습니다. 전체 수집만 실행할 수 있습니다.");
+		}
+	}
+
+	/** 재계산이 실행 중이면 수집 시작·재시작을 409 BATCH_ALREADY_RUNNING으로 막는다(서버 기동 전 기록은 실행 중으로 보지 않는다) */
+	private void throwIfRecalcRunning() {
+		if (planRecalcExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
+			throw new BatchAlreadyRunningException("재계산이 실행 중이라 수집을 시작할 수 없습니다.");
 		}
 	}
 

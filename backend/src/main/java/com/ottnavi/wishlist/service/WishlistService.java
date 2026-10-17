@@ -20,6 +20,8 @@ import com.ottnavi.wishlist.service.model.WishlistItemView;
 import com.ottnavi.wishlist.service.model.WishlistView;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -91,6 +93,18 @@ public class WishlistService {
 		List<ActiveWishlistEntry> result = new ArrayList<>();
 		for (WishlistItem item : wishlistItemRepository.findAllByUserIdAndWatchedAtIsNullOrderByIdAsc(userId)) {
 			result.add(new ActiveWishlistEntry(item.getId(), item.getWatchUnitId(), item.getPriority()));
+		}
+		return result;
+	}
+
+	/**
+	 * since 이후(초과)에 "다 봤음"으로 표시된 찜의 시청 단위 ID를 돌려준다. 매월 재계산이 "시청 체크" 이유를 판정할 때 쓴다.
+	 * 이후에 다시 되돌린(watched_at이 null이 된) 찜은 포함되지 않는다.
+	 */
+	public Set<Long> listWatchedUnitIdsAfter(Long userId, Instant since) {
+		Set<Long> result = new HashSet<>();
+		for (WishlistItem item : wishlistItemRepository.findAllByUserIdAndWatchedAtAfter(userId, since)) {
+			result.add(item.getWatchUnitId());
 		}
 		return result;
 	}
