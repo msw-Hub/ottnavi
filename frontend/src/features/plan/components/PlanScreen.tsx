@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import {
   CalculatorIcon,
   CircleCheckIcon,
+  HistoryIcon,
   InfoIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
@@ -25,6 +26,7 @@ import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
 import { formatDateTimeKorean } from '@/lib/format'
+import { isMockMode } from '@/lib/mockScenario'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
 function getFailureMessage(error: unknown): string {
@@ -180,9 +182,26 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
         </Alert>
       )}
 
-      <div className="grid gap-1">
-        <h2 className="text-xl font-semibold">내 현재 플랜 · {typeName}</h2>
-        {savedAt && <p className="text-sm text-muted-foreground tabular-nums">{savedAt}에 저장</p>}
+      {/* 변경 내역(SCR-11) 진입점은 저장한 플랜이 있을 때만 의미가 있어(매월 재계산은 저장한 플랜을 기준으로 한다) 이 화면에만 둔다.
+          제목 줄 오른쪽(좁은 화면은 아래)에 둬 긴 플랜을 다 내려가지 않아도 보이게 했다. 머리글 메뉴는 늘리지 않는다(Task 068 사용자 결정 5)
+          이전: <div className="grid gap-1"> 안에 제목·저장 시각만 있었다 */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+        <div className="grid gap-1">
+          <h2 className="text-xl font-semibold">내 현재 플랜 · {typeName}</h2>
+          {savedAt && (
+            <p className="text-sm text-muted-foreground tabular-nums">{savedAt}에 저장</p>
+          )}
+        </div>
+        {/* 운영에는 변경 내역 API가 아직 없어 링크를 목업 모드에서만 보인다(CodeRabbit 지적 반영, Task 070에서 조건을 없앤다) */}
+        {isMockMode() && (
+          <Link
+            to={`/plan/history${search}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <HistoryIcon aria-hidden="true" className="size-4" />
+            변경 내역 보기
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-6">
