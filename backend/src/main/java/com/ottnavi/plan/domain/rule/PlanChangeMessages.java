@@ -139,7 +139,7 @@ public final class PlanChangeMessages {
 		if (last >= 0xAC00 && last <= 0xD7A3) {
 			return (last - 0xAC00) % 28 == 8;
 		}
-		return last == '1' || last == '8'; // 일·팔은 ㄹ 받침
+		return last == '1' || last == '7' || last == '8'; // 일·칠·팔은 ㄹ 받침
 	}
 
 	private static char lastChar(String word) {

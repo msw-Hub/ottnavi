@@ -1011,7 +1011,7 @@ paths:
       summary: 매월 재계산 수동 실행 요청
       description: |
         매월 재계산 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 재계산은 수집이 끝나면 자동으로 이어 돌고, 이 API는 자동 실행이 실패했을 때 관리자가 다시 돌리는 복구용이다. 요청 본문은 없다.
-        재계산이 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+        재계산이나 수집이 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
         오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
       responses:
         '202':
