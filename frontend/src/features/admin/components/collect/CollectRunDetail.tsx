@@ -42,7 +42,7 @@ function StatusChange({
 }
 
 /**
- * 수집 실행 한 건의 펼침 영역이다(SCR-16): 이 실행에서 제공 상태가 바뀐 작품 목록과, 2단계부터 제공할 항목 자리.
+ * 수집 실행 한 건의 펼침 영역이다(SCR-16): 이 실행에서 제공 상태가 바뀐 작품 목록과, 재계산 대상 플랜 수와 2단계부터 제공할 항목 자리.
  *
  * 실행 중인 행은 목록을 불러오지 않고 "끝나면 보인다"고만 알린다(요청도 보내지 않는다).
  * 성공한 행은 열릴 때 처음 불러온다(이 컴포넌트는 펼쳤을 때만 그려져서, 펼치기 전에는 요청이 없다).
@@ -106,8 +106,13 @@ export function CollectRunDetail({ id, execution, serviceNames }: CollectRunDeta
       {body}
       <dl className="grid gap-1.5 border-t border-border pt-3 text-sm sm:grid-cols-[auto_1fr] sm:gap-x-4">
         <dt className="text-muted-foreground">재계산 대상 플랜</dt>
+        {/* 수집 뒤 이어 돈 재계산의 대상 플랜 수(계약 recalcTargetCount). null이면 재계산이 없거나 아직 끝나지 않았다 */}
         <dd>
-          <PhaseLaterTag label="2단계부터 제공" />
+          {execution.recalcTargetCount === null ? (
+            <span className="text-muted-foreground">집계 전</span>
+          ) : (
+            <span className="tabular-nums">{execution.recalcTargetCount}개</span>
+          )}
         </dd>
         <dt className="text-muted-foreground">알림 발송 상태</dt>
         <dd>

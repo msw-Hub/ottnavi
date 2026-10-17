@@ -332,7 +332,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
-      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
+      recalcTargetCount: 12, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
     },
     {
       executionId: 4,
@@ -346,7 +346,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
-      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
+      recalcTargetCount: 8, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
     },
     {
       executionId: 3,
@@ -374,7 +374,7 @@ export function buildMockCollectExecutions(
       failureReason: 'TMDB 응답 지연(연속 3회 시간 초과)으로 중단했습니다.',
       canRecover: false,
       canRestart: true, // 같은 날짜·범위의 최신 실패이고 실행 중인 수집이 없다
-      recalcTargetCount: null,
+      recalcTargetCount: null, // 실패한 수집은 재계산이 돌지 않아 null
     },
     {
       executionId: 1,
@@ -388,7 +388,7 @@ export function buildMockCollectExecutions(
       failureReason: null,
       canRecover: false,
       canRestart: false,
-      recalcTargetCount: null, // 재계산 결과 표시는 Task 069 화면 몫이라 목업은 비워 둔다
+      recalcTargetCount: 7, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
     },
   ]
 }

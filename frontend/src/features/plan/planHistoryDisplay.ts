@@ -15,7 +15,7 @@ import {
   PlusIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { PlanChangeReasonType, PlanTitleChangeType } from '@/features/plan/mockTypes'
+import type { PlanChangeReasonType, PlanTitleChangeType } from '@/api/generated/model'
 
 // 바뀐 이유 4종의 글자·아이콘. 접힌 항목의 이유 칩과 펼친 "바뀐 이유" 목록이 같은 표를 쓴다
 export const CHANGE_REASON_DISPLAY: Record<
