@@ -259,6 +259,68 @@ class CollectDetailJobTest extends IntegrationTestSupport {
     }
 
     @Test
+    void 시즌_단위_KR_정보가_비면_작품_단위_제공처로_판정하고_같은_작품은_한_번만_부른다() throws Exception {
+        // given: 시즌 1·2 모두 시즌 단위 KR이 비어 있고, 작품 단위에는 Disney+ 구독이 있다
+        stubDiscover(DISCOVER_TV, "8|1796", 1, 1, "name", 800001);
+        stubTv(800001, "[]", """
+                [{"id":810001,"season_number":1,"name":"시즌 1","air_date":"2023-03-01"},
+                 {"id":810002,"season_number":2,"name":"시즌 2","air_date":"2023-06-01"}]""");
+        stubSeason(800001, 1, "시즌 1", "2023-03-01", "[{\"episode_number\":1,\"air_date\":\"2023-03-01\",\"runtime\":60}]");
+        stubSeason(800001, 2, "시즌 2", "2023-06-01", "[{\"episode_number\":1,\"air_date\":\"2023-06-01\",\"runtime\":60}]");
+        stubSeasonProviders(800001, 1, "{\"id\":1,\"results\":{}}");
+        stubSeasonProviders(800001, 2, "{\"id\":1,\"results\":{}}");
+        stubTvProviders(800001, region(new int[] {337}, new int[] {}));
+
+        // when
+        JobExecution execution = start(nextParameters());
+
+        // then: 두 시즌 모두 Disney+ 있음이고, 작품 단위 호출은 한 번뿐이다
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        for (Long unitId : jdbcTemplate.queryForList("SELECT id FROM watch_unit", Long.class)) {
+            assertThat(availability(unitId, "DISNEY_PLUS")).containsEntry("status", "AVAILABLE");
+            assertThat(availability(unitId, "NETFLIX")).containsEntry("status", "NOT_AVAILABLE");
+        }
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/3/tv/800001/watch/providers")));
+    }
+
+    @Test
+    void 시즌_단위에_KR_정보가_있으면_작품_단위_제공처를_부르지_않는다() throws Exception {
+        // given: 시즌 단위는 KR이 있고(Netflix 구독) 작품 단위는 Disney+ 구독이다
+        stubDiscover(DISCOVER_TV, "8|1796", 1, 1, "name", 800001);
+        stubTv(800001, "[]", "[{\"id\":810001,\"season_number\":1,\"name\":\"시즌 1\",\"air_date\":\"2023-03-01\"}]");
+        stubSeason(800001, 1, "시즌 1", "2023-03-01", "[{\"episode_number\":1,\"air_date\":\"2023-03-01\",\"runtime\":60}]");
+        stubSeasonProviders(800001, 1, region(new int[] {8}, new int[] {}));
+        stubTvProviders(800001, region(new int[] {337}, new int[] {}));
+
+        // when
+        start(nextParameters());
+
+        // then: 시즌 단위 결과만 쓰고 작품 단위는 호출하지 않는다
+        long unitId = jdbcTemplate.queryForObject("SELECT id FROM watch_unit", Long.class);
+        assertThat(availability(unitId, "NETFLIX")).containsEntry("status", "AVAILABLE");
+        assertThat(availability(unitId, "DISNEY_PLUS")).containsEntry("status", "NOT_AVAILABLE");
+        wireMock.verify(0, getRequestedFor(urlPathEqualTo("/3/tv/800001/watch/providers")));
+    }
+
+    @Test
+    void 시즌_단위와_작품_단위_모두_KR_정보가_없으면_KR_데이터_없음으로_모름이다() throws Exception {
+        // given: 시즌 단위는 KR이 없고 작품 단위는 404다
+        stubDiscover(DISCOVER_TV, "8|1796", 1, 1, "name", 800001);
+        stubTv(800001, "[]", "[{\"id\":810001,\"season_number\":1,\"name\":\"시즌 1\",\"air_date\":\"2023-03-01\"}]");
+        stubSeason(800001, 1, "시즌 1", "2023-03-01", "[{\"episode_number\":1,\"air_date\":\"2023-03-01\",\"runtime\":60}]");
+        stubSeasonProviders(800001, 1, "{\"id\":1,\"results\":{}}");
+
+        // when
+        start(nextParameters());
+
+        // then
+        long unitId = jdbcTemplate.queryForObject("SELECT id FROM watch_unit", Long.class);
+        assertThat(availability(unitId, "DISNEY_PLUS")).containsEntry("status", "UNKNOWN")
+                .containsEntry("unknown_reason", "NO_KR_DATA");
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/3/tv/800001/watch/providers")));
+    }
+
+    @Test
     void 애니메이션_드라마의_빈_runtime은_24분으로_추정한다() throws Exception {
         stubDiscover(DISCOVER_TV, "8|1796", 1, 1, "name", 800001);
         stubTv(800001, "[{\"id\":16,\"name\":\"애니메이션\"}]",
@@ -497,6 +559,10 @@ class CollectDetailJobTest extends IntegrationTestSupport {
     private static void stubSeasonProviders(int tvId, int seasonNumber, String body) {
         wireMock.stubFor(get(urlPathEqualTo("/3/tv/" + tvId + "/season/" + seasonNumber + "/watch/providers"))
                 .willReturn(json(body)));
+    }
+
+    private static void stubTvProviders(int tvId, String body) {
+        wireMock.stubFor(get(urlPathEqualTo("/3/tv/" + tvId + "/watch/providers")).willReturn(json(body)));
     }
 
     /** KR 제공처 응답. flatrate(구독)와 rent(대여) 제공처 번호를 받는다 */

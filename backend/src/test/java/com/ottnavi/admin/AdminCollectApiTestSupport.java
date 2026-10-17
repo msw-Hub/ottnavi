@@ -111,6 +111,14 @@ public abstract class AdminCollectApiTestSupport extends IntegrationTestSupport 
 		return aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody(body);
 	}
 
+	protected static String createBody(String targetDate, String tier, String scope) {
+		String base = createBody(targetDate, tier);
+		if (scope == null) {
+			return base;
+		}
+		return base.substring(0, base.length() - 1) + ",\"scope\":\"" + scope + "\"}";
+	}
+
 	protected static String createBody(String targetDate, String tier) {
 		StringBuilder body = new StringBuilder("{");
 		if (targetDate != null) {

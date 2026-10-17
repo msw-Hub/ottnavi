@@ -855,8 +855,9 @@ export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listC
  * 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
  * MVP는 `tier: ALL`만 받는다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 설정 키 `app.collect.allow-target-date-override`가 true인 환경(로컬)에서만 허용하고(오늘 이하), 운영에서는 오늘(KST)만 받으며 다른 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
  * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도 `BATCH_ALREADY_RUNNING`(409)이다. 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
+ * 선택 값 `scope`(`AVAILABILITY_TV`)를 주면 후보·상세 Step을 건너뛰고 드라마 시즌 제공 상태 판정 Step만 실행한다(이미 모은 데이터에 새 판정 규칙을 다시 적용할 때). `targetDate`처럼 로컬에서만 받고 운영에서는 400(`fieldErrors.scope`)이다. 중복·재시작 판정은 날짜·범위·scope가 같은 실행끼리만 한다(같은 날짜에 전체 수집이 완료돼도 scope 실행은 새로 시작된다).
  * 같은 날짜·범위의 마지막 실행이 실패(`FAILED`)면 새 실행으로 다시 시작해 202다(Spring Batch는 같은 식별 파라미터로 시작하면 실패한 인스턴스를 재시작한다, TECH 3절 "실패한 실행은 같은 파라미터로 restart").
- * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 범위 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
+ * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 `tier`·`scope` 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`, 운영에서 `scope`를 지정하면 `fieldErrors.scope`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
  * @summary 수집 실행 요청
  */
 export const createCollectExecution = (

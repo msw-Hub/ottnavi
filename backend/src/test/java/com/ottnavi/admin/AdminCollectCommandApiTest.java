@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.ottnavi.collect.job.CollectExecutionRecord;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
@@ -65,6 +66,31 @@ class AdminCollectCommandApiTest extends AdminCollectApiTestSupport {
 		CollectExecutionRecord record = collectExecutionQuery.findById(executionId).orElseThrow();
 		assertThat(record.batchStatus()).isEqualTo(BatchStatus.COMPLETED);
 		assertThat(record.targetDate()).isEqualTo(LocalDate.parse(DAY));
+	}
+
+	@Test
+	void scope_AVAILABILITY_TV는_같은_날짜_전체_수집이_완료돼도_시작되고_판정_Step만_실행한다() throws Exception {
+		// given: 같은 날짜의 전체 수집을 먼저 완료시킨다
+		var full = postCreate(createBody(DAY, "ALL"));
+		full.andExpect(status().isAccepted());
+		awaitFinished(executionIdOf(full));
+
+		// when
+		var scoped = postCreate(createBody(DAY, "ALL", "AVAILABILITY_TV"));
+		scoped.andExpect(status().isAccepted());
+		long scopedId = executionIdOf(scoped);
+		awaitFinished(scopedId);
+
+		// then: 후보·상세 Step은 실행 기록이 없고 시즌 판정 Step만 있다
+		assertThat(collectExecutionQuery.findById(scopedId).orElseThrow().batchStatus()).isEqualTo(BatchStatus.COMPLETED);
+		List<String> stepNames = jdbcTemplate.queryForList(
+				"SELECT STEP_NAME FROM BATCH_STEP_EXECUTION WHERE JOB_EXECUTION_ID = ?", String.class, scopedId);
+		assertThat(stepNames).containsExactly("tvAvailabilityStep");
+
+		// then: 같은 scope를 한 번 더 요청하면 이미 완료로 409이다
+		postCreate(createBody(DAY, "ALL", "AVAILABILITY_TV"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.errorCode").value("BATCH_ALREADY_COMPLETED"));
 	}
 
 	@Test

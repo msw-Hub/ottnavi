@@ -9,6 +9,7 @@
  *
  * OpenAPI spec version: 0.1.0
  */
+import type { CollectScope } from './collectScope';
 import type { CollectTier } from './collectTier';
 
 /**
@@ -21,4 +22,6 @@ export interface CreateCollectExecutionRequest {
      */
   targetDate?: string | null;
   tier: CollectTier;
+  /** 일부 Step만 실행하는 범위. 비우거나 null이면 전체 수집(기존 동작). 값을 주면 같은 날짜의 전체 수집과 별개의 실행으로 취급하고, 운영 프로필에서는 400(`VALIDATION_FAILED`, 필드 `scope`)으로 거절한다 */
+  scope?: CollectScope | null;
 }

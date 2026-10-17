@@ -53,8 +53,8 @@
 | `PLAN_DRAFT_STALE` | 409 | 저장하려는 DRAFT의 데이터 기준일이 최신 수집 완료 시각보다 이름. 프론트가 받으면 자동으로 재계산을 요청한다 | 데이터가 갱신되어 플랜을 다시 계산하고 있습니다. | TECH 2절, PRD 5.4 |
 | `PLAN_DRAFT_NOT_FOUND` | 404 | 저장하려는 DRAFT가 없거나 본인 것이 아님. 이미 저장돼 DRAFT가 아니게 됐거나 다시 계산해 지워진 경우 포함 | 계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요. | TECH 2절 |
 | `BATCH_ALREADY_RUNNING` | 409 | 같은 날짜 또는 다른 날짜의 수집이 실행 중(전체 동시 실행 금지, 관리자 API) | 수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요. | TECH 3절 (도출) |
-| `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
-| `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |
+| `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`(+`scope`)의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
+| `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`(+`scope`)에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |
 | `BATCH_NOT_STOPPED` | 409 | 복구하려는 실행이 중단됨(`STOPPED`)이 아님(복구 API 전용. 재시작 API는 실행 상태에 맞는 `BATCH_ALREADY_*`·`BATCH_RECOVERY_REQUIRED`를 쓴다) | 중단된 실행만 복구할 수 있습니다. | TECH 3절, Task 029·031 |
 | `PRICE_START_DATE_NOT_AFTER_LAST` | 409 | 추가·수정하려는 월 구독요금 이력의 적용 시작일이 바로 앞 요금 이력의 시작일보다 늦지 않음(관리자 API) | 적용 시작일은 마지막 월 구독요금의 시작일보다 늦어야 합니다. | PRD FR-19 "기간이 겹치지 않는다", Task 029·031 |
 | `PRICE_START_DATE_DUPLICATE` | 409 | 같은 상품에 같은 적용 시작일의 요금 이력이 이미 있음(ERD `UNIQUE(product_id, effective_from)`, 관리자 API) | 같은 적용 시작일의 월 구독요금이 이미 있습니다. | ERD `product_price`, Task 029·031 |

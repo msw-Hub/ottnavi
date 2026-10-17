@@ -2,6 +2,7 @@
 
 > 2026-10-13 작성. Task 042가 만든 규칙을 한 곳에 정리한 설명 문서다. 규칙의 근거는 PRD FR-02·5.4·5.5, ERD A 영역이고, 이 문서는 구현을 설명한다.
 > 코드는 `backend/src/main/java/com/ottnavi/catalog/domain/rule/`, 테스트는 같은 구조의 `backend/src/test/java/` 아래(37건).
+> 2026-10-17 추가: 드라마 시즌 단위 제공처가 비면 작품 단위로 대신 판정하는 규칙(3절 마지막 항목). 판정기(`AvailabilityJudge`) 자체는 바뀌지 않았고, 판정기에 **어떤 KR 제공처를 넘기는지**가 수집 단계(`AvailabilityProcessor`)에서 바뀌었다.
 
 ## 1. 배경
 
@@ -9,7 +10,7 @@
 
 ```
 수집 Job (043·044)                                         ← 서버 안의 코드
-  ① TMDB에서 받음      작품·시즌의 KR 제공처 조회 응답
+  ① TMDB에서 받음      작품·시즌의 KR 제공처 조회 응답 (드라마 시즌 응답에 KR이 없으면 작품 단위를 한 번 더 받음)
   ② DB에서 읽음        매핑표(tmdb_provider), 서비스 목록(ott_service)
   ③ 판정·계산 호출     AvailabilityJudge, RuntimeCalculator  ← Task 042 (순수 Java)
   ④ 비교·저장          AvailabilityChangeDetector → availability, availability_change 저장 (044)
@@ -37,13 +38,26 @@ TMDB는 "이 영화가 한국에서 어디서 제공되나"를 TMDB 자기 번�
 | 순서 | 조건 | 결과 |
 |---|---|---|
 | 1 | 영화 단위이고 서비스가 쿠팡플레이 | UNKNOWN / `STRUCTURAL_GAP` (TMDB에 영화 데이터가 구조적으로 비어 있음. KR 데이터가 있어도 동일) |
-| 2 | KR 데이터 자체가 없음 | UNKNOWN / `NO_KR_DATA` |
+| 2 | KR 데이터 자체가 없음 (드라마 시즌은 작품 단위까지 확인한 뒤에도 없을 때) | UNKNOWN / `NO_KR_DATA` |
 | 3 | KR flatrate에 이 서비스로 매핑된 번호가 있음 | AVAILABLE (`inStandard`/`inAdTier`는 해당 tier) |
 | 4 | 그 외(대여·구매만, flatrate 목록이 비어 있음 등) | NOT_AVAILABLE |
 
 - KR 키가 없으면 `KrProviders.noKrData()`, KR은 있는데 flatrate가 없거나 비었으면 `KrProviders.of(빈 집합)`을 넘긴다. 앞은 "모름", 뒤는 "없음"이다.
 - `data_quality`(쿠팡플레이의 `INSUFFICIENT`)는 화면 표시용이라 판정에 쓰지 않는다. 쿠팡플레이 드라마는 일반 규칙을 따른다.
 - 드라마는 시즌 단위로 따로 판정한다(시즌마다 제공처가 다를 수 있다).
+- **시즌 단위가 비면 작품 단위로 대신 판정한다**(PRD 11절 43번). TMDB가 시즌 단위(`/tv/{id}/season/{n}/watch/providers`) KR 제공처를 비워 두는 작품이 많기 때문이다(로컬 DB 드라마 시즌 20,057개 중 4,203개가 7개 서비스 전부 `NO_KR_DATA`였다). 어떤 제공처를 판정기에 넘기는지는 아래 순서로 정한다.
+
+| 순서 | 시즌 단위 응답 | 판정기에 넘기는 KR 제공처 |
+|---|---|---|
+| 1 | KR 정보가 있음 (flatrate가 비어 있어도) | 시즌 단위 결과만 쓴다. 작품 단위는 조회하지 않는다 → flatrate가 없으면 NOT_AVAILABLE |
+| 2 | KR 키가 없음 → 작품 단위(`/tv/{id}/watch/providers`)를 조회해 KR 정보가 있음 | 작품 단위 결과 |
+| 3 | KR 키가 없음 → 작품 단위에도 KR 정보가 없음 (404 포함) | `KrProviders.noKrData()` → UNKNOWN / `NO_KR_DATA` |
+
+  - **시즌 단위 조회 자체가 404이면(TMDB가 그 시즌을 모름) 작품 단위로 대신하지 않고 그 시즌을 건너뛴다.** 기존 상태를 그대로 두고 새 상태를 지어내지 않는다(위 표의 "KR 키가 없음"은 응답은 왔는데 KR만 없는 경우다).
+  - 같은 시리즈의 시즌을 이어서 처리할 때는 직전 시리즈 한 건의 작품 단위 결과만 들고 있어 호출을 줄인다.
+  - **한계**: 작품 단위 값은 시리즈 전체 기준이라, 시즌마다 제공처가 다른 드라마에서는 시즌별로 부정확할 수 있다.
+  - 예: 드라마 "카지노"(tmdbId 112486)는 시즌 단위가 비어 있지만 작품 단위에 Disney Plus(337) flatrate가 있다 → 시즌도 디즈니+ AVAILABLE.
+  - 영화 판정과 쿠팡플레이 영화 `STRUCTURAL_GAP` 규칙은 그대로다.
 
 예: 영화, KR flatrate = {8, 1796}, 웨이브는 대여만 → 넷플릭스 AVAILABLE(`inStandard`·`inAdTier` 둘 다 true), 웨이브 NOT_AVAILABLE, 쿠팡플레이 UNKNOWN(`STRUCTURAL_GAP`).
 

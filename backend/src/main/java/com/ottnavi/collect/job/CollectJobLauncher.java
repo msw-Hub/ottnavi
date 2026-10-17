@@ -43,6 +43,11 @@ public class CollectJobLauncher {
         return launch(CollectJobParameters.of(targetDate, tier));
     }
 
+    /** 수집을 비동기로 시작한다. scope가 null이면 전체, 있으면 그 범위의 Step만 실행한다 */
+    public long start(LocalDate targetDate, CollectTier tier, CollectScope scope) {
+        return launch(CollectJobParameters.of(targetDate, tier, scope));
+    }
+
     /**
      * 실패한 실행을 같은 파라미터로 다시 시작하고 새 실행의 ID를 돌려준다.
      * operator.restart(JobExecution)은 원인 예외를 뭉쳐 버려서, 이전 실행의 파라미터로 start를 다시 부른다.

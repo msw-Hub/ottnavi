@@ -46,6 +46,7 @@ public class TmdbClient {
     private static final String EP_TV_SEASON = "tv_season";
     private static final String EP_MOVIE_PROVIDERS = "movie_providers";
     private static final String EP_TV_SEASON_PROVIDERS = "tv_season_providers";
+    private static final String EP_TV_PROVIDERS = "tv_providers";
     private static final String EP_PROVIDER_LIST = "provider_list";
     private static final String RESULT_SUCCESS = "success";
     private static final String RESULT_NOT_FOUND = "not_found";
@@ -110,6 +111,11 @@ public class TmdbClient {
     /** 드라마 한 시즌의 나라별 시청 제공처를 가져온다 */
     public TmdbWatchProvidersResponse getTvSeasonWatchProviders(long tvId, int seasonNumber) {
         return call(EP_TV_SEASON_PROVIDERS, () -> api.getTvSeasonWatchProviders(tvId, seasonNumber));
+    }
+
+    /** 드라마 작품(시리즈) 단위의 나라별 시청 제공처를 가져온다. 시즌 단위 KR 정보가 비었을 때 대신 쓴다 */
+    public TmdbWatchProvidersResponse getTvWatchProviders(long tvId) {
+        return call(EP_TV_PROVIDERS, () -> api.getTvWatchProviders(tvId));
     }
 
     /** KR의 제공처 전체 목록을 가져온다. 우리 7곳 외 제공처도 거르지 않고 돌려준다(저장은 Task 043) */

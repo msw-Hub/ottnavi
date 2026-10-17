@@ -91,13 +91,45 @@ public class CollectExecutionQuery {
         return firstOf(found);
     }
 
-    /** 같은 targetDate+tier에서 가장 최근에 만들어진 실행 */
+    /** 같은 targetDate+tier의 전체(scope 없는) 실행 중 가장 최근에 만들어진 실행 */
     public Optional<CollectExecutionRecord> findLatest(LocalDate targetDate, CollectTier tier) {
+        return findLatest(targetDate, tier, null);
+    }
+
+    /**
+     * 같은 targetDate+tier+scope에서 가장 최근에 만들어진 실행. scope가 null이면 scope 파라미터가 없는 전체 실행만 본다.
+     * scope가 다르면 Batch가 다른 인스턴스로 보므로 중복 판정도 scope별로 따로 한다.
+     */
+    public Optional<CollectExecutionRecord> findLatest(LocalDate targetDate, CollectTier tier, CollectScope scope) {
+        String sql = SELECT_FROM + " AND d.PARAMETER_VALUE = ? AND t.PARAMETER_VALUE = ?";
+        List<Object> args = new ArrayList<>();
+        args.add(CollectJobParameters.TARGET_DATE);
+        args.add(CollectJobParameters.TIER);
+        args.add(CollectJobConfig.JOB_NAME);
+        args.add(targetDate.toString());
+        args.add(tier.name());
+        if (scope == null) {
+            sql += " AND NOT EXISTS (SELECT 1 FROM BATCH_JOB_EXECUTION_PARAMS s"
+                    + " WHERE s.JOB_EXECUTION_ID = e.JOB_EXECUTION_ID AND s.PARAMETER_NAME = ?)";
+            args.add(CollectJobParameters.SCOPE);
+        } else {
+            sql += " AND EXISTS (SELECT 1 FROM BATCH_JOB_EXECUTION_PARAMS s"
+                    + " WHERE s.JOB_EXECUTION_ID = e.JOB_EXECUTION_ID AND s.PARAMETER_NAME = ? AND s.PARAMETER_VALUE = ?)";
+            args.add(CollectJobParameters.SCOPE);
+            args.add(scope.name());
+        }
+        sql += " ORDER BY e.JOB_EXECUTION_ID DESC LIMIT 1";
+        // 파라미터 순서: SELECT_FROM의 ?(이름 2개, Job 이름) → 값 2개 → scope 조건
+        List<CollectExecutionRecord> found = jdbcTemplate.query(sql, recordMapper, args.toArray());
+        return firstOf(found);
+    }
+
+    /** 같은 Job 인스턴스(날짜·tier·scope가 같은 실행 묶음)에서 가장 최근에 만들어진 실행. 재시작 판정이 쓴다 */
+    public Optional<CollectExecutionRecord> findLatestOfInstance(long instanceId) {
         List<CollectExecutionRecord> found = jdbcTemplate.query(
-                SELECT_FROM + " AND d.PARAMETER_VALUE = ? AND t.PARAMETER_VALUE = ?"
-                        + " ORDER BY e.JOB_EXECUTION_ID DESC LIMIT 1",
+                SELECT_FROM + " AND e.JOB_INSTANCE_ID = ? ORDER BY e.JOB_EXECUTION_ID DESC LIMIT 1",
                 recordMapper, CollectJobParameters.TARGET_DATE, CollectJobParameters.TIER, CollectJobConfig.JOB_NAME,
-                targetDate.toString(), tier.name());
+                instanceId);
         return firstOf(found);
     }
 

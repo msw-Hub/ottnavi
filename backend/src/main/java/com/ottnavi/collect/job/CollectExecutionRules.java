@@ -24,6 +24,12 @@ public final class CollectExecutionRules {
         FUTURE // 지정 허용 모드에서 오늘보다 뒤
     }
 
+    /** 실행 범위(scope) 판정 결과 */
+    public enum ScopeVerdict {
+        OK,
+        NOT_ALLOWED // 운영 모드에서 전체가 아닌 일부 범위를 요청함
+    }
+
     /** 시작·재시작 가능 여부 판정 결과 */
     public enum LaunchVerdict {
         ALLOWED,
@@ -69,6 +75,17 @@ public final class CollectExecutionRules {
             return DateVerdict.FUTURE;
         }
         return DateVerdict.OK;
+    }
+
+    /**
+     * 실행 범위가 허용되는지 판정한다. 비어 있으면(전체) 항상 허용하고, 값이 있으면 지정 허용 모드(local)에서만 허용한다.
+     * 날짜 직접 지정과 같은 스위치를 쓴다: 일부 Step만 돌리는 것은 로컬 재현·재판정용이기 때문이다.
+     */
+    public static ScopeVerdict judgeScope(CollectScope scope, boolean isOverrideAllowed) {
+        if (scope == null || isOverrideAllowed) {
+            return ScopeVerdict.OK;
+        }
+        return ScopeVerdict.NOT_ALLOWED;
     }
 
     /**

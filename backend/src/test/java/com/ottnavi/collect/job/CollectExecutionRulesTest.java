@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ottnavi.collect.job.CollectExecutionRules.DateVerdict;
 import com.ottnavi.collect.job.CollectExecutionRules.LaunchVerdict;
+import com.ottnavi.collect.job.CollectExecutionRules.ScopeVerdict;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -151,6 +152,18 @@ class CollectExecutionRulesTest {
         assertThat(CollectExecutionRules.judgeDate(TODAY.plusDays(1), TODAY, true)).isEqualTo(DateVerdict.FUTURE);
         assertThat(CollectExecutionRules.judgeDate(TODAY.minusDays(30), TODAY, true)).isEqualTo(DateVerdict.OK);
         assertThat(CollectExecutionRules.judgeDate(TODAY, TODAY, true)).isEqualTo(DateVerdict.OK);
+    }
+
+    // 실행 범위 판정
+
+    @Test
+    void scope가_없으면_운영에서도_OK이고_있으면_로컬에서만_OK다() {
+        // when, then
+        assertThat(CollectExecutionRules.judgeScope(null, false)).isEqualTo(ScopeVerdict.OK);
+        assertThat(CollectExecutionRules.judgeScope(null, true)).isEqualTo(ScopeVerdict.OK);
+        assertThat(CollectExecutionRules.judgeScope(CollectScope.AVAILABILITY_TV, true)).isEqualTo(ScopeVerdict.OK);
+        assertThat(CollectExecutionRules.judgeScope(CollectScope.AVAILABILITY_TV, false))
+                .isEqualTo(ScopeVerdict.NOT_ALLOWED);
     }
 
     // 시작 판정
