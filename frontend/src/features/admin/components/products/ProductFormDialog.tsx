@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import { useState, type RefObject } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { isApiError } from '@/api/http'
@@ -14,12 +14,19 @@ import { CloseLabeledDialogContent } from '@/components/common/CloseLabeledDialo
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
+  checkBundleComponents,
+  TIER_OPTION_LABELS,
+  TIER_SELECT_CLASS,
+} from '@/features/admin/bundleRules'
 import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
+import { BundleComponentsField } from '@/features/admin/components/products/ProductCompositionFields'
 import {
   useCreateAdminProduct,
   useUpdateAdminProduct,
 } from '@/features/admin/hooks/useAdminProducts'
-import type { AdminProduct } from '@/api/generated/model'
+import type { AdminProduct, ProviderTier } from '@/api/generated/model'
+import type { ProductComponentDraft, ProductKind } from '@/features/admin/mockTypes'
 import {
   checkFirstPriceStartDate,
   checkMonthlyPriceText,
@@ -43,6 +50,9 @@ interface ProductFormDialogProps {
   onClose: () => void // 닫기(취소·저장 성공·Esc)
   onCreated: (productId: number) => void // 등록에 성공했을 때. 새 OTT 구독상품을 바로 골라 이력을 보여 준다
   openerRef: RefObject<HTMLElement | null> // 대화상자를 연 버튼. 닫히면 포커스를 여기로 돌려준다
+  // 번들·광고형 1차안(Task 075) 미리보기인지(목업 모드 + ?productsPreview=bundle). 켜면 번들 유형과 등급을 고를 수 있다.
+  // 번들·광고형 등록은 계약에 아직 없어 서버로 보내지 않고 안내만 띄운다. 꺼져 있으면 지금(MVP) 동작 그대로다
+  isBundlePreview?: boolean
 }
 
 /**
@@ -59,6 +69,7 @@ export function ProductFormDialog({
   onClose,
   onCreated,
   openerRef,
+  isBundlePreview = false,
 }: ProductFormDialogProps) {
   return (
     <Dialog
@@ -76,7 +87,13 @@ export function ProductFormDialog({
         }}
       >
         {state?.mode === 'create' && (
-          <CreateForm services={services} today={today} onClose={onClose} onCreated={onCreated} />
+          <CreateForm
+            services={services}
+            today={today}
+            onClose={onClose}
+            onCreated={onCreated}
+            isBundlePreview={isBundlePreview}
+          />
         )}
         {state?.mode === 'edit' && <EditForm product={state.product} onClose={onClose} />}
       </CloseLabeledDialogContent>
@@ -101,8 +118,18 @@ function CreateForm({
   today,
   onClose,
   onCreated,
-}: Pick<ProductFormDialogProps, 'services' | 'today' | 'onClose' | 'onCreated'>) {
+  isBundlePreview = false,
+}: Pick<
+  ProductFormDialogProps,
+  'services' | 'today' | 'onClose' | 'onCreated' | 'isBundlePreview'
+>) {
   const create = useCreateAdminProduct()
+  // ===== 번들·광고형 1차안(Task 075, 미리보기에서만 바뀐다) =====
+  const [productType, setProductType] = useState<ProductKind>('SINGLE') // 고른 유형. 미리보기가 아니면 항상 SINGLE
+  const [singleTier, setSingleTier] = useState<ProviderTier>('STANDARD') // 단품의 등급
+  const [bundleComponents, setBundleComponents] = useState<ProductComponentDraft[]>([]) // 번들 구성
+  const [bundleError, setBundleError] = useState<string | null>(null) // 번들 구성 검증 문장
+  const isBundle = productType === 'BUNDLE'
   const {
     register,
     handleSubmit,
@@ -119,6 +146,18 @@ function CreateForm({
   const hasPastNotice = !startError && startCheck.isPastDate
 
   const submit = handleSubmit((values) => {
+    // 1. 번들·광고형 1차안: 계약에 아직 없어 서버로 보내지 않는다. 번들은 구성부터 검사하고, 통과하면 안내만 띄우고 닫는다
+    if (isBundlePreview && (isBundle || singleTier === 'AD')) {
+      const message = isBundle ? checkBundleComponents(bundleComponents) : null
+      if (message) {
+        setBundleError(message)
+        return
+      }
+      toast.info('1차안 미리보기라 저장하지 않았어요. 번들·광고형 등록은 계약 반영 뒤 저장돼요.')
+      onClose()
+      return
+    }
+    // 2. 단품(일반)은 지금처럼 등록 API로 보낸다
     create.mutate(
       {
         name: values.name.trim(),
@@ -174,45 +213,112 @@ function CreateForm({
         )}
       </div>
 
-      <div className="grid gap-1.5">
-        <Label htmlFor="product-service">서비스</Label>
-        <select
-          id="product-service"
-          aria-invalid={errors.ottServiceId ? true : undefined}
-          aria-describedby={errors.ottServiceId ? 'product-service-error' : undefined}
-          className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive"
-          {...register('ottServiceId', { validate: (v) => v !== '' || '서비스를 선택해 주세요.' })}
-        >
-          <option value="">서비스를 선택해 주세요</option>
-          {services.map((service) => (
-            <option key={service.ottServiceId} value={service.ottServiceId}>
-              {service.name}
-            </option>
-          ))}
-        </select>
-        {errors.ottServiceId && (
-          <p id="product-service-error" className="text-sm text-destructive">
-            {errors.ottServiceId.message}
-          </p>
-        )}
-      </div>
+      {/* 유형을 서비스보다 먼저 묻는다(미리보기): 번들이면 서비스 칸 대신 구성 목록이 나와, 고르는 순서가 화면 순서와 맞는다.
+          미리보기가 아니면 예전처럼 서비스 → 유형 순서다(아래 원래 자리의 유형 칸) */}
+      {isBundlePreview && (
+        <fieldset className="grid gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium">유형</legend>
+          <RadioGroup
+            value={productType}
+            onValueChange={(value) => {
+              setProductType(value as ProductKind)
+              setBundleError(null)
+            }}
+            aria-label="OTT 구독상품 유형"
+            className="flex flex-wrap gap-4"
+          >
+            <div className="flex min-h-11 items-center gap-2">
+              <RadioGroupItem id="product-type-single" value="SINGLE" />
+              <Label htmlFor="product-type-single">단품 (서비스 1곳)</Label>
+            </div>
+            <div className="flex min-h-11 items-center gap-2">
+              <RadioGroupItem id="product-type-bundle" value="BUNDLE" />
+              <Label htmlFor="product-type-bundle">번들 (서비스 2곳 이상)</Label>
+            </div>
+          </RadioGroup>
+        </fieldset>
+      )}
 
-      <fieldset className="grid gap-1.5">
-        <legend className="mb-1.5 text-sm font-medium">유형</legend>
-        <RadioGroup value="SINGLE" aria-label="OTT 구독상품 유형" className="gap-2">
-          <div className="flex items-center gap-2">
-            <RadioGroupItem id="product-type-single" value="SINGLE" />
-            <Label htmlFor="product-type-single">단품</Label>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <RadioGroupItem id="product-type-bundle" value="BUNDLE" disabled />
-            <Label htmlFor="product-type-bundle" className="text-muted-foreground">
-              번들
-            </Label>
-            <PhaseLaterTag />
-          </div>
-        </RadioGroup>
-      </fieldset>
+      {isBundlePreview && isBundle ? (
+        <div className="grid gap-2">
+          <BundleComponentsField
+            idPrefix="product-create"
+            services={services}
+            value={bundleComponents}
+            onChange={(next) => {
+              setBundleComponents(next)
+              setBundleError(null)
+            }}
+            error={bundleError ?? undefined}
+          />
+          {/* 구성은 등록 뒤 바꿀 수 없다(2026-10-17 사용자 확정). 가격 이력처럼 바뀐 상품은 새로 등록하고 기존 상품은 판매 종료한다 */}
+          <p className="text-sm text-muted-foreground">
+            등록한 구성은 바꿀 수 없어요. 바꾸려면 새 상품을 등록하고 기존 상품은 판매 종료하세요.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-1.5">
+          <Label htmlFor="product-service">서비스</Label>
+          <select
+            id="product-service"
+            aria-invalid={errors.ottServiceId ? true : undefined}
+            aria-describedby={errors.ottServiceId ? 'product-service-error' : undefined}
+            className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive"
+            {...register('ottServiceId', {
+              // 번들(미리보기)에서는 서비스 칸이 사라지고 구성 목록이 대신하므로 검사하지 않는다
+              validate: (v) => isBundle || v !== '' || '서비스를 선택해 주세요.',
+            })}
+          >
+            <option value="">서비스를 선택해 주세요</option>
+            {services.map((service) => (
+              <option key={service.ottServiceId} value={service.ottServiceId}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+          {errors.ottServiceId && (
+            <p id="product-service-error" className="text-sm text-destructive">
+              {errors.ottServiceId.message}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 단품의 등급(미리보기). 광고형은 그 서비스 작품 중 광고형 제공으로 확인된 것만 볼 수 있다고 계산한다 */}
+      {isBundlePreview && !isBundle && (
+        <div className="grid gap-1.5">
+          <Label htmlFor="product-tier">등급</Label>
+          <select
+            id="product-tier"
+            value={singleTier}
+            onChange={(event) => setSingleTier(event.target.value as ProviderTier)}
+            className={`${TIER_SELECT_CLASS} w-full`}
+          >
+            <option value="STANDARD">{TIER_OPTION_LABELS.STANDARD}</option>
+            <option value="AD">{TIER_OPTION_LABELS.AD}</option>
+          </select>
+        </div>
+      )}
+
+      {/* MVP(미리보기 아님)의 유형 칸: 단품만 고를 수 있고 번들은 "2단계부터" 태그와 함께 막혀 있다 */}
+      {!isBundlePreview && (
+        <fieldset className="grid gap-1.5">
+          <legend className="mb-1.5 text-sm font-medium">유형</legend>
+          <RadioGroup value="SINGLE" aria-label="OTT 구독상품 유형" className="gap-2">
+            <div className="flex items-center gap-2">
+              <RadioGroupItem id="product-type-single" value="SINGLE" />
+              <Label htmlFor="product-type-single">단품</Label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <RadioGroupItem id="product-type-bundle" value="BUNDLE" disabled />
+              <Label htmlFor="product-type-bundle" className="text-muted-foreground">
+                번들
+              </Label>
+              <PhaseLaterTag />
+            </div>
+          </RadioGroup>
+        </fieldset>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-1.5">

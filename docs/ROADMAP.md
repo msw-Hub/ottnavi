@@ -1401,13 +1401,19 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: 알림 끄기·켜기와 발송 이력이 API 값대로 보이고, 관리자 화면 알림 상태가 표시된다.
 
-#### Task 075: 번들 관리·독점 목록 화면 목업 구현으로 데이터 확장 표현 확정 ⬜ `[v0.1.0 포함]`
+#### Task 075: 번들 관리·독점 목록 화면 목업 구현으로 데이터 확장 표현 확정 🔄 `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, FR-04, FR-19, SCR-03, SCR-14(번들) · 선행: 037 · 브랜치: `feature/o3-bundle-exclusive-mock`
 - 구현 사항
   - [ ] 독점 목록: 서비스 탭 7개, "확인된 범위"·산정 기준, 구조적 공백 제외 명시, 쿠팡플레이 데이터 부족 안내, 출처·기준일
-  - [ ] 상품 화면 번들 구성 편집·tier, 요금 확인 화면 번들 표시. 계약 변경안 기록·승인
+  - [ ] 상품 화면 번들 등록 시 구성·tier 선택(등록 뒤 구성 편집은 없음, 2026-10-17 사용자 확정), 요금 확인 화면 번들 표시. 계약 변경안 기록·승인
 - 완료 기준
-  - V-F: 탭 전환과 번들 편집 목업 흐름 재현, 콘솔 에러 0건.
+  - V-F: 탭 전환과 번들 등록 목업 흐름 재현, 콘솔 에러 0건.
+- 기록: 2026-10-17 1차안 구현(브랜치 `feature/o3-bundle-exclusive-mock`, PR 전). 독점 목록 `/exclusives`(서비스 탭 7개, 작품 카드, 쿠팡플레이 데이터 부족 안내, 출처·기준일), 관리자 상품 화면의 번들·광고형 표시와 번들 등록 대화상자(유형·구성 서비스·등급 선택, 2곳 미만 오류), 요금 확인 화면의 번들 표시를 만들었다.
+  - 사용자 확정(2026-10-17, 1차안 화면 확인 뒤 "문제없다, 이대로 진행"): 1) 독점 목록은 작품 단위 카드에 독점 시즌을 적는다. 2) 카드의 "다른 N곳: 없음 · 모름" 표시를 유지한다. 3) **번들 구성은 등록할 때만 정하고 등록 뒤 구성 편집은 없다.** 바꾸려면 새 상품을 등록하고 기존 상품은 판매 종료한다(가격 이력과 같은 원칙). 그래서 1차안의 [구성 편집] 버튼과 구성 편집 대화상자를 제거했다. 4) 요금 확인 화면은 번들을 아래쪽 "번들 상품" 묶음으로 분리한다. 5) 머리글 메뉴는 늘리지 않고, 서비스 탭 공통 폴더 통합은 하지 않는다(홈과 독점 화면의 탭은 각자 기능 폴더에 둔다).
+  - 1차안 구성: 상태 확인용 주소 파라미터 `?exclusivesPreview=empty|loading|error`(독점 목록), `?productsPreview=bundle`(관리자 상품), `?pricingPreview=bundle`(요금 확인)은 목업 모드에서만 읽는다. 계약에 없는 값은 `features/admin/mockTypes.ts`, `features/pricing/mockTypes.ts`, `features/exclusives/mockTypes.ts` 3개의 임시 타입과 샘플 데이터 파일(`bundleSampleData.ts` 2개, `exclusives/sampleData.ts`)로 둔다. 모두 Task 076·078·079에서 지운다. 375px에서 `?service=WATCHA`처럼 주소로 바로 열면 고른 탭이 탭 줄 밖에 있어 보이지 않던 문제는 독점 화면 탭만 고른 탭을 보이는 위치로 스크롤하게 보완했다(홈 탭은 그대로).
+  - 계약 변경안(2026-10-17 사용자 승인. `docs/api/openapi.yaml`에는 Task 076·078 구현 PR에서 기록한다): 1) 독점 목록 `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`). 응답은 페이지 형식 5개 필드에 `ottServiceId`, `isJudged`(데이터 부족 서비스는 `false`와 빈 목록이고 404가 아니다), `dataAsOf`를 더한다. 항목 `ExclusiveTitle`: `mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`(영화는 null), `comparedServiceCount`, `unknownElsewhereCount`. 정렬은 TMDB 인기도순. 오류는 `VALIDATION_FAILED` 400, 없는 서비스 404(`/api/public/**`은 도메인 코드가 원칙이고 `error-codes.md`에 서비스용 코드가 아직 없어 새 코드 `OTT_SERVICE_NOT_FOUND`(가칭)가 필요하다. 이름·문구는 Task 078에서 정하고 프론트 `errorMessages`에도 같이 넣는다), `RATE_LIMIT_EXCEEDED` 429. 2) `ProductType`에 `BUNDLE`을 추가한다. 3) 새 스키마 `ProductComponent{ottServiceId, tier: ProviderTier(STANDARD/AD)}`. 4) `AdminProduct`·`CreateAdminProductRequest`에 `components`를 필수로 추가하고 `ottServiceId`를 대체한다(단품은 1개, 번들은 서로 다른 서비스 2개 이상). 프론트도 같은 PR에서 바뀌는 깨지는 변경이다. 5) **구성 편집 API(`PUT .../components`)는 두지 않는다**(사용자 확정 3번). 6) `ServicePrice`에 `productType`·`components`를 추가하고 `ottServiceId`는 번들이면 null(nullable)로 한다. 목록 순서는 단품(서비스 ID 순) 다음 번들이다.
+  - 넘길 내용: Task 076(**opus 설계 먼저**)이 정할 것 — PRD 11절 33번의 중복 결제 불허(같은 달 어떤 서비스를 볼 수 있게 하는 상품은 최대 1개)가 확정됐다는 점을 전제로 한 상품 조합 규칙, 번들·광고형 상품의 판매 종료 흐름(현재 관리자 화면의 [수정]에 판매 중·판매 종료 전환은 이미 있으나, 1차안 샘플 상품은 목업 API가 모르는 ID라 저장하면 "찾을 수 없음" 오류가 난다. 실제 판매 종료 흐름은 076에서 필요하다), 서비스를 여러 개 가진 번들 상품이 변경 내역 응답 `PlanChangeProduct`의 `ottServiceIds`(목록)로 나가는 점. Task 079는 목업 지우기 대상: 미리보기 파라미터 `?productsPreview=`, `?pricingPreview=`, `?exclusivesPreview=`, `mockTypes.ts` 3개, 샘플 데이터 파일.
+  - 확인하지 못한 것: 다크 모드, 포커스 테두리·대비 측정, 관리자 번들 등록 흐름·요금 번들 표시의 자동 테스트(미추가).
 
 #### Task 076: 번들·광고형 요금제 지원 구현으로 상품 선택지 확장 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-19(번들), R11-9 · 선행: 075, 059 · 브랜치: `feature/o3-bundle-ad-tier`

@@ -1,11 +1,17 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { InfoIcon, PlusIcon } from 'lucide-react'
+import type { AdminProduct } from '@/api/generated/model'
 import { useSearchParams } from 'react-router'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import {
+  BUNDLE_SAMPLE_PRODUCTS,
+  getProductComposition,
+  SAMPLE_COMPOSITIONS,
+} from '@/features/admin/bundleSampleData'
 import { PriceHistoryPanel } from '@/features/admin/components/products/PriceHistoryPanel'
 import {
   ProductFormDialog,
@@ -15,9 +21,14 @@ import { ProductTable } from '@/features/admin/components/products/ProductTable'
 import { useAdminProducts } from '@/features/admin/hooks/useAdminProducts'
 import { useOttServices } from '@/hooks/useOttServices'
 import { getTodayDateString } from '@/lib/dateUtils'
+import { isMockMode } from '@/lib/mockScenario'
 
 // 고른 OTT 구독상품을 담는 주소 검색 파라미터 이름. 예: /admin/products?product=101
 const SELECTED_PRODUCT_PARAM = 'product'
+
+// 번들·광고형 1차안(Task 075)을 보는 주소 파라미터(?productsPreview=bundle). 목업 모드에서만 읽는다(변경 내역 화면의 ?historyPreview=와 같은 방식)
+const PRODUCTS_PREVIEW_PARAM = 'productsPreview'
+const BUNDLE_PREVIEW_VALUE = 'bundle'
 
 /**
  * SCR-14 OTT 구독상품·월 구독요금 관리 화면의 본문이다(Task 029).
@@ -37,6 +48,14 @@ export function ProductsScreen() {
   const [dialogState, setDialogState] = useState<ProductDialogState>(null)
   const dialogOpenerRef = useRef<HTMLElement | null>(null) // 대화상자를 연 버튼. 닫힐 때 포커스를 돌려줄 곳
 
+  // ===== 번들·광고형 1차안(Task 075) =====
+  // 목업 모드 + ?productsPreview=bundle일 때만 켠다. 운영에서는 파라미터를 읽지 않아 지금 화면 그대로다
+  const isBundlePreview =
+    isMockMode() && searchParams.get(PRODUCTS_PREVIEW_PARAM) === BUNDLE_PREVIEW_VALUE
+  // 상품 ID → 구성(샘플 고정값). 번들 구성은 등록할 때만 정하고 등록 뒤에는 바꾸지 않으므로(2026-10-17 사용자 확정) 상태로 두지 않는다.
+  // 이전: useState로 두고 [구성 편집] 대화상자에서 바꿨다(구성 편집 UI 제거)
+  const compositions = SAMPLE_COMPOSITIONS
+
   // 대화상자를 연다. 누른 버튼을 기억해 두는 것은 닫힐 때 키보드 사용자가 있던 자리로 돌아가게 하려는 것이다
   function openDialog(state: ProductDialogState) {
     dialogOpenerRef.current =
@@ -49,8 +68,22 @@ export function ProductsScreen() {
 
   const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
 
+  // 미리보기면 목업 API 목록 뒤에 번들·광고형 샘플 상품을 덧붙인다
+  const productList: AdminProduct[] | undefined = products.data
+    ? isBundlePreview
+      ? [...products.data.products, ...BUNDLE_SAMPLE_PRODUCTS]
+      : products.data.products
+    : undefined
+
   const selectedId = Number(searchParams.get(SELECTED_PRODUCT_PARAM))
-  const selectedProduct = products.data?.products.find((p) => p.productId === selectedId) ?? null
+  const selectedProduct = productList?.find((p) => p.productId === selectedId) ?? null
+
+  // 월 구독요금 이력 제목 아래 보조 글자. 번들은 구성 서비스를 "+"로 잇는다(예: "티빙 + 웨이브")
+  function productServiceLabel(product: AdminProduct): string {
+    return getProductComposition(product, isBundlePreview ? compositions : undefined)
+      .components.map((c) => serviceNames.get(c.ottServiceId) ?? `서비스 ${c.ottServiceId}`)
+      .join(' + ')
+  }
 
   function selectProduct(productId: number) {
     setSearchParams(
@@ -85,21 +118,20 @@ export function ProductsScreen() {
     content = (
       <>
         <ProductTable
-          products={products.data.products}
+          products={productList ?? products.data.products}
           serviceNames={serviceNames}
           selectedProductId={selectedProduct?.productId ?? null}
           today={today}
           onSelect={selectProduct}
           onEdit={(product) => openDialog({ mode: 'edit', product })}
+          compositions={isBundlePreview ? compositions : undefined}
         />
         {selectedProduct ? (
           <PriceHistoryPanel
             key={selectedProduct.productId}
             product={selectedProduct}
-            serviceName={
-              serviceNames.get(selectedProduct.ottServiceId) ??
-              `서비스 ${selectedProduct.ottServiceId}`
-            }
+            // 이전: serviceNames.get(selectedProduct.ottServiceId) ?? `서비스 ${selectedProduct.ottServiceId}` (번들은 서비스가 여러 곳이라 바꿨다)
+            serviceName={productServiceLabel(selectedProduct)}
             today={today}
           />
         ) : (
@@ -125,7 +157,9 @@ export function ProductsScreen() {
       <Alert role="note">
         <InfoIcon aria-hidden="true" />
         <AlertDescription>
-          MVP는 단품(STANDARD)만 다룹니다. 번들·광고형 OTT 구독상품은 2단계부터 등록할 수 있습니다.
+          {isBundlePreview
+            ? '1차안 미리보기: 번들·광고형 샘플 상품 3개를 목록 끝에 덧붙였습니다. 번들 구성은 등록할 때만 정하고, 판매 종료는 각 행의 [수정]에서 합니다. 등록은 서버에 저장되지 않습니다.'
+            : 'MVP는 단품(STANDARD)만 다룹니다. 번들·광고형 OTT 구독상품은 2단계부터 등록할 수 있습니다.'}
         </AlertDescription>
       </Alert>
 
@@ -141,6 +175,7 @@ export function ProductsScreen() {
         onClose={() => setDialogState(null)}
         onCreated={selectProduct}
         openerRef={dialogOpenerRef}
+        isBundlePreview={isBundlePreview}
       />
     </section>
   )
