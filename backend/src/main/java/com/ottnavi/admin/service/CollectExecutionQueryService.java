@@ -13,6 +13,7 @@ import com.ottnavi.collect.job.CollectProperties;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.global.common.PageResponse;
 import com.ottnavi.global.error.ResourceNotFoundException;
+import com.ottnavi.plan.batch.PlanRecalcExecutionQuery;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ public class CollectExecutionQueryService {
 	private final AvailabilityChangeQueryService availabilityChangeQueryService;
 	private final CollectProperties collectProperties;
 	private final ServerBootTime serverBootTime;
+	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 
 	/** 실행 한 건을 조회한다. 없거나 수집 Job의 실행이 아니면 404이다 */
 	public CollectExecutionResponse getExecution(long executionId) {
@@ -111,6 +113,7 @@ public class CollectExecutionQueryService {
 		// 3. 처리 건수와 변경 건수를 묶어서 조회한다
 		Map<Long, Integer> writeCounts = collectExecutionQuery.sumDetailWriteCounts(executionIds);
 		Map<Long, Integer> changeCounts = availabilityChangeQueryService.countByJobExecutionIds(executionIds);
+		Map<Long, Integer> recalcCounts = planRecalcExecutionQuery.findTargetCountsByCollectExecutionIds(executionIds); // 재계산 대상 플랜 수도 IN 조회 한 번
 
 		// 4. Job의 종료 메시지가 빈 실패 실행은 실패한 Step의 메시지로 대체할 수 있게 모아 조회한다
 		List<Long> needStepMessageIds = new ArrayList<>();
@@ -125,7 +128,7 @@ public class CollectExecutionQueryService {
 		// 5. 한 건씩 응답으로 바꾼다
 		List<CollectExecutionResponse> responses = new ArrayList<>();
 		for (CollectExecutionRecord record : records) {
-			responses.add(toResponse(record, writeCounts, changeCounts, stepMessages, context));
+			responses.add(toResponse(record, writeCounts, changeCounts, recalcCounts, stepMessages, context));
 		}
 		return responses;
 	}
@@ -148,7 +151,8 @@ public class CollectExecutionQueryService {
 	}
 
 	private CollectExecutionResponse toResponse(CollectExecutionRecord record, Map<Long, Integer> writeCounts,
-			Map<Long, Integer> changeCounts, Map<Long, String> stepMessages, CollectViewContext context) {
+			Map<Long, Integer> changeCounts, Map<Long, Integer> recalcCounts, Map<Long, String> stepMessages,
+			CollectViewContext context) {
 		// 1. 화면 상태
 		CollectExecutionStatus status = CollectExecutionRules.statusOf(record, context.bootedAt());
 
@@ -187,7 +191,8 @@ public class CollectExecutionQueryService {
 				changedCount,
 				failureReason,
 				canRecover,
-				canRestart);
+				canRestart,
+				recalcCounts.get(record.executionId())); // 이 수집 뒤 이어 돈 재계산이 없거나 끝나지 않았으면 null
 	}
 
 	private static int valueOrZero(Map<Long, Integer> counts, long executionId) {

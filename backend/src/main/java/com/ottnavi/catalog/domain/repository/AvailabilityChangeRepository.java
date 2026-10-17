@@ -1,6 +1,8 @@
 package com.ottnavi.catalog.domain.repository;
 
 import com.ottnavi.catalog.domain.entity.AvailabilityChange;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -9,6 +11,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface AvailabilityChangeRepository extends JpaRepository<AvailabilityChange, Long> {
+
+    /** 시청 단위별 가장 최근 변경 시각. 변경이 없는 단위는 행이 없다. 각 행은 [watchUnitId(Long), 최근 changedAt(Instant)] */
+    @Query("select c.watchUnit.id, max(c.changedAt) from AvailabilityChange c "
+            + "where c.watchUnit.id in :unitIds group by c.watchUnit.id")
+    List<Object[]> findLatestChangedAtByUnitIds(@Param("unitIds") Collection<Long> unitIds);
+
+    /** 시청 단위들의 변경 중 since 이후(초과)인 것을 시각 순으로 조회한다 */
+    @Query("select c from AvailabilityChange c where c.watchUnit.id in :unitIds and c.changedAt > :since "
+            + "order by c.changedAt asc, c.id asc")
+    List<AvailabilityChange> findByUnitIdsChangedAfter(@Param("unitIds") Collection<Long> unitIds,
+            @Param("since") Instant since);
 
     /** 수집 실행 ID별 변경 건수. 변경이 없는 실행은 행이 없다. 각 행은 [jobExecutionId(Long), count(Long)] */
     @Query("select c.jobExecutionId, count(c) from AvailabilityChange c "

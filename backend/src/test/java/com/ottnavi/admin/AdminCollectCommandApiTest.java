@@ -11,6 +11,7 @@ import com.ottnavi.collect.job.CollectExecutionRecord;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.BatchStatus;
@@ -242,6 +243,28 @@ class AdminCollectCommandApiTest extends AdminCollectApiTestSupport {
 			if (statuses[i] == 409) {
 				assertThat(bodies[i]).contains("BATCH_ALREADY_RUNNING");
 			}
+		}
+	}
+
+	@Test
+	void 재계산이_실행_중이면_수집_시작은_409이고_detail에_재계산이_원인임이_나온다() throws Exception {
+		// given: 재계산 Job이 실행 중인 기록을 만든다(생성 시각이 서버 기동 이후라 실행 중으로 본다)
+		long instanceId = jdbcTemplate.queryForObject("SELECT nextval('BATCH_JOB_INSTANCE_SEQ')", Long.class);
+		long executionId = jdbcTemplate.queryForObject("SELECT nextval('BATCH_JOB_EXECUTION_SEQ')", Long.class);
+		LocalDateTime startedAt = LocalDateTime.now().plusMinutes(1); // JVM 기본 시간대 기준(Batch 시각과 같은 기준)
+		jdbcTemplate.update("INSERT INTO BATCH_JOB_INSTANCE (JOB_INSTANCE_ID, VERSION, JOB_NAME, JOB_KEY) VALUES (?, 0, 'planRecalcJob', 'test-recalc')", instanceId);
+		jdbcTemplate.update("INSERT INTO BATCH_JOB_EXECUTION (JOB_EXECUTION_ID, VERSION, JOB_INSTANCE_ID, CREATE_TIME, START_TIME, STATUS, EXIT_CODE) "
+				+ "VALUES (?, 0, ?, ?, ?, 'STARTED', 'EXECUTING')", executionId, instanceId, startedAt, startedAt);
+
+		try {
+			// when, then: 수집 시작은 재계산이 끝나기 전까지 409 BATCH_ALREADY_RUNNING이다
+			postCreate(createBody(DAY, "ALL"))
+					.andExpect(status().isConflict())
+					.andExpect(jsonPath("$.errorCode").value("BATCH_ALREADY_RUNNING"))
+					.andExpect(jsonPath("$.detail").value(containsString("재계산")));
+		} finally {
+			// 다음 테스트가 실행 중인 기록을 기다리지 않도록 끝난 것으로 바꾼다
+			jdbcTemplate.update("UPDATE BATCH_JOB_EXECUTION SET STATUS = 'COMPLETED', END_TIME = now() WHERE JOB_EXECUTION_ID = ?", executionId);
 		}
 	}
 }

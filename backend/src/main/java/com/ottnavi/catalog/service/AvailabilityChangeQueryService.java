@@ -5,6 +5,10 @@ import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.entity.WatchUnit;
 import com.ottnavi.catalog.domain.repository.AvailabilityChangeRepository;
 import com.ottnavi.catalog.service.model.ExecutionChange;
+import com.ottnavi.catalog.service.model.UnitAvailabilityShift;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AvailabilityChangeQueryService {
 
     private final AvailabilityChangeRepository availabilityChangeRepository;
+    private static final int CHUNK_SIZE = 1000; // IN 절에 한 번에 넣는 ID 수의 상한
 
     /**
      * 수집 실행 ID별 변경 건수를 센다. 변경이 없는 실행은 결과에 없다(호출하는 쪽이 0으로 본다).
@@ -73,5 +78,44 @@ public class AvailabilityChangeQueryService {
 
         // 3. 전체 건수는 저장소 결과 그대로 둔다
         return new PageImpl<>(changes, found.getPageable(), found.getTotalElements());
+    }
+
+    /**
+     * 시청 단위별 가장 최근 제공 상태 변경 시각을 돌려준다. 변경 이력이 없는 단위는 결과에 없다.
+     * 매월 재계산 대상 선정(플랜 data_as_of 이후 변경이 있는지)이 쓴다. ID가 많으면 1000개씩 나눠 조회한다.
+     * 예: [10, 11] → {10=2026-10-20T01:00:00Z}
+     */
+    public Map<Long, Instant> findLatestChangedAtByUnitIds(Collection<Long> watchUnitIds) {
+        Map<Long, Instant> latest = new HashMap<>();
+        for (List<Long> chunk : chunksOf(watchUnitIds)) {
+            for (Object[] row : availabilityChangeRepository.findLatestChangedAtByUnitIds(chunk)) {
+                latest.put((Long) row[0], (Instant) row[1]);
+            }
+        }
+        return latest;
+    }
+
+    /**
+     * 시청 단위들의 제공 상태 변경 중 since 이후(초과)인 것을 시각 순으로 돌려준다. 이유 판정(작품이 서비스에서 빠짐·들어옴)의 근거다.
+     */
+    public List<UnitAvailabilityShift> findShiftsAfter(Collection<Long> watchUnitIds, Instant since) {
+        List<UnitAvailabilityShift> shifts = new ArrayList<>();
+        for (List<Long> chunk : chunksOf(watchUnitIds)) {
+            for (AvailabilityChange change : availabilityChangeRepository.findByUnitIdsChangedAfter(chunk, since)) {
+                shifts.add(new UnitAvailabilityShift(change.getWatchUnit().getId(), change.getOttService().getId(),
+                        change.getBeforeStatus(), change.getAfterStatus(), change.getChangedAt()));
+            }
+        }
+        shifts.sort(Comparator.comparing(UnitAvailabilityShift::changedAt));
+        return shifts;
+    }
+
+    private static List<List<Long>> chunksOf(Collection<Long> ids) {
+        List<List<Long>> chunks = new ArrayList<>();
+        List<Long> all = new ArrayList<>(ids);
+        for (int start = 0; start < all.size(); start += CHUNK_SIZE) {
+            chunks.add(all.subList(start, Math.min(start + CHUNK_SIZE, all.size())));
+        }
+        return chunks;
     }
 }

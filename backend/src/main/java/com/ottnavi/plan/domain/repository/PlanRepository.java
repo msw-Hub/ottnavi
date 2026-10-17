@@ -3,8 +3,10 @@ package com.ottnavi.plan.domain.repository;
 import com.ottnavi.plan.domain.entity.Plan;
 import com.ottnavi.plan.domain.enums.PlanStatus;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -37,4 +39,21 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("delete from Plan p where p.userId = :userId and p.status = com.ottnavi.plan.domain.enums.PlanStatus.DRAFT")
 	int deleteDraftsByUserId(@Param("userId") Long userId);
+
+	/** 해당 상태의 플랜 전부(매월 재계산이 ACTIVE 전체에서 대상을 고른다) */
+	List<Plan> findAllByStatus(PlanStatus status);
+
+	/** 변경 요약이 있는 사용자의 플랜을 최신(ID 큰 순)부터 조회한다. 변경 내역 조회·ARCHIVED 정리가 Pageable로 개수를 자른다 */
+	@Query("select p from Plan p where p.userId = :userId and p.changeSummary is not null order by p.id desc")
+	List<Plan> findWithChangeSummary(@Param("userId") Long userId, Pageable pageable);
+
+	/**
+	 * 보관 대상이 아닌 ARCHIVED를 지운다(Task 069 결정 2). keepIds에 든 플랜은 남긴다. 하위 행은 DB FK CASCADE가 지우고
+	 * calc_run.plan_id와 plan.previous_plan_id는 FK ON DELETE SET NULL이 비운다(TECH T-1).
+	 * clear는 지워진 엔티티가 영속성 컨텍스트에 남지 않게 한다.
+	 */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from Plan p where p.userId = :userId and p.status = com.ottnavi.plan.domain.enums.PlanStatus.ARCHIVED "
+			+ "and p.id not in :keepIds")
+	int deleteArchivedExcept(@Param("userId") Long userId, @Param("keepIds") Collection<Long> keepIds);
 }

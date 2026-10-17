@@ -4,9 +4,11 @@ import com.ottnavi.global.common.CommonResponse;
 import com.ottnavi.global.security.AuthUser;
 import com.ottnavi.plan.dto.request.CreatePlanRequest;
 import com.ottnavi.plan.dto.response.CurrentPlanResponse;
+import com.ottnavi.plan.dto.response.PlanChangeHistoryListResponse;
 import com.ottnavi.plan.dto.response.PlanDraftListResponse;
 import com.ottnavi.plan.dto.response.SavedPlanResponse;
 import com.ottnavi.plan.service.PlanActivateService;
+import com.ottnavi.plan.service.PlanChangeHistoryService;
 import com.ottnavi.plan.service.PlanCalculateService;
 import com.ottnavi.plan.service.PlanQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +35,7 @@ public class PlanController {
 	private final PlanCalculateService planCalculateService;
 	private final PlanActivateService planActivateService;
 	private final PlanQueryService planQueryService;
+	private final PlanChangeHistoryService planChangeHistoryService;
 
 	/** 내 찜·설정·요금으로 3개월 플랜을 계산해 초안 3종(추천형·절약형·간편형)을 만든다. 기존 초안은 덮어쓴다 */
 	@Operation(operationId = "createPlanDrafts", summary = "플랜 계산(초안 3종 생성)")
@@ -57,6 +60,14 @@ public class PlanController {
 	public CommonResponse<CurrentPlanResponse> getCurrentPlan(
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthUser authUser) {
 		return CommonResponse.success(CurrentPlanResponse.from(planQueryService.getCurrent(authUser.userId())));
+	}
+
+	/** 매월 재계산으로 플랜이 바뀐 변경 내역을 최신순 최대 6건 돌려준다. 없으면 200과 빈 배열이다 */
+	@Operation(operationId = "listPlanChanges", summary = "플랜 변경 내역 조회")
+	@GetMapping("/plan-changes")
+	public CommonResponse<PlanChangeHistoryListResponse> listPlanChanges(
+			@Parameter(hidden = true) @AuthenticationPrincipal AuthUser authUser) {
+		return CommonResponse.success(PlanChangeHistoryListResponse.from(planChangeHistoryService.listRecent(authUser.userId())));
 	}
 
 	/** 고른 초안을 현재 플랜(ACTIVE)으로 저장한다. 기존 ACTIVE는 보관되고 나머지 초안은 삭제된다 */
