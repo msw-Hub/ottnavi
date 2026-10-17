@@ -1342,7 +1342,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 승인과 추가 결정(2026-10-17 사용자): 계약 변경안을 위 내용으로 승인. 새 달에 구독이 없어도 그 달을 기록에 넣는다("구독 안 함"으로 표시). 새 달만 생기고 다른 변화가 없는 재계산은 기록하지 않는다(매월 셋째 달은 항상 새로 생기므로 이것만으로 기록하면 "변경 없는 달은 기록하지 않는다"가 의미를 잃는다). 새 달 표시는 다른 변경이 있는 기록 안에서만 보인다. 화면: 최신 1건 펼침, 새로 생긴 달은 "새로 생긴 달" 칩과 이전 쪽 "해당 없음", 비용은 비교하지 않음, 절감액 삭제. 주소 규칙 확인: kebab-case 복수형 명사, 주소에 동사 없음(operationId의 동사는 프론트 훅 이름용). 남은 것: frontend-dev의 저장된 플랜 시나리오 링크 확인(Task 070). CodeRabbit 지적 1건(운영에서 샘플이 보이는 문제)은 운영에서 준비 중 화면으로 분기해 반영했다(`PlanHistoryPage`, 링크는 목업 모드에서만 표시, Task 070에서 분기 제거).
   - 넘길 내용: Task 069(**opus 설계 먼저**): 변경 요약·이유를 어떻게 계산해 어디에 저장할지(`plan.change_summary` 컬럼의 내부 형식, 이유 판정 규칙), 재계산이 지난 달 배정을 자동으로 시청 완료 처리하는지(PRD에 없음, 체크하지 않은 작품은 다음 재계산에 다시 들어간다), ARCHIVED 보관 개수 N. 확인하지 못한 것: "변경 내역 보기" 링크의 실제 모습(목업에 저장된 플랜이 없어 브라우저로 못 봄, 저장된 플랜 시나리오에서 확인 필요), 라우터 `plan/history` 주석의 "(2단계, 준비 중)" 문구 정리(frontend-dev).
 
-#### Task 069: 매월 재계산·변경 요약과 변경 내역 API 구현으로 플랜 자동 갱신 ⬜ `[v0.1.0 포함]`
+#### Task 069: 매월 재계산·변경 요약과 변경 내역 API 구현으로 플랜 자동 갱신 🔄 `[v0.1.0 포함]`
 - 태그: [B] · PRD: O1, FR-14, FR-18 · 선행: 068, 066, 045 · 브랜치: `feature/o1-monthly-recalc`
 - 068에서 넘어온 서버 규칙(2026-10-17 승인): 변경 내역은 매월 재계산에서 **다른 변화가 있을 때만** 기록한다(새 달만 생긴 재계산은 기록하지 않음). 새 달은 구독이 없어도 "구독 안 함"으로 기록 안에 포함한다. 이유 종류는 가격 변경·작품이 서비스에서 빠짐·작품이 새로 들어옴·시청 체크 4종이며 이유 문장은 서버가 만든다. 최근 6건만 내려준다(ARCHIVED 보관 개수 N은 이 Task 설계에서 확정). 확인 필요: 재계산이 지난 달 배정을 자동으로 시청 완료 처리하는지(PRD에 없음, 체크하지 않은 작품은 다음 재계산에 다시 들어간다), `plan.change_summary`의 내부 형식. 계약: `GET /api/me/plan-changes`(`listPlanChanges`), 068 기록 참조.
 - 구현 사항
@@ -1357,6 +1357,12 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: ACTIVE 1개, `previous_plan_id`, DRAFT 미접촉, `change_summary`, 영향 플랜만 선정, 수집 COMPLETED 시에만 재계산 시작 테스트.
   - V-API: local에서 `targetDate`를 지정한 수집 실행(Task 045) → 재계산이 자동으로 이어지고 수집 이력에 재계산 대상 플랜 수가 나온다. 실제 cron 경로 확인은 Task 102.
+- 기록(2026-10-17, 구현·테스트 완료, PR 전): 브랜치 `feature/o1-monthly-recalc`. 결정 9건(사용자 승인): 1) 지난 달 배정을 자동으로 시청 완료 처리하지 않는다. 2) ARCHIVED는 변경 기록 있는 최근 6개(ACTIVE 포함)와 바로 이전 1개만 남긴다. 3) `change_summary`는 기존 TEXT 안 JSON(v:1), 마이그레이션 없음. 4) 이유 4종이 하나도 없으면 플랜은 갱신하되 요약은 기록하지 않는다. 5) 영향 플랜 = ACTIVE이면서 (`start_month` < 이번 달 KST 1일) 또는 (`plan_item` 시청 단위의 `availability_change.changed_at` > `plan.data_as_of`)(R-19 해소). 6) 월 중간 재계산도 엔진을 바꾸지 않는다. 7) 수동 재실행은 `POST /api/admin/plans/monthly/executions`(`createPlanRecalcExecution`). 8) 이유 항목 필드는 `reasonType`·`description`. 9) 찜을 모두 체크한 플랜은 건너뛴다.
+  - 구현: 1단계 도메인(`PlanChangeDetector`·`PlanChangeMessages` 순수 규칙, `PlanChangeSummaryCodec`, `Plan.createRecalculated`·`recordChangeSummary`, `PlanResultWriter` 분리), 2단계 `collect`(`CollectCompletedEvent`·`CollectCompletionListener`), `plan/batch`(재계산 Job·Tasklet·Launcher·Trigger), `plan/service`(대상 선정·재계산·쓰기·스냅샷·근거·변경 내역), API 2개, `CollectExecution.recalcTargetCount`. 계약: `listPlanChanges`, `createPlanRecalcExecution`, `recalcTargetCount`.
+  - 계약 변경(사용자 승인, 068 승인 계약을 바꿈): `PlanChangeProduct.ottServiceId`를 `ottServiceIds`(배열, 필수, minItems 1)로 바꿨다(번들은 076에서 생기며 069에서는 항상 길이 1). 프론트 `features/plan/mockTypes.ts`는 Task 070에서 생성 타입으로 교체할 때 맞춘다.
+  - 실측: afterJob 안에서 이벤트로 시작한 비동기 재계산이 실행 기록을 정상으로 남긴다(실제 수집 Job, `PlanRecalcAfterCollectTest`). Tasklet(Resourceless) 안에서 부른 쓰기 트랜잭션이 정상 커밋된다(`PlanRecalcIntegrationTest`). 수집의 afterJob 시점에는 그 수집이 DB에 COMPLETED로 저장되기 전이라 Tasklet이 저장을 최대 60초 기다린다.
+  - 결정(2026-10-17 사용자): `scope=AVAILABILITY_TV` 수집은 COMPLETED여도 재계산을 시작하지 않는다. 재계산이 실행 중이면 수집 시작·재시작 요청은 409 `BATCH_ALREADY_RUNNING`이다(양방향 보호, `admin/service/CollectExecutionService`에서 확인. `createCollectExecution` 409 설명 보충). 한계: 조사(이/가, 을/를, 으로/로)는 한글 받침과 숫자 읽기로 고르고 영문·기호로 끝나는 서비스명은 받침 없음으로 본다.
+  - 남은 것: 알림 연결은 Task 073, 수집 이력 화면 연결과 변경 내역 화면 연결은 Task 070, 번들 서비스 목록은 076, 실제 cron 경로 확인은 Task 102.
 
 #### Task 070: 변경 내역 화면 실제 API 연결로 O1 완성 ⬜ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O1, SCR-11, SCR-16(FR-20) · 선행: 069, 061 · 브랜치: `feature/o1-plan-history-api`
@@ -1618,7 +1624,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 전후 비교표를 기록했고 R11-29·30 확정안을 사용자에게 올렸다.
 
 #### Task 101: 프론트 번들과 큰 목록 렌더링 점검으로 화면 성능 확보 ⬜ `[v0.1.0 포함]`
-- 태그: [F] · PRD: Q2 · 선행: 095 · 브랜치: `feature/q2-frontend-performance`
+- 태그: [F] · PRD: Q2 · 선행: 067 · 브랜치: `feature/q2-frontend-performance` (2026-10-17 개정: 101이 첫 공개 전으로 당겨져 095(공개)의 선행이 됐으므로 이 Task의 선행을 095에서 067로 바꿔 순환을 없앴다)
 - 구현 사항
   - [ ] 빌드 결과물 크기, 라우트 지연 로딩, 큰 찜 목록·검색 결과 렌더링(필요 시 가상화), 필요한 곳만 memo
 - 완료 기준
@@ -1719,7 +1725,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-16 | MVP 일괄 수집의 `tier` 값. TECH 3절은 식별 파라미터를 `tier`(DAILY/WEEKLY)로 정했고 PRD 5.5는 "MVP는 일괄 갱신"이라고만 한다. 일괄 실행에 어떤 값을 쓸지(예: WEEKLY로 전체, 별도 값 추가) 근거가 없다 | **해소(2026-10-09, 사용자 결정)**: 새 값 **`ALL`**을 추가한다(`DAILY`·`WEEKLY`로 표기하면 이름과 실제가 달라 헷갈림). `tier`의 뜻은 TECH 3절에 기록. 계약(Task 045)의 `tier` enum에 `ALL`을 넣고, Job 파라미터 `tier`와 `title.refresh_tier`가 같은 enum을 공유하는지는 Task 043에서 정한다 | PRD 5.5, TECH 3절 | 2026-10-15 |
 | R-17 | Vercel `routes`와 `rewrites`(·`headers`) 동시 사용. TECH는 함께 쓸 수 있다고 적었다. context7(`/vercel/vercel`, `@vercel/routing-utils` `getTransformedRoutes`)로 두 값을 함께 받으면 `routes`가 먼저, `rewrites`가 `handle: filesystem` 뒤에 붙는다는 코드는 확인했지만, 배포 검증이 혼용을 거부하는지는 확인하지 못했다(과거 Vercel은 거부한 것으로 알려짐). 3판에서 실측을 Task 014(미리보기 배포)로 당겼다. **2026-10-04 갱신(Task 009 작업 중 조사)**: Vercel CLI 소스(`compile-vercel-config.ts`)가 `routes`와 `rewrites`·`redirects`·`headers`를 함께 정의하면 합치지 않고 스키마 검증이 실패하도록 두고, `@vercel/config` 소스 주석에도 "Vercel doesn't allow mixing routes with redirects, rewrites, headers..."라고 적혀 있어 혼용은 거부될 가능성이 높다고 판단했다(배포 실측은 아님). 그래서 Task 009를 처음부터 `routes` 단일 형식으로 작성했고 `routesSchema` 검증을 통과했다. Task 014는 이 파일의 미리보기 배포 성공만 확인한다. 적용 순서와 프록시·헤더 주입의 실제 동작은 Task 021 `기록:` **2026-10-05 실측(Task 014)**: 미리보기 배포(브랜치 `feature/docs-human-tasks-status`, 커밋 `adba3e1`)가 `routes` 단일 형식 `vercel.json`으로 설정 오류 없이 만들어졌고(`Build Completed`, `Deployment completed`), `ORIGIN_SECRET` 환경 변수가 아직 없어도 배포가 실패하지 않았다. 루트 페이지가 열리고 `/api/public/ott-services`는 SPA 화면이 아니라 `502 DNS_HOSTNAME_NOT_FOUND`(자리표시 호스트로 프록시 시도)가 나와 `/api` 프록시 규칙이 SPA 대체보다 먼저 적용되는 것을 확인했다. 혼용 여부는 시험하지 않았다. 프록시·헤더 주입의 실제 동작은 Task 021 | 확인됨(Task 014, 2026-10-05) | TECH 6절·T-8 | 2026-10-07 |
 | R-18 | LLM 초안 저장 위치. ERD(24개 테이블)에 초안 테이블이 없다. Redis(TTL) 또는 ERD 추가 중 선택 필요. ERD 추가로 정하면 ERD 수정과 Flyway 마이그레이션이 Task 087 범위에 들어간다 | 미결 | PRD SCR-18, ERD | 2026-11-19 |
-| R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인 필요 | 미결 | FR-18, TECH 2절 | 2026-11-05 |
+| R-19 | 제공처 변경 시 "영향받는 ACTIVE 플랜" 선정 기준이 문서에 없다. Task 069에 제안(이번 수집의 `availability_change` × `plan_item`)을 적었다. 사용자 승인으로 확정: ACTIVE이면서 start_month < 이번 달 KST 1일 또는 plan_item 시청 단위의 availability_change.changed_at > plan.data_as_of(TECH 2절) | 해소(2026-10-17, Task 069 결정 5) | FR-18, TECH 2절 | 2026-11-05 |
 | R-20 | MVP 계약 초안의 보관 방식 | **해소(2026-10-03, 사용자 결정)**: 별도 초안 파일 없이 `docs/api/openapi.yaml` 하나에 두고, 구현 전 operation에 `x-planned: true`("제안" 표시)를 단다. 계약 대조 테스트(Task 023)는 이 경로를 제외하고, 구현 Task가 표시를 지운다. orval 입력은 `openapi.yaml` 하나(Task 017). 4.2, Task 023·031 반영. `api-contract.md`는 다른 작업자가 갱신 중. 남은 판단: 2단계 이후 기능에도 `x-planned`를 쓸지(현재 4.4는 PRD 9절대로 구현 PR에서 추가) | PRD 9절, TECH T-5, api-contract.md | — |
 | R-21 | 수집 → 재계산 → 월초 알림 생성의 연결 주체. 2판은 `collect.yml`이 수집 뒤 재계산을, 별도 cron이 월초 알림 생성을 호출했다 | **해소(2026-10-03, 사용자 결정)**: 백엔드가 수집 Job 완료 리스너(Spring Batch `JobExecutionListener`)에서 재계산을 이어 실행하고, 월초 알림 생성은 재계산 완료 뒤 이어 실행한다. GitHub Actions는 수집 시작만 호출(202). Task 047·069·073·102 반영. PRD 11절 5번·TECH 3·4절(배치 토큰 경로) 문구는 다른 작업자가 갱신 중 | PRD 11절 5번, TECH 3절 | — |
 
