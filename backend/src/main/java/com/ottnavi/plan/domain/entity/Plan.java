@@ -83,7 +83,7 @@ public class Plan extends BaseTimeEntity {
 	private Instant activatedAt; // ACTIVE로 저장된 시각. DRAFT만 null
 
 	@Column(columnDefinition = "text")
-	private String changeSummary; // 재계산 변경 요약. MVP는 null
+	private String changeSummary; // 재계산 변경 요약(JSON, v 필드 포함). 직접 저장한 플랜과 변화 없는 재계산은 null
 
 	/** 계산 결과 한 건을 DRAFT로 만든다. 하위 행은 만든 뒤 각각 저장한다 */
 	public static Plan createDraft(Long userId, Long previousPlanId, PlanType planType, LocalDate startMonth,
@@ -105,6 +105,37 @@ public class Plan extends BaseTimeEntity {
 		plan.allSubscribeCost = allSubscribeCost;
 		plan.dataAsOf = dataAsOf;
 		return plan;
+	}
+
+	/**
+	 * 매월 재계산 결과를 DRAFT 없이 바로 ACTIVE로 만든다(Task 069). 저장 시각(activatedAt)은 재계산 시각(now)이다.
+	 * previousPlanId는 방금 보관한 이전 ACTIVE의 ID이고, 기존 ACTIVE는 먼저 archive하고 flush한 뒤 저장해야 부분 유니크를 위반하지 않는다.
+	 */
+	public static Plan createRecalculated(Long userId, Long previousPlanId, PlanType planType, LocalDate startMonth,
+			int monthlyBudget, int monthlyWatchMinutes, SolverType algorithm, int mustTotal, int mustCompleted,
+			int score, int totalCost, int allSubscribeCost, Instant dataAsOf, Instant now) {
+		if (previousPlanId == null) {
+			throw new IllegalArgumentException("재계산 플랜은 이전 플랜이 있어야 한다");
+		}
+		Plan plan = createDraft(userId, previousPlanId, planType, startMonth, monthlyBudget, monthlyWatchMinutes,
+				algorithm, mustTotal, mustCompleted, score, totalCost, allSubscribeCost, dataAsOf);
+		plan.status = PlanStatus.ACTIVE;
+		plan.activatedAt = now;
+		return plan;
+	}
+
+	/** 재계산 변경 요약(JSON)을 남긴다. 재계산으로 만든 ACTIVE에만 쓰고, 한 번 남기면 바꾸지 않는다 */
+	public void recordChangeSummary(String changeSummaryJson) {
+		if (status != PlanStatus.ACTIVE) {
+			throw new IllegalStateException("ACTIVE만 변경 요약을 남길 수 있다: " + status);
+		}
+		if (changeSummary != null) {
+			throw new IllegalStateException("변경 요약이 이미 있다: planId=" + id);
+		}
+		if (changeSummaryJson == null || changeSummaryJson.isBlank()) {
+			throw new IllegalArgumentException("변경 요약이 비어 있다");
+		}
+		this.changeSummary = changeSummaryJson;
 	}
 
 	/**
