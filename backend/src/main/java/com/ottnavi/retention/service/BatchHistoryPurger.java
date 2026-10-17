@@ -50,7 +50,7 @@ public class BatchHistoryPurger {
 				"SELECT i.JOB_INSTANCE_ID FROM BATCH_JOB_INSTANCE i "
 						+ "WHERE EXISTS (SELECT 1 FROM BATCH_JOB_EXECUTION e WHERE e.JOB_INSTANCE_ID = i.JOB_INSTANCE_ID) "
 						+ "AND NOT EXISTS (SELECT 1 FROM BATCH_JOB_EXECUTION e WHERE e.JOB_INSTANCE_ID = i.JOB_INSTANCE_ID "
-						+ "AND NOT (e.END_TIME < ? AND e.STATUS IN " + TERMINAL_STATUSES + " AND e.JOB_EXECUTION_ID <> ?))",
+						+ "AND (e.END_TIME IS NULL OR NOT (e.END_TIME < ? AND e.STATUS IN " + TERMINAL_STATUSES + " AND e.JOB_EXECUTION_ID <> ?)))",
 				Long.class, cutoff, protectedId);
 
 		// 3. 인스턴스를 묶음으로 나눠 하위 테이블부터 지운다

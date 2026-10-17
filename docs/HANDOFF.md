@@ -134,6 +134,13 @@
 3. `calc_run`의 플랜과 끊긴 기록은 180일 뒤 삭제한다.
 4. 별도 정리 Job을 주 1회 cron과 관리자 수동 실행 API로 돌린다. 수집·정리가 실행 중이면 409이고, 점검은 `fetched_at`이 5개월을 넘은 작품 수를 센다.
 
+**Task 083 이월(2026-10-18)**
+
+1. **정리가 못 끝내는 작품이 쌓일 가능성**: 갱신을 건너뛴(`REFRESH_SKIPPED`, 시즌 404 등) 작품이나 보류(`DEFERRED`)된 작품은 `fetched_at`이 그대로라 다음 실행에서도 가장 오래된 순으로 맨 앞에 다시 뽑힌다. 같은 이유로 계속 건너뛰는 작품이 1회 상한(`app.retention.max-titles-per-run`=500)만큼 쌓이면 뒤의 오래된 작품이 처리되지 않는다(CodeRabbit PR #82 지적, 사용자 결정 A: 이번에는 두고 기록). 고치려면 재시도 표시 컬럼(새 마이그레이션) 또는 커서 방식이 필요하다. 운영 정리 실행 요약 로그의 "갱신 못 함·보류" 건수가 상한 가까이 쌓이는지 보고 필요하면 설계한다.
+2. **TMDB 404 확정과 빈도 미확인**: 삭제된 TMDB ID가 404를 주는지와 빈도는 문서로 확정하지 못했다. 운영 수집이 돈 뒤 `tmdb.call{endpoint=movie_detail, result=not_found}` 카운터와 warn 로그로 실측해 ROADMAP에 기록한다.
+3. **정리 Job의 Step 상태**: 앞 Step이 실패해 다음으로 넘어가면 그 Step은 `ABANDONED`(종료 코드 `FAILED`)로 남고 Job 전체는 `COMPLETED`다. 실패는 error 로그와 Step 종료 코드로만 드러난다.
+4. **`retention.yml`·실서버 미확인**: `schedule`은 주석이다. `main` 병합 뒤 `workflow_dispatch`로 한 번 돌려 확인하고, 수집 cron(Task 093)을 켤 때 함께 켠다.
+
 ## 5. 환경과 도구 함정 (Windows 11)
 
 - 셸 두 가지가 있다. Bash(Git Bash)와 PowerShell. Bash의 heredoc에 한글·따옴표가 섞이면 깨질 수 있으니 긴 파일은 Write 도구로 쓴다. `python`은 쓸 수 없고 node로 스크립트를 쓴다(줄바꿈 CRLF를 읽고 되돌려 쓸 때 보존한다).
