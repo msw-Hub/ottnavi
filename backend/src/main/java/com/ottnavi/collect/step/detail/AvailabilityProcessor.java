@@ -27,8 +27,7 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
 
     // 작품 단위 조회 결과 임시 저장: 같은 시리즈의 시즌은 id 순으로 이어서 읽히므로 바로 직전 시리즈 한 건만 들고 있는다
     private int cachedTvId;
-    private KrProviders cachedTvProviders;
-    private boolean cached;
+    private KrProviders cachedTvProviders; // null이면 아직 저장한 값이 없다
 
     private int fallbackUnitCount; // 작품 단위로 대신 판정한 시즌 수(Step 로그용)
     private int fallbackCallCount; // 작품 단위 제공처를 실제로 호출한 횟수(Step 로그용)
@@ -36,7 +35,6 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
     /** Step이 시작될 때 임시 저장과 집계를 비운다(빈이 Job 실행 사이에 재사용되기 때문) */
     @Override
     public void beforeStep(StepExecution stepExecution) {
-        cached = false;
         cachedTvProviders = null;
         fallbackUnitCount = 0;
         fallbackCallCount = 0;
@@ -79,7 +77,7 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
     /** 작품 단위 KR 제공처를 돌려준다. 직전과 같은 시리즈면 호출하지 않고, 작품 단위가 404면 KR 데이터 없음으로 본다 */
     private KrProviders seriesProviders(int tvId) {
         // 1. 직전 시리즈와 같으면 저장해 둔 값을 쓴다
-        if (cached && cachedTvId == tvId) {
+        if (cachedTvProviders != null && cachedTvId == tvId) {
             return cachedTvProviders;
         }
         // 2. 작품 단위 제공처를 호출한다(404면 이 작품에도 KR 정보가 없는 것으로 본다)
@@ -91,7 +89,6 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
             providers = KrProviders.noKrData();
         }
         // 3. 다음 시즌을 위해 저장해 둔다
-        cached = true;
         cachedTvId = tvId;
         cachedTvProviders = providers;
         return providers;

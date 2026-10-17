@@ -69,7 +69,8 @@ public class AdminCollectController {
 	@ResponseStatus(HttpStatus.ACCEPTED)
 	public CommonResponse<CollectExecutionAcceptedResponse> createCollectExecution(
 			@Valid @RequestBody CreateCollectExecutionRequest request) {
-		long executionId = collectExecutionService.start(request.targetDate(), request.tier());
+		long executionId = collectExecutionService.start(request.targetDate(), request.tier(),
+				request.scope());
 		return CommonResponse.success(new CollectExecutionAcceptedResponse(executionId));
 	}
 

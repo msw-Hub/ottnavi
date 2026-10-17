@@ -38,6 +38,15 @@ class AdminCollectProdModeApiTest extends AdminCollectApiTestSupport {
 	}
 
 	@Test
+	void 운영_모드에서_scope를_주면_400_fieldErrors_scope다() throws Exception {
+		// given, when, then
+		postCreate(createBody(null, "ALL", "AVAILABILITY_TV"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("scope"));
+	}
+
+	@Test
 	void 운영_모드에서_날짜를_비우면_오늘로_202다() throws Exception {
 		// given, when
 		var result = postCreate(createBody(null, "ALL"));

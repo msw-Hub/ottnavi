@@ -11,9 +11,11 @@ import com.ottnavi.collect.job.CollectExecutionRecord;
 import com.ottnavi.collect.job.CollectExecutionRules;
 import com.ottnavi.collect.job.CollectExecutionRules.DateVerdict;
 import com.ottnavi.collect.job.CollectExecutionRules.LaunchVerdict;
+import com.ottnavi.collect.job.CollectExecutionRules.ScopeVerdict;
 import com.ottnavi.collect.job.CollectExecutionStatus;
 import com.ottnavi.collect.job.CollectJobLauncher;
 import com.ottnavi.collect.job.CollectProperties;
+import com.ottnavi.collect.job.CollectScope;
 import com.ottnavi.collect.job.CollectTier;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.global.error.FieldValidationException;
@@ -55,9 +57,10 @@ public class CollectExecutionService {
 
 	/**
 	 * 수집을 새로 시작하고 새 실행 ID를 돌려준다. 같은 날짜·범위의 최신 실행이 실패면 재시작한다.
-	 * 예: targetDate=null, tier=ALL → 오늘(KST) 기준으로 시작.
+	 * 예: targetDate=null, tier=ALL, scope=null → 오늘(KST) 기준 전체 수집으로 시작.
+	 * scope가 있으면(로컬 전용) 그 범위의 Step만 실행하며, 중복·재시작 판정은 scope별로 따로 한다.
 	 */
-	public long start(LocalDate targetDateOrNull, CollectTier tier) {
+	public long start(LocalDate targetDateOrNull, CollectTier tier, CollectScope scope) {
 		// 1. 날짜가 비면 오늘(KST)로 채운다
 		LocalDate today = LocalDate.now(KST);
 		LocalDate targetDate = targetDateOrNull;
@@ -73,11 +76,14 @@ public class CollectExecutionService {
 		// 3. 날짜 규칙: 운영은 오늘만, local은 미래만 막는다
 		validateDate(targetDate, today);
 
-		// 4. 사전 검사와 시작을 한 덩어리로 직렬화한다
+		// 4. 실행 범위 규칙: 운영은 전체만, local은 일부 범위도 허용
+		validateScope(scope);
+
+		// 5. 사전 검사와 시작을 한 덩어리로 직렬화한다
 		launchLock.lock();
 		try {
-			// 5. 같은 날짜·범위의 최신 실행과 그 상태
-			Optional<CollectExecutionRecord> latest = collectExecutionQuery.findLatest(targetDate, tier);
+			// 6. 같은 날짜·범위·scope의 최신 실행과 그 상태
+			Optional<CollectExecutionRecord> latest = collectExecutionQuery.findLatest(targetDate, tier, scope);
 			CollectExecutionStatus latestStatus = null;
 			long sameInstanceId = -1;
 			if (latest.isPresent()) {
@@ -85,24 +91,25 @@ public class CollectExecutionService {
 				sameInstanceId = latest.get().instanceId();
 			}
 
-			// 6. 다른 날짜·범위의 수집이 실행 중인지
+			// 7. 다른 날짜·범위의 수집이 실행 중인지(scope가 달라도 전체 동시 실행은 금지)
 			CollectViewContext context = collectExecutionQueryService.createContext();
 			CollectExecutionRecord otherRunning = context.findRunningOtherThan(sameInstanceId);
 
-			// 7. 판정 결과가 거절이면 예외로 바꾼다
+			// 8. 판정 결과가 거절이면 예외로 바꾼다
 			LaunchVerdict verdict = CollectExecutionRules.judgeLaunch(latestStatus, otherRunning != null);
 			throwIfRejected(verdict, otherRunning);
 
-			// 8. 실패한 최신 실행이 있으면 재시작, 없으면 새로 시작
+			// 9. 실패한 최신 실행이 있으면 재시작, 없으면 새로 시작
 			long executionId;
 			if (latestStatus == CollectExecutionStatus.FAILED) {
 				executionId = restartLaunch(latest.get().executionId());
 			} else {
-				executionId = startLaunch(targetDate, tier);
+				executionId = startLaunch(targetDate, tier, scope);
 			}
 
-			// 9. 정상 흐름 기록
-			log.info("수집 실행을 접수했다: executionId={}, targetDate={}, tier={}", executionId, targetDate, tier);
+			// 10. 정상 흐름 기록
+			log.info("수집 실행을 접수했다: executionId={}, targetDate={}, tier={}, scope={}",
+					executionId, targetDate, tier, scope);
 			return executionId;
 		} finally {
 			launchLock.unlock();
@@ -127,10 +134,10 @@ public class CollectExecutionService {
 		// 3. 사전 검사와 시작을 한 덩어리로 직렬화한다
 		launchLock.lock();
 		try {
-			// 4. 같은 날짜·범위의 최신 실행으로 판정한다
+			// 4. 같은 날짜·범위·scope(같은 Job 인스턴스)의 최신 실행으로 판정한다
 			CollectExecutionRecord latest = record;
 			Optional<CollectExecutionRecord> latestFound =
-					collectExecutionQuery.findLatest(record.targetDate(), record.tier());
+					collectExecutionQuery.findLatestOfInstance(record.instanceId());
 			if (latestFound.isPresent()) {
 				latest = latestFound.get();
 			}
@@ -191,6 +198,14 @@ public class CollectExecutionService {
 		}
 	}
 
+	/** 운영에서 scope를 주면 400(필드 scope)으로 거절한다 */
+	private void validateScope(CollectScope scope) {
+		ScopeVerdict verdict = CollectExecutionRules.judgeScope(scope, collectProperties.allowTargetDateOverride());
+		if (verdict == ScopeVerdict.NOT_ALLOWED) {
+			throw new FieldValidationException("scope", "운영 환경에서는 scope를 지정할 수 없습니다. 전체 수집만 실행할 수 있습니다.");
+		}
+	}
+
 	/** 시작·재시작이 불가능한 판정을 409 예외로 바꾼다. ALLOWED면 아무것도 하지 않는다 */
 	private void throwIfRejected(LaunchVerdict verdict, CollectExecutionRecord otherRunning) {
 		if (verdict == LaunchVerdict.ALREADY_RUNNING) {
@@ -208,9 +223,9 @@ public class CollectExecutionService {
 		}
 	}
 
-	private long startLaunch(LocalDate targetDate, CollectTier tier) {
+	private long startLaunch(LocalDate targetDate, CollectTier tier, CollectScope scope) {
 		try {
-			return collectJobLauncher.start(targetDate, tier);
+			return collectJobLauncher.start(targetDate, tier, scope);
 		} catch (IllegalStateException e) {
 			throw translateRace(e);
 		}

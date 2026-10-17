@@ -31,6 +31,7 @@ export * from './collectExecutionChange';
 export * from './collectExecutionChangePage';
 export * from './collectExecutionPage';
 export * from './collectExecutionStatus';
+export * from './collectScope';
 export * from './collectTier';
 export * from './commonResponseAccessToken';
 export * from './commonResponseAddWishlistItemResult';

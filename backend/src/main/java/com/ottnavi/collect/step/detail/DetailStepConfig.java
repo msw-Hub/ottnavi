@@ -1,6 +1,7 @@
 package com.ottnavi.collect.step.detail;
 
 import com.ottnavi.catalog.domain.enums.MediaType;
+import com.ottnavi.catalog.domain.enums.UnitType;
 import com.ottnavi.catalog.domain.rule.RuntimeDefaults;
 import com.ottnavi.catalog.service.model.TitleDetail;
 import com.ottnavi.catalog.service.model.UnitProviders;
@@ -30,6 +31,8 @@ public class DetailStepConfig {
 
     public static final String MOVIE_DETAIL_STEP = "movieDetailStep"; // 실행 이력의 처리 건수 집계가 참조한다
     public static final String TV_DETAIL_STEP = "tvDetailStep";
+    public static final String AVAILABILITY_STEP = "availabilityStep";
+    public static final String TV_AVAILABILITY_STEP = "tvAvailabilityStep"; // scope=AVAILABILITY_TV일 때만 쓰는 시즌 전용 판정 Step
 
     private static final int CHUNK_SIZE = 10; // 작품·단위 하나가 TMDB 호출 여러 번이라 chunk를 작게 둔다(TECH T-2)
 
@@ -37,6 +40,9 @@ public class DetailStepConfig {
             + "t.id, t.mediaType, t.tmdbId) from Title t where t.mediaType = :mediaType order by t.id";
     private static final String UNIT_QUERY = "select new com.ottnavi.collect.step.detail.AvailabilityTarget("
             + "u.id, u.unitType, t.tmdbId, u.seasonNumber) from WatchUnit u join u.title t order by u.id";
+    private static final String SEASON_UNIT_QUERY = "select new com.ottnavi.collect.step.detail.AvailabilityTarget("
+            + "u.id, u.unitType, t.tmdbId, u.seasonNumber) from WatchUnit u join u.title t "
+            + "where u.unitType = :unitType order by u.id";
 
     @Bean
     public RuntimeDefaults runtimeDefaults(CollectProperties properties) {
@@ -61,6 +67,19 @@ public class DetailStepConfig {
                 .name("watchUnitReader")
                 .entityManagerFactory(entityManagerFactory)
                 .queryString(UNIT_QUERY)
+                .pageSize(CHUNK_SIZE)
+                .saveState(true)
+                .build();
+    }
+
+    /** 드라마 시즌만 읽는 Reader. 위치 저장 키(name)를 전체 판정 Reader와 달리해 서로 섞이지 않게 한다 */
+    @Bean
+    public JpaPagingItemReader<AvailabilityTarget> seasonUnitReader(EntityManagerFactory entityManagerFactory) {
+        return new JpaPagingItemReaderBuilder<AvailabilityTarget>()
+                .name("seasonUnitReader")
+                .entityManagerFactory(entityManagerFactory)
+                .queryString(SEASON_UNIT_QUERY)
+                .parameterValues(Map.of("unitType", UnitType.SEASON))
                 .pageSize(CHUNK_SIZE)
                 .saveState(true)
                 .build();
@@ -100,10 +119,26 @@ public class DetailStepConfig {
     public Step availabilityStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                  JpaPagingItemReader<AvailabilityTarget> watchUnitReader,
                                  AvailabilityProcessor processor, AvailabilityWriter writer) {
-        return new StepBuilder("availabilityStep", jobRepository)
+        return buildAvailabilityStep(AVAILABILITY_STEP, jobRepository, transactionManager, watchUnitReader, processor, writer);
+    }
+
+    /** scope=AVAILABILITY_TV 전용: 판정 Step과 같은 Processor·Writer로 드라마 시즌 단위만 다시 판정한다 */
+    @Bean
+    public Step tvAvailabilityStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
+                                   JpaPagingItemReader<AvailabilityTarget> seasonUnitReader,
+                                   AvailabilityProcessor processor, AvailabilityWriter writer) {
+        return buildAvailabilityStep(TV_AVAILABILITY_STEP, jobRepository, transactionManager, seasonUnitReader, processor, writer);
+    }
+
+    /** 판정 Step 조립: 전체 판정과 시즌 전용 판정이 Reader와 이름만 다르고 나머지는 같다 */
+    private static Step buildAvailabilityStep(String stepName, JobRepository jobRepository,
+                                              PlatformTransactionManager transactionManager,
+                                              JpaPagingItemReader<AvailabilityTarget> reader,
+                                              AvailabilityProcessor processor, AvailabilityWriter writer) {
+        return new StepBuilder(stepName, jobRepository)
                 .<AvailabilityTarget, UnitProviders>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager)
-                .reader(watchUnitReader)
+                .reader(reader)
                 .processor(processor)
                 .writer(writer)
                 .listener(writer) // beforeStep에서 jobExecutionId를 받는다

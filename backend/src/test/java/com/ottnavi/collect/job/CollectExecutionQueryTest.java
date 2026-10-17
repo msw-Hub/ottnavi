@@ -201,9 +201,15 @@ class CollectExecutionQueryTest extends IntegrationTestSupport {
 
         // then
         assertThat(record.batchStatus()).isEqualTo(BatchStatus.FAILED);
-        assertThat(record.exitMessage()).isNotBlank();
-        assertThat(record.exitMessage().split("\\R")[0]).contains("Exception");
+        // Job이 scope 분기(Flow)로 조립된 뒤로는 Job의 종료 메시지가 비고 실패 사유는 실패한 Step의 메시지에 남는다.
+        // 화면 응답은 이 경우 Step 메시지로 대체한다(CollectExecutionQueryService.toResponse)
         assertThat(stepMessages).containsKey(executionId);
+        assertThat(stepMessages.get(executionId).split("\\R")[0]).contains("Exception");
+        CollectExecutionRecord withStepMessage = new CollectExecutionRecord(record.executionId(), record.instanceId(),
+                record.targetDate(), record.tier(), record.batchStatus(), record.exitCode(),
+                stepMessages.get(executionId), record.createTime(), record.startTime(), record.endTime(),
+                record.isLatestOfInstance());
+        reason = CollectExecutionRules.failureReasonOf(withStepMessage, CollectExecutionStatus.FAILED);
         assertThat(reason).isNotBlank().doesNotContain("org.springframework").contains(":");
     }
 
