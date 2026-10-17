@@ -21,13 +21,14 @@ import org.springframework.web.util.UrlPathHelper;
  * GitHub Actions cron이 관리자 JWT 없이 호출하는 배치 경로에서 정적 배치 토큰(Authorization: Bearer)을 확인하고,
  * 맞으면 ROLE_BATCH 인증을 설정한다. 틀리거나 없으면 아무것도 하지 않고 다음 필터로 넘긴다(그러면 JWT 필터와
  * 인가 규칙이 판정하므로 ADMIN JWT와 OR 관계가 된다). 토큰 값은 로그에 남기지 않는다.
- * 대상은 /api/admin/collect, /api/admin/plans/monthly, /api/admin/retention과 그 하위 경로뿐이다.
+ * 대상은 /api/admin/collect, /api/admin/plans/monthly, /api/admin/retention, /api/admin/popularity와 그 하위 경로뿐이다.
  * Spring Boot가 서블릿 필터로 자동 등록하지 않도록 빈이 아니라 SecurityConfig에서 new로 만든다.
  */
 public class BatchTokenAuthenticationFilter extends OncePerRequestFilter {
 
 	private static final String BEARER_PREFIX = "Bearer ";
-	private static final String[] PROTECTED_PATHS = {"/api/admin/collect", "/api/admin/plans/monthly", "/api/admin/retention"};
+	private static final String[] PROTECTED_PATHS = {"/api/admin/collect", "/api/admin/plans/monthly", "/api/admin/retention",
+			"/api/admin/popularity"};
 
 	private final byte[] token; // 기대하는 토큰 값(UTF-8)
 
