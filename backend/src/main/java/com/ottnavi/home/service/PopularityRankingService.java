@@ -68,7 +68,11 @@ public class PopularityRankingService {
 		}
 		List<RankedPopularity> ranked = PopularityRankingRules.rank(rows, daysCounted, limit);
 
-		// 4. 순위의 작품을 카드로 바꾼다(우리 DB에 있으면 서비스별 제공 상태 포함, 없으면 스냅샷 값만으로 빈 제공 상태)
+		// 4. 순위에 오른 작품을 화면용 카드로 바꾼다.
+		//    순위 규칙이 돌려준 값은 제목·포스터·인기도뿐이라, 화면이 보여 줄 "서비스 7곳 각각의 제공 상태(있음·없음·모름)"가 없다.
+		//    제공 상태는 우리 DB(수집해 둔 작품 정보)에 있으므로, 순위의 (매체, tmdbId)로 한 번에 찾아 카드로 만든다.
+		//    인기 순위는 TMDB 인기 목록 기준이라 우리 DB에 아직 없는 작품이 섞일 수 있다.
+		//    그때는 기록해 둔 제목·포스터·개봉연도만으로 카드를 만들고 제공 상태는 빈 목록으로 둔다(건너뛰어 순위가 끊기지 않게).
 		List<TitleKey> keys = new ArrayList<>();
 		for (RankedPopularity item : ranked) {
 			keys.add(new TitleKey(item.mediaType(), item.tmdbId()));

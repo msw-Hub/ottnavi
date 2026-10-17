@@ -21,8 +21,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 서비스별 인기 순위의 일별 스냅샷 한 줄(ERD popularity_snapshot, V9).
+ * 서비스별 인기 순위의 날짜별 기록 한 줄(ERD popularity_snapshot, V9). 이름의 스냅샷은 "그날 받아 둔 값을 그대로 저장한 기록"이라는 뜻이다.
  * 하루 한 번 TMDB discover의 인기순 상위 작품을 서비스·매체별로 저장하고, "최근 7일" 순위는 이 인기도의 평균으로 만든다.
+ * TMDB는 오늘의 인기도만 주고 지난 값은 주지 않아서, 평균을 내려면 매일 받아 DB에 쌓아 두어야 한다.
+ * 예: 2026-10-19 / 넷플릭스 / 영화 / tmdbId 550 / 인기도 87.4 한 줄.
  * 한 번 저장한 행은 바꾸지 않는다(같은 날 재실행은 행을 지우고 다시 넣는다).
  */
 @Getter

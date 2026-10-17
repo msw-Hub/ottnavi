@@ -21,7 +21,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 서비스별 인기 순위 스냅샷 수집(Task 107): 서비스 7곳 × 영화·드라마별로 TMDB discover(인기순) 한 쪽을 받아 오늘 날짜로 저장한다.
+ * 서비스별 인기 순위 수집(Task 107): 서비스 7곳 × 영화·드라마별로 TMDB discover(인기순) 한 쪽을 받아 오늘 날짜로 저장한다.
+ * 저장한 것을 스냅샷(그날 받은 인기 순위 원본의 날짜별 기록)이라 부른다. TMDB는 오늘의 인기도만 주고 지난 값은 주지 않으므로,
+ * 최근 7일 평균 순위를 만들려면 매일 받아 DB에 쌓아 두어야 한다. 순위 완성본을 미리 만들어 두는 것이 아니라,
+ * 조회할 때(PopularityRankingService) 이 기록을 읽어 평균을 계산한다(기록은 최대 7일 × 14자리 × 20건 = 1,960행이라 가볍다).
  * 클래스에 @Transactional을 붙이지 않는다. TMDB 호출은 트랜잭션 밖이어야 하고, 저장은 PopularitySnapshotService가 자기 트랜잭션을 연다.
  */
 @Slf4j
@@ -41,7 +44,7 @@ public class PopularityCollectService {
 	 * 한 자리(서비스 × 매체)의 TMDB 호출이 실패하면 warn 로그만 남기고 그 자리는 건너뛴다(이전 스냅샷은 그대로 남는다).
 	 */
 	public PopularityCollectSummary collect() {
-		// 1. 스냅샷 날짜와 서비스 코드별 서비스 정보, 서비스별 TMDB 제공처 묶음을 준비한다
+		// 1. 준비: 저장할 날짜(오늘), 서비스 7곳의 정보, 서비스마다 TMDB에 물을 때 쓸 제공처 번호 묶음을 모은다
 		LocalDate snapshotDate = LocalDate.now(clock);
 		Map<OttServiceCode, OttService> servicesByCode = new HashMap<>();
 		for (OttService service : ottServiceQueryService.listOttServices()) {
@@ -60,7 +63,7 @@ public class PopularityCollectService {
 				continue;
 			}
 
-			// 3. 영화·드라마를 각각 받아 저장한다
+			// 3. 서비스 하나당 영화·드라마 두 번, TMDB에 "이 서비스에서 볼 수 있는 작품을 인기순으로" 1쪽(20건)을 물어 받아 바로 저장한다
 			for (MediaType mediaType : MediaType.values()) {
 				slots++;
 				try {
