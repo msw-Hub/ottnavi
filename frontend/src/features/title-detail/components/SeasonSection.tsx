@@ -8,7 +8,7 @@ import { WishlistControl } from '@/features/title-detail/components/WishlistCont
 import type { TitleSeason } from '@/api/generated/model'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn'
 import { useUserSettings } from '@/hooks/useUserSettings'
-import { formatMinutes } from '@/lib/format'
+import { formatMinutes, formatSeasonName } from '@/lib/format'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
 
 // 처음에 보이는 시즌 줄 수. 시즌이 많은 드라마(예: 12시즌)도 화면이 길어지지 않게 나머지는 "시즌 더 보기"로 연다
@@ -149,19 +149,22 @@ function SeasonItem({
   monthlyWatchMinutes,
 }: SeasonItemProps) {
   const statusEntries = buildServiceStatusEntries(services, season.availabilities)
+  // 시즌 이름 표기 통일: "Season N"(영어 기본 이름)만 "시즌 N"으로 바꾸고 고유 이름은 그대로 둔다(lib/format, HANDOFF 5-1 #1).
+  // 이전에는 아래 네 곳 모두 season.name을 그대로 썼다
+  const seasonName = formatSeasonName(season.name)
   // 시즌 총 시간이 한 달에 볼 수 있는 시간보다 길면 한 달에 다 못 본다 → 플랜이 여러 달에 나눠 배정한다(PRD 5.4 긴 시즌)
   const isLongSeason = monthlyWatchMinutes !== null && season.totalRuntimeMin > monthlyWatchMinutes
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">
       <div className="grid grid-cols-[1fr_auto] items-start gap-x-2">
-        <h3 className="min-w-0 pt-2.5 font-semibold">{season.name}</h3>
+        <h3 className="min-w-0 pt-2.5 font-semibold">{seasonName}</h3>
         <WishlistControl
           mediaType="tv"
           tmdbId={tmdbId}
           seasonNumber={season.seasonNumber}
-          targetName={season.name}
-          popupName={title ? `${title} ${season.name}` : season.name}
+          targetName={seasonName}
+          popupName={title ? `${title} ${seasonName}` : seasonName}
           posterUrl={posterUrl}
           panelAlign="end"
         />
@@ -186,7 +189,7 @@ function SeasonItem({
       )}
       {isShowingProviders && (
         <div className="mt-1">
-          <AvailableServiceBadges entries={statusEntries} label={`${season.name} 볼 수 있는 곳`} />
+          <AvailableServiceBadges entries={statusEntries} label={`${seasonName} 볼 수 있는 곳`} />
         </div>
       )}
     </div>

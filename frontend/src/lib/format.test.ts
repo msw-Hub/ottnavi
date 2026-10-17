@@ -8,8 +8,33 @@ import {
   formatElapsed,
   formatIsoDate,
   formatMinutes,
+  formatSeasonName,
   formatWon,
 } from '@/lib/format'
+
+// 시즌 표기 통일(HANDOFF 5-1 #1): 영어 기본 이름만 한국어로 바꾸고 작품이 붙인 고유 이름은 지키는지 본다
+describe('formatSeasonName', () => {
+  it('영어 기본 이름 "Season N"은 "시즌 N"으로 바꾼다', () => {
+    expect(formatSeasonName('Season 1')).toBe('시즌 1')
+    expect(formatSeasonName('Season 12')).toBe('시즌 12')
+    // 앞자리 0과 앞뒤·가운데 여분 공백은 정리한다
+    expect(formatSeasonName(' Season  03 ')).toBe('시즌 3')
+  })
+
+  it('이미 한국어인 이름과 고유 이름은 그대로 둔다', () => {
+    expect(formatSeasonName('시즌 2')).toBe('시즌 2')
+    expect(formatSeasonName('스페셜')).toBe('스페셜')
+    // "Season N" 뒤에 부제가 붙으면 작품이 붙인 이름이라 바꾸지 않는다
+    expect(formatSeasonName('Season 1: 새로운 시작')).toBe('Season 1: 새로운 시작')
+    expect(formatSeasonName('Specials')).toBe('Specials')
+    // 대소문자가 다르면 기본 이름 형식이 아니라고 본다
+    expect(formatSeasonName('season 1')).toBe('season 1')
+  })
+
+  it('시즌이 없으면(null) 그대로 null', () => {
+    expect(formatSeasonName(null)).toBeNull()
+  })
+})
 
 describe('formatDate', () => {
   it('개봉일·방영일(YYYY-MM-DD)을 한국어 날짜로 바꾼다', () => {

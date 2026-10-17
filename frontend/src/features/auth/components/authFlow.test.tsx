@@ -159,28 +159,32 @@ describe('비로그인 찜 → 로그인 → 원래 화면', () => {
     expect(
       await screen.findByRole('button', { name: '기생충 찜함 · 보고 싶음' }),
     ).toBeInTheDocument()
+    // 머리글 하트 배지가 찜 개수를 따라 "찜 목록, 1개"가 된다(찜 추가가 같은 쿼리 키를 무효화해 배지도 갱신된다)
+    expect(await screen.findByRole('link', { name: '찜 목록, 1개' })).toBeInTheDocument()
   })
 })
 
 describe('머리글의 목업 로그인 상태 전환', () => {
-  it('전환하면 머리글 표시가 바뀐다: 비로그인(로그인 링크) → 회원(회원·로그아웃) → 관리자 → 로그아웃', async () => {
+  it('전환하면 머리글 표시가 바뀐다: 비로그인(로그인 링크) → 회원(찜 하트·로그아웃) → 관리자(관리 링크) → 로그아웃', async () => {
     const user = userEvent.setup()
     renderAt('/about')
     const select = await screen.findByRole('combobox', { name: '개발용 목업 로그인 상태' })
     const nav = screen.getByRole('navigation', { name: '계정' })
     expect(screen.getByRole('link', { name: '로그인' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: /^찜 목록/ })).not.toBeInTheDocument() // 비로그인이면 하트가 없다
 
     await user.selectOptions(select, '회원')
     expect(getMockRole()).toBe('USER')
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '로그인' })).not.toBeInTheDocument()
-    // 선택 상자의 선택지에도 같은 글자가 있어, 사용자 표시(span)만 골라 확인한다
-    expect(within(nav).getByText('회원', { selector: 'span' })).toBeInTheDocument()
+    // 역할 라벨("회원"/"관리자")은 없앴다(HANDOFF 5-1 #3). 대신 하트 링크가 보이고 "관리" 링크는 없는지 확인한다
+    expect(await within(nav).findByRole('link', { name: /^찜 목록/ })).toBeInTheDocument()
+    expect(within(nav).queryByRole('link', { name: '관리' })).not.toBeInTheDocument()
 
     await user.selectOptions(select, '관리자')
     expect(getMockRole()).toBe('ADMIN')
-    expect(within(nav).getByText('관리자', { selector: 'span' })).toBeInTheDocument()
+    expect(await within(nav).findByRole('link', { name: '관리' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '로그아웃' }))
     expect(getMockRole()).toBe('GUEST')

@@ -206,6 +206,29 @@ export function formatDateTimeKorean(value: string | Date | null | undefined): s
   return `${year}년 ${Number(month)}월 ${Number(day)}일 ${timePart}`
 }
 
+// 영어 기본 시즌 이름 "Season 3"을 알아보는 정규식. 앞뒤 공백은 trim으로 먼저 지우고, 가운데 공백은 여러 칸이어도 받는다
+const ENGLISH_DEFAULT_SEASON_PATTERN = /^Season\s+(\d+)$/
+
+/**
+ * 시즌 이름을 화면 표기로 바꾼다. 이름이 정확히 영어 기본 이름 "Season N"일 때만 "시즌 N"으로 바꾸고, 나머지는 그대로 돌려준다.
+ *
+ * 왜 필요한가: TMDB가 주는 시즌 이름이 작품마다 한국어("시즌 1")와 영어("Season 1")로 섞여 와서
+ * 같은 화면에서 표기가 달라 보였다(HANDOFF 5-1 #1). 영어 기본 이름만 한국어로 맞춘다.
+ * 고유 이름(예: "스페셜", "Season 1: 새로운 시작", "파트 2")은 작품이 붙인 이름이라 손대지 않는다.
+ * null·빈 문자열은 그대로 돌려준다(시즌이 없는 영화는 seasonName이 null이다).
+ * 번호는 숫자로 읽어 "Season 01" → "시즌 1"처럼 앞자리 0을 뗀다.
+ */
+export function formatSeasonName(name: string): string
+export function formatSeasonName(name: string | null): string | null
+export function formatSeasonName(name: string | null): string | null {
+  if (name == null) return name
+  // 1. 정확히 "Season 숫자"인지 본다(대소문자까지 같아야 한다. "season 1"·"SEASON 1"은 기본 이름 형식이 아니라 그대로 둔다)
+  const match = ENGLISH_DEFAULT_SEASON_PATTERN.exec(name.trim())
+  if (!match) return name
+  // 2. 한국어 기본 이름 형식으로 다시 만든다
+  return `시즌 ${Number(match[1])}`
+}
+
 /**
  * 시작·종료 시각 사이를 "24분", "1시간 5분" 형식으로 바꾼다(분 표기는 formatMinutes를 재사용한다).
  *

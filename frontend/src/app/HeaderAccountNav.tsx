@@ -1,11 +1,15 @@
+import { HeartIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
+import { useListWishlistItems } from '@/api/generated/wishlist/wishlist'
 import { MockRoleSwitcher } from '@/app/MockRoleSwitcher'
 import { useLogout } from '@/hooks/useLogout'
 import { useSession } from '@/hooks/useSession'
 import { getMockRequestParams } from '@/lib/mockScenario'
+import { cn } from '@/lib/utils'
 
 /**
- * 머리글 오른쪽의 계정 영역이다. 비로그인이면 "로그인" 링크, 로그인했으면 사용자 표시와 "로그아웃"을 보인다.
+ * 머리글 오른쪽의 계정 영역이다. 비로그인이면 "로그인" 링크, 로그인했으면 찜 하트(개수 배지)·관리(ADMIN만)·"로그아웃"을 보인다.
+ * 이전: 로그인했으면 사용자 표시("회원"/"관리자")와 "로그아웃"을 보였다(역할 표시는 HANDOFF 5-1 #3으로 없앴다).
  *
  * 로그인 상태는 hooks/useSession이 준다(실제 환경은 authStore, 목업 모드는 개발용 전환 토글의 역할).
  * 재발급을 확인하는 중(checking)에는 계정 영역을 비워 둔다(로그인한 사용자에게 "로그인" 링크가 잠깐 보였다 사라지는 깜빡임을 피한다).
@@ -20,6 +24,18 @@ export function HeaderAccountNav() {
   const logout = useLogout()
   // 비로그인으로 그릴 상태: guest, 그리고 재발급 오류(error: 로그인 여부를 몰라 로그인 링크를 남겨 둔다)
   const isGuest = session.status === 'guest' || session.status === 'error'
+
+  // 하트 배지에 쓸 찜 개수(계산 대상 = "다 봤음" 제외, 상한 20). 찜 목록 화면·찜 버튼과 같은 생성 훅·같은 쿼리 키(['/me/wishlist-items'])라
+  // 캐시를 함께 쓰고, 찜을 추가·변경·해제하면 그쪽에서 이 키를 무효화하므로 배지도 따로 손대지 않아도 갱신된다.
+  // 로그인했을 때만 요청한다(비로그인이면 하트 자체가 없고, 보내 봐야 401이다)
+  const wishlistCountQuery = useListWishlistItems({
+    query: {
+      enabled: session.status === 'authenticated',
+      select: (res) => res.data.activeItemCount,
+    },
+  })
+  const wishlistCount = wishlistCountQuery.data ?? 0
+  const hasWishlistBadge = wishlistCount > 0
 
   // 찜 목록 링크에 이어 붙일 목업 확인용 파라미터(없으면 빈 문자열). 운영(목업 아님)에서는 빈 객체라 아무것도 붙지 않는다
   const mockParams = new URLSearchParams(getMockRequestParams()).toString()
@@ -54,11 +70,54 @@ export function HeaderAccountNav() {
             지금은 찜 목록으로 가는 길이 푸터의 개발용 이동뿐이라 회원일 때 머리글에서 바로 갈 수 있게 둔다.
             목업 확인용 파라미터(?mockScenario=… 등)는 이어 붙이고, 검색어 같은 다른 쿼리는 가져가지 않는다.
           */}
+          {/*
+            하트 아이콘 + 개수 배지(HANDOFF 5-1 #2). 글자 "찜 목록"을 아이콘으로 바꿔 375px 윗줄의 폭을 아꼈다.
+            - 누르는 영역: 40x40px(size-10) 정사각형. -my-2는 다른 링크와 같은 이유로 머리글 높이를 키우지 않게 하는 장치다.
+            - mr-2: 하트와 "로그아웃"이 너무 붙어 보인다는 사용자 의견으로 오른쪽 간격 8px을 더했다(관리 링크가 없을 때 특히 가깝다).
+            - 배지: 계산 대상 개수(activeItemCount)가 1 이상일 때만 하트 오른쪽 위에 겹쳐 숫자로 보인다(최대 20이라 두 자리까지).
+              0개·불러오는 중·실패일 때는 배지 없이 하트만 둔다(0을 굳이 보이면 "아무 일 없음"을 강조하는 꼴이 된다).
+              색만으로 알리지 않고 숫자 자체를 보이며, 배지 바탕(primary)과 글자(primary-foreground)는 shadcn 기본 짝이라 대비를 맞춰 둔 값이다.
+              위치(top-0 -right-1): 두 자리("20")일 때도 하트가 보이도록 누르는 영역 밖으로 4px 내보냈다. 옆 링크와의 간격(gap-1 + px-1 = 8px) 안이라 겹치지 않는다.
+              배지를 위로 더 올리지 않는 이유: 375px에서는 계정 줄이 검색창 바로 아래(위 여백 0px)에 붙어, 배지를 올리면 검색창 아래 테두리를 덮는다.
+              대신 하트를 채운 뒤에는 "20" 배지가 하트 오른쪽 위 볼록한 부분을 덮어 모양이 뭉개져 보여서, 채운 하트만 왼쪽·아래로 2px씩 옮겼다(아래 HeartIcon).
+              ring-card: 배지 둘레에 머리글 바탕색 테두리를 둘러 하트 선과 숫자가 엉겨 보이지 않게 한다.
+            - 접근성 이름: 아이콘·배지는 낭독기에서 숨기고(aria-hidden) 링크의 aria-label로 "찜 목록, 12개"를 읽힌다.
+            이전(글자 링크):
+            <Link to={{ pathname: '/wishlist', search: wishlistSearch }}
+              className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline">찜 목록</Link>
+          */}
           <Link
             to={{ pathname: '/wishlist', search: wishlistSearch }}
-            className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
+            aria-label={hasWishlistBadge ? `찜 목록, ${wishlistCount}개` : '찜 목록'}
+            className="relative -my-2 mr-2 inline-flex size-10 items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
-            찜 목록
+            {/*
+              하트 모양: 찜이 1개 이상이면 빨강으로 채우고, 0개·불러오는 중·실패면 윤곽선만 둔다(사용자 요청: 윤곽선은 잘 안 보인다).
+              0개에도 채우면 "찜한 게 있다"는 신호로 읽혀서 배지와 같은 조건(hasWishlistBadge)으로 맞췄다.
+              색: --destructive(index.css의 밝은 빨강). 머리글 바탕(--card) 위 대비 약 7:1로 아이콘 기준(3:1)을 넘는다.
+              짙은 빨강 --destructive-solid(#B32228)는 같은 바탕 위 약 1.6:1이라 어두운 머리글에서 묻혀 쓰지 않았다.
+              색은 링크가 아니라 아이콘에 직접 줘서, 링크의 hover:text-accent-foreground가 덮어써도 하트는 빨강을 유지한다.
+              색만으로 알리지 않는다: 채움(모양 차이)과 숫자 배지, 낭독 이름("찜 목록, 12개")이 같은 정보를 함께 전한다.
+              -translate-x-0.5 translate-y-0.5: 배지가 있을 때만 하트를 왼쪽·아래로 2px 옮겨, 배지가 하트 오른쪽 위 모서리에만 걸치게 한다.
+              하트+배지 묶음 전체로 보면 가운데에 가까워진다. 누르는 영역(링크 40x40)과 포커스 표시는 그대로다.
+              이전: <HeartIcon aria-hidden="true" className="size-5" />
+            */}
+            <HeartIcon
+              aria-hidden="true"
+              className={cn(
+                'size-5',
+                hasWishlistBadge &&
+                  '-translate-x-0.5 translate-y-0.5 fill-destructive text-destructive',
+              )}
+            />
+            {hasWishlistBadge && (
+              <span
+                aria-hidden="true"
+                className="absolute top-0 -right-1 inline-flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-primary px-1 text-[0.6875rem] leading-none font-bold text-primary-foreground tabular-nums ring-2 ring-card"
+              >
+                {wishlistCount}
+              </span>
+            )}
           </Link>
           {/*
             관리자(ADMIN)에게만 보이는 관리 화면 진입점(홈 1차안). 역할은 useSession 값을 읽어 표시만 바꾸는 것이고,
@@ -72,11 +131,13 @@ export function HeaderAccountNav() {
               관리
             </Link>
           )}
-          {/* 역할 표시. 640px 미만에서는 화면에서 숨기고 낭독기에만 남긴다(max-sm:sr-only):
-              375px 윗줄에 로고·돋보기·개발용 전환·찜 목록·관리·로그아웃이 모두 들어가야 해서 글자 하나를 덜어 냈다 */}
-          <span className="text-sm text-muted-foreground max-sm:sr-only">
-            {session.role === 'ADMIN' ? '관리자' : '회원'}
-          </span>
+          {/*
+            역할 표시("회원"/"관리자")는 없앴다(HANDOFF 5-1 #3): 사용자에게 필요 없는 정보이고, 관리자는 "관리" 링크로 이미 구분된다.
+            이전:
+            <span className="text-sm text-muted-foreground max-sm:sr-only">
+              {session.role === 'ADMIN' ? '관리자' : '회원'}
+            </span>
+          */}
           <button
             type="button"
             onClick={handleLogout}

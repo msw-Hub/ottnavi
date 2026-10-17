@@ -25,6 +25,7 @@ import {
   useWishlist,
 } from '@/features/wishlist/hooks/useWishlist'
 import { useOttServices } from '@/hooks/useOttServices'
+import { formatSeasonName } from '@/lib/format'
 import { buildServiceStatusEntries } from '@/lib/serviceStatus'
 
 // 우선순위 묶음이 비었을 때의 안내. 꼭 볼 작품이 비면 무엇을 하면 좋은지까지 알린다(계산이 가장 먼저 챙기는 단계라서)
@@ -208,11 +209,13 @@ function WishlistContent({ list, services }: WishlistContentProps) {
       },
       onRemove: () =>
         remove.mutate(item.wishlistItemId, {
-          // 바로 삭제되므로(되돌리기 없음) 무엇을 뺐는지 이름으로 알린다
-          onSuccess: () =>
+          // 바로 삭제되므로(되돌리기 없음) 무엇을 뺐는지 이름으로 알린다. 시즌 이름은 카드와 같은 표기("Season N" → "시즌 N")다
+          onSuccess: () => {
+            const seasonName = formatSeasonName(item.seasonName)
             toast.success(
-              `${item.seasonName ? `${item.title} ${item.seasonName}` : item.title} 찜을 해제했어요`,
-            ),
+              `${seasonName ? `${item.title} ${seasonName}` : item.title} 찜을 해제했어요`,
+            )
+          },
           onError: notifyFailure,
         }),
     }

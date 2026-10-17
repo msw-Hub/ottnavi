@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { ServiceStatusChips } from '@/features/wishlist/components/ServiceStatusChips'
 import { WishlistCard, type WishlistCardProps } from '@/features/wishlist/components/WishlistCard'
 import type { WishlistItem } from '@/api/generated/model'
+import { formatSeasonName } from '@/lib/format'
 
 // 행이 카드에 직접 넘기지 않는 값(펼침 상태는 행이 관리한다)을 뺀 카드 props
 export type WishlistRowCardProps = Omit<
@@ -63,9 +64,9 @@ export function WishlistRow({
       {items.map((item, index) => {
         if (expandedId !== item.wishlistItemId) return null
         const { statusEntries, item: cardItem } = getCardProps(item)
-        const displayTitle = cardItem.seasonName
-          ? `${cardItem.title} ${cardItem.seasonName}`
-          : cardItem.title
+        // 시즌 이름은 카드와 같은 규칙으로 맞춘다("Season N" → "시즌 N", lib/format). 이전: cardItem.seasonName을 그대로 이어 붙였다
+        const seasonName = formatSeasonName(cardItem.seasonName)
+        const displayTitle = seasonName ? `${cardItem.title} ${seasonName}` : cardItem.title
         const panelId = `${baseId}-panel-${item.wishlistItemId}`
         const headingId = `${panelId}-heading`
         return (

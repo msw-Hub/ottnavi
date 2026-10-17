@@ -8,7 +8,7 @@ import { PriorityBadge, PrioritySegmented } from '@/components/common/WishlistPr
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import type { WishlistItem } from '@/api/generated/model'
-import { formatDate, formatMinutes } from '@/lib/format'
+import { formatDate, formatMinutes, formatSeasonName } from '@/lib/format'
 import { getTmdbImageUrl } from '@/lib/tmdbImage'
 import { cn } from '@/lib/utils'
 
@@ -76,7 +76,10 @@ export function WishlistCard({
   onRemove,
 }: WishlistCardProps) {
   const isWatched = item.watchedAt !== null
-  const displayTitle = item.seasonName ? `${item.title} ${item.seasonName}` : item.title
+  // 시즌 이름은 "Season N"(영어 기본 이름)을 "시즌 N"으로 맞춰 보인다(lib/format, HANDOFF 5-1 #1). 고유 이름은 그대로다
+  const seasonName = formatSeasonName(item.seasonName)
+  // 이전: const displayTitle = item.seasonName ? `${item.title} ${item.seasonName}` : item.title
+  const displayTitle = seasonName ? `${item.title} ${seasonName}` : item.title
   const detailPath = `/titles/${item.mediaType}/${item.tmdbId}${detailSearch}`
   const summaryText = buildSummaryText(statusEntries)
 
@@ -119,10 +122,8 @@ export function WishlistCard({
           >
             {item.title}
           </Link>
-          {item.seasonName && (
-            <span className="ml-1.5 text-sm font-semibold text-muted-foreground">
-              {item.seasonName}
-            </span>
+          {seasonName && (
+            <span className="ml-1.5 text-sm font-semibold text-muted-foreground">{seasonName}</span>
           )}
         </h4>
 
