@@ -20,7 +20,7 @@ import com.ottnavi.wishlist.service.model.WishlistItemView;
 import com.ottnavi.wishlist.service.model.WishlistView;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -196,6 +196,17 @@ public class WishlistService {
 	public void remove(Long userId, Long wishlistItemId) {
 		int deleted = wishlistItemRepository.deleteByIdAndUserId(wishlistItemId, userId);
 		log.info("찜 삭제: userId={}, wishlistItemId={}, 삭제 건수={}", userId, wishlistItemId, deleted);
+	}
+
+	/** TMDB에서 사라진 작품 정리용: 해당 시청 단위들을 찜한 모든 사용자의 찜을 지우고 지운 건수를 돌려준다 */
+	@Transactional
+	public int removeByWatchUnitIds(Collection<Long> watchUnitIds) {
+		if (watchUnitIds.isEmpty()) {
+			return 0;
+		}
+		int deleted = wishlistItemRepository.deleteByWatchUnitIdIn(watchUnitIds);
+		log.info("사라진 작품의 찜을 모두 삭제했다: 시청 단위={}개, 삭제 건수={}", watchUnitIds.size(), deleted);
+		return deleted;
 	}
 
 	/** 시청 단위 요약에 찜 정보와 "지금 볼 수 있는지"를 더해 응답 한 줄로 만든다 */

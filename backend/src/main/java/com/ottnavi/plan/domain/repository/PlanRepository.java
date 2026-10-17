@@ -56,4 +56,23 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 	@Query("delete from Plan p where p.userId = :userId and p.status = com.ottnavi.plan.domain.enums.PlanStatus.ARCHIVED "
 			+ "and p.id not in :keepIds")
 	int deleteArchivedExcept(@Param("userId") Long userId, @Param("keepIds") Collection<Long> keepIds);
+
+	/** 해당 시청 단위가 항목에 들어 있는 ACTIVE 플랜 ID(TMDB에서 사라진 작품 정리가 재계산 대상을 정할 때 쓴다) */
+	@Query("select distinct i.plan.id from PlanItem i where i.watchUnitId in :watchUnitIds "
+			+ "and i.plan.status = com.ottnavi.plan.domain.enums.PlanStatus.ACTIVE")
+	List<Long> findActiveIdsByWatchUnitIds(@Param("watchUnitIds") Collection<Long> watchUnitIds);
+
+	/** 해당 시청 단위가 항목에 들어 있는 DRAFT를 모든 사용자에서 지운다. 하위 행은 DB FK CASCADE가 지운다(TECH T-1) */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from Plan p where p.status = com.ottnavi.plan.domain.enums.PlanStatus.DRAFT "
+			+ "and p.id in (select i.plan.id from PlanItem i where i.watchUnitId in :watchUnitIds)")
+	int deleteDraftsByWatchUnitIds(@Param("watchUnitIds") Collection<Long> watchUnitIds);
+
+	/**
+	 * 해당 시청 단위가 항목에 들어 있는 플랜을 상태와 상관없이 지운다(ARCHIVED 통째 삭제, 재계산하지 못한 ACTIVE 포함).
+	 * 하위 행은 DB FK CASCADE가 지우고 calc_run.plan_id와 previous_plan_id는 SET NULL이 비운다.
+	 */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from Plan p where p.id in (select i.plan.id from PlanItem i where i.watchUnitId in :watchUnitIds)")
+	int deleteByWatchUnitIds(@Param("watchUnitIds") Collection<Long> watchUnitIds);
 }

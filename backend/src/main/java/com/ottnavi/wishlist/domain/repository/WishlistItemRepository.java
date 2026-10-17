@@ -2,6 +2,7 @@ package com.ottnavi.wishlist.domain.repository;
 
 import com.ottnavi.wishlist.domain.entity.WishlistItem;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,4 +34,9 @@ public interface WishlistItemRepository extends JpaRepository<WishlistItem, Long
 	@Modifying
 	@Query("delete from WishlistItem w where w.id = :id and w.userId = :userId")
 	int deleteByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+	/** 시청 단위들을 가리키는 모든 사용자의 찜을 지운다("다 봤음" 행 포함). TMDB에서 사라진 작품 정리가 쓴다 */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from WishlistItem w where w.watchUnitId in :watchUnitIds")
+	int deleteByWatchUnitIdIn(@Param("watchUnitIds") Collection<Long> watchUnitIds);
 }

@@ -75,6 +75,10 @@ app:
       initial-backoff: 500ms   # 첫 재시도 전 대기. 이후 두 배씩
       max-backoff: 4s          # 지수 대기의 상한
       max-retry-after: 5s      # 서버가 이보다 오래 기다리라고 하면 기다리지 않고 포기한다
+  retention:
+    stale-months: 5             # 마지막 수집이 이보다 오래된 작품을 TMDB에 다시 묻는다(TMDB 약관 6개월 보관 기한 대비, Task 083)
+    history-retention-days: 180 # BATCH_* 이력과 플랜과 끊긴 calc_run을 이 일수가 지나면 지운다
+    max-titles-per-run: 500     # 한 번 실행에 점검할 작품 수 상한(가장 오래된 순). 나머지는 다음 주 실행에서 처리한다
   plan-recalc:
     auto-start: true                      # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
   collect:
