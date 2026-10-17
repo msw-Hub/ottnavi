@@ -149,6 +149,7 @@
 4. **구독형(flatrate)만 쓰는 한계**: 후보 수집과 같은 `with_watch_monetization_types=flatrate`로 받으므로 구독 외(대여·구매·광고) 노출이 큰 서비스(쿠팡플레이 등)는 순위가 비거나 짧아 보일 수 있다.
 5. **인물 탐색 한계**: 이름 완전 일치(대소문자 무시)이고 작품당 출연 상위 10명만 저장돼 있다. 동명이인이 섞이고 10번째 밖 출연작은 빠진다(화면 안내 문구는 108).
 6. **조정 위치(사용자가 나중에 바꿀 수 있다)**: `app.home.min-wishlist-users`(3)·`arrival-days`(14)·`release-days`(30), `app.popularity.top-n`(20)·`retention-days`(14), 7일 평균 규칙은 `PopularityRankingRules`, 7일 범위는 `PopularityRankingService.WEEK_DAYS`, 새 작품 대표 선택은 `NewArrivalPicker`, 안내 문구는 `PopularityRankingService.NOTICE`.
+7. **홈·탐색 응답 캐시**: 공개 조회 5개(출연자별 작품 제외)는 Redis에 캐시되므로 TTL(인기 60분·새 작품 30분·찜 10분·장르 24시간·장르별 작품 30분)이 지나기 전에는 이전 값이 나간다. 수집·정리 Job 종료 때 모두, 인기 수집 종료 때 인기 순위를 바로 비운다. 값은 `app.home.cache.*`, 브라우저 캐시는 `browser-seconds`(60)다. Vercel 엣지 캐시는 확인하지 않았다.
 
 ## 5. 환경과 도구 함정 (Windows 11)
 

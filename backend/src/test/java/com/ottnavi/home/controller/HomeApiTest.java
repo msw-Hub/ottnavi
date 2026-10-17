@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ottnavi.global.config.RedisConfig;
 import com.ottnavi.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,6 +32,7 @@ class HomeApiTest extends IntegrationTestSupport {
 
 	@Autowired private MockMvc mockMvc;
 	@Autowired private JdbcTemplate jdbcTemplate;
+	@Autowired private CacheManager cacheManager;
 
 	private LocalDate today;
 	private long netflixId;
@@ -59,6 +62,10 @@ class HomeApiTest extends IntegrationTestSupport {
 		jdbcTemplate.update("DELETE FROM genre WHERE id = " + GENRE_ID);
 		jdbcTemplate.update("DELETE FROM users WHERE email LIKE 'home-test-%'");
 		jdbcTemplate.update("DELETE FROM popularity_snapshot");
+		// 응답 캐시가 이전 테스트의 값을 돌려주지 않게 홈 캐시를 비운다(Task 107)
+		for (String name : RedisConfig.HOME_CACHES) {
+			cacheManager.getCache(name).clear();
+		}
 	}
 
 	// 인기 순위

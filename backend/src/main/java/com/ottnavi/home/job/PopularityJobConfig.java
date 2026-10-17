@@ -24,9 +24,11 @@ public class PopularityJobConfig {
 	public static final String PURGE_STEP_NAME = "popularityPurgeStep";
 
 	@Bean
-	public Job popularityJob(JobRepository jobRepository, Step popularityCollectStep, Step popularityPurgeStep) {
+	public Job popularityJob(JobRepository jobRepository, Step popularityCollectStep, Step popularityPurgeStep,
+			PopularityCacheEvictListener popularityCacheEvictListener) {
 		return new JobBuilder(JOB_NAME, jobRepository)
 				.validator(new PopularityJobParameters())
+				.listener(popularityCacheEvictListener) // 끝나면 인기 순위 캐시를 비운다(Task 107)
 				.start(popularityCollectStep).on("*").to(popularityPurgeStep)
 				.from(popularityPurgeStep).on("*").end()
 				.end()

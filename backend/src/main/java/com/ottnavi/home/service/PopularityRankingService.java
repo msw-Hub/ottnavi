@@ -3,6 +3,7 @@ package com.ottnavi.home.service;
 import com.ottnavi.catalog.service.TitleCardAssembler;
 import com.ottnavi.catalog.service.model.TitleKey;
 import com.ottnavi.catalog.service.model.TitleSearchItemView;
+import com.ottnavi.global.config.RedisConfig;
 import com.ottnavi.home.domain.entity.PopularitySnapshot;
 import com.ottnavi.home.domain.enums.PopularityPeriod;
 import com.ottnavi.home.domain.repository.PopularitySnapshotRepository;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,11 +37,14 @@ public class PopularityRankingService {
 
 	/**
 	 * 인기 순위를 돌려준다. 스냅샷이 하나도 없으면 빈 목록(snapshotDate=null, daysCounted=0)이다.
+	 * 결과는 Redis에 60분(app.home.cache.popularity-ttl) 캐시하고, 인기 수집·수집·정리 Job이 끝나면 비운다.
 	 *
 	 * @param period       TODAY(가장 최근 스냅샷 하루) 또는 WEEK(그 날짜까지 최근 7일의 평균)
 	 * @param ottServiceId 한 서비스만 보려면 서비스 ID, 전체 순위면 null
 	 * @param limit        돌려줄 최대 개수
 	 */
+	@Cacheable(cacheNames = RedisConfig.HOME_POPULARITY,
+			key = "#period.name() + ':' + (#ottServiceId ?: 'all') + ':' + #limit") // 로그인 정보는 키에 넣지 않는다(모두에게 같은 목록)
 	public PopularityRankingView rank(PopularityPeriod period, Long ottServiceId, int limit) {
 		// 1. 가장 최근 스냅샷 날짜. 없으면 빈 순위
 		LocalDate latestDate = snapshotRepository.findLatestSnapshotDate();

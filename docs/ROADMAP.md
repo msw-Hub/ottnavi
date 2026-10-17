@@ -1314,6 +1314,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 매일 수집이 돌아야 하므로 실제 운영 적재는 Task 093(cron 활성화)에 의존한다.
 - 결과(2026-10-18, 브랜치 `feature/b9-home-explore`, 병합 전): 공개 조회 6개(`GET /api/public/popularity-rankings`·`wishlisted-titles`·`newly-available-titles`·`genres`·`genres/{genreId}/titles`·`people/titles`)와 관리자 `POST /api/admin/popularity/executions`(202·409, 배치 토큰 허용)를 구현했다. 인기 수집 Job(`popularityJob`, Step 2개: 수집 → 14일 지난 스냅샷 삭제, 같은 날 재실행은 교체라 멱등)은 수집·재계산·정리와 서로 409로 막는다. 워크플로 `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(Task 093에서 켠다).
   - 결정(2026-10-18 사용자, 11절 39번): 새로 볼 수 있게 된 작품 = 입고(최근 14일 안에 없음·모름 → 있음) 또는 공개(첫 적재라도 공개일 30일 이내, 공개일 모르면 제외), 같은 작품·서비스는 최근 한 건. 찜 많은 작품 = 작품 단위 사용자 수·"다 봤음" 제외·3명 미만 제외·빈 목록이면 프론트가 줄을 숨김. 인기 7일 평균 = 스냅샷이 있는 날 수로 나누고 없던 날은 0. 장르·인물 탐색은 우리 DB만(인물은 이름 완전 일치, 대소문자 무시). 기준 수치는 `app.home.*`·`app.popularity.*` 설정값, 평균 규칙은 `PopularityRankingRules` 한 곳이다.
+  - 응답 캐시(2026-10-18 사용자 결정, 같은 브랜치): 공개 조회 5개를 Redis(`homePopularity` 60분·`homeNewArrivals` 30분·`homeWishlisted` 10분·`homeGenres` 24시간·`homeGenreTitles` 30분, `app.home.cache.*`)에 캐시하고 브라우저에 `Cache-Control: public, max-age=60`을 준다. 출연자별 작품은 캐시하지 않는다. 수집·정리 Job 종료 때 5개 모두, 인기 수집 Job 종료 때 인기 순위를 비운다. 상세는 TECH 3절.
   - 넘길 내용: Task 108(프론트 연결)이 목업과 계약의 차이 6가지를 반영한다(HANDOFF 참고). 순위에는 우리 DB에 없는 작품이 나올 수 있다(`availabilities`가 빈 배열). 구독형(flatrate)만 쓴다.
 
 #### Task 108: 홈·탐색 실제 API 연결로 첫 화면 완성 ⬜ `[v0.1.0 포함]`

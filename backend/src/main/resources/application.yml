@@ -86,6 +86,13 @@ app:
     min-wishlist-users: 3       # "찜 많은 작품"에 넣는 최소 찜 사용자 수. 이보다 적은 작품은 목록에서 뺀다
     arrival-days: 14            # "새로 볼 수 있게 된 작품": 없음·모름 → 있음으로 바뀐 것을 확인한 최근 일수(입고)
     release-days: 30            # 첫 적재 작품은 공개일(영화 개봉일/드라마 시즌 방영일)이 이 일수 안이면 새 작품(공개)
+    cache:                      # 홈·탐색 공개 응답 캐시(Redis). 수집·인기 수집·정리 Job이 끝나면 비운다. 출연자별 작품은 캐시하지 않는다
+      popularity-ttl: 60m         # 인기 순위
+      new-arrivals-ttl: 30m       # 새로 볼 수 있게 된 작품
+      wishlisted-ttl: 10m         # 찜 많은 작품(찜이 바뀔 때마다 비우지 않고 이 시간에 맡긴다)
+      genres-ttl: 24h             # 장르 목록
+      genre-titles-ttl: 30m       # 장르별 작품
+      browser-seconds: 60         # 브라우저 Cache-Control: public, max-age 값(초). Vercel 엣지 캐시용 s-maxage는 쓰지 않는다
   plan-recalc:
     auto-start: true                    # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
   collect:
