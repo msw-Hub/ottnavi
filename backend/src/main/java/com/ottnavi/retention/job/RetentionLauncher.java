@@ -5,6 +5,7 @@ import com.ottnavi.collect.job.CollectExecutionRecord;
 import com.ottnavi.collect.job.CollectExecutionRules;
 import com.ottnavi.collect.job.CollectExecutionStatus;
 import com.ottnavi.collect.job.ServerBootTime;
+import com.ottnavi.home.job.PopularityExecutionQuery;
 import com.ottnavi.plan.batch.PlanRecalcExecutionQuery;
 import com.ottnavi.retention.exception.RetentionAlreadyRunningException;
 import java.time.Clock;
@@ -33,6 +34,7 @@ public class RetentionLauncher {
 	private final RetentionExecutionQuery retentionExecutionQuery;
 	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 	private final CollectExecutionQuery collectExecutionQuery;
+	private final PopularityExecutionQuery popularityExecutionQuery;
 	private final ServerBootTime serverBootTime;
 	private final Clock clock;
 
@@ -40,12 +42,14 @@ public class RetentionLauncher {
 
 	public RetentionLauncher(@Qualifier("retentionJobOperator") JobOperator operator, Job retentionJob,
 			RetentionExecutionQuery retentionExecutionQuery, PlanRecalcExecutionQuery planRecalcExecutionQuery,
-			CollectExecutionQuery collectExecutionQuery, ServerBootTime serverBootTime, Clock clock) {
+			CollectExecutionQuery collectExecutionQuery, PopularityExecutionQuery popularityExecutionQuery,
+			ServerBootTime serverBootTime, Clock clock) {
 		this.operator = operator;
 		this.retentionJob = retentionJob;
 		this.retentionExecutionQuery = retentionExecutionQuery;
 		this.planRecalcExecutionQuery = planRecalcExecutionQuery;
 		this.collectExecutionQuery = collectExecutionQuery;
+		this.popularityExecutionQuery = popularityExecutionQuery;
 		this.serverBootTime = serverBootTime;
 		this.clock = clock;
 	}
@@ -71,7 +75,12 @@ public class RetentionLauncher {
 				}
 			}
 
-			// 4. 새 실행으로 시작한다
+			// 4. 인기 순위 수집이 실행 중인지(Task 107, 서로 막는다)
+			if (popularityExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
+				throw new RetentionAlreadyRunningException("인기 순위 수집이 실행 중이라 데이터 정리를 시작할 수 없습니다.");
+			}
+
+			// 5. 새 실행으로 시작한다
 			JobExecution execution = operator.start(retentionJob, RetentionJobParameters.of(clock.instant()));
 			log.info("데이터 정리를 시작했다: executionId={}", execution.getId());
 			return execution.getId();

@@ -6,6 +6,7 @@ import com.ottnavi.collect.job.CollectExecutionRules;
 import com.ottnavi.collect.job.CollectExecutionStatus;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.plan.exception.PlanRecalcAlreadyRunningException;
+import com.ottnavi.home.job.PopularityExecutionQuery;
 import com.ottnavi.retention.job.RetentionExecutionQuery;
 import java.time.Clock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -33,6 +34,7 @@ public class PlanRecalcLauncher {
 	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 	private final CollectExecutionQuery collectExecutionQuery;
 	private final RetentionExecutionQuery retentionExecutionQuery;
+	private final PopularityExecutionQuery popularityExecutionQuery;
 	private final ServerBootTime serverBootTime;
 	private final Clock clock;
 
@@ -40,12 +42,14 @@ public class PlanRecalcLauncher {
 
 	public PlanRecalcLauncher(@Qualifier("planRecalcJobOperator") JobOperator operator, Job planRecalcJob,
 			PlanRecalcExecutionQuery planRecalcExecutionQuery, CollectExecutionQuery collectExecutionQuery,
-			RetentionExecutionQuery retentionExecutionQuery, ServerBootTime serverBootTime, Clock clock) {
+			RetentionExecutionQuery retentionExecutionQuery, PopularityExecutionQuery popularityExecutionQuery,
+			ServerBootTime serverBootTime, Clock clock) {
 		this.operator = operator;
 		this.planRecalcJob = planRecalcJob;
 		this.planRecalcExecutionQuery = planRecalcExecutionQuery;
 		this.collectExecutionQuery = collectExecutionQuery;
 		this.retentionExecutionQuery = retentionExecutionQuery;
+		this.popularityExecutionQuery = popularityExecutionQuery;
 		this.serverBootTime = serverBootTime;
 		this.clock = clock;
 	}
@@ -86,7 +90,12 @@ public class PlanRecalcLauncher {
 				throw new PlanRecalcAlreadyRunningException("데이터 정리가 실행 중이라 재계산을 시작할 수 없습니다.");
 			}
 
-			// 4. 새 실행으로 시작한다
+			// 4. 인기 순위 수집이 실행 중인지(Task 107, 수집·정리와 같은 규칙으로 서로 막는다)
+			if (popularityExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
+				throw new PlanRecalcAlreadyRunningException("인기 순위 수집이 실행 중이라 재계산을 시작할 수 없습니다.");
+			}
+
+			// 5. 새 실행으로 시작한다
 			JobExecution execution = operator.start(planRecalcJob,
 					PlanRecalcJobParameters.of(collectExecutionId, trigger, clock.instant()));
 			log.info("재계산을 시작했다: executionId={}, trigger={}, collectExecutionId={}", execution.getId(), trigger,

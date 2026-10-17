@@ -84,7 +84,7 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/public/**", "/api/auth/**", "/api/oauth2/**", "/api/login/**").permitAll()
 						.requestMatchers("/api/admin/collect/**", "/api/admin/plans/monthly/**",
-								"/api/admin/retention/**")
+								"/api/admin/retention/**", "/api/admin/popularity/**")
 								.hasAnyRole("ADMIN", "BATCH")
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/**").authenticated()

@@ -15,6 +15,7 @@ import com.ottnavi.wishlist.exception.WishlistItemNotFoundException;
 import com.ottnavi.wishlist.exception.WishlistLimitExceededException;
 import com.ottnavi.wishlist.service.model.ActiveWishlistEntry;
 import com.ottnavi.wishlist.service.model.AddWishlistResult;
+import com.ottnavi.wishlist.service.model.TitleWishlistCount;
 import com.ottnavi.wishlist.service.model.UpdatedWishlistItemView;
 import com.ottnavi.wishlist.service.model.WishlistItemView;
 import com.ottnavi.wishlist.service.model.WishlistView;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -86,6 +88,18 @@ public class WishlistService {
 			views.add(toView(item, summary, usableServiceIds));
 		}
 		return new WishlistView(views, activeItemCount, MAX_ACTIVE_ITEM_COUNT, summaries.dataAsOf());
+	}
+
+	/**
+	 * 공개 홈의 "찜 많은 작품"용으로 작품별 찜 사용자 수를 많은 순으로 돌려준다.
+	 * "다 봤음"은 세지 않고 작품 단위로 서로 다른 사용자를 센다. 사용자 수가 minUsers보다 적은 작품은 뺀다(누가 찜했는지 가늠되지 않게).
+	 */
+	public List<TitleWishlistCount> listMostWishlistedTitles(int minUsers, int limit) {
+		List<TitleWishlistCount> result = new ArrayList<>();
+		for (Object[] row : wishlistItemRepository.countUsersByTitle(minUsers, PageRequest.of(0, limit))) {
+			result.add(new TitleWishlistCount((Long) row[0], (Long) row[1]));
+		}
+		return result;
 	}
 
 	/** 플랜 계산 입력용으로 "다 봤음"이 아닌 찜을 ID 순으로 돌려준다. 다른 도메인이 찜 리포지토리를 직접 쓰지 않게 하는 창구다 */

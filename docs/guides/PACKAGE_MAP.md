@@ -31,7 +31,7 @@ com.ottnavi
 │   │   ├── enums/
 │   │   ├── repository/      DB 조회·저장 인터페이스
 │   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator, AvailabilityAggregation …)
-│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083)
+│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleCardAssembler(작품 목록 → 서비스별 제공 상태 카드, 검색·탐색·홈이 공용, Task 107), TitleExploreService(장르 목록·장르별·출연자 이름별 작품, Task 107), NewlyAvailableQueryService(새로 볼 수 있게 된 작품: 입고·공개 후보 조회 → NewArrivalPicker로 대표 선택, Task 107), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083)
 │       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange, TitleDetailView …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
@@ -52,7 +52,7 @@ com.ottnavi
 │   │   ├── request/         AddWishlistItemRequest, UpdateWishlistItemRequest
 │   │   └── response/        WishlistItemListResponse, WishlistItemResponse, AddWishlistItemResultResponse, UpdatedWishlistItemResponse
 │   ├── exception/         WishlistLimitExceededException(409), WishlistItemNotFoundException(404)
-│   ├── service/           WishlistService(목록·추가·변경·삭제, 상한 20 판정과 사용자 행 잠금 직렬화) + model/ (WishlistView, WishlistItemView, AddWishlistResult, UpdatedWishlistItemView)
+│   ├── service/           WishlistService(목록·추가·변경·삭제, 상한 20 판정과 사용자 행 잠금 직렬화, 공개 홈용 작품별 찜 사용자 수 listMostWishlistedTitles) + model/ (WishlistView, WishlistItemView, AddWishlistResult, UpdatedWishlistItemView, TitleWishlistCount)
 │   └── domain/            entity(WishlistItem) · enums(WishlistPriority) · repository(WishlistItemRepository). 사용자·시청 단위는 ID만 들고 catalog·user 서비스를 통해 읽는다
 ├── product/             구독 상품·월 구독요금
 │   ├── controller/        AdminProductController (/api/admin/products, 상품 등록·수정과 요금 이력 추가·수정·삭제·확인함, Task 059), MyServicePriceController (/api/me/service-prices, 내 요금 조회·수정·되돌리기, Task 060)
@@ -93,6 +93,14 @@ com.ottnavi
 │   ├── job/               RetentionJobConfig(Job·Step 3개, 앞 Step이 실패해도 다음으로), RetentionLaunchConfig(정리 전용 비동기 operator), RetentionLauncher(정리·재계산·수집 실행 중이면 409), RetentionExecutionQuery(BATCH_* 조회: 정리 실행 중 여부. admin·plan/batch도 쓴다), RetentionJobParameters, RetentionProperties·RetentionConfig(app.retention.*)
 │   ├── service/           RetentionService(Step이 부르는 세 일: 작품 점검, 배치 이력 삭제, calc_run 삭제), TitleRetentionService(작품 한 건: 확인 → 갱신 또는 찜·플랜 정리 후 삭제), TitleExistenceProbe(작품 단위 404만 사라짐으로 판정), TitleRefresher(수집 상세 Processor 재사용), BatchHistoryPurger(BATCH_* 하위 테이블부터 삭제, 마지막 COMPLETED 수집 보존) + model/ (TitleExistence, TitleRetentionResult, TitleRetentionSummary)
 │   └── step/              TitleRetentionTasklet, BatchHistoryPurgeTasklet, CalcRunPurgeTasklet
+├── home/                홈·랭킹·탐색의 공통 목록 (Task 107, 개인화 없음): 서비스별 인기 순위 수집 Job과 공개 조회 API. 찜·작품 데이터는 wishlist·catalog 서비스를 호출해 읽는다
+│   ├── controller/        HomeController (GET /api/public/popularity-rankings·wishlisted-titles·newly-available-titles·genres·genres/{genreId}/titles·people/titles, 공개·요청 제한), AdminPopularityController (POST /api/admin/popularity/executions, 202·409, ADMIN JWT 또는 배치 토큰)
+│   ├── dto/response/      PopularityRankingResponse·PopularityRankingItemResponse, WishlistedTitleListResponse·WishlistedTitleResponse, NewlyAvailableTitleListResponse·NewlyAvailableTitleResponse, GenreResponse, TitleExplorePageResponse, PopularityExecutionAcceptedResponse
+│   ├── exception/         PopularityAlreadyRunningException (409 BATCH_ALREADY_RUNNING)
+│   ├── job/               PopularityJobConfig(Job·Step 2개: 수집 → 오래된 스냅샷 삭제), PopularityLaunchConfig(인기 수집 전용 비동기 operator), PopularityLauncher(인기 수집·정리·재계산·수집 실행 중이면 409), PopularityExecutionQuery(BATCH_* 조회: 인기 수집 실행 중 여부. admin·plan/batch·retention도 쓴다), PopularityJobParameters, PopularityProperties·PopularityConfig(app.popularity.*, app.home.* 등록)
+│   ├── service/           PopularityCollectService(서비스×매체별 TMDB discover → 스냅샷 저장, 트랜잭션 없음), PopularitySnapshotService(날짜·서비스·매체 단위 교체·삭제), PopularityItemMapper(TMDB 응답 → 값 묶음), PopularityRankingService(TODAY·WEEK 순위 조회), HomeQueryService(찜 많은 작품·새로 볼 수 있게 된 작품·탐색을 각 도메인 서비스에서 받아 돌려줌), HomeProperties(app.home.*: 최소 찜 인원·입고 일수·공개 일수) + model/ (PopularityItem, PopularityCollectSummary, PopularityRankingView, WishlistedTitleListView)
+│   ├── step/              PopularityCollectTasklet, PopularityPurgeTasklet
+│   └── domain/            entity(PopularitySnapshot) · enums(PopularityPeriod) · repository(PopularitySnapshotRepository) · rule(PopularityRankingRules: 날짜별 인기도 → 평균 순위. 없던 날 0 · DailyPopularity, RankedPopularity)
 └── engine/              플랜 계산 엔진 (순수 Java, 프레임워크 없음)
     ├── model/             입력·출력 값 틀
     ├── rule/              평가·비교 규칙

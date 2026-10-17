@@ -20,6 +20,7 @@ import com.ottnavi.collect.job.CollectTier;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.global.error.FieldValidationException;
 import com.ottnavi.global.error.ResourceNotFoundException;
+import com.ottnavi.home.job.PopularityExecutionQuery;
 import com.ottnavi.plan.batch.PlanRecalcExecutionQuery;
 import com.ottnavi.retention.job.RetentionExecutionQuery;
 import java.time.LocalDate;
@@ -56,6 +57,7 @@ public class CollectExecutionService {
 	private final ServerBootTime serverBootTime;
 	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
 	private final RetentionExecutionQuery retentionExecutionQuery;
+	private final PopularityExecutionQuery popularityExecutionQuery;
 
 	private final ReentrantLock launchLock = new ReentrantLock(); // 사전 검사와 시작 사이에 다른 요청이 끼지 못하게 한다
 
@@ -212,13 +214,16 @@ public class CollectExecutionService {
 		}
 	}
 
-	/** 재계산이나 데이터 정리가 실행 중이면 수집 시작·재시작을 409 BATCH_ALREADY_RUNNING으로 막는다(서버 기동 전 기록은 실행 중으로 보지 않는다) */
+	/** 재계산·데이터 정리·인기 순위 수집이 실행 중이면 수집 시작·재시작을 409 BATCH_ALREADY_RUNNING으로 막는다(서버 기동 전 기록은 실행 중으로 보지 않는다) */
 	private void throwIfRecalcRunning() {
 		if (planRecalcExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
 			throw new BatchAlreadyRunningException("재계산이 실행 중이라 수집을 시작할 수 없습니다.");
 		}
 		if (retentionExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
 			throw new BatchAlreadyRunningException("데이터 정리가 실행 중이라 수집을 시작할 수 없습니다.");
+		}
+		if (popularityExecutionQuery.existsRunning(serverBootTime.getBootedAt())) {
+			throw new BatchAlreadyRunningException("인기 순위 수집이 실행 중이라 수집을 시작할 수 없습니다.");
 		}
 	}
 

@@ -2,6 +2,7 @@ package com.ottnavi.catalog.domain.repository;
 
 import com.ottnavi.catalog.domain.entity.AvailabilityChange;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,32 @@ public interface AvailabilityChangeRepository extends JpaRepository<Availability
             + "order by c.changedAt asc, c.id asc")
     List<AvailabilityChange> findByUnitIdsChangedAfter(@Param("unitIds") Collection<Long> unitIds,
             @Param("since") Instant since);
+
+    /**
+     * 입고(ARRIVAL) 후보: since 이후에 없음·모름에서 있음으로 바뀐 기록. 첫 적재(before가 null)는 제외한다.
+     * 지금도 그 서비스에서 있음인 것만 센다(그 뒤 빠진 작품은 "새로 볼 수 있게 됨"이 아니다). 시청 단위·작품을 함께 읽어 N+1을 피한다.
+     */
+    @Query("select c from AvailabilityChange c join fetch c.watchUnit u join fetch u.title t join fetch c.ottService s "
+            + "where c.afterStatus = com.ottnavi.catalog.domain.enums.AvailabilityStatus.AVAILABLE "
+            + "and c.beforeStatus is not null and c.beforeStatus <> com.ottnavi.catalog.domain.enums.AvailabilityStatus.AVAILABLE "
+            + "and c.changedAt >= :since "
+            + "and exists (select 1 from Availability a where a.watchUnit = u and a.ottService = s "
+            + "and a.status = com.ottnavi.catalog.domain.enums.AvailabilityStatus.AVAILABLE)")
+    List<AvailabilityChange> findArrivalsSince(@Param("since") Instant since);
+
+    /**
+     * 공개(RELEASE) 후보: 첫 적재(before가 null)로 바로 있음이 됐고, 공개일이 [from, to]에 드는 기록.
+     * 공개일은 영화면 작품의 개봉일, 드라마면 시즌(시청 단위)의 방영일이다. 공개일이 null이면 조건에 맞지 않아 빠진다.
+     * 지금도 그 서비스에서 있음인 것만 센다.
+     */
+    @Query("select c from AvailabilityChange c join fetch c.watchUnit u join fetch u.title t join fetch c.ottService s "
+            + "where c.afterStatus = com.ottnavi.catalog.domain.enums.AvailabilityStatus.AVAILABLE "
+            + "and c.beforeStatus is null "
+            + "and ((t.mediaType = com.ottnavi.catalog.domain.enums.MediaType.MOVIE and t.releaseDate between :from and :to) "
+            + "or (t.mediaType = com.ottnavi.catalog.domain.enums.MediaType.TV and u.airDate between :from and :to)) "
+            + "and exists (select 1 from Availability a where a.watchUnit = u and a.ottService = s "
+            + "and a.status = com.ottnavi.catalog.domain.enums.AvailabilityStatus.AVAILABLE)")
+    List<AvailabilityChange> findFirstLoadsReleasedBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /** 수집 실행 ID별 변경 건수. 변경이 없는 실행은 행이 없다. 각 행은 [jobExecutionId(Long), count(Long)] */
     @Query("select c.jobExecutionId, count(c) from AvailabilityChange c "

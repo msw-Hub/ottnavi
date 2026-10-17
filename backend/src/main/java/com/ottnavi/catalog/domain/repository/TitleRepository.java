@@ -3,6 +3,7 @@ package com.ottnavi.catalog.domain.repository;
 import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.enums.MediaType;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,26 @@ public interface TitleRepository extends JpaRepository<Title, Long> {
             countQuery = "select count(t) from Title t "
                     + "where t.title ilike :pattern escape :escapeChar or t.originalTitle ilike :pattern escape :escapeChar")
     Page<Title> searchByTitle(@Param("pattern") String pattern, @Param("escapeChar") char escapeChar, Pageable pageable);
+
+    /** 작품 구분 하나와 TMDB ID 여러 개로 작품을 한 번에 찾는다. 홈 인기 순위가 스냅샷의 작품을 카드로 바꿀 때 쓴다 */
+    List<Title> findByMediaTypeAndTmdbIdIn(MediaType mediaType, Collection<Integer> tmdbIds);
+
+    /** 장르에 연결된 작품을 인기도 내림차순(동률은 id 오름차순, 인기도 없는 작품은 뒤)으로 한 페이지 조회한다 */
+    @Query(value = "select t from Title t where t.id in (select tg.title.id from TitleGenre tg where tg.genre.id = :genreId) "
+            + "order by t.popularity desc nulls last, t.id asc",
+            countQuery = "select count(t) from Title t "
+                    + "where t.id in (select tg.title.id from TitleGenre tg where tg.genre.id = :genreId)")
+    Page<Title> findPageByGenreId(@Param("genreId") Integer genreId, Pageable pageable);
+
+    /**
+     * 이름이 같은(대소문자 무시) 출연자가 나온 작품을 인기도 내림차순으로 한 페이지 조회한다.
+     * 출연진은 작품당 상위 10명만 저장돼 있어 그 범위의 결과다.
+     */
+    @Query(value = "select t from Title t where t.id in (select c.title.id from TitleCast c where lower(c.name) = lower(:name)) "
+            + "order by t.popularity desc nulls last, t.id asc",
+            countQuery = "select count(t) from Title t "
+                    + "where t.id in (select c.title.id from TitleCast c where lower(c.name) = lower(:name))")
+    Page<Title> findPageByCastName(@Param("name") String name, Pageable pageable);
 
     /** 마지막 수집 시각이 기준보다 이른(오래된) 작품 수. 6개월 갱신 점검이 센다 */
     long countByFetchedAtBefore(Instant cutoff);

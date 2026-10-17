@@ -44,7 +44,7 @@ paths:
 | 항목 | 규칙 | 예 |
 |---|---|---|
 | 필드명 | camelCase (Java record 필드명과 동일) | `watchUnitId`, `totalRuntimeMin` |
-| ID | 정수(int64). 내부 ID는 `xxxId`, TMDB ID는 `tmdbId`·`providerId` | `"watchUnitId": 1024` |
+| ID | 정수(int64). 내부 ID는 `xxxId`, TMDB ID는 `tmdbId`·`providerId`. 예외: TMDB 장르 ID(`genreId`)는 int32 | `"watchUnitId": 1024` |
 | 날짜 | `YYYY-MM-DD` 문자열 (`format: date`) | `"2026-11-01"` |
 | 일시 | ISO-8601, 오프셋 포함 (`format: date-time`) | `"2026-10-03T14:00:00+09:00"` |
 | 월 | `YYYY-MM` 문자열 | `"2026-11"` |
