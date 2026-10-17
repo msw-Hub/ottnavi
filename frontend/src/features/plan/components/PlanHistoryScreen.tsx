@@ -1,25 +1,17 @@
 import type { ReactNode } from 'react'
 import { ArrowLeftIcon, CircleCheckBigIcon, ListChecksIcon } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router'
+import { Link } from 'react-router'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { Button } from '@/components/ui/button'
 import { PlanChangeEntry } from '@/features/plan/components/PlanChangeEntry'
-import {
-  HISTORY_SAMPLE_SERVICE_NAMES,
-  PLAN_HISTORY_SAMPLE,
-} from '@/features/plan/historySampleData'
-import { isMockMode } from '@/lib/mockScenario'
-
-// 목업 모드에서 상태 화면을 확인하는 주소 파라미터 이름과 값(?historyPreview=…). 1차안 검토용이다
-const HISTORY_PREVIEW_PARAM = 'historyPreview'
-type HistoryPreview = 'changes' | 'empty' | 'loading' | 'error'
-const HISTORY_PREVIEWS: HistoryPreview[] = ['changes', 'empty', 'loading', 'error']
+import { usePlanChanges } from '@/features/plan/hooks/usePlanChanges'
+import { useOttServices } from '@/hooks/useOttServices'
 
 /**
- * SCR-11 플랜 변경 내역 화면의 본문이다(Task 068 1차안). pages/PlanHistoryPage는 이 컴포넌트를 연결만 한다(pages는 얇게, frontend.md).
+ * SCR-11 플랜 변경 내역 화면의 본문이다. pages/PlanHistoryPage는 이 컴포넌트를 연결만 한다(pages는 얇게, frontend.md).
  *
  * 이 화면이 하는 일: 매월 재계산으로 저장한 플랜이 바뀌었을 때 "무엇이, 왜 바뀌었는지"를 최신순으로 보여 준다.
  * 바뀌지 않은 달은 기록이 없고, 사용자가 직접 다시 계산해 저장한 것은 넣지 않는다(사용자 결정 3·4).
@@ -31,36 +23,27 @@ const HISTORY_PREVIEWS: HistoryPreview[] = ['changes', 'empty', 'loading', 'erro
  * 3. 변경 내역 목록(최신순, 항목마다 접고 펼침): 접힌 상태에서도 날짜·한 줄 요약·이유 칩이 보여 훑어 읽을 수 있다.
  * 4. 맨 아래 출처(JustWatch)와 "확인된 범위" 안내. 데이터 기준일은 기록마다 달라 각 항목 안에 둔다.
  *
- * 데이터: 1차안은 정적 샘플(historySampleData.ts)을 넘긴다. API가 생기면 이 파일에서 샘플 대신 조회 훅 결과를 넘기면 된다.
- * 상태 화면 확인(목업 모드 전용): 주소에 ?historyPreview=empty|loading|error를 붙이면 그 상태로 보인다(changes 또는 없음 = 기록 있음).
- * 운영에서는 이 파라미터를 읽지 않는다.
+ * 데이터: 변경 내역 조회 API(usePlanChanges)와 서비스 목록(useOttServices, 작품 변화의 서비스 이름용)을 불러온다.
+ * 이전(Task 068 1차안): 정적 샘플과 목업 전용 ?historyPreview= 상태 확인 파라미터를 썼다. API 연결(Task 070)로 둘 다 없앴다.
  */
 export function PlanHistoryScreen() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  const changes = usePlanChanges()
+  const services = useOttServices()
 
-  // 1. 목업 모드에서만 상태 확인용 파라미터를 읽는다. 모르는 값이면 기록 있음으로 본다
-  const rawPreview = isMockMode() ? searchParams.get(HISTORY_PREVIEW_PARAM) : null
-  const preview: HistoryPreview = HISTORY_PREVIEWS.includes(rawPreview as HistoryPreview)
-    ? (rawPreview as HistoryPreview)
-    : 'changes'
-  // 2. 기록 있음이면 샘플 3건, 빈 상태면 빈 목록
-  const entries = preview === 'empty' ? [] : PLAN_HISTORY_SAMPLE
+  // 1. 서비스 ID → 이름. 서비스 목록이 아직 없으면 빈 맵이라 이름 자리에 "서비스"가 대신 보인다
+  const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
+  const entries = changes.data ?? []
 
-  // 3. 상태별 본문(로딩 → 오류 → 빈 상태 → 목록)
+  // 2. 상태별 본문(로딩 → 오류 → 빈 상태 → 목록). 서비스 목록은 이름 보조용이라 실패해도 본문을 막지 않는다
   let content: ReactNode
-  if (preview === 'loading') {
+  if (changes.isPending) {
     content = <LoadingState message="변경 내역을 불러오고 있어요" />
-  } else if (preview === 'error') {
+  } else if (changes.isError) {
     content = (
       <ErrorState
+        error={changes.error}
         title="변경 내역을 불러오지 못했어요"
-        message="잠시 후 다시 시도해 주세요."
-        // 1차안: "다시 시도"는 확인용 파라미터를 지워 기록 있음 화면으로 돌아간다. 실제 화면은 조회 훅의 refetch를 넘긴다
-        onRetry={() => {
-          const next = new URLSearchParams(searchParams)
-          next.delete(HISTORY_PREVIEW_PARAM)
-          setSearchParams(next)
-        }}
+        onRetry={() => void changes.refetch()}
       />
     )
   } else if (entries.length === 0) {
@@ -88,7 +71,7 @@ export function PlanHistoryScreen() {
             <li key={entry.changeId}>
               <PlanChangeEntry
                 entry={entry}
-                serviceNames={HISTORY_SAMPLE_SERVICE_NAMES}
+                serviceNames={serviceNames}
                 defaultExpanded={index === 0}
               />
             </li>

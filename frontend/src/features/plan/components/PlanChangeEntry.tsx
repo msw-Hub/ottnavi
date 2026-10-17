@@ -20,7 +20,7 @@ import type {
   PlanMonthChange,
   PlanTitleChange,
   PlanTitlePlacement,
-} from '@/features/plan/mockTypes'
+} from '@/api/generated/model'
 import {
   CHANGE_REASON_DISPLAY,
   getAmountDelta,
@@ -145,7 +145,7 @@ function ReasonSection({ entry }: { entry: PlanChangeHistoryEntry }) {
       <ul className="grid gap-2">
         {entry.reasons.map((reason) => (
           <li
-            key={`${reason.reasonType}-${reason.title ?? ''}-${reason.seasonNumber ?? ''}-${reason.ottServiceId ?? ''}`}
+            key={`${reason.reasonType}-${reason.description}`}
             className="grid justify-items-start gap-1.5 rounded-lg border border-border bg-background px-3 py-2.5"
           >
             <ReasonChip reasonType={reason.reasonType} />
@@ -183,7 +183,7 @@ function MonthChangeSection({ monthChanges }: { monthChanges: PlanMonthChange[] 
  * 지금 기준이 어느 쪽인지 한눈에 보이게 하되, 강조는 보조 수단이다.
  */
 function MonthChangeRow({ change }: { change: PlanMonthChange }) {
-  // 이전 플랜에 없던 달(새로 생긴 셋째 달 등)인지. 이전 비용이 null이면 그렇다(mockTypes.ts 주석)
+  // 이전 플랜에 없던 달(새로 생긴 셋째 달 등)인지. 이전 비용이 null이면 그렇다(계약 PlanMonthChange.previousCost)
   const isNewMonth = change.previousCost === null
 
   return (
@@ -286,6 +286,7 @@ function ProductSide({ label, products, cost, isCurrent }: ProductSideProps) {
         <ul className="grid gap-0.5">
           {products.map((product) => (
             <li key={product.productId} className={cn('break-keep', isCurrent && 'font-semibold')}>
+              {/* 번들도 상품 이름에 구성 서비스가 들어 있어 이름만 보인다(구성 서비스 줄은 정보 과다라 뺐다, 2026-10-17 사용자 결정) */}
               {product.productName}
             </li>
           ))}

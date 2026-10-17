@@ -127,7 +127,7 @@ export const routes: RouteObject[] = [
                 lazy: { Component: () => import('@/pages/PlanPage').then((m) => m.PlanPage) },
               },
               {
-                path: 'plan/history', // SCR-11 플랜 변경 내역 (2단계, 준비 중)
+                path: 'plan/history', // SCR-11 플랜 변경 내역
                 lazy: {
                   Component: () => import('@/pages/PlanHistoryPage').then((m) => m.PlanHistoryPage),
                 },

@@ -8,6 +8,7 @@ import type {
 import type {
   ActivePlan,
   CommonResponseCurrentPlan,
+  CommonResponsePlanChangeHistoryList,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
   CreatePlanRequest,
@@ -30,6 +31,7 @@ import {
   readMockJson,
   writeMockJson,
 } from '@/mocks/handlerUtils'
+import { MOCK_PLAN_CHANGES } from '@/mocks/fixtures/planChanges'
 import { buildPlanDrafts, type PlanPriceInfo, type PlanScenario } from '@/mocks/fixtures/plan'
 import {
   findMockProduct,
@@ -68,6 +70,7 @@ import {
  *              GET  /api/me/plan-drafts              (저장해 둔 초안을 그대로 돌려줌. 계산 전이거나 저장한 뒤에는 빈 목록)
  *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 404 판정이 409보다 먼저. 저장하면 나머지 초안은 삭제)
  *              GET  /api/me/plans/current            (저장한 현재 플랜. 없으면 404가 아니라 200 { plan: null })
+ *              GET  /api/me/plan-changes             (플랜 변경 내역 최신순. empty 시나리오는 빈 목록, error는 500)
  *
  * 시나리오(주소의 ?mockScenario= 값을 목업 모드가 X-Mock-Scenario 요청 헤더로 보낸다):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
@@ -716,6 +719,26 @@ export const memberHandlers: RequestHandler[] = [
     if (denied) return denied
 
     const body: CommonResponsePlanDraftList = { success: true, data: { drafts: storedDrafts } }
+    return HttpResponse.json(body)
+  }),
+
+  // 플랜 변경 내역 조회(계약 listPlanChanges, Task 070): 최신순 목록. 시나리오 empty는 빈 목록, error는 500이다(상태 화면 확인용)
+  http.get('/api/me/plan-changes', async ({ request }) => {
+    await wait()
+    const denied = denyGuest(request)
+    if (denied) return denied
+    if (hasMockScenario(request, 'error')) {
+      return problemResponse(
+        request,
+        500,
+        'Internal Server Error',
+        'INTERNAL_ERROR',
+        '일시적인 오류가 발생했습니다.',
+      )
+    }
+
+    const items = hasMockScenario(request, 'empty') ? [] : MOCK_PLAN_CHANGES
+    const body: CommonResponsePlanChangeHistoryList = { success: true, data: { items } }
     return HttpResponse.json(body)
   }),
 
