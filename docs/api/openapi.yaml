@@ -249,6 +249,28 @@ paths:
           $ref: '#/components/responses/InternalError'
 
   # ===== user =====
+  /me:
+    delete:
+      tags:
+        - user
+      operationId: withdrawMe
+      x-planned: true
+      security:
+        - bearerAuth: []
+      summary: 회원 탈퇴
+      description: |
+        제안(Task 081, 구현은 Task 082). 로그인한 본인의 계정을 즉시 영구 삭제한다. 대기 기간이나 복구는 없다(PRD FR-07).
+        찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
+        서버는 Refresh Token 계열과 사용자 캐시도 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
+        요청 본문은 없다. 이미 삭제된 계정의 Access Token은 만료 전이라도 사용자를 찾을 수 없어 `UNAUTHORIZED`로 거절될 수 있다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '204':
+          description: 탈퇴됨(본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /me/settings:
     get:
       tags:

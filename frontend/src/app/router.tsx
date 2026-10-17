@@ -142,7 +142,7 @@ export const routes: RouteObject[] = [
                 },
               },
               {
-                path: 'settings/withdraw', // SCR-13 탈퇴 (2단계, 준비 중)
+                path: 'settings/withdraw', // SCR-13 탈퇴 (화면·목업 흐름 완료, 실제 API는 Task 082·084)
                 lazy: {
                   Component: () => import('@/pages/WithdrawPage').then((m) => m.WithdrawPage),
                 },

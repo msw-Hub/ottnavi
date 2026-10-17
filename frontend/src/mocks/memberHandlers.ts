@@ -29,6 +29,7 @@ import {
   type MockWishlistEntry,
   problemResponse,
   readMockJson,
+  resetMockWishlist,
   writeMockJson,
 } from '@/mocks/handlerUtils'
 import { MOCK_PLAN_CHANGES } from '@/mocks/fixtures/planChanges'
@@ -60,6 +61,7 @@ import {
  * 검색 필터·찜 저장·20개 상한 같은 동작은 이 핸들러가 맡는다.
  * 모두 로그인이 필요하다(목업 로그인 역할이 GUEST면 401).
  *
+ * - 회원 탈퇴: DELETE /api/me                        (Task 081, 계약 withdrawMe. 204. 설정·요금·플랜·찜과 온보딩 여부를 지운다. error 시나리오는 500)
  * - 내 설정:   GET  /api/me/settings                 (온보딩 전에는 isOnboardingDone=false인 빈 설정)
  *              PUT  /api/me/settings                 (저장하면 온보딩 완료. 입력 규칙 위반은 400 VALIDATION_FAILED)
  * - 찜 목록:   GET  /api/me/wishlist-items           (추가·우선순위·다 봤음 PATCH·삭제는 handlers.ts의 Task 027 핸들러를 쓴다)
@@ -524,6 +526,32 @@ function toWishlistListItem(
 }
 
 export const memberHandlers: RequestHandler[] = [
+  // 회원 탈퇴(계약 withdrawMe, Task 081): 서버가 계정과 데이터를 즉시 지우는 것을 흉내 낸다. 성공하면 204(본문 없음)
+  http.delete('/api/me', async ({ request }) => {
+    await wait()
+    const denied = denyGuest(request)
+    if (denied) return denied
+    // 실패 안내(모달 안 오류 문구)를 눈으로 보는 용도. 데이터는 지우지 않는다
+    if (hasMockScenario(request, 'error')) {
+      return problemResponse(
+        request,
+        500,
+        'Internal Server Error',
+        'INTERNAL_ERROR',
+        '일시적인 오류가 발생했습니다.',
+      )
+    }
+
+    // 1. 회원 데이터를 지운다(설정·요금 수정값·플랜 상태, 찜 목록)
+    resetMockMemberState()
+    resetMockWishlist()
+    // 2. 다시 로그인하면 신규 가입처럼 온보딩부터 시작한다(ROADMAP 084 완료 기준).
+    //    로그인 역할(GUEST로 되돌리기)은 여기서 바꾸지 않는다: 요청이 끝나기도 전에 역할이 바뀌면 화면 가드가 로그인 화면으로 보내 버린다.
+    //    역할은 응답을 받은 프론트가 정리 단계에서 비운다(hooks/useEndSession)
+    setMockOnboardingDone(false)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // 내 설정 조회
   http.get('/api/me/settings', async ({ request }) => {
     await wait()
