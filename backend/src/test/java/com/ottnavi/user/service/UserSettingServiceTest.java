@@ -75,7 +75,7 @@ class UserSettingServiceTest {
 		requested.add(new SubscriptionState(1L, ServiceSubscriptionStatus.SUBSCRIBED, " 스탠다드 ", null));
 
 		// when
-		UserSettingsState result = service.updateSettings(USER_ID, 20000, 900, WatchPreset.NORMAL, requested);
+		UserSettingsState result = service.updateSettings(USER_ID, 20000, 900, WatchPreset.NORMAL, false, requested);
 
 		// then
 		ArgumentCaptor<UserSubscription> captor = ArgumentCaptor.forClass(UserSubscription.class);
@@ -94,7 +94,7 @@ class UserSettingServiceTest {
 		requested.add(new SubscriptionState(3L, ServiceSubscriptionStatus.FREE, null, null));
 
 		// when
-		UserSettingsState result = service.updateSettings(USER_ID, 0, 120, WatchPreset.CUSTOM, requested);
+		UserSettingsState result = service.updateSettings(USER_ID, 0, 120, WatchPreset.CUSTOM, false, requested);
 
 		// then
 		ArgumentCaptor<UserSubscription> captor = ArgumentCaptor.forClass(UserSubscription.class);
@@ -111,11 +111,11 @@ class UserSettingServiceTest {
 		// given
 		List<SubscriptionState> requested = new ArrayList<>();
 		requested.add(new SubscriptionState(1L, ServiceSubscriptionStatus.UNKNOWN, null, null));
-		UserSetting existing = UserSetting.create(USER_ID, 1000, 200, WatchPreset.LIGHT);
+		UserSetting existing = UserSetting.create(USER_ID, 1000, 200, WatchPreset.LIGHT, false);
 		when(userSettingRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
 		// when
-		service.updateSettings(USER_ID, 30000, 1800, WatchPreset.HEAVY, requested);
+		service.updateSettings(USER_ID, 30000, 1800, WatchPreset.HEAVY, false, requested);
 
 		// then
 		assertThat(existing.getMonthlyBudget()).isEqualTo(30000);
@@ -131,7 +131,7 @@ class UserSettingServiceTest {
 		requested.add(new SubscriptionState(99L, ServiceSubscriptionStatus.UNKNOWN, null, null));
 
 		// when & then
-		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, requested))
+		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, false, requested))
 				.isInstanceOf(FieldValidationException.class)
 				.hasMessageContaining("존재하지 않는 서비스");
 		verify(userRepository, never()).findByIdForUpdate(any());
@@ -145,7 +145,7 @@ class UserSettingServiceTest {
 		requested.add(new SubscriptionState(1L, ServiceSubscriptionStatus.UNKNOWN, null, null));
 
 		// when & then
-		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, requested))
+		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, false, requested))
 				.isInstanceOf(FieldValidationException.class)
 				.hasMessageContaining("중복");
 	}
@@ -157,7 +157,7 @@ class UserSettingServiceTest {
 		requested.add(new SubscriptionState(1L, ServiceSubscriptionStatus.SUBSCRIBED, "  ", 10));
 
 		// when & then
-		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, requested))
+		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, false, requested))
 				.isInstanceOf(FieldValidationException.class)
 				.hasMessageContaining("요금제 이름");
 	}
@@ -171,12 +171,12 @@ class UserSettingServiceTest {
 		withDay.add(new SubscriptionState(1L, ServiceSubscriptionStatus.NOT_SUBSCRIBED, null, 5));
 
 		// when & then
-		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, withPlan))
+		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, false, withPlan))
 				.isInstanceOf(FieldValidationException.class)
 				.extracting(e -> ((FieldValidationException) e).getField())
 				.isEqualTo("subscriptions[0].planName");
 		// 결제일만 보낸 경우에는 오류 위치가 결제일 칸이다
-		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, withDay))
+		assertThatThrownBy(() -> service.updateSettings(USER_ID, 0, 120, WatchPreset.LIGHT, false, withDay))
 				.isInstanceOf(FieldValidationException.class)
 				.extracting(e -> ((FieldValidationException) e).getField())
 				.isEqualTo("subscriptions[0].billingDay");

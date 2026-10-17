@@ -36,6 +36,24 @@ class AllSubscribeCostCalculatorTest {
 	}
 
 	@Test
+	void 번들은_전체_구독_비용에_넣지_않고_단품만_3개월치로_센다() {
+		// given: 단품 두 개(서비스 1·2)와 그 둘을 묶은 번들. 두 단위가 번들도 시청 가능 상품으로 가진다
+		List<OttProduct> products = new ArrayList<>();
+		products.add(new OttProduct(1L, 13_500, OttProductCondition.NONE, List.of(1L)));
+		products.add(new OttProduct(2L, 10_900, OttProductCondition.NONE, List.of(2L)));
+		products.add(new OttProduct(3L, 16_000, OttProductCondition.NONE, List.of(1L, 2L)));
+		List<WatchUnit> units = new ArrayList<>();
+		units.add(new WatchUnit(1L, Priority.MUST, 100, Set.of(1L, 3L), false));
+		units.add(new WatchUnit(2L, Priority.WANT, 100, Set.of(2L, 3L), false));
+
+		// when
+		int cost = AllSubscribeCostCalculator.calculate(units, products);
+
+		// then: (13,500 + 10,900) × 3 = 73,200, 번들 16,000은 더하지 않는다
+		assertThat(cost).isEqualTo(73_200);
+	}
+
+	@Test
 	void 시청_가능_상품이_하나도_없으면_0이다() {
 		// given: 후보 상품은 있지만 어느 단위도 볼 수 있는 상품이 없다
 		List<OttProduct> products = new ArrayList<>();

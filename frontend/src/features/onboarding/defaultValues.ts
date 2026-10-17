@@ -48,5 +48,6 @@ export function buildDefaultValues(
     }),
     watchTime,
     monthlyBudget: settings.monthlyBudget ?? undefined,
+    isLowestPriceMode: settings.isLowestPriceMode, // 온보딩 전에는 서버가 false(끔)로 준다
   }
 }

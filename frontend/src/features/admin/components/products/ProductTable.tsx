@@ -11,11 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getProductComposition } from '@/features/admin/bundleSampleData'
 import { AdminStatusPill } from '@/features/admin/components/AdminStatusPill'
 import { ProductCompositionSummary } from '@/features/admin/components/products/ProductCompositionSummary'
 import { StaleVerifiedTag } from '@/features/admin/components/StaleVerifiedTag'
-import type { ProductCompositionDraft } from '@/features/admin/mockTypes'
 import type { AdminProduct } from '@/api/generated/model'
 import { getCurrentPrice, isVerifiedStale, sortPricesAscending } from '@/features/admin/priceRules'
 import { formatWon } from '@/lib/format'
@@ -27,8 +25,7 @@ interface ProductTableProps {
   today: string // 오늘 날짜('YYYY-MM-DD'). 현재 적용 요금과 "확인일 오래됨" 판정 기준
   onSelect: (productId: number) => void // 이름 버튼을 눌러 OTT 구독상품을 고른다
   onEdit: (product: AdminProduct) => void // [수정]을 눌러 이름·판매 상태 수정 대화상자를 연다
-  // 번들·광고형 1차안(Task 075): 상품 ID → 구성. 없으면 계약 값으로 "단품 · 서비스 1곳 · 일반"을 보인다(getProductComposition)
-  compositions?: Map<number, ProductCompositionDraft>
+  // 이전(Task 075 1차안): compositions(상품 ID → 임시 구성 표)를 받았다. Task 076에서 구성이 계약(ottServiceIds·isLowCost)에 들어와 지웠다
 }
 
 // 판매 상태 배지. 색만이 아니라 아이콘과 글자, 테두리 모양(실선/점선)으로 구분한다
@@ -71,18 +68,14 @@ export function ProductTable({
   today,
   onSelect,
   onEdit,
-  compositions,
 }: ProductTableProps) {
   const serviceName = (ottServiceId: number) =>
     serviceNames.get(ottServiceId) ?? `서비스 ${ottServiceId}`
 
   // "구성" 칸(Task 075 1차안). 이전에는 "서비스" 칸에 서비스 이름만 보였다 → <TableCell>{serviceName(product.ottServiceId)}</TableCell>
-  // 번들은 서비스가 여러 곳이라 "유형 + 서비스(+등급)"을 한 칸에 모았다
+  // 번들은 서비스가 여러 곳이라 "유형 + 서비스(+저가형)"을 한 칸에 모았다
   const compositionCell = (product: AdminProduct) => (
-    <ProductCompositionSummary
-      composition={getProductComposition(product, compositions)}
-      serviceName={serviceName}
-    />
+    <ProductCompositionSummary product={product} serviceName={serviceName} />
   )
 
   // 구성은 등록할 때만 정하고 바꾸지 않으므로 행 동작은 [수정](이름·판매 상태)뿐이다. 이전에는 [구성 편집] 버튼이 있었다(2026-10-17 제거)

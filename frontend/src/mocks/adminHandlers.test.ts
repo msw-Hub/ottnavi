@@ -109,7 +109,8 @@ describe('월 구독요금 규칙 강제', () => {
         data: {
           name: '테스트',
           productType: 'SINGLE',
-          ottServiceId: 1,
+          ottServiceIds: [1],
+          isLowCost: false,
           monthlyPrice: 5000,
           effectiveFrom: addDays(TODAY, 1),
         },
@@ -170,7 +171,8 @@ describe('새로고침 뒤 유지', () => {
       data: {
         name: '유지 확인용',
         productType: 'SINGLE',
-        ottServiceId: 2,
+        ottServiceIds: [2],
+        isLowCost: false,
         monthlyPrice: 5000,
         effectiveFrom: addDays(TODAY, -3),
       },
@@ -195,15 +197,16 @@ describe('새로고침 뒤 유지', () => {
     expect(products.find((p) => p.productId === NETFLIX_ID)!.prices).toHaveLength(3)
 
     fresh.resetMockAdminState()
-    expect(window.sessionStorage.getItem('ottnavi:mock-admin-products')).toBeNull()
+    expect(window.sessionStorage.getItem('ottnavi:mock-admin-products:v2')).toBeNull()
   })
 
   it('저장된 값이 깨져 있으면 기본 목록으로 시작한다', async () => {
-    window.sessionStorage.setItem('ottnavi:mock-admin-products', '{깨진 값')
+    window.sessionStorage.setItem('ottnavi:mock-admin-products:v2', '{깨진 값')
     vi.resetModules()
     const fresh = await import('@/mocks/adminHandlers')
     server.use(...fresh.adminHandlers)
-    expect(await listProducts()).toHaveLength(7)
+    // 기본 목록은 단품·저가형·번들을 합쳐 12개다(Task 076 목업, 추가 상품 108~112)
+    expect(await listProducts()).toHaveLength(12)
   })
 })
 
@@ -589,7 +592,7 @@ describe('서버 검사 순서와 오류 모양', () => {
       data: {},
     })
     expect(empty.fieldErrors).toEqual([
-      { field: 'request', message: 'name 또는 isActive 중 하나는 보내야 합니다.' },
+      { field: 'request', message: 'name, isActive, isLowCost 중 하나는 보내야 합니다.' },
     ])
     const tooLong = await errorOf({
       url: `/admin/products/${NETFLIX_ID}`,
@@ -605,23 +608,23 @@ describe('서버 검사 순서와 오류 모양', () => {
     ).toBe(400)
   })
 
-  it('상품 등록의 서비스 계층 검사: 번들은 productType, 없는 서비스는 ottServiceId 필드로 알린다', async () => {
+  it('상품 등록의 서비스 계층 검사: 번들은 서비스 2개 이상이어야 하고, 없는 서비스는 ottServiceIds 필드로 알린다', async () => {
     const base = { name: '새 상품', monthlyPrice: 10000, effectiveFrom: TODAY }
     const bundle = await errorOf({
       url: '/admin/products',
       method: 'POST',
-      data: { ...base, productType: 'BUNDLE', ottServiceId: 1 },
+      data: { ...base, productType: 'BUNDLE', ottServiceIds: [1], isLowCost: false },
     })
     expect(bundle.fieldErrors).toEqual([
-      { field: 'productType', message: '단품(SINGLE)만 등록할 수 있습니다.' },
+      { field: 'ottServiceIds', message: '번들은 서비스 2개 이상이 필요합니다.' },
     ])
     const noService = await errorOf({
       url: '/admin/products',
       method: 'POST',
-      data: { ...base, productType: 'SINGLE', ottServiceId: 99 },
+      data: { ...base, productType: 'SINGLE', ottServiceIds: [99], isLowCost: false },
     })
     expect(noService.fieldErrors).toEqual([
-      { field: 'ottServiceId', message: '존재하지 않는 서비스입니다.' },
+      { field: 'ottServiceIds', message: '존재하지 않는 서비스입니다.' },
     ])
   })
 

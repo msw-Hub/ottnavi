@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -30,35 +30,38 @@ import type {
   CommonResponseCollectExecutionAccepted,
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecutionPage,
-  CommonResponsePlanBenchmark
+  CommonResponsePlanBenchmark,
+  CommonResponsePlanRecalcExecutionAccepted
 } from '../model';
 
 
-export const getListAdminProductsResponseMock = (): CommonResponseAdminProductList => ({"success":true,"data":{"products":[{"productId":101,"name":"넷플릭스 스탠다드","productType":"SINGLE","ottServiceId":1,"isActive":true,"prices":[{"priceId":1011,"monthlyPrice":12000,"effectiveFrom":"2025-09-07","lastVerifiedAt":"2026-03-26T09:00:00+09:00"},{"priceId":1012,"monthlyPrice":13500,"effectiveFrom":"2026-10-02","lastVerifiedAt":"2026-10-07T09:00:00+09:00"},{"priceId":1013,"monthlyPrice":14500,"effectiveFrom":"2026-11-11","lastVerifiedAt":"2026-10-10T09:00:00+09:00"}]},{"productId":106,"name":"왓챠 베이직","productType":"SINGLE","ottServiceId":6,"isActive":false,"prices":[{"priceId":1061,"monthlyPrice":7900,"effectiveFrom":"2026-04-15","lastVerifiedAt":"2026-10-05T09:00:00+09:00"}]}]}})
+export const getListAdminProductsResponseMock = (): CommonResponseAdminProductList => ({"success":true,"data":{"products":[{"productId":101,"name":"넷플릭스 스탠다드","productType":"SINGLE","ottServiceIds":[1],"isLowCost":false,"isActive":true,"prices":[{"priceId":1011,"monthlyPrice":12000,"effectiveFrom":"2025-09-07","lastVerifiedAt":"2026-03-26T09:00:00+09:00"},{"priceId":1012,"monthlyPrice":13500,"effectiveFrom":"2026-10-02","lastVerifiedAt":"2026-10-07T09:00:00+09:00"},{"priceId":1013,"monthlyPrice":14500,"effectiveFrom":"2026-11-11","lastVerifiedAt":"2026-10-10T09:00:00+09:00"}]},{"productId":106,"name":"왓챠 베이직","productType":"SINGLE","ottServiceIds":[6],"isLowCost":false,"isActive":false,"prices":[{"priceId":1061,"monthlyPrice":7900,"effectiveFrom":"2026-04-15","lastVerifiedAt":"2026-10-05T09:00:00+09:00"}]}]}})
 
-export const getCreateAdminProductResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceId":3,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
+export const getCreateAdminProductResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceIds":[3],"isLowCost":false,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
 
-export const getUpdateAdminProductResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceId":3,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
+export const getUpdateAdminProductResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceIds":[3],"isLowCost":false,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
 
-export const getAddAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceId":3,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
+export const getAddAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceIds":[3],"isLowCost":false,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
 
-export const getUpdateAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceId":3,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
+export const getUpdateAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceIds":[3],"isLowCost":false,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
 
-export const getVerifyAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceId":3,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
+export const getVerifyAdminProductPriceResponseMock = (): CommonResponseAdminProduct => ({"success":true,"data":{"productId":103,"name":"애플 TV+","productType":"SINGLE","ottServiceIds":[3],"isLowCost":false,"isActive":true,"prices":[{"priceId":1031,"monthlyPrice":6500,"effectiveFrom":"2025-12-16","lastVerifiedAt":"2026-10-12T09:00:00+09:00"}]}})
 
 export const getListAdminProvidersResponseMock = (): CommonResponseAdminProviderList => ({"success":true,"data":{"providers":[{"providerId":8,"tmdbName":"Netflix","ottServiceId":1,"tier":"STANDARD","firstSeenAt":"2026-03-26T03:10:00+09:00","mappingState":"MAPPED"},{"providerId":1796,"tmdbName":"Netflix Standard with Ads","ottServiceId":1,"tier":"AD","firstSeenAt":"2026-03-26T03:10:00+09:00","mappingState":"MAPPED"},{"providerId":119,"tmdbName":"Amazon Prime Video","ottServiceId":null,"tier":"STANDARD","firstSeenAt":"2026-03-26T03:10:00+09:00","mappingState":"IGNORED"}]}})
 
 export const getUpdateAdminProviderResponseMock = (): CommonResponseAdminProvider => ({"success":true,"data":{"providerId":1881,"tmdbName":"Coupang Play","ottServiceId":7,"tier":"STANDARD","firstSeenAt":"2026-03-26T03:10:00+09:00","mappingState":"MAPPED"}})
 
-export const getListCollectExecutionsResponseMock = (): CommonResponseCollectExecutionPage => ({"success":true,"data":{"page":0,"size":20,"totalElements":2,"totalPages":1,"content":[{"executionId":5,"targetDate":"2026-10-12","tier":"ALL","status":"COMPLETED","startedAt":"2026-10-12T03:00:00+09:00","endedAt":"2026-10-12T03:42:00+09:00","processedCount":1840,"changedCount":2,"failureReason":null,"canRecover":false,"canRestart":false},{"executionId":4,"targetDate":"2026-10-11","tier":"ALL","status":"FAILED","startedAt":"2026-10-11T03:00:00+09:00","endedAt":"2026-10-11T03:05:00+09:00","processedCount":120,"changedCount":0,"failureReason":"TMDB 호출 제한 초과로 중단됨","canRecover":false,"canRestart":false}]}})
+export const getListCollectExecutionsResponseMock = (): CommonResponseCollectExecutionPage => ({"success":true,"data":{"page":0,"size":20,"totalElements":2,"totalPages":1,"content":[{"executionId":5,"targetDate":"2026-10-12","tier":"ALL","status":"COMPLETED","startedAt":"2026-10-12T03:00:00+09:00","endedAt":"2026-10-12T03:42:00+09:00","processedCount":1840,"changedCount":2,"failureReason":null,"canRecover":false,"canRestart":false,"recalcTargetCount":12},{"executionId":4,"targetDate":"2026-10-11","tier":"ALL","status":"FAILED","startedAt":"2026-10-11T03:00:00+09:00","endedAt":"2026-10-11T03:05:00+09:00","processedCount":120,"changedCount":0,"failureReason":"TMDB 호출 제한 초과로 중단됨","canRecover":false,"canRestart":false,"recalcTargetCount":null}]}})
 
 export const getCreateCollectExecutionResponseMock = (): CommonResponseCollectExecutionAccepted => ({"success":true,"data":{"executionId":6}})
 
 export const getListCollectExecutionChangesResponseMock = (): CommonResponseCollectExecutionChangePage => ({"success":true,"data":{"page":0,"size":20,"totalElements":3,"totalPages":1,"content":[{"mediaType":"movie","tmdbId":496243,"title":"기생충","seasonNumber":null,"ottServiceId":6,"previousStatus":"AVAILABLE","currentStatus":"UNKNOWN"},{"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"ottServiceId":1,"previousStatus":null,"currentStatus":"AVAILABLE"},{"mediaType":"movie","tmdbId":838209,"title":"파묘","seasonNumber":null,"ottServiceId":2,"previousStatus":null,"currentStatus":"AVAILABLE"}]}})
 
-export const getRecoverCollectExecutionResponseMock = (): CommonResponseCollectExecution => ({"success":true,"data":{"executionId":3,"targetDate":"2026-10-10","tier":"ALL","status":"FAILED","startedAt":"2026-10-10T03:00:00+09:00","endedAt":null,"processedCount":640,"changedCount":0,"failureReason":"중단된 실행을 관리자가 실패로 복구함","canRecover":false,"canRestart":true}})
+export const getRecoverCollectExecutionResponseMock = (): CommonResponseCollectExecution => ({"success":true,"data":{"executionId":3,"targetDate":"2026-10-10","tier":"ALL","status":"FAILED","startedAt":"2026-10-10T03:00:00+09:00","endedAt":null,"processedCount":640,"changedCount":0,"failureReason":"중단된 실행을 관리자가 실패로 복구함","canRecover":false,"canRestart":true,"recalcTargetCount":null}})
 
 export const getRestartCollectExecutionResponseMock = (): CommonResponseCollectExecutionAccepted => ({"success":true,"data":{"executionId":6}})
+
+export const getCreatePlanRecalcExecutionResponseMock = (): CommonResponsePlanRecalcExecutionAccepted => ({"success":true,"data":{"executionId":14}})
 
 export const getCreatePlanBenchmarkResponseMock = (overrideResponse: Partial<Extract<CommonResponsePlanBenchmark, object>> = {}): CommonResponsePlanBenchmark => ({success: faker.datatype.boolean(), data: {"measuredRuns":3,"warmupRuns":1,"caseCount":1,"cases":[{"caseName":"case-07-greedy-trap","inputHash":"9f2c000000000000000000000000000000000000000000000000000000000000","candidateCount":27,"exact":{"calcRunId":101,"mustCompleted":1,"score":4,"totalCost":28000,"elapsedMicros":21,"elapsedMs":0,"matchesExpected":true},"greedy":{"calcRunId":102,"mustCompleted":1,"score":2,"totalCost":8000,"elapsedMicros":9,"elapsedMs":0,"matchesExpected":true},"mustDiff":0,"scoreDiff":-2,"costDiff":-20000}],"skippedCaseNames":[]}, ...overrideResponse})
 
@@ -229,6 +232,18 @@ export const getRestartCollectExecutionMockHandler = (overrideResponse?: CommonR
   }, options)
 }
 
+export const getCreatePlanRecalcExecutionMockHandler = (overrideResponse?: CommonResponsePlanRecalcExecutionAccepted | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanRecalcExecutionAccepted> | CommonResponsePlanRecalcExecutionAccepted), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/plans/monthly/executions', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getCreatePlanRecalcExecutionResponseMock(),
+      { status: 202
+      })
+  }, options)
+}
+
 export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonResponsePlanBenchmark | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanBenchmark> | CommonResponsePlanBenchmark), options?: RequestHandlerOptions) => {
   return http.post('/api/admin/plan-benchmarks', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -255,5 +270,6 @@ export const getAdminMock = () => [
   getListCollectExecutionChangesMockHandler(),
   getRecoverCollectExecutionMockHandler(),
   getRestartCollectExecutionMockHandler(),
+  getCreatePlanRecalcExecutionMockHandler(),
   getCreatePlanBenchmarkMockHandler()
 ]

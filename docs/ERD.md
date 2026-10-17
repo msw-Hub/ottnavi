@@ -179,7 +179,7 @@ erDiagram
 | status | VARCHAR(20) | | AVAILABLE / NOT_AVAILABLE / UNKNOWN. 엔티티 메서드 하나에서만 변경. `CHECK ((status = 'UNKNOWN') = (unknown_reason IS NOT NULL))` |
 | unknown_reason | VARCHAR(30) | | NULL 허용. UNKNOWN일 때만 값이 있고 아니면 NULL. NO_KR_DATA(응답에 KR 없음) / STRUCTURAL_GAP(쿠팡플레이 영화 등) |
 | in_standard | BOOLEAN | | STANDARD tier 제공처가 있었는지 |
-| in_ad_tier | BOOLEAN | | AD tier 제공처가 있었는지 (광고형 요금제 판정) |
+| in_ad_tier | BOOLEAN | | AD tier 제공처가 있었는지 (수집·저장만 하고 시청 판정에는 읽지 않는다, Task 076) |
 | checked_at | TIMESTAMPTZ | | 마지막 확인 시각 |
 
 ### availability_change — 제공 상태 변경 이력
@@ -216,6 +216,7 @@ erDiagram
     varchar name "넷플릭스 광고형 등"
     varchar product_type "SINGLE / BUNDLE"
     boolean active
+    boolean low_cost "저가형 요금 분류"
   }
   product_component {
     bigint product_id PK, FK
@@ -236,8 +237,8 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| subscription_product | id, name, product_type, active | 관리자가 등록. 판매 종료 상품은 active=false (삭제하지 않음). API에서는 `isActive`. 회원 요금 API는 판매 중(`active = true`) 상품만 다룬다. 한 서비스에 판매 중 상품이 여러 개일 수 있고 서버는 서비스당 1개로 강제하지 않는다(관리자 등록 규칙, 광고형·번들은 2단계, 2026-10-16 결정) |
-| product_component | PK(product_id, ott_service_id), tier | 상품에 포함된 서비스와 tier. tier=AD면 해당 서비스 작품 중 in_ad_tier만 시청 가능으로 본다. MVP는 STANDARD 단품만 다루고, AD tier는 2단계(O3)에서 번들과 함께 추가한다(스키마는 미리 준비) |
+| subscription_product | id, name, product_type, active, low_cost | 관리자가 등록. 판매 종료 상품은 active=false (삭제하지 않음). API에서는 `isActive`. 회원 요금 API는 판매 중(`active = true`) 상품만 다룬다. 한 서비스에 판매 중 상품이 여러 개일 수 있고 서버는 서비스당 1개로 강제하지 않는다(관리자 등록 규칙, 2026-10-16 결정). `low_cost`(V8, Task 076)는 저가형(광고형·베이직 등) 요금 분류이며 가격 선택(CalcCandidateRules)에만 쓴다. 번들(`BUNDLE`)은 구성 서비스 2개 이상이고 구성은 등록 때만 정하며 판매 중 번들은 최대 13개 |
+| product_component | PK(product_id, ott_service_id), tier | 상품에 포함된 서비스(단품은 1행, 번들은 2행 이상)와 tier. **tier는 시청 판정에 읽지 않는다**(Task 076, 사용자 결정: 저가형·광고형 요금제도 볼 수 있는 작품에 제한이 없다고 본다). 등록할 때는 STANDARD로 저장하고 저가형 여부는 `subscription_product.low_cost`로 나타낸다 |
 | product_price | id, product_id FK, monthly_price, effective_from, last_verified_at | `UNIQUE(product_id, effective_from)`. **종료일은 저장하지 않는다**: 다음 요금 이력 시작일의 전날까지 적용되고 마지막 요금 이력은 계속 적용된다. 요금 이력은 맨 뒤에 시작일이 더 늦은 요금 이력으로만 추가하고 수정·삭제는 가장 최근 요금 이력만 허용하므로 기간이 겹치거나 비는 일이 구조상 없다(FR-19). 가격 조회는 기준 날짜(오늘 또는 사용자 결제일, 한국 날짜) 이하의 시작일 중 가장 늦은 요금 이력. last_verified_at(TIMESTAMPTZ)은 관리자가 마지막으로 확인한 일시이며 상품 등록·요금 이력 추가·수정·[요금 확인함]이 현재 시각으로 바꾼다(PRD 11절 41번). 90일 판정은 화면이 한국 날짜 기준으로 한다 |
 
 ---
@@ -267,6 +268,7 @@ erDiagram
     int monthly_budget
     int monthly_watch_minutes
     boolean notification_enabled
+    boolean lowest_price_mode "가장 저렴한 요금제로 계산"
   }
   user_subscription {
     bigint id PK
@@ -295,7 +297,7 @@ erDiagram
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
 | users | id, email UK, name, role, oauth_provider, oauth_subject | `UNIQUE(oauth_provider, oauth_subject)`. 테이블명은 예약어(user)를 피하려고 복수형 |
-| user_setting | user_id PK·FK, monthly_budget, monthly_watch_minutes, watch_preset, notification_enabled | 1:1. 예산·시청 시간 필수(FR-10). watch_preset = LIGHT / NORMAL / HEAVY / CUSTOM. **행이 있으면 온보딩(첫 설정 저장)을 마친 사용자**이고 행은 `PUT /me/settings`가 처음 만든다(가입 때 만들지 않는다). 구독 행 수로는 온보딩 여부를 알 수 없다(모두 미구독이면 0행). 환산 입력(주 N회·회당 M시간)은 저장하지 않는다(R11-18 A안) |
+| user_setting | user_id PK·FK, monthly_budget, monthly_watch_minutes, watch_preset, notification_enabled, lowest_price_mode | 1:1. `lowest_price_mode`(V8, Task 076)는 "가장 저렴한 요금제로 계산할래요" 체크이며 기본 꺼짐이다. 예산·시청 시간 필수(FR-10). watch_preset = LIGHT / NORMAL / HEAVY / CUSTOM. **행이 있으면 온보딩(첫 설정 저장)을 마친 사용자**이고 행은 `PUT /me/settings`가 처음 만든다(가입 때 만들지 않는다). 구독 행 수로는 온보딩 여부를 알 수 없다(모두 미구독이면 0행). 환산 입력(주 N회·회당 M시간)은 저장하지 않는다(R11-18 A안) |
 | user_subscription | id, user_id FK, ott_service_id FK, status, product_id FK NULL, plan_name NULL, billing_day NULL | `UNIQUE(user_id, ott_service_id)`. status = SUBSCRIBED(구독 중) / FREE(무료 이용) / UNKNOWN(잘 모르겠음, 저장하며 계산에서는 미구독과 같이 취급). **미구독(NOT_SUBSCRIBED)은 행을 두지 않는다**(API가 행이 없는 서비스를 NOT_SUBSCRIBED로 채워 준다). plan_name(VARCHAR(30))은 표시용 요금제 이름, billing_day(1~31)는 결제일이며 둘 다 SUBSCRIBED일 때만 값이 있고 나머지 상태에서는 NULL(`CHECK`). 결제일이 비어 들어오면 서비스가 1을 채운다(DB 기본값이 아니다). MVP는 product_id를 NULL로 두고 계산 입력 단계가 서비스의 판매 중 단품을 찾는다. 번들 이용 시 구성 서비스 행들이 같은 product_id를 가리킨다(2단계) |
 | user_price_override | id, user_id FK, product_id FK, monthly_price | `UNIQUE(user_id, product_id)`. 관리자 가격을 바꾸지 않는 사용자별 덮어쓰기(FR-11) |
 | wishlist_item | id, user_id FK, watch_unit_id FK, priority, watched_at(TIMESTAMPTZ) NULL | `UNIQUE(user_id, watch_unit_id)`. 드라마 찜은 시즌별 행으로 저장. watched_at이 있으면 계산에서 제외. **사용자당 찜은 최대 20개**(`watched_at`이 없는 행만 센다, PRD 11절 36번, 2026-10-10)이며 **애플리케이션 규칙이라 DB 제약(CHECK·트리거)을 두지 않는다**(같은 사용자의 동시 요청으로 21개가 되지 않도록 사용자별 직렬화, 예: 사용자 행 잠금(`SELECT ... FOR UPDATE`) 또는 직렬화 격리 수준과 재시도(같은 트랜잭션에서 개수만 확인하는 것으로는 부족하다)으로 검사·저장하며 방식은 Task 056 구현에서 정한다). 개수는 `SELECT count(*) FROM wishlist_item WHERE user_id = ? AND watched_at IS NULL`로 센다(`UNIQUE(user_id, watch_unit_id)`의 선두가 user_id라 별도 인덱스가 없다). 검사·저장이 한 단위로 묶여야 하는 동작은 새 찜 추가와 '다 봤음' 되돌리기 둘이다. 초과하면 서비스 계층이 `WISHLIST_LIMIT_EXCEEDED`(제안)로 막는다. 같은 시리즈의 시즌 순서(PRD 11절 37번)는 `watch_unit.title_id`·`season_number`로 판단하므로 스키마 변경은 없다 |
@@ -401,7 +403,7 @@ erDiagram
 - **대리키 + 복합 유니크.** TMDB ID는 영화와 드라마가 겹칠 수 있다. 그래서 `UNIQUE(media_type, tmdb_id)`로 중복을 막고, 내부 참조는 `id` 하나로 단순하게 유지한다. 예외는 `tmdb_provider`와 `genre`다. 외부 ID가 유일하고 안정적이라 그대로 PK로 쓴다.
 - **시청 단위 통일.** 찜, 제공 상태, 플랜 배정이 모두 `watch_unit`을 참조한다. 계산 엔진은 영화와 시즌을 구분하지 않는다. 작품 단위 제공 상태는 저장하지 않고 시즌 상태에서 도출한다.
 - **서비스와 제공처 분리 (3NF).** 서비스 속성은 `ott_service`에만 있다. `tmdb_name`은 외부 원본 라벨이고, `ott_service_id`와 `tier`는 우리 판정이다.
-- **서비스 단위 집계 저장.** 원본(시청 단위 × 제공처) 대신 서비스 단위로 집계해 저장한다. 조회 성능을 위한 판단이다. 광고형 판정에 필요한 정보는 tier 플래그로 유지한다.
+- **서비스 단위 집계 저장.** 원본(시청 단위 × 제공처) 대신 서비스 단위로 집계해 저장한다. 조회 성능을 위한 판단이다. tier 플래그(`in_standard`·`in_ad_tier`)는 수집 때 기록해 두지만 시청 판정에는 쓰지 않는다(Task 076).
 - **요금제와 번들을 상품으로 통일.** 사용자 구독, 금액 수정, 플랜이 모두 `product_id` 하나만 참조한다. 단품과 번들을 구분하는 분기가 사라진다.
 - **계산 결과는 스냅샷.** 가격과 조건을 플랜에 복사해 저장하므로, 이후 가격이 바뀌어도 과거 결과는 변하지 않는다. 재계산은 새 플랜을 만들고 이전 플랜과 연결한다.
 - **CHECK 제약(Task 032 D3 확정).** 열끼리의 규칙과 enum 값 목록, 변하지 않는 하한만 DB에 둔다. 열끼리의 규칙: `tmdb_provider`(MAPPED ⇔ 서비스), `user_subscription`(구독 중 ⇔ 요금제·결제일), `plan`(DRAFT ⇔ `activated_at` NULL, `must_completed <= must_total`), `watch_unit`(SEASON ⇔ 시즌 번호), `availability`(UNKNOWN ⇔ `unknown_reason`), `plan_item`(UNSCHEDULED ⇔ `reason`), `plan_month`(`confirmed` ⇔ `month_index = 0`). 하한: `monthly_budget`·`monthly_watch_minutes`·`monthly_price`·`total_cost`·`all_subscribe_cost`·`plan_month.cost`·`applied_price` 등 금액·분 열은 `>= 0`, `plan_assignment.minutes`는 `> 0`. 입력 상·하한(120~44640분, 100만 원)은 계약 검증에 맡기고 DB에 넣지 않는다(바뀔 때 마이그레이션이 필요해서).
@@ -443,7 +445,7 @@ erDiagram
 
 | API 필드 | 출처 |
 |---|---|
-| `AdminProduct.ottServiceId` | `product_component.ott_service_id`(단품은 1행). 상품 등록은 `subscription_product` + `product_component`(STANDARD) + `product_price`(첫 요금 이력)를 한 트랜잭션으로 만든다 |
+| `AdminProduct.ottServiceIds` | `product_component.ott_service_id`(단품은 1행, 번들은 2행 이상). 상품 등록은 `subscription_product` + `product_component`(STANDARD) + `product_price`(첫 요금 이력)를 한 트랜잭션으로 만든다 |
 | `ServicePrice.adminPrice·effectiveFrom·lastVerifiedAt` | `product_price`의 기준 날짜 적용 요금 이력 |
 | `ServicePrice.userPrice` | `user_price_override.monthly_price`(없으면 null) |
 | `ServicePrice.subscriptionStatus` | `user_subscription.status`, 행이 없으면 `NOT_SUBSCRIBED` |

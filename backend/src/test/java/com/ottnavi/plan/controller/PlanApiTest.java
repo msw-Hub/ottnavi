@@ -336,7 +336,7 @@ class PlanApiTest extends IntegrationTestSupport {
 		User user = createUser();
 		saveProduct("A", services.get(0), 10_000);
 		saveProduct("B", services.get(1), 20_000);
-		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, new ArrayList<>());
+		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
 
 		WatchUnit must = saveMovie(BASE_TMDB_ID + 1, 120);
 		WatchUnit want = saveMovie(BASE_TMDB_ID + 2, 200);
@@ -352,7 +352,7 @@ class PlanApiTest extends IntegrationTestSupport {
 
 	private void saveProduct(String name, OttService service, int price) {
 		SubscriptionProduct product = subscriptionProductRepository
-				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE));
+				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE, false));
 		productComponentRepository.save(ProductComponent.create(product, service, ProviderTier.STANDARD));
 		productPriceRepository.save(ProductPrice.create(product, price, LocalDate.now(KST).minusDays(30), Instant.now()));
 	}

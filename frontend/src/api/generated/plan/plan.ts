@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -31,6 +31,7 @@ import type {
 import type {
   BadRequestResponse,
   CommonResponseCurrentPlan,
+  CommonResponsePlanChangeHistoryList,
   CommonResponsePlanDraftList,
   CommonResponseSavedPlan,
   ConflictResponse,
@@ -394,3 +395,99 @@ export const useCreatePlan = <TError = ErrorType<BadRequestResponse | Unauthoriz
       > => {
       return useMutation(getCreatePlanMutationOptions(options), queryClient);
     }
+    /**
+ * 매월 재계산으로 현재 플랜이 바뀐 기록을 최신순으로 최대 6건 돌려준다(Task 068·069). 직접 저장한 플랜은 기록하지 않는다.
+ * 기록은 두 플랜이 함께 다루는 달에서 구독 상품·요금이 달라졌거나 작품 자리가 바뀌었고, 그 이유(가격 변경·작품이 서비스에서 빠짐·작품이 서비스에 새로 들어옴·시청 체크)가 있을 때만 남는다.
+ * 기록이 없으면 404가 아니라 200이고 `items`가 빈 배열이다. 페이지 파라미터는 없다. 요약·이유 문장은 서버가 만들고, 서비스 이름은 서비스 목록 API(`listOttServices`)로 상품의 `ottServiceIds`와 작품 자리의 `ottServiceId`를 풀어 쓴다.
+ * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * @summary 플랜 변경 내역 조회
+ */
+export const listPlanChanges = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponsePlanChangeHistoryList>(
+      {url: `/me/plan-changes`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListPlanChangesQueryKey = () => {
+    return [
+    `/me/plan-changes`
+    ] as const;
+    }
+
+
+export const getListPlanChangesQueryOptions = <TData = Awaited<ReturnType<typeof listPlanChanges>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlanChangesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlanChanges>>> = ({ signal }) => listPlanChanges(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPlanChangesQueryResult = NonNullable<Awaited<ReturnType<typeof listPlanChanges>>>
+export type ListPlanChangesQueryError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+
+
+export function useListPlanChanges<TData = Awaited<ReturnType<typeof listPlanChanges>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPlanChanges>>,
+          TError,
+          Awaited<ReturnType<typeof listPlanChanges>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPlanChanges<TData = Awaited<ReturnType<typeof listPlanChanges>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPlanChanges>>,
+          TError,
+          Awaited<ReturnType<typeof listPlanChanges>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPlanChanges<TData = Awaited<ReturnType<typeof listPlanChanges>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 플랜 변경 내역 조회
+ */
+
+export function useListPlanChanges<TData = Awaited<ReturnType<typeof listPlanChanges>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPlanChanges>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPlanChangesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

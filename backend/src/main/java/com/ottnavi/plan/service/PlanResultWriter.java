@@ -1,5 +1,6 @@
 package com.ottnavi.plan.service;
 
+import com.ottnavi.catalog.service.model.WatchUnitSummary;
 import com.ottnavi.engine.model.WatchUnit;
 import com.ottnavi.plan.domain.entity.CalcRun;
 import com.ottnavi.plan.domain.entity.Plan;
@@ -112,7 +113,10 @@ public class PlanResultWriter {
 					throw new IllegalStateException("배정의 달 또는 상품을 찾지 못했다: unitId=" + input.id()
 							+ ", monthIndex=" + slot.monthIndex() + ", productId=" + slot.productId());
 				}
-				planAssignmentRepository.save(PlanAssignment.create(item, planMonth, info.ottServiceId(), slot.minutes()));
+				// 번들이면 작품이 제공되는 구성 서비스 중 ID가 가장 작은 것을 배정 서비스로 저장한다(표시용, PRD 11절 33번)
+				WatchUnitSummary summary = bundle.unitSummaries().get(input.id());
+				long assignedServiceId = PlanDraftMapper.assignedServiceId(info, PlanDraftMapper.availableServiceIds(summary));
+				planAssignmentRepository.save(PlanAssignment.create(item, planMonth, assignedServiceId, slot.minutes()));
 			}
 		}
 

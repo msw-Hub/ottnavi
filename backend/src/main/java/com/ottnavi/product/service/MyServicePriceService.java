@@ -5,10 +5,12 @@ import com.ottnavi.product.domain.entity.ProductPrice;
 import com.ottnavi.product.domain.entity.SubscriptionProduct;
 import com.ottnavi.product.domain.entity.UserPriceOverride;
 import com.ottnavi.product.domain.enums.PriceSource;
+import com.ottnavi.product.domain.enums.ProductType;
 import com.ottnavi.product.domain.repository.ProductComponentRepository;
 import com.ottnavi.product.domain.repository.ProductPriceRepository;
 import com.ottnavi.product.domain.repository.SubscriptionProductRepository;
 import com.ottnavi.product.domain.repository.UserPriceOverrideRepository;
+import com.ottnavi.product.domain.rule.CalcCandidateRules;
 import com.ottnavi.product.domain.rule.ProductPriceRules;
 import com.ottnavi.product.exception.ServicePriceNotFoundException;
 import com.ottnavi.product.service.model.MyServicePriceView;
@@ -17,10 +19,12 @@ import com.ottnavi.user.service.UserQueryService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +32,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 내 서비스별 월 요금 조회·수정·되돌리기(Task 060, FR-11). 관리자 요금표는 바꾸지 않고
+ * 내 서비스별 월 요금 조회·수정·되돌리기(Task 060, FR-11). 단품과 번들을 함께 다루며(Task 076) 각 상품이
+ * 내 모드({@link CalcCandidateRules}) 기준 계산 후보인지(isCalcCandidate)도 알려 준다. 관리자 요금표는 바꾸지 않고
  * 사용자가 고친 금액(user_price_override)만 상품 단위로 저장한다.
  * 기준일은 오늘(KST)이며 요금 이력 선택은 {@link ProductPriceRules#selectOn}을 쓴다(PRD 11절 40번).
  * 같은 사용자의 동시 수정은 사용자 행 잠금으로 한 줄로 세워, (user_id, product_id) 유니크 위반(500)을 막는다.
@@ -79,15 +84,16 @@ public class MyServicePriceService {
 		}
 
 		// 4. 바뀐 항목을 목록과 같은 방식으로 만들어 돌려준다
-		List<SubscriptionProduct> one = new ArrayList<>();
-		one.add(product);
-		List<MyServicePriceView> views = buildViews(userId, one);
-		if (views.isEmpty()) {
-			// 오늘 적용 중인 기본 요금이 없어 목록에도 나오지 않는 상품이다. 응답을 만들 수 없으므로 고칠 수 없는 상품으로 본다
-			throw new ServicePriceNotFoundException("오늘 적용 중인 요금이 없는 상품입니다: " + productId);
+		// 계산 후보 여부(isCalcCandidate)는 같은 서비스의 다른 상품과 견줘야 정해지므로 판매 중 상품 전체로 만든 뒤 이 상품만 고른다
+		List<MyServicePriceView> views = buildViews(userId, subscriptionProductRepository.findAllByActiveTrueOrderByIdAsc());
+		for (MyServicePriceView view : views) {
+			if (view.productId() == product.getId()) {
+				log.info("내 요금 수정: userId={}, productId={}, monthlyPrice={}", userId, productId, monthlyPrice);
+				return view;
+			}
 		}
-		log.info("내 요금 수정: userId={}, productId={}, monthlyPrice={}", userId, productId, monthlyPrice);
-		return views.get(0);
+		// 오늘 적용 중인 기본 요금이 없어 목록에도 나오지 않는 상품이다. 응답을 만들 수 없으므로 고칠 수 없는 상품으로 본다
+		throw new ServicePriceNotFoundException("오늘 적용 중인 요금이 없는 상품입니다: " + productId);
 	}
 
 	/**
@@ -122,7 +128,8 @@ public class MyServicePriceService {
 
 	/**
 	 * 상품들의 구성·요금 이력·내 금액·이용 상태를 한 번씩만 읽어 응답 항목을 만든다(상품마다 조회하지 않는다).
-	 * 서비스 ID 오름차순, 같은 서비스 안에서는 상품 ID 오름차순이다.
+	 * 순서는 단품(서비스 ID 오름차순, 같은 서비스 안에서는 상품 ID 오름차순) 다음 번들(상품 ID 오름차순)이다.
+	 * 계산 후보 여부(isCalcCandidate)는 넘겨받은 상품들끼리 견줘 정하므로, 정확한 값이 필요하면 판매 중 상품 전체를 넘긴다.
 	 */
 	private List<MyServicePriceView> buildViews(Long userId, List<SubscriptionProduct> products) {
 		List<MyServicePriceView> result = new ArrayList<>();
@@ -136,10 +143,19 @@ public class MyServicePriceService {
 			productIds.add(product.getId());
 		}
 
-		// 2. 상품별 서비스 ID(단품은 구성 1행)
-		Map<Long, Long> ottServiceIdByProduct = new HashMap<>();
+		// 2. 상품별 서비스 ID 목록(단품은 구성 1행, 번들은 여러 행)
+		Map<Long, List<Long>> ottServiceIdsByProduct = new HashMap<>();
 		for (ProductComponent component : productComponentRepository.findByProductIds(productIds)) {
-			ottServiceIdByProduct.put(component.getId().getProductId(), component.getId().getOttServiceId());
+			Long productId = component.getId().getProductId();
+			List<Long> serviceIds = ottServiceIdsByProduct.get(productId);
+			if (serviceIds == null) {
+				serviceIds = new ArrayList<>();
+				ottServiceIdsByProduct.put(productId, serviceIds);
+			}
+			serviceIds.add(component.getId().getOttServiceId());
+		}
+		for (List<Long> serviceIds : ottServiceIdsByProduct.values()) {
+			Collections.sort(serviceIds);
 		}
 
 		// 3. 상품별 요금 이력
@@ -154,19 +170,22 @@ public class MyServicePriceService {
 			group.add(price);
 		}
 
-		// 4. 상품별 내가 고친 금액과 서비스별 이용 상태
+		// 4. 상품별 내가 고친 금액, 서비스별 이용 상태, 내 모드
 		Map<Long, Integer> overrideByProduct = new HashMap<>();
 		for (UserPriceOverride override : userPriceOverrideRepository.findByUserIdAndProductIdIn(userId, productIds)) {
 			overrideByProduct.put(override.getProductId(), override.getMonthlyPrice());
 		}
 		Map<Long, ServiceSubscriptionStatus> statusByService = userQueryService.mapStatusByServiceId(userId);
+		boolean lowestPriceMode = userQueryService.isLowestPriceMode(userId);
 
-		// 5. 서비스 ID 순으로 모은다(TreeMap이 키 순서를 유지한다)
+		// 5. 상품마다 응답 항목을 만든다. 단품은 서비스 ID 순(TreeMap), 번들은 따로 모은다
 		LocalDate today = LocalDate.now(clock);
-		Map<Long, List<MyServicePriceView>> viewsByService = new TreeMap<>();
+		Map<Long, List<MyServicePriceView>> singlesByService = new TreeMap<>();
+		List<MyServicePriceView> bundles = new ArrayList<>();
+		List<CalcCandidateRules.Candidate> candidates = new ArrayList<>();
 		for (SubscriptionProduct product : products) {
-			Long ottServiceId = ottServiceIdByProduct.get(product.getId());
-			if (ottServiceId == null) {
+			List<Long> ottServiceIds = ottServiceIdsByProduct.get(product.getId());
+			if (ottServiceIds == null || ottServiceIds.isEmpty()) {
 				log.warn("구성 서비스가 없는 상품이라 내 요금에서 뺀다: productId={}", product.getId());
 				continue;
 			}
@@ -191,26 +210,58 @@ public class MyServicePriceService {
 				appliedPrice = userPrice;
 				priceSource = PriceSource.USER_OVERRIDE;
 			}
-			ServiceSubscriptionStatus status = statusByService.get(ottServiceId);
-			if (status == null) {
-				status = ServiceSubscriptionStatus.NOT_SUBSCRIBED; // 미구독은 행을 두지 않는다
+
+			// 8. 이용 상태: 단품은 서비스 상태를 따르고, 번들은 항상 미구독으로 본다(번들 구독 입력은 없다)
+			boolean isBundle = product.getProductType() == ProductType.BUNDLE;
+			Long ottServiceId = null;
+			ServiceSubscriptionStatus status = ServiceSubscriptionStatus.NOT_SUBSCRIBED; // 미구독은 행을 두지 않는다
+			if (!isBundle) {
+				ottServiceId = ottServiceIds.get(0);
+				ServiceSubscriptionStatus saved = statusByService.get(ottServiceId);
+				if (saved != null) {
+					status = saved;
+				}
 			}
 
-			MyServicePriceView view = new MyServicePriceView(product.getId(), product.getName(), ottServiceId,
+			// 9. 후보 선택 입력과 응답 항목을 만든다(후보 여부는 모두 모은 뒤 정하므로 일단 false)
+			candidates.add(new CalcCandidateRules.Candidate(
+					product.getId(), isBundle, product.isLowCost(), ottServiceId, appliedPrice));
+			MyServicePriceView view = new MyServicePriceView(product.getId(), product.getName(),
+					product.getProductType(), ottServiceId, ottServiceIds, product.isLowCost(), false,
 					price.getMonthlyPrice(), userPrice, appliedPrice, priceSource, status,
 					price.getEffectiveFrom(), price.getLastVerifiedAt());
-			List<MyServicePriceView> group = viewsByService.get(ottServiceId);
+			if (isBundle) {
+				bundles.add(view);
+				continue;
+			}
+			List<MyServicePriceView> group = singlesByService.get(ottServiceId);
 			if (group == null) {
 				group = new ArrayList<>();
-				viewsByService.put(ottServiceId, group);
+				singlesByService.put(ottServiceId, group);
 			}
 			group.add(view);
 		}
 
-		// 8. 서비스 순서대로 펼친다
-		for (List<MyServicePriceView> group : viewsByService.values()) {
-			result.addAll(group);
+		// 10. 내 모드에 맞는 계산 후보를 고른다(서비스마다 단품 1개 + 모드에 걸러진 번들)
+		Set<Long> candidateIds = CalcCandidateRules.select(candidates, lowestPriceMode);
+
+		// 11. 단품 다음 번들 순서로 펼치며 후보 여부를 채운다
+		for (List<MyServicePriceView> group : singlesByService.values()) {
+			for (MyServicePriceView view : group) {
+				result.add(withCandidate(view, candidateIds.contains(view.productId())));
+			}
+		}
+		for (MyServicePriceView view : bundles) {
+			result.add(withCandidate(view, candidateIds.contains(view.productId())));
 		}
 		return result;
+	}
+
+	/** 후보 여부만 바꾼 새 항목을 만든다(record라 값을 직접 바꿀 수 없다) */
+	private MyServicePriceView withCandidate(MyServicePriceView view, boolean isCalcCandidate) {
+		return new MyServicePriceView(view.productId(), view.productName(), view.productType(), view.ottServiceId(),
+				view.ottServiceIds(), view.isLowCost(), isCalcCandidate, view.adminPrice(), view.userPrice(),
+				view.appliedPrice(), view.priceSource(), view.subscriptionStatus(), view.effectiveFrom(),
+				view.lastVerifiedAt());
 	}
 }

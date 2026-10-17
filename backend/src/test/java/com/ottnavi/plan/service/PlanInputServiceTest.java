@@ -132,7 +132,7 @@ class PlanInputServiceTest extends IntegrationTestSupport {
 		List<SubscriptionState> subscriptions = new ArrayList<>();
 		subscriptions.add(new SubscriptionState(services.get(2).getId(), ServiceSubscriptionStatus.SUBSCRIBED, "스탠다드", 1));
 		subscriptions.add(new SubscriptionState(services.get(3).getId(), ServiceSubscriptionStatus.FREE, null, null));
-		userSettingService.updateSettings(user.getId(), 30_000, 600, WatchPreset.NORMAL, subscriptions);
+		userSettingService.updateSettings(user.getId(), 30_000, 600, WatchPreset.NORMAL, false, subscriptions);
 
 		// given: 영화 1편(서비스 0·4·5에서 제공), 드라마 시즌 1·2, 이미 다 본 영화 1편
 		var movie = saveUnit(MediaType.MOVIE, BASE_TMDB_ID + 1, 100);
@@ -161,10 +161,10 @@ class PlanInputServiceTest extends IntegrationTestSupport {
 
 		// then: 엔진 입력이 기대값과 같다(상품 p4·p5는 상품 목록과 시청 가능 상품 ID 모두에서 빠진다)
 		List<OttProduct> expectedProducts = new ArrayList<>();
-		expectedProducts.add(new OttProduct(p0, 10_000, OttProductCondition.NONE));
-		expectedProducts.add(new OttProduct(p1, 7_000, OttProductCondition.NONE));
-		expectedProducts.add(new OttProduct(p2, 12_000, OttProductCondition.SUBSCRIBED));
-		expectedProducts.add(new OttProduct(p3, 4_500, OttProductCondition.FREE));
+		expectedProducts.add(new OttProduct(p0, 10_000, OttProductCondition.NONE, List.of(services.get(0).getId())));
+		expectedProducts.add(new OttProduct(p1, 7_000, OttProductCondition.NONE, List.of(services.get(1).getId())));
+		expectedProducts.add(new OttProduct(p2, 12_000, OttProductCondition.SUBSCRIBED, List.of(services.get(2).getId())));
+		expectedProducts.add(new OttProduct(p3, 4_500, OttProductCondition.FREE, List.of(services.get(3).getId())));
 		List<com.ottnavi.engine.model.WatchUnit> expectedUnits = new ArrayList<>();
 		expectedUnits.add(new com.ottnavi.engine.model.WatchUnit(movie.getId(), Priority.MUST, 100, Set.of(p0), false));
 		expectedUnits.add(new com.ottnavi.engine.model.WatchUnit(season1.getId(), Priority.WANT, 600, Set.of(p1, p2, p3),
@@ -217,7 +217,7 @@ class PlanInputServiceTest extends IntegrationTestSupport {
 		assertThatThrownBy(() -> planInputService.assemble(user.getId())).isInstanceOf(FieldValidationException.class);
 
 		// given: 설정은 있고 찜이 없다
-		userSettingService.updateSettings(user.getId(), 30_000, 600, WatchPreset.NORMAL, new ArrayList<>());
+		userSettingService.updateSettings(user.getId(), 30_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
 
 		// when
 		// then: 찜 없음
@@ -234,7 +234,7 @@ class PlanInputServiceTest extends IntegrationTestSupport {
 	/** 단품 상품과 구성, 요금 이력 하나를 저장하고 상품 ID를 돌려준다 */
 	private long saveProduct(String name, OttService service, int price, LocalDate effectiveFrom) {
 		SubscriptionProduct product = subscriptionProductRepository
-				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE));
+				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE, false));
 		productComponentRepository.save(ProductComponent.create(product, service, ProviderTier.STANDARD));
 		productPriceRepository.save(ProductPrice.create(product, price, effectiveFrom, Instant.now()));
 		return product.getId();

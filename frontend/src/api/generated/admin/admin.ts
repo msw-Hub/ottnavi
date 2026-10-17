@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 33개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -40,6 +40,7 @@ import type {
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecutionPage,
   CommonResponsePlanBenchmark,
+  CommonResponsePlanRecalcExecutionAccepted,
   ConflictResponse,
   CreateAdminProductRequest,
   CreateCollectExecutionRequest,
@@ -172,9 +173,10 @@ export function useListAdminProducts<TData = Awaited<ReturnType<typeof listAdmin
 
 
 /**
- * OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 요금 이력의 마지막 확인일은 오늘이다.
- * 첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.
- * 오류: `VALIDATION_FAILED`(400, 이름 비어 있음·SINGLE 아님·없는 서비스·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
+ * OTT 구독상품을 첫 월 구독요금과 함께 등록한다. 단품(`SINGLE`)은 서비스 1개, 번들(`BUNDLE`)은 서로 다른 서비스 2개 이상이다.
+ * 번들 구성은 등록할 때만 정하며 편집 API는 없다(판매를 끝내고 새로 등록한다). 판매 중 번들은 최대 13개다.
+ * 첫 요금 이력의 마지막 확인일은 오늘이고, 적용 시작일은 오늘 이하여야 한다.
+ * 오류: `VALIDATION_FAILED`(400, 이름 비어 있음·서비스 개수가 종류와 안 맞음·서비스 중복·없는 서비스·판매 중 번들 13개 초과·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
  * @summary OTT 구독상품 등록
  */
 export const createAdminProduct = (
@@ -243,7 +245,8 @@ export const useCreateAdminProduct = <TError = ErrorType<BadRequestResponse | Un
     }
     /**
  * 보낸 필드만 바꾼다(하나 이상 필요). `isActive: false`는 판매 종료, `true`는 판매 재개다. 상품은 삭제하지 않는다(ERD).
- * 오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
+ * `isLowCost`로 저가형 분류를 바꾼다. 번들 구성은 바꿀 수 없다. 판매 중 번들이 13개일 때 번들의 판매 재개는 거절한다.
+ * 오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음·판매 중 번들 13개 초과), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
  * @summary OTT 구독상품 이름·판매 여부 수정
  */
 export const updateAdminProduct = (
@@ -854,10 +857,10 @@ export function useListCollectExecutions<TData = Awaited<ReturnType<typeof listC
 /**
  * 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
  * MVP는 `tier: ALL`만 받는다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 설정 키 `app.collect.allow-target-date-override`가 true인 환경(로컬)에서만 허용하고(오늘 이하), 운영에서는 오늘(KST)만 받으며 다른 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
- * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도 `BATCH_ALREADY_RUNNING`(409)이다. 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
+ * 수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도, 매월 재계산이 실행 중일 때도 `BATCH_ALREADY_RUNNING`(409)이다(재계산이 끝난 뒤 다시 요청). 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
  * 선택 값 `scope`(`AVAILABILITY_TV`)를 주면 후보·상세 Step을 건너뛰고 드라마 시즌 제공 상태 판정 Step만 실행한다(이미 모은 데이터에 새 판정 규칙을 다시 적용할 때). `targetDate`처럼 로컬에서만 받고 운영에서는 400(`fieldErrors.scope`)이다. 중복·재시작 판정은 날짜·범위·scope가 같은 실행끼리만 한다(같은 날짜에 전체 수집이 완료돼도 scope 실행은 새로 시작된다).
  * 같은 날짜·범위의 마지막 실행이 실패(`FAILED`)면 새 실행으로 다시 시작해 202다(Spring Batch는 같은 식별 파라미터로 시작하면 실패한 인스턴스를 재시작한다, TECH 3절 "실패한 실행은 같은 파라미터로 restart").
- * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 `tier`·`scope` 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`, 운영에서 `scope`를 지정하면 `fieldErrors.scope`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
+ * 오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 `tier`·`scope` 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. `ALL`이 아닌 범위(`DAILY`·`WEEKLY`)는 `fieldErrors.tier`, 운영에서 `scope`를 지정하면 `fieldErrors.scope`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중이거나 매월 재계산이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
  * @summary 수집 실행 요청
  */
 export const createCollectExecution = (
@@ -1099,7 +1102,7 @@ export const useRecoverCollectExecution = <TError = ErrorType<BadRequestResponse
  * `FAILED` 실행을 같은 대상 날짜·범위로 다시 실행한다. 요청 본문은 없다. 새 실행으로 접수해 202와 새 `executionId`를 돌려주고, 실패 기록은 이력에 남는다.
  * 실패가 아닌 실행은 그 날짜·범위의 현재 상태에 맞는 코드로 거절한다: 실행 중이면 `BATCH_ALREADY_RUNNING`, 완료면 `BATCH_ALREADY_COMPLETED`, 중단됨이면 `BATCH_RECOVERY_REQUIRED`(먼저 복구). 그래서 "실패한 실행이 아님" 전용 코드는 두지 않는다. 같은 날짜·범위에 더 나중 실행이 있으면 그 실행의 상태로 판단한다.
  * 운영 환경에서는 그 실행의 대상 날짜가 오늘(KST)이 아니면 거절한다. 다른 날짜·범위의 수집이 실행 중이어도 시작할 수 없다(전체 동시 실행 금지).
- * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·운영에서 대상 날짜가 오늘이 아님), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409), `INTERNAL_ERROR`(500).
+ * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·운영에서 대상 날짜가 오늘이 아님), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중이거나 매월 재계산이 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409), `INTERNAL_ERROR`(500).
  * @summary 실패한 실행을 새 실행으로 재시작
  */
 export const restartCollectExecution = (
@@ -1163,6 +1166,74 @@ export const useRestartCollectExecution = <TError = ErrorType<BadRequestResponse
         TContext
       > => {
       return useMutation(getRestartCollectExecutionMutationOptions(options), queryClient);
+    }
+    /**
+ * 매월 재계산 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 재계산은 수집이 끝나면 자동으로 이어 돌고, 이 API는 자동 실행이 실패했을 때 관리자가 다시 돌리는 복구용이다. 요청 본문은 없다.
+ * 재계산이나 수집이 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+ * @summary 매월 재계산 수동 실행 요청
+ */
+export const createPlanRecalcExecution = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponsePlanRecalcExecutionAccepted>(
+      {url: `/admin/plans/monthly/executions`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreatePlanRecalcExecutionMutationKey = () => ['createPlanRecalcExecution'] as const;
+
+export const getCreatePlanRecalcExecutionMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlanRecalcExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPlanRecalcExecution>>, TError,void, TContext> => {
+
+const mutationKey = getCreatePlanRecalcExecutionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPlanRecalcExecution>>, void> = () => {
+
+
+          return  createPlanRecalcExecution(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePlanRecalcExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof createPlanRecalcExecution>>>
+
+    export type CreatePlanRecalcExecutionMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
+
+
+    /**
+ * @summary 매월 재계산 수동 실행 요청
+ */
+export const useCreatePlanRecalcExecution = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPlanRecalcExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createPlanRecalcExecution>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreatePlanRecalcExecutionMutationOptions(options), queryClient);
     }
     /**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.

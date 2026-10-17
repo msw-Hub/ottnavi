@@ -186,7 +186,7 @@ class PlanActivateApiTest extends IntegrationTestSupport {
 		String ownerBearer = bearerOf(owner);
 		List<Long> ownerIds = calculate(ownerBearer);
 		User other = createUser();
-		userSettingService.updateSettings(other.getId(), 20_000, 600, WatchPreset.NORMAL, new ArrayList<>());
+		userSettingService.updateSettings(other.getId(), 20_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
 		String otherBearer = bearerOf(other);
 
 		// when, then: B가 A의 초안을 저장하려 하면 404이고 A의 초안은 그대로다
@@ -371,7 +371,7 @@ class PlanActivateApiTest extends IntegrationTestSupport {
 		User user = createUser();
 		saveProduct("A", services.get(0), 10_000);
 		saveProduct("B", services.get(1), 20_000);
-		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, new ArrayList<>());
+		userSettingService.updateSettings(user.getId(), 20_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
 
 		WatchUnit must = saveMovie(BASE_TMDB_ID + 1, 120);
 		WatchUnit want = saveMovie(BASE_TMDB_ID + 2, 200);
@@ -387,7 +387,7 @@ class PlanActivateApiTest extends IntegrationTestSupport {
 
 	private void saveProduct(String name, OttService service, int price) {
 		SubscriptionProduct product = subscriptionProductRepository
-				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE));
+				.save(SubscriptionProduct.create(NAME_PREFIX + name, ProductType.SINGLE, false));
 		productComponentRepository.save(ProductComponent.create(product, service, ProviderTier.STANDARD));
 		productPriceRepository.save(ProductPrice.create(product, price, LocalDate.now(KST).minusDays(30), Instant.now()));
 	}

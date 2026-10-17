@@ -50,7 +50,7 @@ public class UserSettingService {
 		// 1. 설정 행이 없으면 온보딩 전 상태로 응답
 		Optional<UserSetting> found = userSettingRepository.findById(userId);
 		if (found.isEmpty()) {
-			return new UserSettingsState(false, new ArrayList<>(), null, null, null);
+			return new UserSettingsState(false, new ArrayList<>(), null, null, null, false);
 		}
 		UserSetting setting = found.get();
 
@@ -64,7 +64,8 @@ public class UserSettingService {
 
 		// 3. 서비스 전부를 채워 응답
 		return new UserSettingsState(true, fillAllServices(loadServicesById(), saved),
-				setting.getMonthlyBudget(), setting.getMonthlyWatchMinutes(), setting.getWatchPreset());
+				setting.getMonthlyBudget(), setting.getMonthlyWatchMinutes(), setting.getWatchPreset(),
+				setting.isLowestPriceMode());
 	}
 
 	/**
@@ -73,7 +74,7 @@ public class UserSettingService {
 	 */
 	@Transactional
 	public UserSettingsState updateSettings(Long userId, int monthlyBudget, int monthlyWatchMinutes,
-			WatchPreset watchPreset, List<SubscriptionState> requested) {
+			WatchPreset watchPreset, boolean lowestPriceMode, List<SubscriptionState> requested) {
 		// 1. 서비스 7개를 읽고 요청 항목을 검증·정규화한다(잠금 전에 끝내 잠금 시간을 줄인다)
 		Map<Long, OttService> servicesById = loadServicesById();
 		Map<Long, SubscriptionState> normalized = validateAndNormalize(requested, servicesById);
@@ -91,9 +92,10 @@ public class UserSettingService {
 		// 4. 설정 행을 만들거나 바꾼다(바꿀 때는 더티 체킹으로 저장된다)
 		Optional<UserSetting> existing = userSettingRepository.findById(userId);
 		if (existing.isPresent()) {
-			existing.get().updateCondition(monthlyBudget, monthlyWatchMinutes, watchPreset);
+			existing.get().updateCondition(monthlyBudget, monthlyWatchMinutes, watchPreset, lowestPriceMode);
 		} else {
-			userSettingRepository.save(UserSetting.create(userId, monthlyBudget, monthlyWatchMinutes, watchPreset));
+			userSettingRepository.save(
+					UserSetting.create(userId, monthlyBudget, monthlyWatchMinutes, watchPreset, lowestPriceMode));
 		}
 
 		// 5. 미구독이 아닌 서비스만 행으로 넣는다(미구독은 행을 두지 않는다)
@@ -109,7 +111,7 @@ public class UserSettingService {
 
 		// 6. 저장된 모습 그대로 서비스 전부를 채워 응답
 		return new UserSettingsState(true, fillAllServices(servicesById, normalized),
-				monthlyBudget, monthlyWatchMinutes, watchPreset);
+				monthlyBudget, monthlyWatchMinutes, watchPreset, lowestPriceMode);
 	}
 
 	/**

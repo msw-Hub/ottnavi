@@ -559,9 +559,10 @@ paths:
         - bearerAuth: []
       summary: OTT 구독상품 등록
       description: |
-        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. MVP는 단품(`SINGLE`)만 받는다. 첫 요금 이력의 마지막 확인일은 오늘이다.
-        첫 요금 이력의 적용 시작일은 오늘 이하여야 한다.
-        오류: `VALIDATION_FAILED`(400, 이름 비어 있음·SINGLE 아님·없는 서비스·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
+        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. 단품(`SINGLE`)은 서비스 1개, 번들(`BUNDLE`)은 서로 다른 서비스 2개 이상이다.
+        번들 구성은 등록할 때만 정하며 편집 API는 없다(판매를 끝내고 새로 등록한다). 판매 중 번들은 최대 13개다.
+        첫 요금 이력의 마지막 확인일은 오늘이고, 적용 시작일은 오늘 이하여야 한다.
+        오류: `VALIDATION_FAILED`(400, 이름 비어 있음·서비스 개수가 종류와 안 맞음·서비스 중복·없는 서비스·판매 중 번들 13개 초과·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
       requestBody:
         required: true
         content:
@@ -595,7 +596,8 @@ paths:
       summary: OTT 구독상품 이름·판매 여부 수정
       description: |
         보낸 필드만 바꾼다(하나 이상 필요). `isActive: false`는 판매 종료, `true`는 판매 재개다. 상품은 삭제하지 않는다(ERD).
-        오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
+        `isLowCost`로 저가형 분류를 바꾼다. 번들 구성은 바꿀 수 없다. 판매 중 번들이 13개일 때 번들의 판매 재개는 거절한다.
+        오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음·판매 중 번들 13개 초과), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
       parameters:
         - $ref: '#/components/parameters/ProductIdPath'
       requestBody:
@@ -1547,9 +1549,10 @@ components:
         - NO_PROVIDER
     ProductType:
       type: string
-      description: OTT 구독상품 종류. MVP는 단품(SINGLE)만 다룬다(번들은 2단계)
+      description: OTT 구독상품 종류. SINGLE 단품(서비스 1개) / BUNDLE 번들(서비스 2개 이상)
       enum:
         - SINGLE
+        - BUNDLE
     ProviderTier:
       type: string
       description: 제공처 요금제 등급. STANDARD 일반 / AD 광고형 (ERD tmdb_provider.tier)
@@ -2172,13 +2175,14 @@ components:
         billingDay: 15
     UserSettings:
       type: object
-      description: 내 설정. 온보딩 전이면 subscriptions는 빈 배열, 나머지 값은 null
+      description: 내 설정. 온보딩 전이면 subscriptions는 빈 배열, isLowestPriceMode는 false, 나머지 값은 null
       required:
         - isOnboardingDone
         - subscriptions
         - monthlyBudget
         - monthlyWatchMinutes
         - watchPreset
+        - isLowestPriceMode
       properties:
         isOnboardingDone:
           type: boolean
@@ -2203,6 +2207,9 @@ components:
             - $ref: '#/components/schemas/WatchPreset'
           nullable: true
           description: 시청 시간을 고른 방식. 입력 전이면 null
+        isLowestPriceMode:
+          type: boolean
+          description: '"가장 저렴한 요금제로 계산할래요" 체크. 끄면 서비스마다 표준 요금제로, 켜면 가장 싼 요금제로 계산한다. 입력 전이면 false'
     CommonResponseUserSettings:
       type: object
       required:
@@ -2228,6 +2235,7 @@ components:
           monthlyBudget: 20000
           monthlyWatchMinutes: 900
           watchPreset: NORMAL
+          isLowestPriceMode: false
     UpdateMySettingsRequest:
       type: object
       description: 내 설정 저장 요청(전체 교체). 환산 입력값("주 N회 × 회당 M시간")은 받지 않는다(R11-18 A안)
@@ -2236,6 +2244,7 @@ components:
         - monthlyBudget
         - monthlyWatchMinutes
         - watchPreset
+        - isLowestPriceMode
       properties:
         subscriptions:
           type: array
@@ -2257,6 +2266,9 @@ components:
           description: 월 시청 시간(분). 120분 이상(PRD FR-10), 최대 31일 × 24시간
         watchPreset:
           $ref: '#/components/schemas/WatchPreset'
+        isLowestPriceMode:
+          type: boolean
+          description: '"가장 저렴한 요금제로 계산할래요" 체크. 끄면 서비스마다 표준 요금제로, 켜면 가장 싼 요금제로 계산한다. 이미 저장된 플랜은 바뀌지 않고 다음 계산부터 반영된다'
       example:
         subscriptions:
           - { ottServiceId: 1, status: SUBSCRIBED, planName: 스탠다드, billingDay: 15 }
@@ -2269,15 +2281,20 @@ components:
         monthlyBudget: 20000
         monthlyWatchMinutes: 900
         watchPreset: NORMAL
+        isLowestPriceMode: false
 
     # ----- product (내 요금) -----
     ServicePrice:
       type: object
-      description: 서비스 하나의 월 요금 이력(SCR-09)
+      description: 상품 하나의 월 요금(SCR-09). 단품과 번들이 함께 오며, 단품(서비스 ID 순) 다음에 번들 순서다. `subscriptionStatus`는 단품이 속한 서비스의 이용 상태이고 번들은 구독 입력이 없어 항상 NOT_SUBSCRIBED다
       required:
         - ottServiceId
         - productId
         - productName
+        - productType
+        - ottServiceIds
+        - isLowCost
+        - isCalcCandidate
         - adminPrice
         - userPrice
         - appliedPrice
@@ -2289,7 +2306,8 @@ components:
         ottServiceId:
           type: integer
           format: int64
-          description: 서비스 내부 ID. 서비스 이름을 찾는 데 쓴다
+          nullable: true
+          description: 단품이 속한 서비스 내부 ID. 서비스 이름을 찾는 데 쓴다. 번들이면 null(`ottServiceIds`를 쓴다)
         productId:
           type: integer
           format: int64
@@ -2297,6 +2315,20 @@ components:
         productName:
           type: string
           description: 상품(요금제) 이름. 예 "넷플릭스 스탠다드"
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        ottServiceIds:
+          type: array
+          description: 상품이 포함하는 서비스 ID 목록(오름차순). 단품은 1개, 번들은 2개 이상
+          items:
+            type: integer
+            format: int64
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준. 가격 선택에만 쓰고 볼 수 있는 작품 범위와는 무관하다
+        isCalcCandidate:
+          type: boolean
+          description: 내 설정의 모드(`isLowestPriceMode`) 기준으로 이 상품이 플랜 계산 후보인지. 서비스마다 단품은 1개만 후보이고 번들은 모드에 따라 걸러진다
         adminPrice:
           type: integer
           format: int32
@@ -2326,7 +2358,7 @@ components:
           description: adminPrice 요금 이력을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
     ServicePriceList:
       type: object
-      description: 판매 중인 상품의 요금(서비스 ID 순, 같은 서비스는 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
+      description: 판매 중인 상품의 요금(단품은 서비스 ID 순, 같은 서비스는 상품 ID 순이고 그다음에 번들이 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
       required:
         - services
       properties:
@@ -2351,6 +2383,10 @@ components:
             - ottServiceId: 1
               productId: 101
               productName: 넷플릭스 스탠다드
+              productType: SINGLE
+              ottServiceIds: [1]
+              isLowCost: false
+              isCalcCandidate: true
               adminPrice: 13500
               userPrice: null
               appliedPrice: 13500
@@ -2361,6 +2397,10 @@ components:
             - ottServiceId: 3
               productId: 103
               productName: 애플 TV+
+              productType: SINGLE
+              ottServiceIds: [3]
+              isLowCost: false
+              isCalcCandidate: true
               adminPrice: 6500
               userPrice: null
               appliedPrice: 6500
@@ -2371,6 +2411,10 @@ components:
             - ottServiceId: 5
               productId: 105
               productName: 웨이브 스탠다드
+              productType: SINGLE
+              ottServiceIds: [5]
+              isLowCost: false
+              isCalcCandidate: true
               adminPrice: 10900
               userPrice: 9900
               appliedPrice: 9900
@@ -2408,6 +2452,10 @@ components:
           ottServiceId: 5
           productId: 105
           productName: 웨이브 스탠다드
+          productType: SINGLE
+          ottServiceIds: [5]
+          isLowCost: false
+          isCalcCandidate: true
           adminPrice: 10900
           userPrice: 9900
           appliedPrice: 9900
@@ -3178,12 +3226,13 @@ components:
           description: 마지막 확인 일시. [요금 확인함]과 요금 이력 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
     AdminProduct:
       type: object
-      description: OTT 구독상품(단품) 하나와 월 구독요금 이력
+      description: OTT 구독상품(단품 또는 번들) 하나와 월 구독요금 이력
       required:
         - productId
         - name
         - productType
-        - ottServiceId
+        - ottServiceIds
+        - isLowCost
         - isActive
         - prices
       properties:
@@ -3197,10 +3246,15 @@ components:
           description: 이름. 예 "넷플릭스 스탠다드"
         productType:
           $ref: '#/components/schemas/ProductType'
-        ottServiceId:
-          type: integer
-          format: int64
-          description: 이 상품이 속한 서비스 ID
+        ottServiceIds:
+          type: array
+          description: 이 상품이 포함하는 서비스 ID 목록(오름차순). 단품은 1개, 번들은 2개 이상
+          items:
+            type: integer
+            format: int64
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
         isActive:
           type: boolean
           description: false면 판매 종료(삭제하지 않고 남긴다)
@@ -3235,7 +3289,8 @@ components:
             - productId: 101
               name: 넷플릭스 스탠다드
               productType: SINGLE
-              ottServiceId: 1
+              ottServiceIds: [1]
+              isLowCost: false
               isActive: true
               prices:
                 - { priceId: 1011, monthlyPrice: 12000, effectiveFrom: '2025-09-07', lastVerifiedAt: '2026-03-26T09:00:00+09:00' }
@@ -3244,7 +3299,8 @@ components:
             - productId: 106
               name: 왓챠 베이직
               productType: SINGLE
-              ottServiceId: 6
+              ottServiceIds: [6]
+              isLowCost: false
               isActive: false
               prices:
                 - { priceId: 1061, monthlyPrice: 7900, effectiveFrom: '2026-04-15', lastVerifiedAt: '2026-10-05T09:00:00+09:00' }
@@ -3264,7 +3320,8 @@ components:
           productId: 103
           name: 애플 TV+
           productType: SINGLE
-          ottServiceId: 3
+          ottServiceIds: [3]
+          isLowCost: false
           isActive: true
           prices:
             - { priceId: 1031, monthlyPrice: 6500, effectiveFrom: '2025-12-16', lastVerifiedAt: '2026-10-12T09:00:00+09:00' }
@@ -3407,7 +3464,8 @@ components:
       required:
         - name
         - productType
-        - ottServiceId
+        - ottServiceIds
+        - isLowCost
         - monthlyPrice
         - effectiveFrom
       properties:
@@ -3418,11 +3476,18 @@ components:
           description: 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
         productType:
           $ref: '#/components/schemas/ProductType'
-        ottServiceId:
-          type: integer
-          format: int64
-          minimum: 1
-          description: 속할 서비스 ID
+        ottServiceIds:
+          type: array
+          minItems: 1
+          maxItems: 7
+          description: 속할 서비스 ID 목록. 단품은 정확히 1개, 번들은 서로 다른 2개 이상. 번들 구성은 등록할 때만 정한다
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
         monthlyPrice:
           type: integer
           format: int32
@@ -3436,7 +3501,8 @@ components:
       example:
         name: 디즈니+ 프리미엄
         productType: SINGLE
-        ottServiceId: 2
+        ottServiceIds: [2]
+        isLowCost: false
         monthlyPrice: 13900
         effectiveFrom: '2026-10-01'
     UpdateAdminProductRequest:
@@ -3451,7 +3517,10 @@ components:
           description: 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
         isActive:
           type: boolean
-          description: false 판매 종료 / true 판매 재개
+          description: false 판매 종료 / true 판매 재개. 판매 중 번들이 13개이면 번들의 판매 재개는 거절한다
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
       example:
         isActive: false
     AdminProductPriceRequest:

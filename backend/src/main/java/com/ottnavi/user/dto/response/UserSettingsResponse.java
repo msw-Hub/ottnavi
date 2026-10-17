@@ -15,13 +15,15 @@ import java.util.List;
  * @param monthlyBudget       월 예산(원). 입력 전이면 null
  * @param monthlyWatchMinutes 월 시청 시간(분). 입력 전이면 null
  * @param watchPreset         시청 시간을 고른 방식. 입력 전이면 null
+ * @param isLowestPriceMode   "가장 저렴한 요금제로 계산할래요" 체크 여부. 입력 전이면 false
  */
 public record UserSettingsResponse(
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "true") boolean isOnboardingDone,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<UserSubscriptionResponse> subscriptions,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "20000") Integer monthlyBudget,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "900") Integer monthlyWatchMinutes,
-		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "NORMAL") WatchPreset watchPreset) {
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "NORMAL") WatchPreset watchPreset,
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "false") boolean isLowestPriceMode) {
 
 	/** 서비스 계층 값을 응답으로 바꾼다 */
 	public static UserSettingsResponse from(UserSettingsState state) {
@@ -30,6 +32,6 @@ public record UserSettingsResponse(
 			subscriptions.add(UserSubscriptionResponse.from(subscription));
 		}
 		return new UserSettingsResponse(state.isOnboardingDone(), subscriptions,
-				state.monthlyBudget(), state.monthlyWatchMinutes(), state.watchPreset());
+				state.monthlyBudget(), state.monthlyWatchMinutes(), state.watchPreset(), state.isLowestPriceMode());
 	}
 }

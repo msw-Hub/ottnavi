@@ -33,6 +33,7 @@ import {
 import { buildPlanDrafts, type PlanPriceInfo, type PlanScenario } from '@/mocks/fixtures/plan'
 import {
   findMockProduct,
+  MOCK_EXTRA_PRODUCTS,
   MOCK_PRICE_EFFECTIVE_FROM,
   MOCK_PRICE_VERIFIED_AT,
   MOCK_PRODUCTS,
@@ -98,7 +99,9 @@ const PRICE_OVERRIDES_STORAGE_KEY = 'ottnavi:mock-price-overrides-by-product'
 function readStoredSettings(): UserSettings | null {
   const stored = readMockJson(SETTINGS_STORAGE_KEY)
   if (typeof stored === 'object' && stored !== null && 'subscriptions' in stored) {
-    return stored as UserSettings
+    // Task 076 전에 저장한 값에는 isLowestPriceMode가 없다. 계약 기본값(끔)으로 채운다
+    const settings = stored as UserSettings
+    return { ...settings, isLowestPriceMode: settings.isLowestPriceMode ?? false }
   }
   return null
 }
@@ -217,24 +220,115 @@ function getPriceInfo(ottServiceId: number): PlanPriceInfo {
   }
 }
 
-// 요금 화면의 한 줄(계약 ServicePrice)을 만든다
-function toServicePrice(ottServiceId: number, settings: UserSettings | null): ServicePrice {
-  const info = getPriceInfo(ottServiceId)
+// 요금 화면에 나오는 상품 하나(표준 단품 7개와 저가형 단품·번들을 같은 모양으로 모은 것, Task 076)
+interface PricingProduct {
+  productId: number
+  productName: string
+  ottServiceIds: number[] // 단품 1개, 번들 2개 이상(오름차순)
+  isLowCost: boolean // 저가형인지
+  adminPrice: number // 관리자 기본 월 요금(원)
+}
+
+// 판매 중인 요금 화면 상품 전부. 플랜 계산 목업(getPriceInfo)은 여전히 표준 단품 7개만 쓴다
+function getPricingProducts(): PricingProduct[] {
+  const singles = MOCK_PRODUCTS.map((product) => ({
+    productId: product.productId,
+    productName: product.productName,
+    ottServiceIds: [product.ottServiceId],
+    isLowCost: false,
+    adminPrice: product.adminPrice,
+  }))
+  return [...singles, ...MOCK_EXTRA_PRODUCTS].filter((product) =>
+    isProductOnSale(product.productId),
+  )
+}
+
+// 적용 금액(사용자가 고친 금액이 있으면 그 값)
+function appliedPriceOf(product: PricingProduct): number {
+  return priceOverrides.get(product.productId) ?? product.adminPrice
+}
+
+/**
+ * 계산 후보 상품 ID를 고른다(목업 판정, docs/guides/BUNDLE_PRICE_MODE_FLOW.md의 규칙을 흉내 낸다).
+ * 서버의 실제 판정(가격 상한 제외 등)과 세부가 다를 수 있다. 화면 확인용이다.
+ */
+function selectCalcCandidateIds(
+  products: PricingProduct[],
+  isLowestPriceMode: boolean,
+): Set<number> {
+  const ids = new Set<number>()
+  // 1. 단품을 서비스별로 모은다
+  const singlesByService = new Map<number, PricingProduct[]>()
+  for (const product of products) {
+    if (product.ottServiceIds.length !== 1) continue
+    const serviceId = product.ottServiceIds[0]
+    singlesByService.set(serviceId, [...(singlesByService.get(serviceId) ?? []), product])
+  }
+  // 2. 서비스마다 1개: 켬이면 모든 단품 중, 끔이면 표준 단품 중(없으면 저가형 중) 적용 금액이 가장 싼 것. 같으면 상품 ID가 작은 것
+  for (const singles of singlesByService.values()) {
+    const standards = singles.filter((product) => !product.isLowCost)
+    const pool = isLowestPriceMode || standards.length === 0 ? singles : standards
+    const cheapest = [...pool].sort(
+      (a, b) => appliedPriceOf(a) - appliedPriceOf(b) || a.productId - b.productId,
+    )[0]
+    if (cheapest) ids.add(cheapest.productId)
+  }
+  // 3. 번들: 켬이면 모두, 끔이면 표준 번들만
+  for (const product of products) {
+    if (product.ottServiceIds.length > 1 && (isLowestPriceMode || !product.isLowCost)) {
+      ids.add(product.productId)
+    }
+  }
+  return ids
+}
+
+// 요금 화면의 한 줄(계약 ServicePrice)을 만든다. 번들은 서비스 하나에 속하지 않아 ottServiceId가 null이고 구독 상태는 항상 미구독이다
+function toServicePrice(
+  product: PricingProduct,
+  settings: UserSettings | null,
+  candidateIds: Set<number>,
+): ServicePrice {
+  const override = priceOverrides.get(product.productId)
+  const isBundle = product.ottServiceIds.length > 1
+  const ottServiceId = isBundle ? null : product.ottServiceIds[0]
   return {
     ottServiceId,
-    productId: info.productId,
-    productName: info.productName,
-    adminPrice: info.adminPrice,
-    userPrice: info.source === 'USER_OVERRIDE' ? info.price : null,
-    appliedPrice: info.price,
-    priceSource: info.source,
+    productId: product.productId,
+    productName: product.productName,
+    productType: isBundle ? 'BUNDLE' : 'SINGLE',
+    ottServiceIds: product.ottServiceIds,
+    isLowCost: product.isLowCost,
+    isCalcCandidate: candidateIds.has(product.productId),
+    adminPrice: product.adminPrice,
+    userPrice: override ?? null,
+    appliedPrice: override ?? product.adminPrice,
+    priceSource: override === undefined ? 'ADMIN' : 'USER_OVERRIDE',
     subscriptionStatus:
-      settings?.subscriptions.find((s) => s.ottServiceId === ottServiceId)?.status ??
+      (ottServiceId !== null &&
+        settings?.subscriptions.find((s) => s.ottServiceId === ottServiceId)?.status) ||
       'NOT_SUBSCRIBED',
     effectiveFrom: MOCK_PRICE_EFFECTIVE_FROM,
     lastVerifiedAt: MOCK_PRICE_VERIFIED_AT,
   }
 }
+
+// 요금 목록 전체를 만든다. 순서는 단품(서비스 ID 순, 같은 서비스 안은 등록 순) 다음 번들이다(계약)
+function buildServicePriceList(settings: UserSettings | null): ServicePrice[] {
+  const products = getPricingProducts()
+  const candidateIds = selectCalcCandidateIds(products, settings?.isLowestPriceMode ?? false)
+  const singles = products
+    .filter((product) => product.ottServiceIds.length === 1)
+    .sort((a, b) => a.ottServiceIds[0] - b.ottServiceIds[0])
+  const bundles = products.filter((product) => product.ottServiceIds.length > 1)
+  return [...singles, ...bundles].map((product) => toServicePrice(product, settings, candidateIds))
+}
+
+/* 이전(Task 076 전): 서비스마다 상품 하나라 서비스 ID로 한 줄을 만들었다
+function toServicePrice(ottServiceId: number, settings: UserSettings | null): ServicePrice {
+  const info = getPriceInfo(ottServiceId)
+  return { ottServiceId, productId: info.productId, ..., subscriptionStatus: 설정의 상태 ?? 'NOT_SUBSCRIBED', ... }
+}
+*/
 
 // 요청의 시나리오 파라미터에서 플랜 응답 모양을 고른다
 function getPlanScenario(request: Request): PlanScenario {
@@ -464,6 +558,7 @@ export const memberHandlers: RequestHandler[] = [
       monthlyBudget: requestBody.monthlyBudget,
       monthlyWatchMinutes: requestBody.monthlyWatchMinutes,
       watchPreset: requestBody.watchPreset,
+      isLowestPriceMode: requestBody.isLowestPriceMode ?? false, // 예전 요청 모양(필드 없음)도 끔으로 받는다
     }
     writeMockJson(SETTINGS_STORAGE_KEY, savedSettings)
     // 로그인 콜백이 "온보딩 미완료면 SCR-07, 아니면 원래 화면"을 고를 때 본다(mockSession)
@@ -520,10 +615,8 @@ export const memberHandlers: RequestHandler[] = [
     const body: CommonResponseServicePriceList = {
       success: true,
       data: {
-        // 판매 종료 상품은 목록에서 뺀다(계약: 판매 중인 상품만 준다)
-        services: MOCK_PRODUCTS.filter((product) => isProductOnSale(product.productId)).map(
-          (product) => toServicePrice(product.ottServiceId, settings),
-        ),
+        // 판매 종료 상품은 목록에서 뺀다(계약: 판매 중인 상품만 준다). 단품 다음 번들 순서다
+        services: buildServicePriceList(settings),
       },
     }
     return HttpResponse.json(body)
@@ -545,15 +638,22 @@ export const memberHandlers: RequestHandler[] = [
     const validPrice = monthlyPrice as number
 
     // 2. 상품 확인: 없거나 판매 종료면 404 SERVICE_PRICE_NOT_FOUND
-    const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
-    if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
+    // 이전: MOCK_PRODUCTS(표준 단품 7개)에서만 찾았다. 저가형 단품·번들(Task 076)도 금액을 고칠 수 있다
+    const product = getPricingProducts().find((p) => p.productId === Number(params.productId))
+    if (!product) return servicePriceNotFound(request) // getPricingProducts는 판매 중인 상품만 준다
 
     priceOverrides.set(product.productId, validPrice)
     persistPriceOverrides()
 
+    // 금액이 바뀌면 같은 서비스의 계산 후보가 바뀔 수 있어 후보를 다시 고른다
+    const settings = getEffectiveSettings()
+    const candidateIds = selectCalcCandidateIds(
+      getPricingProducts(),
+      settings?.isLowestPriceMode ?? false,
+    )
     const body: CommonResponseServicePrice = {
       success: true,
-      data: toServicePrice(product.ottServiceId, getEffectiveSettings()),
+      data: toServicePrice(product, settings, candidateIds),
     }
     return HttpResponse.json(body)
   }),
@@ -566,8 +666,8 @@ export const memberHandlers: RequestHandler[] = [
 
     const idError = positiveProductIdError(params.productId)
     if (idError) return validationError(request, '요청 값이 올바르지 않습니다.', [idError])
-    const product = MOCK_PRODUCTS.find((p) => p.productId === Number(params.productId))
-    if (!product || !isProductOnSale(product.productId)) return servicePriceNotFound(request)
+    const product = getPricingProducts().find((p) => p.productId === Number(params.productId))
+    if (!product) return servicePriceNotFound(request)
 
     priceOverrides.delete(product.productId)
     persistPriceOverrides()

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { LoaderCircleIcon } from 'lucide-react'
+import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -32,6 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
   monthlyBudget: '월 예산',
   monthlyWatchMinutes: '한 달 시청 시간',
   subscriptions: '이용 중인 서비스',
+  isLowestPriceMode: '계산할 요금제',
 }
 
 // 이름표 표에서 찾는다. hasOwn으로 확인하는 이유: 서버가 "constructor" 같은 이름을 보내도 객체 기본 속성이 딸려 나오지 않게 하기 위함이다
@@ -79,7 +80,7 @@ interface SettingsFormProps {
 }
 
 /**
- * 온보딩·내 설정 폼(SCR-07). 서비스 이용 상태 → 월 시청 시간 → 월 예산 → 저장 순서의 구역 카드로 이루어진다.
+ * 온보딩·내 설정 폼(SCR-07). 서비스 이용 상태 → 월 시청 시간 → 월 예산 → 계산할 요금제(Task 076) → 저장 순서의 구역 카드로 이루어진다.
  *
  * 폼 상태는 React Hook Form, 검증은 Zod 스키마(onboarding/schema.ts)가 맡는다. 이 컴포넌트는 입력 칸을 배치하고
  * 저장 성공 뒤 원래 보던 화면(location.state.from)으로 돌려보내는 일만 한다.
@@ -153,6 +154,11 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
               <strong>잘 모르겠음</strong>: 이용 여부가 확실하지 않을 때 골라요. 시청 가능한
               서비스로 세지 않아요.
             </li>
+            {/* 번들 안내(Task 076). 번들은 구독 상태를 따로 받지 않아, 이미 쓰는 번들은 포함 서비스별 "구독 중"으로 받아야 계산이 맞다 */}
+            <li>
+              <strong>번들 이용 중</strong>: 여러 서비스를 한 번에 결제하는 번들을 쓰고 있다면,
+              포함된 서비스를 각각 &quot;구독 중&quot;으로 입력해 주세요.
+            </li>
           </ul>
         }
       >
@@ -214,6 +220,45 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
               {errors.monthlyBudget.message}
             </p>
           )}
+        </div>
+      </SectionCard>
+
+      {/* 계산할 요금제(Task 076). 기본은 끔(표준 요금제로 계산).
+          체크박스는 브라우저 기본 <input type="checkbox">를 쓴다(shadcn checkbox가 설치돼 있지 않다. 관리자 번들 구성 칸과 같은 방식).
+          줄 전체를 <label>로 감싸 글자를 눌러도 켜지고, 높이 44px(min-h-11)로 손가락 터치 크기를 맞췄다 */}
+      <SectionCard
+        stepNumber={4}
+        title="계산할 요금제"
+        description="한 서비스에 요금제가 여럿이면 어떤 요금제로 계산할지 정해요."
+      >
+        <div className="grid gap-2 py-1">
+          <label
+            htmlFor="isLowestPriceMode"
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border px-3 py-2.5 has-[:checked]:border-primary has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50"
+          >
+            <input
+              id="isLowestPriceMode"
+              type="checkbox"
+              aria-describedby="isLowestPriceMode-help"
+              className="mt-0.5 size-4.5 shrink-0 accent-primary focus-visible:outline-none"
+              {...register('isLowestPriceMode')}
+            />
+            <span className="grid gap-1">
+              <span className="text-base font-semibold">가장 저렴한 요금제로 계산할래요</span>
+              <span
+                id="isLowestPriceMode-help"
+                className="text-sm break-keep text-muted-foreground"
+              >
+                켜면 광고형·베이직 같은 저가형까지 포함해 서비스마다 가장 싼 요금제로 계산하고,
+                번들도 모두 비교해요. 끄면 표준 요금제로 계산해요.
+              </span>
+            </span>
+          </label>
+          {/* 모드를 바꿔도 이미 저장한 플랜은 바뀌지 않는다(계약 UpdateMySettingsRequest.isLowestPriceMode). 아이콘 + 글자로 알린다 */}
+          <p className="flex items-start gap-1.5 text-sm break-keep text-muted-foreground">
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            바꿔도 이미 저장한 플랜은 그대로예요. 다음 계산과 매월 다시 계산할 때부터 반영돼요.
+          </p>
         </div>
       </SectionCard>
 

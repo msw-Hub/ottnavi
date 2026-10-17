@@ -174,6 +174,9 @@ export const onboardingFormSchema = z.object({
     .number({ error: '월 예산을 입력해 주세요.' })
     .int('월 예산은 원 단위 정수로 입력해 주세요.')
     .min(0, '월 예산은 0원 이상이어야 합니다.'),
+  // "가장 저렴한 요금제로 계산할래요" 체크(Task 076). 끄면 서비스마다 표준 요금제, 켜면 가장 싼 요금제로 계산한다
+  // 선택으로 둔 이유: 폼은 항상 처음 값(buildDefaultValues)으로 채우지만, 값이 빠져도 계약 기본값(끔)으로 보내면 되므로 막을 이유가 없다
+  isLowestPriceMode: z.boolean().optional(),
 })
 
 // 폼 값 타입(스키마에서 나온다)
@@ -210,5 +213,6 @@ export function toSaveSettingsRequest(values: OnboardingFormValues): UpdateMySet
     monthlyBudget: values.monthlyBudget,
     monthlyWatchMinutes,
     watchPreset,
+    isLowestPriceMode: values.isLowestPriceMode ?? false,
   }
 }

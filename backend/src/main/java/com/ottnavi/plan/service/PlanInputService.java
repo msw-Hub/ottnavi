@@ -15,6 +15,8 @@ import com.ottnavi.global.error.FieldValidationException;
 import com.ottnavi.plan.service.model.PlanInputBundle;
 import com.ottnavi.plan.service.model.ProductPriceInfo;
 import com.ottnavi.product.domain.enums.PriceSource;
+import com.ottnavi.product.domain.enums.ProductType;
+import com.ottnavi.product.domain.rule.CalcCandidateRules;
 import com.ottnavi.product.service.MyServicePriceService;
 import com.ottnavi.product.service.model.MyServicePriceView;
 import com.ottnavi.user.domain.enums.ServiceSubscriptionStatus;
@@ -75,11 +77,11 @@ public class PlanInputService {
 			throw new FieldValidationException("wishlist", "다 보지 않은 찜이 1개 이상 있어야 계산할 수 있습니다.");
 		}
 
-		// 3. 판매 중이고 오늘 적용 중인 요금이 있는 상품을 후보로 만든다(가격 상한 초과는 제외)
+		// 3. 판매 중이고 오늘 적용 중인 요금이 있는 상품 중 모드에 맞는 후보를 만든다(가격 상한 초과는 먼저 제외)
 		Map<Long, ProductPriceInfo> productPrices = new LinkedHashMap<>();
 		Set<Long> excludedProductIds = new HashSet<>();
 		Map<Long, List<Long>> productIdsByService = new HashMap<>();
-		List<OttProduct> products = buildProducts(userId, productPrices, excludedProductIds, productIdsByService);
+		List<OttProduct> products = buildProducts(userId, settings.isLowestPriceMode(), productPrices, excludedProductIds, productIdsByService);
 
 		// 4. 찜한 시청 단위의 제공 상태를 한 번에 읽어 엔진 시청 단위로 바꾼다
 		List<Long> unitIds = new ArrayList<>();
@@ -116,23 +118,41 @@ public class PlanInputService {
 	}
 
 	/**
-	 * 후보 상품을 만든다. 오늘 적용 중인 요금이 없는 상품은 내 서비스 요금 목록에서 이미 빠져 있다.
-	 * 가격이 월 상한(100만 원)을 넘는 상품은 경고만 남기고 제외한다(엔진이 예외로 막는 값을 500으로 만들지 않는다).
+	 * 후보 상품을 만든다(Task 076). 오늘 적용 중인 요금이 없는 상품은 내 서비스 요금 목록에서 이미 빠져 있다.
+	 * 서비스마다 단품은 정확히 1개, 번들은 모드에 따라 걸러진 전부가 후보다({@link CalcCandidateRules}, 사용자 모드 반영).
+	 * 가격이 월 상한(100만 원)을 넘는 상품은 후보를 고르기 전에 경고만 남기고 제외한다(엔진이 예외로 막는 값을 500으로 만들지 않는다).
+	 * 상한 제외가 먼저라서 표준 단품이 상한을 넘으면 다음으로 싼 단품이 그 서비스의 후보가 된다.
 	 * 가격 출처: 무료 이용 → FREE, 구독 중 → ALREADY_PAID, 그 외 → 사용자 수정 금액이 있으면 USER_OVERRIDE, 없으면 ADMIN.
 	 * 어느 출처든 appliedPrice는 원래 월 요금이다. 비용 제외는 엔진의 구독 상태(FREE·SUBSCRIBED)가 처리한다.
+	 * 구독 상태는 단품에만 붙는다(번들은 항상 NONE). productIdsByService에는 번들을 구성 서비스마다 넣어, 그 서비스가 AVAILABLE이면 번들도 시청 가능 상품이 된다.
 	 */
-	private List<OttProduct> buildProducts(Long userId, Map<Long, ProductPriceInfo> productPrices,
+	private List<OttProduct> buildProducts(Long userId, boolean lowestPriceMode, Map<Long, ProductPriceInfo> productPrices,
 			Set<Long> excludedProductIds, Map<Long, List<Long>> productIdsByService) {
-		List<OttProduct> products = new ArrayList<>();
+		// 1. 가격 상한을 넘는 상품을 후보 선택 전에 뺀다(상한 제외가 선택보다 먼저여야 다음으로 싼 단품이 후보가 된다)
+		List<MyServicePriceView> underCap = new ArrayList<>();
+		List<CalcCandidateRules.Candidate> candidates = new ArrayList<>();
 		for (MyServicePriceView view : myServicePriceService.list(userId)) {
-			// 1. 가격 상한을 넘으면 후보에서 뺀다
 			if (view.appliedPrice() > OttProduct.MAX_MONTHLY_PRICE) {
 				log.warn("월 가격이 상한을 넘어 후보 상품에서 제외한다: productId={}, appliedPrice={}", view.productId(), view.appliedPrice());
 				excludedProductIds.add(view.productId());
 				continue;
 			}
+			underCap.add(view);
+			candidates.add(new CalcCandidateRules.Candidate(view.productId(), view.productType() == ProductType.BUNDLE,
+					view.isLowCost(), view.ottServiceId(), view.appliedPrice()));
+		}
 
-			// 2. 구독 상태와 가격 출처를 정한다
+		// 2. 서비스마다 단품 1개 + 모드에 걸러진 번들을 고른다
+		Set<Long> selectedIds = CalcCandidateRules.select(candidates, lowestPriceMode);
+
+		// 3. 고른 상품마다 구독 상태와 가격 출처를 정해 엔진 상품·가격 정보로 만든다
+		List<OttProduct> products = new ArrayList<>();
+		for (MyServicePriceView view : underCap) {
+			if (!selectedIds.contains(view.productId())) {
+				continue;
+			}
+
+			// 4. 구독 상태와 가격 출처를 정한다(번들은 구독 상태가 항상 미구독이라 NONE이다)
 			OttProductCondition condition = OttProductCondition.NONE;
 			PriceSource basePriceSource = PriceSource.ADMIN; // 구독 상태와 무관한 기본 출처
 			if (view.userPrice() != null) {
@@ -147,17 +167,19 @@ public class PlanInputService {
 				priceSource = PriceSource.ALREADY_PAID;
 			}
 
-			// 3. 상품·가격 정보·서비스별 상품 목록에 담는다
-			products.add(new OttProduct(view.productId(), view.appliedPrice(), condition));
+			// 5. 상품·가격 정보·서비스별 상품 목록에 담는다(번들은 구성 서비스마다)
+			products.add(new OttProduct(view.productId(), view.appliedPrice(), condition, view.ottServiceIds()));
 			productPrices.put(view.productId(),
-					new ProductPriceInfo(view.productId(), view.productName(), view.ottServiceId(), view.appliedPrice(),
+					new ProductPriceInfo(view.productId(), view.productName(), view.ottServiceIds(), view.appliedPrice(),
 							priceSource, basePriceSource));
-			List<Long> sameService = productIdsByService.get(view.ottServiceId());
-			if (sameService == null) {
-				sameService = new ArrayList<>();
-				productIdsByService.put(view.ottServiceId(), sameService);
+			for (Long ottServiceId : view.ottServiceIds()) {
+				List<Long> sameService = productIdsByService.get(ottServiceId);
+				if (sameService == null) {
+					sameService = new ArrayList<>();
+					productIdsByService.put(ottServiceId, sameService);
+				}
+				sameService.add(view.productId());
 			}
-			sameService.add(view.productId());
 		}
 		return products;
 	}

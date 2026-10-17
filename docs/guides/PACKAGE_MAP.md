@@ -61,7 +61,7 @@ com.ottnavi
 │   │   └── response/        AdminProductResponse, AdminProductPriceResponse, AdminProductListResponse, ServicePriceResponse, ServicePriceListResponse
 │   ├── service/           AdminProductService(관리자 상품·요금 관리), ProductPriceQueryService(기준일 유효 요금 조회, 계산·내 요금이 재사용), MyServicePriceService(내 요금 조회·수정·되돌리기, 사용자 행 잠금 직렬화), ProductSummaryQueryService(상품 이름·포함 서비스 일괄 조회, 판매 종료 상품 포함, 저장된 플랜 조회가 사용) + model/ (AdminProductView, ProductPriceView, MyServicePriceView, ProductSummary)
 │   ├── exception/         ProductPriceConflictException (PRICE_* 409 6종을 코드로 구분), ServicePriceNotFoundException(404)
-│   └── domain/            entity(…, UserPriceOverride: 사용자·상품은 ID만 보관) · enums(ProductType, PriceSource) · repository(…, UserPriceOverrideRepository) · rule(ProductPriceRules: 요금 이력 추가·수정·삭제 허용 판정과 기준일 선택)
+│   └── domain/            entity(…, UserPriceOverride: 사용자·상품은 ID만 보관) · enums(ProductType, PriceSource) · repository(…, UserPriceOverrideRepository) · rule(ProductPriceRules: 요금 이력 추가·수정·삭제 허용 판정과 기준일 선택 · CalcCandidateRules: 서비스당 단품 1개와 번들을 모드에 따라 고르는 계산 후보 규칙)
 ├── plan/                3개월 플랜 저장·계산 (Task 062 엔티티·리포지토리, Task 063 계산 입력 조립, Task 064 계산 API·DRAFT 저장, Task 065 비교 측정 API, Task 066 초안 저장·조회, Task 069 변경 판정 기반)
 │   ├── controller/        PlanController (POST /api/me/plan-drafts 플랜 계산, POST /api/me/plans 초안 저장, GET /api/me/plan-drafts 초안 조회, GET /api/me/plans/current 현재 플랜 조회, GET /api/me/plan-changes 변경 내역 조회), AdminPlanBenchmarkController (POST /api/admin/plan-benchmarks, ADMIN 전용 완전탐색·그리디 비교 측정), AdminPlanRecalcController (POST /api/admin/plans/monthly/executions, 재계산 수동 실행 202·409, ADMIN JWT 또는 배치 토큰)
 │   ├── dto/

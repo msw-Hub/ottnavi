@@ -45,9 +45,9 @@
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 1/3 | 🔄 진행 중 (106 화면 1차안은 PR #75로 병합, 107·108 대기) |
-| 4 | 추가 기능 개발 | 1/24 | 🔄 진행 중 (068 변경 내역 화면 1차안은 PR #76으로 병합) |
+| 4 | 추가 기능 개발 | 3/24 | 🔄 진행 중 (068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78 병합. 076 번들·저가형 요금제는 구현 완료·병합 전) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 68/108 | |
+| 합계 | | 70/108 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -179,6 +179,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 **Flyway 버전 번호 규칙(충돌 방지).**
 - MVP 마이그레이션은 Task에 번호를 미리 배정한다: V1 `ott_service`(019), V2 작품 영역 A(033), V3 상품 영역 B(033), V4 `BATCH_*`(033), V5 사용자 영역 C(034), V6 플랜 영역 D(034), V7 알림 E·`shedlock`(034).
+- 이후 배정: V8 `low_cost`·`lowest_price_mode`(076), V9 홈·탐색 스냅샷(107, 제안). **107을 076보다 먼저 병합하면 안 된다**(076의 `V8__…` 파일 이름이 이미 정해져 있어, 107이 먼저 병합돼 V9가 `develop`에 있으면 Flyway가 순서를 어긴 마이그레이션으로 판단한다). 병합 순서는 076 → 107이다.
 - 그 뒤 Task는 `develop` 병합 직전에 "현재 최대 번호 + 1"로 정한다. 두 브랜치가 같은 번호를 쓰면 나중에 병합하는 쪽이 번호를 올린다.
 - `develop`에 병합된 마이그레이션 파일은 고치지 않고 새 버전을 추가한다.
 
@@ -1323,7 +1324,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 8. Phase 4 — 추가 기능 개발 · 1/24
+## 8. Phase 4 — 추가 기능 개발 · 3/24
 
 **목표.**
 - PRD 2단계(O1~O4)와 3단계 일부(Q3 LLM, Q4 정확도 안내·반응형·접근성)를 4.4 순서(목업 → 계약·백엔드 → 교체)로 구현한다.
@@ -1342,22 +1343,22 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 승인과 추가 결정(2026-10-17 사용자): 계약 변경안을 위 내용으로 승인. 새 달에 구독이 없어도 그 달을 기록에 넣는다("구독 안 함"으로 표시). 새 달만 생기고 다른 변화가 없는 재계산은 기록하지 않는다(매월 셋째 달은 항상 새로 생기므로 이것만으로 기록하면 "변경 없는 달은 기록하지 않는다"가 의미를 잃는다). 새 달 표시는 다른 변경이 있는 기록 안에서만 보인다. 화면: 최신 1건 펼침, 새로 생긴 달은 "새로 생긴 달" 칩과 이전 쪽 "해당 없음", 비용은 비교하지 않음, 절감액 삭제. 주소 규칙 확인: kebab-case 복수형 명사, 주소에 동사 없음(operationId의 동사는 프론트 훅 이름용). 남은 것: frontend-dev의 저장된 플랜 시나리오 링크 확인(Task 070). CodeRabbit 지적 1건(운영에서 샘플이 보이는 문제)은 운영에서 준비 중 화면으로 분기해 반영했다(`PlanHistoryPage`, 링크는 목업 모드에서만 표시, Task 070에서 분기 제거).
   - 넘길 내용: Task 069(**opus 설계 먼저**): 변경 요약·이유를 어떻게 계산해 어디에 저장할지(`plan.change_summary` 컬럼의 내부 형식, 이유 판정 규칙), 재계산이 지난 달 배정을 자동으로 시청 완료 처리하는지(PRD에 없음, 체크하지 않은 작품은 다음 재계산에 다시 들어간다), ARCHIVED 보관 개수 N. 확인하지 못한 것: "변경 내역 보기" 링크의 실제 모습(목업에 저장된 플랜이 없어 브라우저로 못 봄, 저장된 플랜 시나리오에서 확인 필요), 라우터 `plan/history` 주석의 "(2단계, 준비 중)" 문구 정리(frontend-dev).
 
-#### Task 069: 매월 재계산·변경 요약과 변경 내역 API 구현으로 플랜 자동 갱신 🔄 `[v0.1.0 포함]`
+#### Task 069: 매월 재계산·변경 요약과 변경 내역 API 구현으로 플랜 자동 갱신 ✅ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O1, FR-14, FR-18 · 선행: 068, 066, 045 · 브랜치: `feature/o1-monthly-recalc`
 - 068에서 넘어온 서버 규칙(2026-10-17 승인): 변경 내역은 매월 재계산에서 **다른 변화가 있을 때만** 기록한다(새 달만 생긴 재계산은 기록하지 않음). 새 달은 구독이 없어도 "구독 안 함"으로 기록 안에 포함한다. 이유 종류는 가격 변경·작품이 서비스에서 빠짐·작품이 새로 들어옴·시청 체크 4종이며 이유 문장은 서버가 만든다. 최근 6건만 내려준다(ARCHIVED 보관 개수 N은 이 Task 설계에서 확정). 확인 필요: 재계산이 지난 달 배정을 자동으로 시청 완료 처리하는지(PRD에 없음, 체크하지 않은 작품은 다음 재계산에 다시 들어간다), `plan.change_summary`의 내부 형식. 계약: `GET /api/me/plan-changes`(`listPlanChanges`), 068 기록 참조.
 - 구현 사항
-  - [ ] **위험 Task: opus 설계(코드 없이 계획)를 먼저 받은 뒤 구현한다**(2026-10-17). 알림(072·073)이 공개 뒤로 이월돼 "재계산 뒤 월초 알림 생성" 연결(R-21)은 이 Task에 넣지 않고 Task 073에서 붙인다
-  - [ ] 계약 추가(Task 068 변경안) + 재계산 Job
-  - [ ] 연결(R-21 확정): 수집 Job의 `JobExecutionListener.afterJob`이 상태가 COMPLETED일 때만 재계산 Job을 비동기로 시작한다. 수집이 실패하면 재계산하지 않는다. GitHub Actions(`collect.yml`)는 수정하지 않는다(수집 시작만 호출)
-  - [ ] 실패 복구용 관리자 수동 재실행 API(제안: `POST /api/admin/plans/monthly/run`, 202·중복 409). 배치 토큰 허용 여부는 TECH 4절 갱신을 따른다
-  - [ ] `previous_plan_id`는 같은 `user_id`의 이전 플랜만 가리킨다(DB가 검사하지 않는다, Task 034 결정). 통합 테스트로 확인한다
-  - [ ] ACTIVE만 대상. 이전 ACTIVE → ARCHIVED(명시 flush) → 새 ACTIVE 생성 → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
-  - [ ] 영향 플랜 선정(제안, R-19): 이번 수집 실행의 `availability_change`(`job_execution_id`)에 걸린 `watch_unit`을 `plan_item`으로 가진 ACTIVE 플랜. 월초(제안: 그 달 첫 COMPLETED 수집)에는 전체 ACTIVE
-  - [ ] 재계산 대상 플랜 수를 실행 기록으로 남기고(제안: 재계산 Job의 실행 컨텍스트 또는 읽기 건수) Task 045 수집 이력 응답에 필드로 추가한다(계약 변경, SCR-16 연결은 Task 070)
+  - [x] **위험 Task: opus 설계(코드 없이 계획)를 먼저 받은 뒤 구현한다**(2026-10-17). 알림(072·073)이 공개 뒤로 이월돼 "재계산 뒤 월초 알림 생성" 연결(R-21)은 이 Task에 넣지 않고 Task 073에서 붙인다
+  - [x] 계약 추가(Task 068 변경안) + 재계산 Job
+  - [x] 연결(R-21 확정): 수집 Job의 `JobExecutionListener.afterJob`이 상태가 COMPLETED일 때만 재계산 Job을 비동기로 시작한다. 수집이 실패하면 재계산하지 않는다. GitHub Actions(`collect.yml`)는 수정하지 않는다(수집 시작만 호출)
+  - [x] 실패 복구용 관리자 수동 재실행 API(제안: `POST /api/admin/plans/monthly/run`, 202·중복 409). 배치 토큰 허용 여부는 TECH 4절 갱신을 따른다
+  - [x] `previous_plan_id`는 같은 `user_id`의 이전 플랜만 가리킨다(DB가 검사하지 않는다, Task 034 결정). 통합 테스트로 확인한다
+  - [x] ACTIVE만 대상. 이전 ACTIVE → ARCHIVED(명시 flush) → 새 ACTIVE 생성 → `previous_plan_id` → `change_summary`를 한 트랜잭션에서
+  - [x] 영향 플랜 선정(제안, R-19): 이번 수집 실행의 `availability_change`(`job_execution_id`)에 걸린 `watch_unit`을 `plan_item`으로 가진 ACTIVE 플랜. 월초(제안: 그 달 첫 COMPLETED 수집)에는 전체 ACTIVE
+  - [x] 재계산 대상 플랜 수를 실행 기록으로 남기고(제안: 재계산 Job의 실행 컨텍스트 또는 읽기 건수) Task 045 수집 이력 응답에 필드로 추가한다(계약 변경, SCR-16 연결은 Task 070)
 - 완료 기준
   - V-B: ACTIVE 1개, `previous_plan_id`, DRAFT 미접촉, `change_summary`, 영향 플랜만 선정, 수집 COMPLETED 시에만 재계산 시작 테스트.
   - V-API: local에서 `targetDate`를 지정한 수집 실행(Task 045) → 재계산이 자동으로 이어지고 수집 이력에 재계산 대상 플랜 수가 나온다. 실제 cron 경로 확인은 Task 102.
-- 기록(2026-10-17, 구현·테스트 완료, PR 전): 브랜치 `feature/o1-monthly-recalc`. 결정 9건(사용자 승인): 1) 지난 달 배정을 자동으로 시청 완료 처리하지 않는다. 2) ARCHIVED는 변경 기록 있는 최근 6개(ACTIVE 포함)와 바로 이전 1개만 남긴다. 3) `change_summary`는 기존 TEXT 안 JSON(v:1), 마이그레이션 없음. 4) 이유 4종이 하나도 없으면 플랜은 갱신하되 요약은 기록하지 않는다. 5) 영향 플랜 = ACTIVE이면서 (`start_month` < 이번 달 KST 1일) 또는 (`plan_item` 시청 단위의 `availability_change.changed_at` > `plan.data_as_of`)(R-19 해소). 6) 월 중간 재계산도 엔진을 바꾸지 않는다. 7) 수동 재실행은 `POST /api/admin/plans/monthly/executions`(`createPlanRecalcExecution`). 8) 이유 항목 필드는 `reasonType`·`description`. 9) 찜을 모두 체크한 플랜은 건너뛴다.
+- 기록(2026-10-17, 구현·테스트 완료, PR #79로 병합 `e62e6c0`): 브랜치 `feature/o1-monthly-recalc`. 결정 9건(사용자 승인): 1) 지난 달 배정을 자동으로 시청 완료 처리하지 않는다. 2) ARCHIVED는 변경 기록 있는 최근 6개(ACTIVE 포함)와 바로 이전 1개만 남긴다. 3) `change_summary`는 기존 TEXT 안 JSON(v:1), 마이그레이션 없음. 4) 이유 4종이 하나도 없으면 플랜은 갱신하되 요약은 기록하지 않는다. 5) 영향 플랜 = ACTIVE이면서 (`start_month` < 이번 달 KST 1일) 또는 (`plan_item` 시청 단위의 `availability_change.changed_at` > `plan.data_as_of`)(R-19 해소). 6) 월 중간 재계산도 엔진을 바꾸지 않는다. 7) 수동 재실행은 `POST /api/admin/plans/monthly/executions`(`createPlanRecalcExecution`). 8) 이유 항목 필드는 `reasonType`·`description`. 9) 찜을 모두 체크한 플랜은 건너뛴다.
   - 구현: 1단계 도메인(`PlanChangeDetector`·`PlanChangeMessages` 순수 규칙, `PlanChangeSummaryCodec`, `Plan.createRecalculated`·`recordChangeSummary`, `PlanResultWriter` 분리), 2단계 `collect`(`CollectCompletedEvent`·`CollectCompletionListener`), `plan/batch`(재계산 Job·Tasklet·Launcher·Trigger), `plan/service`(대상 선정·재계산·쓰기·스냅샷·근거·변경 내역), API 2개, `CollectExecution.recalcTargetCount`. 계약: `listPlanChanges`, `createPlanRecalcExecution`, `recalcTargetCount`.
   - 계약 변경(사용자 승인, 068 승인 계약을 바꿈): `PlanChangeProduct.ottServiceId`를 `ottServiceIds`(배열, 필수, minItems 1)로 바꿨다(번들은 076에서 생기며 069에서는 항상 길이 1). 프론트 `features/plan/mockTypes.ts`는 Task 070에서 생성 타입으로 교체할 때 맞춘다.
   - 실측: afterJob 안에서 이벤트로 시작한 비동기 재계산이 실행 기록을 정상으로 남긴다(실제 수집 Job, `PlanRecalcAfterCollectTest`). Tasklet(Resourceless) 안에서 부른 쓰기 트랜잭션이 정상 커밋된다(`PlanRecalcIntegrationTest`). 수집의 afterJob 시점에는 그 수집이 DB에 COMPLETED로 저장되기 전이라 Tasklet이 저장을 최대 60초 기다린다.
@@ -1407,29 +1408,33 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-FS: 알림 끄기·켜기와 발송 이력이 API 값대로 보이고, 관리자 화면 알림 상태가 표시된다.
 
-#### Task 075: 번들 관리·독점 목록 화면 목업 구현으로 데이터 확장 표현 확정 🔄 `[v0.1.0 포함]`
+#### Task 075: 번들 관리·독점 목록 화면 목업 구현으로 데이터 확장 표현 확정 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, FR-04, FR-19, SCR-03, SCR-14(번들) · 선행: 037 · 브랜치: `feature/o3-bundle-exclusive-mock`
 - 구현 사항
-  - [ ] 독점 목록: 서비스 탭 7개, "확인된 범위"·산정 기준, 구조적 공백 제외 명시, 쿠팡플레이 데이터 부족 안내, 출처·기준일
-  - [ ] 상품 화면 번들 등록 시 구성·tier 선택(등록 뒤 구성 편집은 없음, 2026-10-17 사용자 확정), 요금 확인 화면 번들 표시. 계약 변경안 기록·승인
+  - [x] 독점 목록: 서비스 탭 7개, "확인된 범위"·산정 기준, 구조적 공백 제외 명시, 쿠팡플레이 데이터 부족 안내, 출처·기준일
+  - [x] 상품 화면 번들 등록 시 구성 서비스 선택(등록 뒤 구성 편집은 없음, 2026-10-17 사용자 확정. 등급 선택은 Task 076 최종안에서 저가형 분류 체크로 바뀜), 요금 확인 화면 번들 표시. 계약 변경안 기록·승인
 - 완료 기준
   - V-F: 탭 전환과 번들 등록 목업 흐름 재현, 콘솔 에러 0건.
-- 기록: 2026-10-17 1차안 구현(브랜치 `feature/o3-bundle-exclusive-mock`, PR 전). 독점 목록 `/exclusives`(서비스 탭 7개, 작품 카드, 쿠팡플레이 데이터 부족 안내, 출처·기준일), 관리자 상품 화면의 번들·광고형 표시와 번들 등록 대화상자(유형·구성 서비스·등급 선택, 2곳 미만 오류), 요금 확인 화면의 번들 표시를 만들었다.
+- 기록: 2026-10-17 1차안 구현(브랜치 `feature/o3-bundle-exclusive-mock`, PR #78로 병합 `828b9be`). 독점 목록 `/exclusives`(서비스 탭 7개, 작품 카드, 쿠팡플레이 데이터 부족 안내, 출처·기준일), 관리자 상품 화면의 번들·광고형 표시와 번들 등록 대화상자(유형·구성 서비스·등급 선택, 2곳 미만 오류), 요금 확인 화면의 번들 표시를 만들었다.
   - 사용자 확정(2026-10-17, 1차안 화면 확인 뒤 "문제없다, 이대로 진행"): 1) 독점 목록은 작품 단위 카드에 독점 시즌을 적는다. 2) 카드의 "다른 N곳: 없음 · 모름" 표시를 유지한다. 3) **번들 구성은 등록할 때만 정하고 등록 뒤 구성 편집은 없다.** 바꾸려면 새 상품을 등록하고 기존 상품은 판매 종료한다(가격 이력과 같은 원칙). 그래서 1차안의 [구성 편집] 버튼과 구성 편집 대화상자를 제거했다. 4) 요금 확인 화면은 번들을 아래쪽 "번들 상품" 묶음으로 분리한다. 5) 머리글 메뉴는 늘리지 않고, 서비스 탭 공통 폴더 통합은 하지 않는다(홈과 독점 화면의 탭은 각자 기능 폴더에 둔다).
   - 1차안 구성: 상태 확인용 주소 파라미터 `?exclusivesPreview=empty|loading|error`(독점 목록), `?productsPreview=bundle`(관리자 상품), `?pricingPreview=bundle`(요금 확인)은 목업 모드에서만 읽는다. 계약에 없는 값은 `features/admin/mockTypes.ts`, `features/pricing/mockTypes.ts`, `features/exclusives/mockTypes.ts` 3개의 임시 타입과 샘플 데이터 파일(`bundleSampleData.ts` 2개, `exclusives/sampleData.ts`)로 둔다. 모두 Task 076·078·079에서 지운다. 375px에서 `?service=WATCHA`처럼 주소로 바로 열면 고른 탭이 탭 줄 밖에 있어 보이지 않던 문제는 독점 화면 탭만 고른 탭을 보이는 위치로 스크롤하게 보완했다(홈 탭은 그대로).
-  - 계약 변경안(2026-10-17 사용자 승인. `docs/api/openapi.yaml`에는 Task 076·078 구현 PR에서 기록한다): 1) 독점 목록 `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`). 응답은 페이지 형식 5개 필드에 `ottServiceId`, `isJudged`(데이터 부족 서비스는 `false`와 빈 목록이고 404가 아니다), `dataAsOf`를 더한다. 항목 `ExclusiveTitle`: `mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`(영화는 null), `comparedServiceCount`, `unknownElsewhereCount`. 정렬은 TMDB 인기도순. 오류는 `VALIDATION_FAILED` 400, 없는 서비스 404(`/api/public/**`은 도메인 코드가 원칙이고 `error-codes.md`에 서비스용 코드가 아직 없어 새 코드 `OTT_SERVICE_NOT_FOUND`(가칭)가 필요하다. 이름·문구는 Task 078에서 정하고 프론트 `errorMessages`에도 같이 넣는다), `RATE_LIMIT_EXCEEDED` 429. 2) `ProductType`에 `BUNDLE`을 추가한다. 3) 새 스키마 `ProductComponent{ottServiceId, tier: ProviderTier(STANDARD/AD)}`. 4) `AdminProduct`·`CreateAdminProductRequest`에 `components`를 필수로 추가하고 `ottServiceId`를 대체한다(단품은 1개, 번들은 서로 다른 서비스 2개 이상). 프론트도 같은 PR에서 바뀌는 깨지는 변경이다. 5) **구성 편집 API(`PUT .../components`)는 두지 않는다**(사용자 확정 3번). 6) `ServicePrice`에 `productType`·`components`를 추가하고 `ottServiceId`는 번들이면 null(nullable)로 한다. 목록 순서는 단품(서비스 ID 순) 다음 번들이다.
+  - 계약 변경안(2026-10-17 사용자 승인. `docs/api/openapi.yaml`에는 Task 076·078 구현 PR에서 기록한다. 1)은 Task 078용이고, 2)~6)은 아래 Task 076 최종안으로 교체됐다): 1) 독점 목록 `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`). 응답은 페이지 형식 5개 필드에 `ottServiceId`, `isJudged`(데이터 부족 서비스는 `false`와 빈 목록이고 404가 아니다), `dataAsOf`를 더한다. 항목 `ExclusiveTitle`: `mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`(영화는 null), `comparedServiceCount`, `unknownElsewhereCount`. 정렬은 TMDB 인기도순. 오류는 `VALIDATION_FAILED` 400, 없는 서비스 404(`/api/public/**`은 도메인 코드가 원칙이고 `error-codes.md`에 서비스용 코드가 아직 없어 새 코드 `OTT_SERVICE_NOT_FOUND`(가칭)가 필요하다. 이름·문구는 Task 078에서 정하고 프론트 `errorMessages`에도 같이 넣는다), `RATE_LIMIT_EXCEEDED` 429. 2)~6) 번들 계약안(`ProductComponent{ottServiceId, tier}`, `components` 필드, 구성 편집, `ServicePrice.components`)은 **Task 076 최종안으로 교체됐다**(2026-10-17, 사용자 확정). `ProductType`에 `BUNDLE` 추가, 관리자 상품·요금 응답은 `ottServiceIds`(배열)와 `isLowCost`를 쓰고 `ProductComponent` 스키마와 구성 편집 API(`PUT .../components`)는 두지 않는다. 최종 계약은 Task 076 기록을 본다.
   - 넘길 내용: Task 076(**opus 설계 먼저**)이 정할 것 — PRD 11절 33번의 중복 결제 불허(같은 달 어떤 서비스를 볼 수 있게 하는 상품은 최대 1개)가 확정됐다는 점을 전제로 한 상품 조합 규칙, 번들·광고형 상품의 판매 종료 흐름(현재 관리자 화면의 [수정]에 판매 중·판매 종료 전환은 이미 있으나, 1차안 샘플 상품은 목업 API가 모르는 ID라 저장하면 "찾을 수 없음" 오류가 난다. 실제 판매 종료 흐름은 076에서 필요하다), 서비스를 여러 개 가진 번들 상품이 변경 내역 응답 `PlanChangeProduct`의 `ottServiceIds`(목록)로 나가는 점. Task 079는 목업 지우기 대상: 미리보기 파라미터 `?productsPreview=`, `?pricingPreview=`, `?exclusivesPreview=`, `mockTypes.ts` 3개, 샘플 데이터 파일.
   - 확인하지 못한 것: 다크 모드, 포커스 테두리·대비 측정, 관리자 번들 등록 흐름·요금 번들 표시의 자동 테스트(미추가).
 
-#### Task 076: 번들·광고형 요금제 지원 구현으로 상품 선택지 확장 ⬜ `[v0.1.0 포함]`
+#### Task 076: 번들·저가형 요금제 지원 구현으로 상품 선택지 확장 🔄 `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-19(번들), R11-9 · 선행: 075, 059 · 브랜치: `feature/o3-bundle-ad-tier`
 - 구현 사항
-  - [ ] **위험 Task: 요금 모델은 opus 설계(코드 없이 계획)를 먼저 받은 뒤 구현한다**(2026-10-17)
-  - [ ] 계약 추가 + 관리자 BUNDLE 구성 편집(구성 서비스·tier), AD tier 단품
-  - [ ] 엔진 입력: 번들은 상품 하나, AD tier는 `in_ad_tier`만 시청 가능으로 본다. 사용자 구독의 번들(같은 `product_id`)
-  - [ ] 후보 조합 2^P 증가에 따른 그리디 전환 상한 재측정(R11-30)
+  - [x] **위험 Task: 요금 모델은 opus 설계(코드 없이 계획)를 먼저 받은 뒤 구현한다**(2026-10-17)
+  - [x] 계약 추가: 관리자 상품 등록·응답은 `ottServiceIds`(단품 1개, 번들 서로 다른 2개 이상)와 `isLowCost`(저가형 분류)를 쓴다. **번들 구성 편집 API는 없다**(바꾸려면 판매 종료 뒤 새로 등록, 판매 중 번들은 13개까지). 내 설정은 `isLowestPriceMode`, 내 서비스 요금(`ServicePrice`)은 `productType`·`ottServiceIds`·`isLowCost`·`isCalcCandidate`, 플랜 상품(`PlanMonthProduct`)은 `ottServiceIds`
+  - [x] V8 마이그레이션: `subscription_product.low_cost`, `user_setting.lowest_price_mode`. 번들 구성은 기존 `product_component`를 쓴다
+  - [x] 요금 분류: 저가형(광고형·베이직 등)은 `low_cost` 분류일 뿐 **볼 수 있는 작품 범위를 제한하지 않는다**(`product_component.tier`·`availability.in_ad_tier`는 시청 판정에 읽지 않음). 모드 끔은 서비스마다 표준 단품 중 가장 싼 것(없으면 저가형), 켬은 모든 단품 중 가장 싼 것, 번들은 끔이면 표준만·켬이면 전부 후보(`CalcCandidateRules`)
+  - [x] 엔진: `OttProduct.ottServiceIds`, 달별 부분집합에서 서비스가 겹치는 상품 쌍 금지(S1b), 후보 제외(S6) 확장(0번째 달에 구독 중 서비스와 겹치는 번들 제외), 입력 해시 v3
+  - [x] 입력 조립·절감액·배정: 구독 상태는 고른 단품에만 붙이고 번들은 항상 미구독, 절감액의 전체 구독 비용은 고른 단품 × 3개월(번들 제외), 배정 서비스는 (작품이 AVAILABLE인 서비스) ∩ (구성) 중 최소 ID
+  - [x] 후보 조합 증가에 따른 그리디 전환 확인: 번들 3개+단품 7개이면 달마다 225개로 상한을 넘어 절약형·간편형이 그리디로 풀린다(`BundleSolverTest`). 실측은 Task 100
 - 완료 기준
-  - V-B: 번들·광고형 정답 케이스와 상한 초과 GREEDY 전환 테스트가 통과한다.
+  - V-B: 번들 정답 케이스(설계 문서 5절 예시)와 상한 초과 GREEDY 전환 테스트가 통과한다. V-API: 번들 상품 저장 → 플랜 계산 통합 테스트(`PlanBundleApiTest`)가 통과한다.
+- 기록(2026-10-17, 구현·전체 빌드 완료, PR 번호 미정): 설계·흐름은 `docs/guides/BUNDLE_PRICE_MODE_FLOW.md`. 사용자 확정: 1) 모드는 내 설정 체크 "가장 저렴한 요금제로 계산할래요"(기본 끔). 2) 구독 입력은 서비스 단위 그대로이며 번들 구독 입력은 만들지 않는다(번들 이용자는 포함 서비스를 각각 구독 중으로 입력, 한계는 HANDOFF에 이월). 3) S6 확장은 0번째 달에서만 겹치는 번들을 뺀다(1·2번째 달은 번들이 후보로 남고 구독 중 단품과의 동시 선택은 S1b가 막음). 4) 모드를 바꿔도 저장된 ACTIVE 플랜은 그대로이고 다음 계산·재계산부터 반영한다. 5) 계약이 깨지는 변경(`ottServiceId` → `ottServiceIds`)이라 프론트도 같은 PR에서 바뀌어야 한다. 마이그레이션 순서 제약은 4.2를 본다.
 
 #### Task 077: 계층별 갱신 구현으로 수집 호출량 절감 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-18(계층), 5.5 · 선행: 056 · 브랜치: `feature/o3-tiered-refresh`
@@ -1456,10 +1461,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 080: 탈퇴·데이터 정리 관련 결정으로 O4 구현 범위 확정 ⬜ `[v0.1.0 포함]`
 - 태그: [H] · PRD: O4, FR-07, FR-18(6개월), TECH T-1 · 선행: 없음 · 기한: 묶음 4 착수 전(2026-10-17 개정, 이전 기한 2026-11-05)
 - 구현 사항
-  - [ ] R-10: `watch_unit` 6개월 삭제가 NO ACTION FK에 막히는 문제의 처리 방식. 막는 참조는 `wishlist_item`과 모든 상태(ACTIVE·DRAFT·ARCHIVED) 플랜의 `plan_item`이다(ERD. `plan_assignment`는 `plan_item`·`plan_month`를 참조하고 `watch_unit`을 직접 참조하지 않는다). 같은 A 영역의 `availability`·`availability_change`도 `watch_unit`을 참조하므로 정리 작업이 먼저 지운다
+  - [ ] (확정 2026-10-17, 사용자: 아래 a~d) R-10: `watch_unit` 6개월 삭제가 NO ACTION FK에 막히는 문제의 처리 방식. 막는 참조는 `wishlist_item`과 모든 상태(ACTIVE·DRAFT·ARCHIVED) 플랜의 `plan_item`이다(ERD. `plan_assignment`는 `plan_item`·`plan_month`를 참조하고 `watch_unit`을 직접 참조하지 않는다). 같은 A 영역의 `availability`·`availability_change`도 `watch_unit`을 참조하므로 정리 작업이 먼저 지운다
   - [ ] `BATCH_*` 이력 보존 기준(Supabase 500MB)
   - [ ] `calc_run` 보존 기준(계산마다 3행이 쌓이고 탈퇴 뒤에도 plan_id만 NULL로 남음, Task 032 db-reviewer 지적)
   - [ ] 6개월 갱신·삭제 정리 방식(점검 쿼리 주기, 삭제 대상, 실행 경로)
+  - 확정 결정(2026-10-17, 사용자): a) R-10: 기한(5개월 넘음)에 가까운 작품은 **먼저 TMDB에 다시 물어 갱신**하고, TMDB가 "없다"고 답한 작품만 플랜·찜을 고려하지 않고 삭제한다(찜 제거, 플랜 항목 처리, 영향받는 ACTIVE 플랜 재계산). TMDB가 사라진 작품을 어떻게 알리는지(404 여부)와 빈도는 확인하지 못했으므로 Task 083 설계에서 확인한다. b) `BATCH_*` 이력은 180일 보관한다. c) `calc_run`의 플랜과 끊긴 기록은 180일 뒤 삭제한다. d) 별도 정리 Job을 주 1회 cron과 관리자 수동 실행 API로 돌리고, 수집·정리가 실행 중이면 409이며, 점검은 `fetched_at`이 5개월을 넘은 작품 수를 센다.
 - 완료 기준
   - V-H: 세 결정을 기록하고 10.3 R-10을 갱신했다.
 
@@ -1481,8 +1487,8 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 083: 6개월 갱신 점검과 데이터 정리 작업 구현으로 약관 보관 기한 준수 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O4, FR-18, 6절 라이선스 · 선행: 080 · 브랜치: `feature/o4-data-retention`
 - 구현 사항
-  - [ ] `fetched_at` 점검 쿼리와 정리 작업(Task 080 결정 방식), ARCHIVED 참조 처리(R-10 결정)
-  - [ ] `BATCH_*` 이력 정리(Task 080 보존 기준)
+  - [ ] `fetched_at` 점검 쿼리(5개월 넘은 작품 수)와 별도 정리 Job(주 1회 cron + 관리자 수동 실행 API, 수집·정리 실행 중이면 409). 5개월 가까운 작품은 TMDB에 먼저 다시 묻고 "없다"고 답한 작품만 삭제(찜 제거·플랜 항목 처리·영향 ACTIVE 플랜 재계산). **설계에서 확인할 것: TMDB가 사라진 작품을 알리는 방식(404 여부)과 빈도**(Task 080 결정 a)
+  - [ ] `BATCH_*` 이력 180일 보관 정리, `calc_run`의 플랜과 끊긴 기록 180일 뒤 삭제(Task 080 결정 b·c)
 - 완료 기준
   - V-B: 기준을 넘긴 데이터만 정리되고, 찜(`wishlist_item`)과 ACTIVE·DRAFT 플랜의 `plan_item`이 참조하는 `watch_unit`은 삭제되지 않는(FK 위반 없음) 테스트가 통과한다.
 
@@ -1723,7 +1729,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | R-7 | api-contract.md `tags`에 인증·알림 태그 없음 | **해소**: `auth`, `notification` 추가됨 | api-contract.md | — |
 | R-8 | 인증 경로가 backend.md 3분류에 걸림 | **해소**: backend.md·api-contract.md가 인증 경로를 3분류의 예외로 명시 | backend.md, api-contract.md | — |
 | R-9 | 관리자 가격 겹침, 찜 상한 초과(`WISHLIST_LIMIT_EXCEEDED` 제안, 2026-10-10) 등 TECH·rules에 없는 오류 코드가 필요. `error-codes.md`에 제안 등록 후 사용자 승인 | 미결 | FR-19, R11-30 | 해당 Task |
-| R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 추천안(미확정): 찜이나 ACTIVE·DRAFT가 참조하는 `watch_unit`은 삭제하지 않고 재수집으로 갱신하고, ARCHIVED만 참조하면서 TMDB에서 사라져 갱신할 수 없는 경우에만 해당 ARCHIVED 플랜을 먼저 삭제 | 미결(Task 080) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
+| R-10 | `watch_unit` 6개월 삭제가 NO ACTION FK에 막힘. 막는 참조는 `wishlist_item`과 ACTIVE·DRAFT·ARCHIVED 플랜의 `plan_item`이다(`plan_assignment`는 `watch_unit`을 직접 참조하지 않음. 2판의 "ARCHIVED의 `plan_item`·`plan_assignment`" 서술을 ERD에 맞게 바로잡음). 확정(2026-10-17, Task 080): 기한에 가까운 작품은 먼저 TMDB에 다시 물어 갱신하고, TMDB가 "없다"고 답한 작품만 플랜·찜을 고려하지 않고 삭제(찜 제거, 플랜 항목 처리, 영향 ACTIVE 플랜 재계산). 사라짐을 알리는 방식(404 여부)·빈도는 Task 083 설계에서 확인 | 확정(Task 080, 083 설계에서 TMDB 응답 확인) | TECH T-1, ERD FK 삭제 동작 | 2026-11-05 |
 | R-11 | 초기 `main` 직접 커밋 범위. git.md는 "폴더 골격, 문서, CI 골격"까지 허용. 최소 빌드 프로젝트(006·007)와 미커밋 문서 변경을 초기 세팅에 포함한다고 가정 | 가정 | git.md | 2026-10-05 |
 | R-12 | Cloudtype 배포 방식과 토큰 이름이 문서에 없다. 3판에서 Cloudtype 서비스 생성·환경 변수·배포 토큰을 Task 015에서 떼어 첫 배포 직전 Task 020으로 옮겼다(준비 구간 015는 GitHub·Vercel·로컬만) | **해소(2026-10-06, 사용자 결정)**: 저장소 연결 + Cloudtype 콘솔 수동 배포. GitHub Actions 배포와 Cloudtype 토큰은 당분간 쓰지 않는다(Task 020 `기록:`) | git.md | 2026-10-12 |
 | R-14 | 첫 전체 수집(Task 048) 실행 환경 | **해소(2026-10-03, 사용자 결정)**: 첫 전체 수집·성능 실측은 로컬 ①, 운영 DB 적재는 MVP 배포 Task 095. MVP 배포 전 Cloudtype에는 수집 코드와 cron이 없다. PRD 11절 4번·FR-18·TECH 3절 문구는 다른 작업자가 이에 맞춰 갱신 중 | git.md, PRD 9절·11절 4번, TECH 3절 | — |
@@ -1755,3 +1761,4 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | 2026-10-08 | 3판 이후 진행 메모. Task 018·022·024·025~031에 사용자 결정(경로표 확정, 025·026 PR 합침, sonner 토스트, 목업 로그인 전환 토글, 대체 이미지 기본, 임시 타입 예외와 `mockTypes.ts` 제거 조건)과 안내서·계획 문서 링크를 반영하고(해당 문서는 이후 정리로 삭제) 3.2에 일정 위험을 적었다. 에이전트 `frontend-dev`·`ui-designer` 추가. Task 번호·상태·선행은 바꾸지 않았다 |
 | 2026-10-17 | 첫 공개 범위 개정(사용자 결정). 첫 공개 `v0.1.0`에 2단계 일부(변경 내역 068~070, 번들·독점 075~079, 탈퇴 080~084)와 정리(089·090·101), 홈·탐색(신설 Task 106~108, Phase 3b)을 포함하고 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 3단계로 이월. Phase 구분과 Task 번호는 유지하고 제목에 `[v0.1.0 포함]`·`[3단계 이월]` 태그를 붙임. 총 108개 Task, 진행 66/108. 3.2에 개정 일정(11월 중순~하순, 기존 일정 폐기), 3.3에 첫 공개 범위 추가, 095 선행·확인 항목 확장, 102를 3단계 공개 태그로 재정의, 공개 전 Task 선행에서 095 제거, 082 선행에서 072 제거(알림 연동은 072로 이월), 069·076은 opus 설계 먼저, 홈의 독점 줄은 078 뒤 연결, 인기 순위 설계(7곳×영화·드라마 discover, 일별 스냅샷 7일 평균) 기록. Task 번호 체계는 바꾸지 않음 |
 | 2026-10-17 | 시즌 제공처 작품 단위 대체 판정(PRD 11절 43번, R11-43)과 수집 재실행 `scope` 경로를 Task 044·045 후속으로 기록. 재수집 측정값은 실행 뒤 기록 |
+| 2026-10-17 | Task 076(번들·저가형 요금제) 구현 완료로 진행 70/108(069·075 ✅). 076 항목을 최종 설계(구성 편집 API 없음, `ottServiceIds`, `low_cost` 저가형 분류, 모드, 시청 범위 제한 없음)로 정정하고 075의 번들 계약안 6개를 076 최종안으로 교체. 4.2에 V8=076·V9=107 순서 제약 추가. Task 080 확정 결정(R-10 갱신 후 삭제, `BATCH_*` 180일, `calc_run` 180일, 별도 정리 Job)을 080·083·R-10에 기록 |

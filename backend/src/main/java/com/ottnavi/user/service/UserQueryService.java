@@ -1,14 +1,17 @@
 package com.ottnavi.user.service;
 
 import com.ottnavi.global.error.UnauthorizedException;
+import com.ottnavi.user.domain.entity.UserSetting;
 import com.ottnavi.user.domain.entity.UserSubscription;
 import com.ottnavi.user.domain.enums.ServiceSubscriptionStatus;
 import com.ottnavi.user.domain.enums.SubscriptionStatus;
 import com.ottnavi.user.domain.repository.UserRepository;
+import com.ottnavi.user.domain.repository.UserSettingRepository;
 import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +26,16 @@ public class UserQueryService {
 
 	private final UserRepository userRepository;
 	private final UserSubscriptionRepository userSubscriptionRepository;
+	private final UserSettingRepository userSettingRepository;
+
+	/** "가장 저렴한 요금제로 계산할래요" 체크 여부. 설정 행이 없으면(온보딩 전) 꺼짐(false)이다 */
+	public boolean isLowestPriceMode(Long userId) {
+		Optional<UserSetting> found = userSettingRepository.findById(userId);
+		if (found.isEmpty()) {
+			return false;
+		}
+		return found.get().isLowestPriceMode();
+	}
 
 	/**
 	 * 사용자 행을 FOR UPDATE로 잠가 같은 사용자의 쓰기 요청을 한 줄로 세운다. 호출하는 쪽의 쓰기 트랜잭션 안에서만 쓴다
