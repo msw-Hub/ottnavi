@@ -60,6 +60,76 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
+ * 제안(Task 081, 구현은 Task 082). 로그인한 본인의 계정을 즉시 영구 삭제한다. 대기 기간이나 복구는 없다(PRD FR-07).
+ * 찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
+ * 서버는 Refresh Token 계열과 사용자 캐시도 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
+ * 요청 본문은 없다. 이미 삭제된 계정의 Access Token은 만료 전이라도 사용자를 찾을 수 없어 `UNAUTHORIZED`로 거절될 수 있다.
+ * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * @summary 회원 탈퇴
+ */
+export const withdrawMe = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getWithdrawMeMutationKey = () => ['withdrawMe'] as const;
+
+export const getWithdrawMeMutationOptions = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext> => {
+
+const mutationKey = getWithdrawMeMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof withdrawMe>>, void> = () => {
+
+
+          return  withdrawMe(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WithdrawMeMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawMe>>>
+
+    export type WithdrawMeMutationError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+
+
+    /**
+ * @summary 회원 탈퇴
+ */
+export const useWithdrawMe = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof withdrawMe>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getWithdrawMeMutationOptions(options), queryClient);
+    }
+    /**
  * 서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
  * 온보딩 뒤에는 `subscriptions`에 서비스 7개가 모두 온다. 미구독은 저장 행이 없으므로(PRD FR-08) 서버가 `NOT_SUBSCRIBED`로 채운다.
  * 요금 화면(SCR-09)의 예산·시청 시간 요약도 이 API로 가져온다.

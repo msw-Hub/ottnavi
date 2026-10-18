@@ -27,6 +27,16 @@ export const getGetMySettingsResponseMock = (): CommonResponseUserSettings => ({
 export const getUpdateMySettingsResponseMock = (): CommonResponseUserSettings => ({"success":true,"data":{"isOnboardingDone":true,"subscriptions":[{"ottServiceId":1,"status":"SUBSCRIBED","planName":"스탠다드","billingDay":15},{"ottServiceId":2,"status":"NOT_SUBSCRIBED","planName":null,"billingDay":null},{"ottServiceId":3,"status":"NOT_SUBSCRIBED","planName":null,"billingDay":null},{"ottServiceId":4,"status":"FREE","planName":null,"billingDay":null},{"ottServiceId":5,"status":"NOT_SUBSCRIBED","planName":null,"billingDay":null},{"ottServiceId":6,"status":"NOT_SUBSCRIBED","planName":null,"billingDay":null},{"ottServiceId":7,"status":"NOT_SUBSCRIBED","planName":null,"billingDay":null}],"monthlyBudget":20000,"monthlyWatchMinutes":900,"watchPreset":"NORMAL","isLowestPriceMode":false}})
 
 
+export const getWithdrawMeMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.delete>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.delete('/api/me', async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+
+    return new HttpResponse(null,
+      { status: 204
+      })
+  }, options)
+}
+
 export const getGetMySettingsMockHandler = (overrideResponse?: CommonResponseUserSettings | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseUserSettings> | CommonResponseUserSettings), options?: RequestHandlerOptions) => {
   return http.get('/api/me/settings', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
@@ -51,6 +61,7 @@ export const getUpdateMySettingsMockHandler = (overrideResponse?: CommonResponse
   }, options)
 }
 export const getUserMock = () => [
+  getWithdrawMeMockHandler(),
   getGetMySettingsMockHandler(),
   getUpdateMySettingsMockHandler()
 ]
