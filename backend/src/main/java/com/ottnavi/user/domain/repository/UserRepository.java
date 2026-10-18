@@ -6,6 +6,7 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -24,4 +25,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select u from User u where u.id = :id")
 	Optional<User> findByIdForUpdate(@Param("id") Long id);
+
+	/**
+	 * 사용자 행을 벌크로 지운다(탈퇴). 하위 행은 DB의 ON DELETE CASCADE가 지우므로 JPA cascade에 기대지 않는다(TECH T-1).
+	 * 영속성 컨텍스트에 남은 User를 비워 지워진 행이 다시 보이지 않게 한다.
+	 */
+	@Modifying(flushAutomatically = true, clearAutomatically = true)
+	@Query("delete from User u where u.id = :id")
+	int deleteByUserId(@Param("id") Long id);
 }

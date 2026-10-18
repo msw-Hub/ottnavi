@@ -40,11 +40,11 @@ com.ottnavi
 │   ├── service/           ProviderCollectService, AdminProviderService(매핑 조회·변경) 등 + model/ (MappedProvider, AdminProviderView …)
 │   └── domain/            entity · enums · repository
 ├── user/                회원·로그인·내 설정
-│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout), UserSettingController (GET·PUT /api/me/settings)
+│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout), UserSettingController (GET·PUT /api/me/settings), UserController (DELETE /api/me 탈퇴)
 │   ├── dto/
 │   │   ├── request/         UpdateMySettingsRequest, UserSubscriptionRequest
 │   │   └── response/        AccessTokenResponse, UserSettingsResponse, UserSubscriptionResponse
-│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사), UserSettingService(내 설정 조회·전체 교체, users 행 잠금), UserQueryService(다른 도메인용 사용자 행 잠금·이용 가능 서비스 조회·서비스별 이용 상태 맵 조회) + model/ (GoogleProfile, LoginUser, TokenIssue, SubscriptionState, UserSettingsState)
+│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사), UserSettingService(내 설정 조회·전체 교체, users 행 잠금), UserWithdrawService·UserWithdrawWriter(탈퇴: DB 삭제 커밋 뒤 Redis 계열 삭제), UserQueryService(다른 도메인용 사용자 행 잠금·이용 가능 서비스 조회·서비스별 이용 상태 맵 조회) + model/ (GoogleProfile, LoginUser, TokenIssue, SubscriptionState, UserSettingsState)
 │   └── domain/            entity(User, UserSetting, UserSubscription) · enums(OAuthProvider, UserRole, WatchPreset, SubscriptionStatus, ServiceSubscriptionStatus) · repository(UserRepository, UserSettingRepository, UserSubscriptionRepository)
 ├── wishlist/            찜·우선순위·"다 봤음" (Task 056)
 │   ├── controller/        WishlistController (GET·POST /api/me/wishlist-items, PATCH·DELETE /api/me/wishlist-items/{id})
