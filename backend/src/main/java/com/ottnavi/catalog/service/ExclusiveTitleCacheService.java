@@ -73,17 +73,27 @@ public class ExclusiveTitleCacheService {
 
     /** 7개 서비스의 독점 목록을 새로 계산해 캐시를 덮어쓴다. 수집 Job 성공 뒤에 쓴다. 실패하면 예외를 그대로 올린다 */
     public void refreshAll() {
-        putAll(calculator.calculateAll());
+        // 조회 쪽 미스 계산과 같은 락을 쓴다. 안 그러면 옛 데이터로 계산 중이던 조회가 나중에 옛 값을 덮어써 최대 TTL 동안 남는다
+        missLock.lock();
+        try {
+            putAll(calculator.calculateAll());
+        } finally {
+            missLock.unlock();
+        }
     }
 
     /**
      * 독점 목록 캐시를 모두 비운다. 비우기에 실패해도 이미 끝난 Job의 결과를 바꾸지 않도록 경고만 남긴다(TTL이 지나면 저절로 새 값이 된다).
      */
     public void evictAll() {
+        // 진행 중인 미스 계산이 끝난 뒤에 비운다. 그래야 계산이 옛 값을 다시 채워 넣는 일이 없다
+        missLock.lock();
         try {
             cacheManager.getCache(RedisConfig.EXCLUSIVE_TITLES).clear();
         } catch (RuntimeException e) {
             log.warn("독점 목록 캐시를 비우지 못했다(TTL이 지나면 만료된다): error={}", e.toString());
+        } finally {
+            missLock.unlock();
         }
     }
 
