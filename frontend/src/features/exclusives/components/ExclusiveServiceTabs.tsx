@@ -1,10 +1,10 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { CheckIcon, DatabaseIcon } from 'lucide-react'
 import { Tabs } from 'radix-ui'
-import type { ExclusiveService } from '@/features/exclusives/mockTypes'
+import type { OttService } from '@/api/generated/model'
 
 interface ExclusiveServiceTabsProps {
-  services: ExclusiveService[] // 탭으로 보일 서비스 7곳. 순서가 화면 순서다
+  services: OttService[] // 탭으로 보일 서비스 7곳(서비스 목록 API). 순서가 화면 순서다
   value: string // 지금 고른 탭 값(서비스 코드, 예: 'NETFLIX')
   onValueChange: (value: string) => void // 탭을 바꿨을 때
   children: ReactNode // 고른 탭의 내용. 고른 탭 하나의 내용만 넘긴다
@@ -15,7 +15,7 @@ interface ExclusiveServiceTabsProps {
  *
  * 홈의 서비스 탭(features/home/components/ServiceTabs)과 같은 모양(알약 탭, 고른 탭은 꽉 채움 + 체크)이다.
  * 기능 폴더끼리 import하지 않는 규칙(frontend.md) 때문에 따로 두었고, 하나 다른 점이 있다:
- * 데이터 부족 서비스(쿠팡플레이) 탭에는 이름 뒤에 데이터 아이콘을 붙여, 누르기 전에도 "이 탭은 목록이 아니라 안내"라는 것을 알린다.
+ * 데이터 부족 서비스(쿠팡플레이) 탭에는 이름 뒤에 데이터 아이콘을 붙여, 누르기 전에도 "이 탭은 확인 범위가 좁다(드라마만)"는 것을 알린다.
  * 아이콘만으로는 뜻이 전달되지 않으니 낭독기에는 "(데이터 부족)"을 읽히고, 마우스를 올리면 title로도 보인다.
  * 두 탭 모양이 앞으로도 같다면 components/common으로 올려 하나로 합칠 수 있다(보고서 결정 질문).
  *
