@@ -46,8 +46,15 @@ public class PopularityRankingService {
 	@Cacheable(cacheNames = RedisConfig.HOME_POPULARITY,
 			key = "#period.name() + ':' + (#ottServiceId ?: 'all') + ':' + #limit") // 로그인 정보는 키에 넣지 않는다(모두에게 같은 목록)
 	public PopularityRankingView rank(PopularityPeriod period, Long ottServiceId, int limit) {
-		// 1. 가장 최근 스냅샷 날짜. 없으면 빈 순위
-		LocalDate latestDate = snapshotRepository.findLatestSnapshotDate();
+		// 1. 가장 최근 기록 날짜. 없으면 빈 순위
+		//    서비스를 지정하면 그 서비스의 기록만 본다. 전체 기준으로 날짜를 구하면, 그 서비스만 TMDB 호출이 실패한 날
+		//    "가장 최근 날"에 그 서비스 기록이 없어 오늘 순위가 비어 버리기 때문이다.
+		LocalDate latestDate;
+		if (ottServiceId == null) {
+			latestDate = snapshotRepository.findLatestSnapshotDate();
+		} else {
+			latestDate = snapshotRepository.findLatestSnapshotDateForService(ottServiceId);
+		}
 		if (latestDate == null) {
 			return new PopularityRankingView(period, ottServiceId, null, 0, NOTICE, new ArrayList<>());
 		}
@@ -57,7 +64,13 @@ public class PopularityRankingService {
 		if (period == PopularityPeriod.WEEK) {
 			fromDate = latestDate.minusDays(WEEK_DAYS - 1L);
 		}
-		int daysCounted = snapshotRepository.findSnapshotDatesBetween(fromDate, latestDate).size();
+		//    서비스를 지정하면 그 서비스의 기록이 있는 날만 센다(다른 서비스만 기록된 날이 분모를 부풀려 평균이 낮아지지 않게)
+		int daysCounted;
+		if (ottServiceId == null) {
+			daysCounted = snapshotRepository.findSnapshotDatesBetween(fromDate, latestDate).size();
+		} else {
+			daysCounted = snapshotRepository.findSnapshotDatesBetweenForService(fromDate, latestDate, ottServiceId).size();
+		}
 
 		// 3. 범위의 스냅샷 줄을 읽어 순위 규칙에 넘긴다
 		List<PopularitySnapshot> snapshots;

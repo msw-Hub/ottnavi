@@ -134,7 +134,7 @@ paths:
       description: |
         서비스별 인기 순위를 `TODAY`(가장 최근 스냅샷 하루) 또는 `WEEK`(최근 7일 스냅샷의 TMDB 인기도 평균)로 돌려준다. 비로그인 공개 API(요청 제한 적용).
         순위는 TMDB `discover`(한국, 서비스 제공처 필터, 인기순)를 하루 한 번 받아 쌓은 일별 스냅샷으로 만든다. **TMDB 인기도 기준이며 OTT 공식 순위가 아니다**(`notice`에 화면 표기용 문구를 담는다). 서비스마다 영화·드라마를 합쳐 인기도 높은 순 상위 `limit`개이고, `ottServiceId`를 생략하면 7개 서비스 전체에서 같은 작품을 한 번만 세어 순위를 매긴다.
-        `WEEK`는 가장 최근 스냅샷 날짜까지 7일 범위에서 스냅샷이 있는 날 수(`daysCounted`)로 나눈 평균이고, 그날 상위권에 없던 작품은 그날을 0으로 센다(한 번 반짝 오른 작품이 부풀려지지 않는다). 공개 직후 7일 미만이면 `daysCounted`가 7보다 작다. 동률이면 가장 최근 날 인기도, TMDB ID 순이다. 스냅샷이 하나도 없으면 `items`는 빈 배열, `snapshotDate`는 null이다(화면은 줄을 숨긴다).
+        `WEEK`는 가장 최근 스냅샷 날짜까지 7일 범위에서 스냅샷이 있는 날 수(`daysCounted`)로 나눈 평균이고, 그날 상위권에 없던 작품은 그날을 0으로 센다(한 번 반짝 오른 작품이 부풀려지지 않는다). 공개 직후 7일 미만이면 `daysCounted`가 7보다 작다. `ottServiceId`를 지정하면 최신 날짜와 `daysCounted` 모두 그 서비스의 기록만으로 구한다(다른 서비스만 기록된 날은 세지 않는다). 동률이면 가장 최근 날 인기도, TMDB ID 순이다. 스냅샷이 하나도 없으면 `items`는 빈 배열, `snapshotDate`는 null이다(화면은 줄을 숨긴다).
         작품 정보(`title`)는 우리 DB에 수집된 작품이면 서비스별 제공 상태(`availabilities`)가 채워지고, 아직 수집되지 않은 작품은 `availabilities`가 빈 배열이다(그런 작품의 상세는 `TITLE_NOT_FOUND`(404)일 수 있다).
         응답은 브라우저가 약 1분 캐시할 수 있다.
         오류: `VALIDATION_FAILED`(400, `period` 값·`limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).

@@ -34,6 +34,16 @@ public interface PopularitySnapshotRepository extends JpaRepository<PopularitySn
 	@Query("select distinct s.snapshotDate from PopularitySnapshot s where s.snapshotDate between :from and :to")
 	List<LocalDate> findSnapshotDatesBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
+	/** 한 서비스의 가장 최근 스냅샷 날짜. 그 서비스의 기록이 하나도 없으면 null */
+	@Query("select max(s.snapshotDate) from PopularitySnapshot s where s.ottService.id = :ottServiceId")
+	LocalDate findLatestSnapshotDateForService(@Param("ottServiceId") Long ottServiceId);
+
+	/** 날짜 범위에서 한 서비스의 스냅샷이 있는 날짜들(중복 없이). 서비스를 지정한 순위의 분모를 센다 */
+	@Query("select distinct s.snapshotDate from PopularitySnapshot s where s.snapshotDate between :from and :to "
+			+ "and s.ottService.id = :ottServiceId")
+	List<LocalDate> findSnapshotDatesBetweenForService(@Param("from") LocalDate from, @Param("to") LocalDate to,
+			@Param("ottServiceId") Long ottServiceId);
+
 	/** 날짜 범위의 모든 서비스 스냅샷 줄. 서비스 엔티티는 읽지 않는다(서비스 ID로 거르는 쪽은 아래 메서드) */
 	@Query("select s from PopularitySnapshot s where s.snapshotDate between :from and :to")
 	List<PopularitySnapshot> findBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);

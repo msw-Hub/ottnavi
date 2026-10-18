@@ -103,6 +103,46 @@ class HomeApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 서비스를_지정하면_그_서비스의_기록_날짜로_오늘_순위와_평균_분모를_구한다() throws Exception {
+		// given: 넷플릭스는 어제·오늘 기록, 티빙은 어제만 기록(오늘은 티빙의 TMDB 호출이 실패한 상황)
+		long tvingId = serviceId("TVING");
+		long wavveId = serviceId("WAVVE"); // 기록이 하나도 없는 서비스
+		insertSnapshotFor(netflixId, today.minusDays(1), "MOVIE", 9300061, "넷플 작품", "10.0");
+		insertSnapshotFor(netflixId, today, "MOVIE", 9300061, "넷플 작품", "10.0");
+		insertSnapshotFor(tvingId, today.minusDays(1), "MOVIE", 9300062, "티빙 작품", "30.0");
+
+		// when, then: 티빙 TODAY는 전체 최신 날짜(오늘)가 아니라 티빙의 최신 기록(어제)으로 순위를 만든다
+		mockMvc.perform(get("/api/public/popularity-rankings").param("period", "TODAY").param("ottServiceId", String.valueOf(tvingId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.snapshotDate").value(today.minusDays(1).toString()))
+				.andExpect(jsonPath("$.data.daysCounted").value(1))
+				.andExpect(jsonPath("$.data.items.length()").value(1))
+				.andExpect(jsonPath("$.data.items[0].title.tmdbId").value(9300062));
+
+		// when, then: 티빙 WEEK는 티빙 기록이 있는 1일로 나눈다(전체 기준 2일이면 15.0이 된다)
+		mockMvc.perform(get("/api/public/popularity-rankings").param("period", "WEEK").param("ottServiceId", String.valueOf(tvingId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.daysCounted").value(1))
+				.andExpect(jsonPath("$.data.items.length()").value(1))
+				.andExpect(jsonPath("$.data.items[0].title.tmdbId").value(9300062));
+
+		// when, then: 서비스를 지정하지 않으면 전체 기준(오늘, 2일)이다
+		mockMvc.perform(get("/api/public/popularity-rankings").param("period", "WEEK"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.snapshotDate").value(today.toString()))
+				.andExpect(jsonPath("$.data.daysCounted").value(2))
+				.andExpect(jsonPath("$.data.items[0].title.tmdbId").value(9300062)) // 30/2=15 > 넷플 작품 (10+10)/2=10
+				.andExpect(jsonPath("$.data.items[1].title.tmdbId").value(9300061));
+
+		// when, then: 기록이 하나도 없는 서비스는 빈 순위다
+		mockMvc.perform(get("/api/public/popularity-rankings").param("period", "TODAY").param("ottServiceId", String.valueOf(wavveId)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.snapshotDate").value(org.hamcrest.Matchers.nullValue()))
+				.andExpect(jsonPath("$.data.daysCounted").value(0))
+				.andExpect(jsonPath("$.data.items.length()").value(0));
+	}
+
+	@Test
 	void 스냅샷이_없으면_200과_빈_순위를_돌려준다() throws Exception {
 		mockMvc.perform(get("/api/public/popularity-rankings"))
 				.andExpect(status().isOk())
@@ -322,8 +362,13 @@ class HomeApiTest extends IntegrationTestSupport {
 	}
 
 	private void insertSnapshot(LocalDate snapshotDate, String mediaType, int tmdbId, String name, String popularity) {
+		insertSnapshotFor(netflixId, snapshotDate, mediaType, tmdbId, name, popularity);
+	}
+
+	private void insertSnapshotFor(long ottServiceId, LocalDate snapshotDate, String mediaType, int tmdbId, String name,
+			String popularity) {
 		jdbcTemplate.update("INSERT INTO popularity_snapshot (snapshot_date, ott_service_id, media_type, tmdb_id, title, popularity) "
-				+ "VALUES (?, ?, ?, ?, ?, ?::numeric)", snapshotDate, netflixId, mediaType, tmdbId, name, popularity);
+				+ "VALUES (?, ?, ?, ?, ?, ?::numeric)", snapshotDate, ottServiceId, mediaType, tmdbId, name, popularity);
 	}
 
 	private void insertCast(long titleId, int castOrder, String name) {
