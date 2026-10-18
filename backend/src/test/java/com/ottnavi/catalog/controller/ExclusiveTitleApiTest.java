@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * 서비스별 독점 목록 공개 API(Task 078)를 실제 DB·Redis(Testcontainers)와 MockMvc로 확인한다(Docker Desktop 필요).
- * 막으려는 사고: 다른 서비스에도 있는 작품이 독점으로 나오는 일, 드라마의 독점 아닌 시즌이 섞이는 일, 데이터 부족 서비스(쿠팡플레이)가 목록을 보이는 일,
+ * 막으려는 사고: 다른 서비스에도 있는 작품이 독점으로 나오는 일, 드라마의 독점 아닌 시즌이 섞이는 일, 쿠팡플레이 영화가 쿠팡플레이 독점으로 나오거나 쿠팡플레이 드라마가 빠지는 일,
  * 없는 서비스가 200으로 나가는 일, 캐시가 안 걸리거나 수집이 끝나도 옛 목록이 남는 일, 캐시가 비었을 때 빈 목록을 돌려주는 일.
  * 이 클래스의 작품은 TMDB ID 9600000번대를 쓰고, 인기도를 매우 크게 줘 목록 맨 위에 오게 한다(다른 테스트의 남은 데이터와 섞여도 순서를 확인할 수 있다).
  */
@@ -38,7 +38,7 @@ class ExclusiveTitleApiTest extends IntegrationTestSupport {
 	private static final int MOVIE_A = 9600001; // 넷플릭스 독점 영화(웨이브는 모름)
 	private static final int TV_B = 9600002; // 시즌 1·2는 넷플릭스 독점, 시즌 3은 디즈니+에도 있음
 	private static final int MOVIE_C = 9600003; // 넷플릭스와 티빙 모두 있음(독점 아님)
-	private static final int TV_D = 9600004; // 쿠팡플레이에만 있음(데이터 부족 서비스라 어느 목록에도 안 나온다)
+	private static final int TV_D = 9600004; // 쿠팡플레이에만 있음(쿠팡플레이 독점 드라마, 다른 서비스 목록에는 안 나온다)
 
 	@Autowired private MockMvc mockMvc;
 	@Autowired private JdbcTemplate jdbcTemplate;
@@ -139,13 +139,16 @@ class ExclusiveTitleApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 쿠팡플레이는_데이터_부족이라_판정하지_않고_빈_목록을_200으로_돌려준다() throws Exception {
+	void 쿠팡플레이도_드라마_시즌만_판정해_독점_목록을_200으로_돌려준다() throws Exception {
 		mockMvc.perform(get("/api/public/ott-services/" + serviceIds.get("COUPANG_PLAY") + "/exclusive-titles"))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.data.isJudged").value(false))
-				.andExpect(jsonPath("$.data.content", hasSize(0)))
-				.andExpect(jsonPath("$.data.totalElements").value(0))
-				.andExpect(jsonPath("$.data.totalPages").value(0));
+				.andExpect(jsonPath("$.data.isJudged").value(true))
+				// D: 쿠팡플레이 드라마 시즌 1이 독점
+				.andExpect(jsonPath("$.data.content[?(@.tmdbId==" + TV_D + ")]", hasSize(1)))
+				.andExpect(jsonPath("$.data.content[?(@.tmdbId==" + TV_D + " && @.exclusiveSeasonNumbers[0]==1)]", hasSize(1)))
+				// 쿠팡플레이 영화(A, C)는 구조적 공백이라 쿠팡플레이 독점에 나오지 않는다
+				.andExpect(jsonPath("$.data.content[?(@.tmdbId==" + MOVIE_A + ")]", hasSize(0)))
+				.andExpect(jsonPath("$.data.content[?(@.tmdbId==" + MOVIE_C + ")]", hasSize(0)));
 	}
 
 	@Test

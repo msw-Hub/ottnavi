@@ -20,7 +20,7 @@ public class ExclusiveTitleQueryService {
 
     /**
      * 서비스 한 곳의 독점 목록 한 페이지를 돌려준다. 없는 서비스면 OttServiceNotFoundException(404).
-     * 데이터 부족 서비스는 404가 아니라 judged=false와 빈 목록이다.
+     * 데이터 부족 서비스(쿠팡플레이)도 같은 규칙으로 판정한 목록(영화 제외, 드라마 시즌만)을 돌려준다.
      */
     public ExclusiveTitlePageView getPage(long ottServiceId, int page, int size) {
         // 1. 서비스가 있는지 확인한다(없으면 404)
