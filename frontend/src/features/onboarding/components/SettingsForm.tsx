@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
@@ -292,6 +292,18 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
           저장한 내용은 언제든 이 화면에서 다시 바꿀 수 있어요.
         </p>
       </section>
+
+      {/* 회원 탈퇴 링크(SCR-13, Task 081). 눈에 덜 띄도록 폼 맨 아래 오른쪽 구석에 작은 빨간 글자로만 둔다(사용자 확정).
+          첫 방문(온보딩)에는 아직 가입을 마치기 전이라 보이지 않는다. 빨간색만으로 뜻을 전하지 않고 "회원 탈퇴" 글자가 있다.
+          높이 44px(min-h-11)는 글자는 작아도 누르는 영역은 터치 크기를 맞추려는 것이다 */}
+      {settings.isOnboardingDone && (
+        <Link
+          to="/settings/withdraw"
+          className="inline-flex min-h-11 items-center justify-self-end rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          회원 탈퇴
+        </Link>
+      )}
     </form>
   )
 }
