@@ -26,6 +26,9 @@ public enum ErrorCode {
 	// 작품
 	TITLE_NOT_FOUND(HttpStatus.NOT_FOUND, "작품을 찾을 수 없습니다."),
 
+	// OTT 서비스
+	OTT_SERVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "서비스를 찾을 수 없습니다."), // 독점 목록의 없는 서비스 ID(Task 078)
+
 	// 찜
 	WISHLIST_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "찜은 20개까지 담을 수 있습니다."), // "다 봤음"이 아닌 찜 기준
 	WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 항목을 찾을 수 없습니다."),

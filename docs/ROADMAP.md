@@ -45,7 +45,7 @@
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 3/3 | ✅ 완료 (106 화면 1차안은 PR #75, 107 홈·탐색 API는 PR #84, 108 홈·탐색 실제 API 연결은 PR #86으로 병합) |
-| 4 | 추가 기능 개발 | 10/24 | 🔄 진행 중 (084 탈퇴 화면 실제 API 연결(구현 완료·병합 전), 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
+| 4 | 추가 기능 개발 | 10/24 | 🔄 진행 중 (084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
 | 합계 | | 79/108 | |
 
@@ -1454,10 +1454,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 078: 독점 목록 사전 계산과 공개 API 구현으로 서비스별 독점 조회 제공 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-04 · 선행: 075, 044, 049 · 브랜치: `feature/o3-exclusive-titles`
 - 구현 사항
-  - [ ] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
-  - [ ] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
+  - [x] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
+  - [x] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
 - 완료 기준
   - V-B: 독점 판정·공백 제외·데이터 부족 테스트. V-API: 서비스별 목록.
+- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o3-exclusive-titles`, 병합 전). `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`)를 `catalog`에 구현했다. 응답은 `PageMeta` 5개 필드 + `ottServiceId`·`isJudged`·`dataAsOf`, 항목 `ExclusiveTitle`(`mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`, `comparedServiceCount`, `unknownElsewhereCount`)이며 Task 075 승인안과 같다. 없는 서비스는 404 `OTT_SERVICE_NOT_FOUND`(신규, `error-codes.md`에 행 추가).
+  - 판정(`ExclusiveRules`, 순수 규칙): 시청 단위(영화 1편·시즌 1개)마다 AVAILABLE인 서비스가 정확히 하나면 그 서비스의 독점이다. 다른 서비스의 없음·모름은 모두 "다른 곳에 없음"으로 본다(모름 수는 `unknownElsewhereCount`). 모름 중 이유가 `STRUCTURAL_GAP`(쿠팡플레이 영화)인 서비스는 비교에서 빼서 `comparedServiceCount`에 세지 않는다(영화 5, 드라마 6). 판정 행이 없는 서비스는 모름으로 센다. 광고형(`in_ad_tier`)도 구독 제공(AVAILABLE)이다(Task 076: 저가형은 시청 범위를 제한하지 않음). 드라마는 독점 시즌만 `exclusiveSeasonNumbers`(오름차순)에 담고, 비교·모름 수는 독점 시즌 중 가장 큰 값이다. 정렬은 TMDB 인기도 내림차순(없으면 뒤, 동률은 작품 ID).
+  - 데이터 부족 서비스(`dataQuality=INSUFFICIENT`, 쿠팡플레이)는 판정하지 않고 `isJudged=false`·빈 목록의 200이다(404 아님). 그 서비스를 기준으로 한 독점은 만들지 않지만, 쿠팡플레이에 있는 작품은 다른 서비스 독점에서 정상적으로 빠진다.
+  - 캐시: 서비스마다 `ExclusiveTitleList` 전체를 `exclusiveTitles`에 저장(키 서비스 ID, TTL `app.exclusive.cache.ttl` 기본 24h). 수집 Job이 COMPLETED로 끝나면 `ExclusiveTitlesRefreshListener`가 7개를 새로 계산해 채우고, 실패·중단이면 비운다. 정리 Job(`RetentionService`)이 작품을 갱신·삭제하면 비운다. 조회 API는 캐시를 읽고, 비어 있으면(재시작·만료·비운 뒤) 7개를 즉석에서 계산해 채운다. 매월 재계산 Job은 제공 상태를 바꾸지 않아 연결하지 않았다. 조회 경로는 Redis 읽기·쓰기 실패 시 DB 계산 결과로 응답한다.
+  - 테스트: `ExclusiveRulesTest`(판정 8), `ExclusiveTitleApiTest`(목록·페이지·쿠팡플레이·404/400·캐시 적중/갱신/폴백 4), `OpenApiContractTest`, `ErrorCodeDocumentTest`, `RetentionHomeCacheEvictTest`(독점 캐시 비우기 확인 추가).
+  - 프론트(Task 079)에 넘길 내용: 응답 모양은 위와 같고, 목업 임시 타입 `ExclusiveTitle`/`ExclusiveTitlePage`는 생성 타입으로 바꾸며 `posterUrl` 대신 `posterPath`(TMDB 상대 경로)를 쓴다. `errorMessages.ts`의 `TECH_ERROR_MESSAGES`에 `OTT_SERVICE_NOT_FOUND`("서비스를 찾을 수 없습니다.")를 추가해야 한다(`errorMessages.test.ts`가 `error-codes.md` 행과 대조). 홈의 독점 줄은 이 API의 첫 페이지(`size`를 작게)로 연결한다.
 
 #### Task 079: 번들·독점 화면 실제 API 연결로 O3 완성 ⬜ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, SCR-03, SCR-14 · 선행: 076, 078 · 브랜치: `feature/o3-bundle-exclusive-api`
@@ -1508,7 +1514,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [F] · PRD: O4, SCR-13 · 선행: 082 · 브랜치: `feature/o4-withdrawal-api`
 - 완료 기준
   - V-FS: 테스트 계정 탈퇴 → 로그아웃·메모리 토큰 제거 → 재로그인 시 신규 계정(온보딩)으로 시작한다.
-- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o4-withdrawal-api`, 병합 전, 실서버 V-FS는 사용자 몫). 081이 이미 생성 훅 `useWithdrawMe`로 만들어 둔 `useWithdraw`가 계약(204·401·500)과 그대로 맞아 화면·훅 코드는 바꾸지 않았다. `npm run api:generate`로 생성물만 최신 계약(설명 문구)에 맞췄다. 실제 API 모드(`VITE_USE_MOCK=false`) 흐름을 `withdrawRealApi.test.tsx`로 고정했다: 204(요청에 Access Token 첨부, 토큰 비움, 첫 화면, 완료 토스트), 401+재발급 401(로그인 화면, 같은 요청 재전송 없음, 완료 토스트 없음), 401+재발급 성공(새 토큰으로 한 번만 재전송해 성공), 429·500(이동·정리 없이 대화상자 안 안내, 다시 시도 가능). `rt` 쿠키 만료는 브라우저·서버 몫이라 테스트로 확인하지 못했다(실서버 V-FS에서 확인).
+- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o4-withdrawal-api`, PR #87로 병합, 실서버 V-FS는 사용자 몫). 081이 이미 생성 훅 `useWithdrawMe`로 만들어 둔 `useWithdraw`가 계약(204·401·500)과 그대로 맞아 화면·훅 코드는 바꾸지 않았다. `npm run api:generate`로 생성물만 최신 계약(설명 문구)에 맞췄다. 실제 API 모드(`VITE_USE_MOCK=false`) 흐름을 `withdrawRealApi.test.tsx`로 고정했다: 204(요청에 Access Token 첨부, 토큰 비움, 첫 화면, 완료 토스트), 401+재발급 401(로그인 화면, 같은 요청 재전송 없음, 완료 토스트 없음), 401+재발급 성공(새 토큰으로 한 번만 재전송해 성공), 429·500(이동·정리 없이 대화상자 안 안내, 다시 시도 가능). `rt` 쿠키 만료는 브라우저·서버 몫이라 테스트로 확인하지 못했다(실서버 V-FS에서 확인).
 
 #### Task 085: Gemini API 무료 등급 키 발급으로 LLM 연동 준비 ⬜ `[3단계 이월]`
 - 태그: [H] · PRD: Q3, 6절 LLM · 선행: 없음 · 기한: 2026-11-19(3단계 착수 전)
