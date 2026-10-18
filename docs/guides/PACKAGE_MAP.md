@@ -31,7 +31,7 @@ com.ottnavi
 │   │   ├── enums/
 │   │   ├── repository/      DB 조회·저장 인터페이스
 │   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator, AvailabilityAggregation, ExclusiveRules(서비스별 독점 판정) …)
-│   └── service/           흐름 조율: TitleCollectService, TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleCardAssembler(작품 목록 → 서비스별 제공 상태 카드, 검색·탐색·홈이 공용, Task 107), TitleExploreService(장르 목록·장르별·출연자 이름별 작품, Task 107), NewlyAvailableQueryService(새로 볼 수 있게 된 작품: 입고·공개 후보 조회 → NewArrivalPicker로 대표 선택, Task 107), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083), ExclusiveTitleCalculator(독점 목록 계산)·ExclusiveTitleCacheService(Redis `exclusiveTitles` 읽기·채우기·비우기, 캐시 미스 폴백)·ExclusiveTitleQueryService(페이지 조회, 없는 서비스 404) (Task 078)
+│   └── service/           흐름 조율: TitleCollectService, TitleRefreshTierService(찜 현황에 맞춰 작품 refresh_tier를 벌크로 재맞춤, 수집 시작 Step이 부름, Task 077), TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleCardAssembler(작품 목록 → 서비스별 제공 상태 카드, 검색·탐색·홈이 공용, Task 107), TitleExploreService(장르 목록·장르별·출연자 이름별 작품, Task 107), NewlyAvailableQueryService(새로 볼 수 있게 된 작품: 입고·공개 후보 조회 → NewArrivalPicker로 대표 선택, Task 107), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083), ExclusiveTitleCalculator(독점 목록 계산)·ExclusiveTitleCacheService(Redis `exclusiveTitles` 읽기·채우기·비우기, 캐시 미스 폴백)·ExclusiveTitleQueryService(페이지 조회, 없는 서비스 404) (Task 078)
 │       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange, TitleDetailView …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
@@ -81,12 +81,13 @@ com.ottnavi
 │   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse, AdminProviderResponse, AdminProviderListResponse
 │   └── exception/         409 예외 4종(BatchAlreadyRunning·BatchAlreadyCompleted·BatchRecoveryRequired·BatchNotStopped)
 ├── collect/             TMDB에서 데이터를 모으는 배치(수집 Job)
-│   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime), 완료 시 작품 상세 캐시 비우기(TitleCacheEvictListener), 종료 시 독점 목록 캐시 갱신(ExclusiveTitlesRefreshListener: COMPLETED면 새로 계산해 채우고 아니면 비움, Task 078), COMPLETED일 때만 완료 이벤트 발행(CollectCompletionListener → CollectCompletedEvent, plan/batch의 재계산 시작이 받는다, Task 069)
+│   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime), tier로 흐름 분기(CollectTierDecider: DAILY면 제공처 목록·후보 발견을 건너뜀, Task 077), 완료 시 작품 상세 캐시 비우기(TitleCacheEvictListener), 종료 시 독점 목록 캐시 갱신(ExclusiveTitlesRefreshListener: COMPLETED면 새로 계산해 채우고 아니면 비움, Task 078), COMPLETED일 때만 완료 이벤트 발행(CollectCompletionListener → CollectCompletedEvent, plan/batch의 재계산 시작이 받는다, Task 069)
 │   ├── service/           CollectDataVersionService(마지막 COMPLETED 수집 종료 시각 = 데이터 기준 시각, 플랜 계산 입력이 사용)
 │   └── step/
 │       ├── CollectPoolMonitor  DB 연결 사용량을 로그로 남기는 보조 도구(두 Step 묶음이 같이 씀)
+│       ├── refresh/         갱신 주기 재맞춤 Step: Tasklet(RefreshTierTasklet) + Step 조립(Task 077, scope 없는 모든 실행의 첫 Step)
 │       ├── candidate/       후보 수집 Step: Reader · Writer · Mapper · Tasklet
-│       └── detail/          상세·시즌·판정 Step: Processor · Writer · Mapper (Reader는 DetailStepConfig에서 조립)
+│       └── detail/          상세·시즌·판정 Step: Processor · Writer · Mapper (Reader는 DetailStepConfig에서 조립, 읽을 작품 범위는 TierReaderParameterListener가 tier로 정함)
 ├── retention/           데이터 정리: 6개월 갱신 점검·TMDB에서 사라진 작품 삭제, 오래된 BATCH_* 이력·끊긴 calc_run 삭제 (Task 083). 각 도메인 서비스를 호출하는 조율 계층
 │   ├── controller/        AdminRetentionController (POST /api/admin/retention/executions, 202·409, ADMIN JWT 또는 배치 토큰)
 │   ├── dto/response/      RetentionExecutionAcceptedResponse

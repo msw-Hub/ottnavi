@@ -42,15 +42,22 @@ public final class CollectJobParameters implements JobParametersValidator {
         return CollectScope.valueOf(scope);
     }
 
-    /** 두 파라미터가 있고 tier가 ALL인지, scope가 있으면 알려진 값인지 검사한다. DAILY·WEEKLY는 2단계(Task 077)에서 열 때까지 거부한다 */
+    /** 이 실행의 tier를 읽는다. 값이 없거나 알 수 없으면 IllegalArgumentException(또는 NullPointerException)이다 */
+    public static CollectTier tierOf(JobParameters parameters) {
+        return CollectTier.valueOf(parameters.getString(TIER));
+    }
+
+    /** targetDate가 있는지, tier가 DAILY/WEEKLY/ALL 중 하나인지, scope가 있으면 알려진 값인지 검사한다 */
     @Override
     public void validate(JobParameters parameters) throws InvalidJobParametersException {
         if (parameters == null || parameters.getLocalDate(TARGET_DATE) == null) {
             throw new InvalidJobParametersException("targetDate(LocalDate) 파라미터가 필요하다");
         }
         String tier = parameters.getString(TIER);
-        if (!CollectTier.ALL.name().equals(tier)) {
-            throw new InvalidJobParametersException("MVP는 tier=ALL만 실행할 수 있다: " + tier);
+        try {
+            CollectTier.valueOf(tier);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new InvalidJobParametersException("알 수 없는 tier다(DAILY, WEEKLY, ALL 중 하나여야 한다): " + tier);
         }
         try {
             scopeOf(parameters); // 알 수 없는 값이면 valueOf가 IllegalArgumentException을 던진다
