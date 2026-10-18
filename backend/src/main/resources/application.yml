@@ -93,6 +93,9 @@ app:
       genres-ttl: 24h             # 장르 목록
       genre-titles-ttl: 30m       # 장르별 작품
       browser-seconds: 60         # 브라우저 Cache-Control: public, max-age 값(초). Vercel 엣지 캐시용 s-maxage는 쓰지 않는다
+  exclusive:                  # 서비스별 독점 목록(Task 078, PRD FR-04)
+    cache:                      # Redis `exclusiveTitles` 캐시. 수집 Job이 성공하면 새로 계산해 채우고, 실패·정리 뒤에는 비운다
+      ttl: 24h                    # 수집이 오래 없을 때의 안전장치. 캐시가 비면 조회 API가 즉석에서 계산해 채운다
   plan-recalc:
     auto-start: true                    # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
   collect:

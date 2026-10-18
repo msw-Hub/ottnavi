@@ -1454,10 +1454,16 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 078: 독점 목록 사전 계산과 공개 API 구현으로 서비스별 독점 조회 제공 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-04 · 선행: 075, 044, 049 · 브랜치: `feature/o3-exclusive-titles`
 - 구현 사항
-  - [ ] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
-  - [ ] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
+  - [x] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
+  - [x] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
 - 완료 기준
   - V-B: 독점 판정·공백 제외·데이터 부족 테스트. V-API: 서비스별 목록.
+- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o3-exclusive-titles`, 병합 전). `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`)를 `catalog`에 구현했다. 응답은 `PageMeta` 5개 필드 + `ottServiceId`·`isJudged`·`dataAsOf`, 항목 `ExclusiveTitle`(`mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`, `comparedServiceCount`, `unknownElsewhereCount`)이며 Task 075 승인안과 같다. 없는 서비스는 404 `OTT_SERVICE_NOT_FOUND`(신규, `error-codes.md`에 행 추가).
+  - 판정(`ExclusiveRules`, 순수 규칙): 시청 단위(영화 1편·시즌 1개)마다 AVAILABLE인 서비스가 정확히 하나면 그 서비스의 독점이다. 다른 서비스의 없음·모름은 모두 "다른 곳에 없음"으로 본다(모름 수는 `unknownElsewhereCount`). 모름 중 이유가 `STRUCTURAL_GAP`(쿠팡플레이 영화)인 서비스는 비교에서 빼서 `comparedServiceCount`에 세지 않는다(영화 5, 드라마 6). 판정 행이 없는 서비스는 모름으로 센다. 광고형(`in_ad_tier`)도 구독 제공(AVAILABLE)이다(Task 076: 저가형은 시청 범위를 제한하지 않음). 드라마는 독점 시즌만 `exclusiveSeasonNumbers`(오름차순)에 담고, 비교·모름 수는 독점 시즌 중 가장 큰 값이다. 정렬은 TMDB 인기도 내림차순(없으면 뒤, 동률은 작품 ID).
+  - 데이터 부족 서비스(`dataQuality=INSUFFICIENT`, 쿠팡플레이)는 판정하지 않고 `isJudged=false`·빈 목록의 200이다(404 아님). 그 서비스를 기준으로 한 독점은 만들지 않지만, 쿠팡플레이에 있는 작품은 다른 서비스 독점에서 정상적으로 빠진다.
+  - 캐시: 서비스마다 `ExclusiveTitleList` 전체를 `exclusiveTitles`에 저장(키 서비스 ID, TTL `app.exclusive.cache.ttl` 기본 24h). 수집 Job이 COMPLETED로 끝나면 `ExclusiveTitlesRefreshListener`가 7개를 새로 계산해 채우고, 실패·중단이면 비운다. 정리 Job(`RetentionService`)이 작품을 갱신·삭제하면 비운다. 조회 API는 캐시를 읽고, 비어 있으면(재시작·만료·비운 뒤) 7개를 즉석에서 계산해 채운다. 매월 재계산 Job은 제공 상태를 바꾸지 않아 연결하지 않았다. 조회 경로는 Redis 읽기·쓰기 실패 시 DB 계산 결과로 응답한다.
+  - 테스트: `ExclusiveRulesTest`(판정 8), `ExclusiveTitleApiTest`(목록·페이지·쿠팡플레이·404/400·캐시 적중/갱신/폴백 4), `OpenApiContractTest`, `ErrorCodeDocumentTest`, `RetentionHomeCacheEvictTest`(독점 캐시 비우기 확인 추가).
+  - 프론트(Task 079)에 넘길 내용: 응답 모양은 위와 같고, 목업 임시 타입 `ExclusiveTitle`/`ExclusiveTitlePage`는 생성 타입으로 바꾸며 `posterUrl` 대신 `posterPath`(TMDB 상대 경로)를 쓴다. `errorMessages.ts`의 `TECH_ERROR_MESSAGES`에 `OTT_SERVICE_NOT_FOUND`("서비스를 찾을 수 없습니다.")를 추가해야 한다(`errorMessages.test.ts`가 `error-codes.md` 행과 대조). 홈의 독점 줄은 이 API의 첫 페이지(`size`를 작게)로 연결한다.
 
 #### Task 079: 번들·독점 화면 실제 API 연결로 O3 완성 ⬜ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, SCR-03, SCR-14 · 선행: 076, 078 · 브랜치: `feature/o3-bundle-exclusive-api`

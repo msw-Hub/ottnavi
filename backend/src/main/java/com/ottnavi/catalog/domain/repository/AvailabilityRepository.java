@@ -1,6 +1,7 @@
 package com.ottnavi.catalog.domain.repository;
 
 import com.ottnavi.catalog.domain.entity.Availability;
+import com.ottnavi.catalog.domain.rule.ExclusiveSourceRow;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -27,4 +28,13 @@ public interface AvailabilityRepository extends JpaRepository<Availability, Long
     /** 전체 제공 상태 중 가장 최근 확인 시각. 판정이 하나도 없으면 null */
     @Query("select max(a.checkedAt) from Availability a")
     Instant findLatestCheckedAt();
+
+    /**
+     * 독점 판정용: 모든 제공 상태를 판정에 필요한 값만 읽는다(엔티티를 만들지 않는다).
+     * 소속 작품은 watch_unit의 title_id 컬럼으로 읽어 title 테이블을 조인하지 않는다.
+     */
+    @Query("select new com.ottnavi.catalog.domain.rule.ExclusiveSourceRow(a.watchUnit.id, a.watchUnit.title.id, "
+            + "a.watchUnit.unitType, a.watchUnit.seasonNumber, a.ottService.id, a.status, a.unknownReason, a.checkedAt) "
+            + "from Availability a")
+    List<ExclusiveSourceRow> findAllExclusiveSourceRows();
 }

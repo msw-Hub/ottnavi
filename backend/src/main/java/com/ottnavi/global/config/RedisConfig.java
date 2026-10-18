@@ -1,5 +1,6 @@
 package com.ottnavi.global.config;
 
+import com.ottnavi.catalog.service.model.ExclusiveTitleList;
 import com.ottnavi.catalog.service.model.GenreInfo;
 import com.ottnavi.catalog.service.model.NewlyAvailableResult;
 import com.ottnavi.catalog.service.model.TitleDetailView;
@@ -28,13 +29,13 @@ import tools.jackson.databind.json.JsonMapper;
 /** Redis 캐시 설정: 값은 JSON(Jackson 3)으로 저장하고 캐시마다 TTL을 둔다. */
 @Configuration
 @EnableCaching
-@EnableConfigurationProperties(HomeCacheProperties.class)
+@EnableConfigurationProperties({HomeCacheProperties.class, ExclusiveCacheProperties.class})
 public class RedisConfig {
 
     // 캐시 이름 (@Cacheable(cacheNames = ...)에서 이 상수를 쓴다)
     public static final String TITLE_DETAIL = "titleDetail";         // 작품 상세(Task 050·051)
     public static final String PLAN_CALC = "planCalc";               // 계산 결과, 키는 input_hash(TECH 1절)
-    public static final String EXCLUSIVE_TITLES = "exclusiveTitles"; // 독점 목록(2단계)
+    public static final String EXCLUSIVE_TITLES = "exclusiveTitles"; // 서비스별 독점 목록, 키는 서비스 ID(Task 078)
 
     // 홈·탐색 공개 응답 캐시(Task 107). 모두 로그인 정보 없이 모두에게 같은 목록이다
     public static final String HOME_POPULARITY = "homePopularity";     // 인기 순위, 키는 기간:서비스:개수
@@ -58,7 +59,7 @@ public class RedisConfig {
     /** 캐시별 TTL. 기본 설정을 바탕으로 TTL만 바꾼다. */
     @Bean
     public RedisCacheManagerBuilderCustomizer cacheTtlCustomizer(RedisCacheConfiguration base,
-            HomeCacheProperties homeCache) {
+            HomeCacheProperties homeCache, ExclusiveCacheProperties exclusiveCache) {
         // 작품 상세는 값 타입(TitleDetailView) 전용 직렬화기를 쓴다. 다른 캐시는 기본(범용) 직렬화기를 그대로 둔다
         RedisCacheConfiguration titleDetailConfig = base.entryTtl(Duration.ofHours(24))
                 .serializeValuesWith(SerializationPair.fromSerializer(
@@ -67,6 +68,10 @@ public class RedisConfig {
         RedisCacheConfiguration planCalcConfig = base.entryTtl(Duration.ofHours(24))
                 .serializeValuesWith(SerializationPair.fromSerializer(
                         new JacksonJsonRedisSerializer<>(PlanCalcResults.class)));
+        // 독점 목록은 서비스 한 곳의 목록(ExclusiveTitleList) 전용 직렬화기를 쓴다. TTL은 app.exclusive.cache.ttl이다(Task 078)
+        RedisCacheConfiguration exclusiveConfig = base.entryTtl(exclusiveCache.ttl())
+                .serializeValuesWith(SerializationPair.fromSerializer(
+                        new JacksonJsonRedisSerializer<>(ExclusiveTitleList.class)));
         // 홈·탐색 캐시: 캐시마다 값 타입과 TTL(app.home.cache.*)을 따로 둔다. 장르 목록은 List<GenreInfo>라 JavaType으로 지정한다
         RedisCacheConfiguration popularityConfig = base.entryTtl(homeCache.popularityTtl())
                 .serializeValuesWith(SerializationPair.fromSerializer(
@@ -88,7 +93,7 @@ public class RedisConfig {
         return builder -> builder
                 .withCacheConfiguration(TITLE_DETAIL, titleDetailConfig)
                 .withCacheConfiguration(PLAN_CALC, planCalcConfig)
-                .withCacheConfiguration(EXCLUSIVE_TITLES, base.entryTtl(Duration.ofHours(24)))
+                .withCacheConfiguration(EXCLUSIVE_TITLES, exclusiveConfig)
                 .withCacheConfiguration(HOME_POPULARITY, popularityConfig)
                 .withCacheConfiguration(HOME_NEW_ARRIVALS, newArrivalsConfig)
                 .withCacheConfiguration(HOME_WISHLISTED, wishlistedConfig)

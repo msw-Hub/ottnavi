@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 44개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -45,6 +45,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommonResponseOttServiceList'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/ott-services/{ottServiceId}/exclusive-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listServiceExclusiveTitles
+      security: []
+      summary: 서비스별 독점 목록 조회
+      description: |
+        "확인된 범위에서 7개 서비스 중 이 서비스에서만 구독으로 볼 수 있는 작품"을 인기도(TMDB 인기도) 높은 순으로 한 페이지 돌려준다(PRD FR-04). 비로그인 공개 API(요청 제한 적용).
+        수집이 끝날 때 미리 계산해 서버 캐시에 두며, 캐시가 비어 있으면 그 자리에서 계산한다. 독점은 시즌(시청 단위) 단위로 판정하므로 드라마는 독점 시즌 번호(`exclusiveSeasonNumbers`)를 함께 준다.
+        다른 서비스가 "없음"이거나 "모름"이면 독점으로 본다. "모름"인 서비스 수는 `unknownElsewhereCount`로 알려 화면이 "다른 곳에도 있을 수 있음"을 표시하게 한다.
+        쿠팡플레이 영화처럼 구조적으로 알 수 없는 서비스는 비교에서 빼므로(`comparedServiceCount`에 세지 않는다) 영화는 보통 5곳, 드라마는 6곳과 비교한다.
+        데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`, 쿠팡플레이)는 404가 아니라 `isJudged: false`와 빈 목록이다. 없는 서비스 ID만 404다.
+        오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `OTT_SERVICE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: ottServiceId
+          in: path
+          description: 서비스 ID(서비스 목록 API의 `ottServiceId`)
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 서비스의 독점 목록 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseExclusiveTitlePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -1533,7 +1573,7 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
     NotFound:
-      description: 요청한 데이터가 없음. `errorCode`는 operation 설명 참고(사용자 API는 도메인 코드 `TITLE_NOT_FOUND`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`(요금을 고칠 수 있는 상품이 아님. 없는 상품이거나 판매 종료)·`PLAN_DRAFT_NOT_FOUND`, 관리자 API의 없는 데이터는 `RESOURCE_NOT_FOUND`)
+      description: 요청한 데이터가 없음. `errorCode`는 operation 설명 참고(사용자 API는 도메인 코드 `TITLE_NOT_FOUND`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`(요금을 고칠 수 있는 상품이 아님. 없는 상품이거나 판매 종료)·`PLAN_DRAFT_NOT_FOUND`·`OTT_SERVICE_NOT_FOUND`(없는 서비스 ID), 관리자 API의 없는 데이터는 `RESOURCE_NOT_FOUND`)
       content:
         application/problem+json:
           schema:
@@ -4573,6 +4613,108 @@ components:
           size: 20
           totalElements: 1
           totalPages: 1
+          dataAsOf: '2026-10-18'
+    ExclusiveTitle:
+      type: object
+      description: 독점 목록의 작품 하나. "확인된 범위에서 7개 서비스 중 이 서비스에서만 구독으로 볼 수 있는 작품"이다(PRD FR-04)
+      required:
+        - mediaType
+        - tmdbId
+        - title
+        - releaseYear
+        - posterPath
+        - exclusiveSeasonNumbers
+        - comparedServiceCount
+        - unknownElsewhereCount
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID. 작품 상세 주소(`/public/titles/{mediaType}/{tmdbId}`)에 쓴다
+        title:
+          type: string
+          description: 한국어 제목
+        releaseYear:
+          type: integer
+          format: int32
+          nullable: true
+          description: 개봉(첫 방영) 연도. 모르면 null
+        posterPath:
+          type: string
+          nullable: true
+          description: TMDB 포스터 상대 경로. 없으면 null
+        exclusiveSeasonNumbers:
+          type: array
+          nullable: true
+          description: 드라마에서 이 서비스 독점으로 확인된 시즌 번호(오름차순). 같은 드라마라도 일부 시즌만 독점일 수 있다. 영화는 null
+          items:
+            type: integer
+            format: int32
+        comparedServiceCount:
+          type: integer
+          format: int32
+          description: 비교한 다른 서비스 수. 구조적 공백(쿠팡플레이 영화)은 세지 않아 영화는 보통 5, 드라마는 6이다
+        unknownElsewhereCount:
+          type: integer
+          format: int32
+          description: 비교한 다른 서비스 중 제공 여부가 "모름"인 곳의 수. 0보다 크면 다른 곳에도 있을 수 있다. 드라마는 독점 시즌 중 가장 큰 값
+    ExclusiveTitlePage:
+      description: 서비스별 독점 목록 한 페이지(페이지네이션 고정 형태 + 서비스 ID·판정 여부·데이터 기준일)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - ottServiceId
+            - isJudged
+            - dataAsOf
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/ExclusiveTitle'
+            ottServiceId:
+              type: integer
+              format: int64
+              description: 요청한 서비스 ID
+            isJudged:
+              type: boolean
+              description: 독점을 판정했는지. 데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`)는 false이고 `content`가 비며 `totalElements`는 0이다. 화면은 목록 대신 "데이터 부족" 안내를 보인다
+            dataAsOf:
+              type: string
+              format: date
+              description: 독점을 계산한 제공 상태의 데이터 기준일(KST)
+    CommonResponseExclusiveTitlePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ExclusiveTitlePage'
+      example:
+        success: true
+        data:
+          content:
+            - mediaType: tv
+              tmdbId: 1396
+              title: 브레이킹 배드
+              releaseYear: 2008
+              posterPath: /ggFHVNu6YYI5L9pCfOacjizRGt.jpg
+              exclusiveSeasonNumbers: [1, 2]
+              comparedServiceCount: 6
+              unknownElsewhereCount: 1
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          ottServiceId: 1
+          isJudged: true
           dataAsOf: '2026-10-18'
 
     # ----- auth -----

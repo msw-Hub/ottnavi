@@ -22,7 +22,7 @@
 
 `INVALID_REQUEST`, `RESOURCE_NOT_FOUND`, `METHOD_NOT_ALLOWED`는 Task 023에서 추가했다(없는 경로·잘못된 요청에도 `errorCode`가 오게 하는 V-API 완료 기준). 화면 메시지는 제안이며 프론트 `errorMessages.ts`(Task 025)에서 확정한다.
 
-**관리자 API의 404 예외(Task 031, 2026-10-12 사용자 확정).** 관리자 화면은 운영자 한 명이 쓰고, 없는 데이터는 다른 탭에서 지웠거나 주소를 직접 고친 경우뿐이라 데이터 종류마다 코드를 나눌 이득이 적다. 그래서 관리자 API의 없는 데이터는 도메인 코드를 만들지 않고 `RESOURCE_NOT_FOUND`를 쓴다. 사용자 API(`/api/public/**`, `/api/me/**`)는 원칙대로 도메인 코드(`TITLE_NOT_FOUND`, `WISHLIST_ITEM_NOT_FOUND`, `SERVICE_PRICE_NOT_FOUND`, `PLAN_DRAFT_NOT_FOUND`)를 쓴다.
+**관리자 API의 404 예외(Task 031, 2026-10-12 사용자 확정).** 관리자 화면은 운영자 한 명이 쓰고, 없는 데이터는 다른 탭에서 지웠거나 주소를 직접 고친 경우뿐이라 데이터 종류마다 코드를 나눌 이득이 적다. 그래서 관리자 API의 없는 데이터는 도메인 코드를 만들지 않고 `RESOURCE_NOT_FOUND`를 쓴다. 사용자 API(`/api/public/**`, `/api/me/**`)는 원칙대로 도메인 코드(`TITLE_NOT_FOUND`, `WISHLIST_ITEM_NOT_FOUND`, `SERVICE_PRICE_NOT_FOUND`, `PLAN_DRAFT_NOT_FOUND`, `OTT_SERVICE_NOT_FOUND`)를 쓴다.
 
 ### `fieldErrors` 구조 (`VALIDATION_FAILED`)
 
@@ -65,5 +65,6 @@
 | `WISHLIST_LIMIT_EXCEEDED` | 409 | "다 봤음"이 아닌 찜이 이미 20개라 새로 추가하거나 "다 봤음"을 되돌릴 수 없음. 이미 찜한 작품(시즌)의 중복 추가는 이 오류가 아니라 200이다 | 찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요. | PRD 11절 36번, FR-09, SCR-08 토스트 문구 |
 | `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031·056 |
 | `SERVICE_PRICE_NOT_FOUND` | 404 | 내 월 요금을 고치거나 되돌리려는 상품이 요금을 고칠 수 있는 상품이 아님(없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다) | 이 서비스의 요금 정보를 찾을 수 없습니다. | ERD `user_price_override`(상품 단위), Task 031·060 |
+| `OTT_SERVICE_NOT_FOUND` | 404 | 독점 목록 조회(`GET /api/public/ott-services/{ottServiceId}/exclusive-titles`)의 서비스 ID가 7개 서비스에 없음. 데이터 부족 서비스는 404가 아니라 `isJudged=false`인 200이다 | 서비스를 찾을 수 없습니다. | Task 075 확정(2026-10-17), Task 078 |
 
-위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045), `WISHLIST_*` 2개(Task 056), `PRICE_*` 6개(Task 059), `SERVICE_PRICE_NOT_FOUND`(Task 060)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
+위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045), `WISHLIST_*` 2개(Task 056), `PRICE_*` 6개(Task 059), `SERVICE_PRICE_NOT_FOUND`(Task 060), `OTT_SERVICE_NOT_FOUND`(Task 078)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).

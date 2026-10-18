@@ -1,5 +1,6 @@
 package com.ottnavi.retention.service;
 
+import com.ottnavi.catalog.service.ExclusiveTitleCacheService;
 import com.ottnavi.catalog.service.StaleTitleQueryService;
 import com.ottnavi.catalog.service.model.StaleTitle;
 import com.ottnavi.global.config.RedisConfig;
@@ -38,6 +39,7 @@ public class RetentionService {
 	private final PlanPurgeService planPurgeService;
 	private final CacheManager cacheManager;
 	private final HomeCacheEvictor homeCacheEvictor; // 삭제된 작품 카드가 홈 목록에 남지 않게 비운다(Task 107)
+	private final ExclusiveTitleCacheService exclusiveTitleCacheService; // 삭제된 작품이 독점 목록에 남지 않게 비운다(Task 078)
 	private final Clock clock;
 
 	/**
@@ -79,10 +81,11 @@ public class RetentionService {
 			}
 		}
 
-		// 4. 갱신·삭제가 있었으면 작품 상세 캐시와 홈·탐색 캐시를 비운다(삭제된 작품 카드가 남지 않게)
+		// 4. 갱신·삭제가 있었으면 작품 상세·홈·탐색·독점 목록 캐시를 비운다(삭제된 작품 카드가 남지 않게)
 		if (refreshed > 0 || purged > 0) {
 			evictTitleDetailCache();
 			homeCacheEvictor.evictAll();
+			exclusiveTitleCacheService.evictAll();
 		}
 
 		log.info("6개월 갱신 점검 종료: 점검={}건, 갱신={}건, 갱신 못 함={}건, 삭제={}건, 보류={}건", targets.size(), refreshed,

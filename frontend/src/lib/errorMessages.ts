@@ -45,6 +45,8 @@ const TECH_ERROR_MESSAGES = {
   WISHLIST_LIMIT_EXCEEDED: '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.',
   WISHLIST_ITEM_NOT_FOUND: '찜 항목을 찾을 수 없습니다.',
   SERVICE_PRICE_NOT_FOUND: '이 서비스의 요금 정보를 찾을 수 없습니다.',
+  // Task 078: 독점 목록 조회의 서비스 ID가 7개 서비스에 없을 때(error-codes.md와 문구를 맞춘다)
+  OTT_SERVICE_NOT_FOUND: '서비스를 찾을 수 없습니다.',
 } as const
 
 // 두 표를 합친 전체 매핑. 화면 코드는 이 값이 아니라 getErrorMessage를 쓴다

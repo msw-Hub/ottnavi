@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.ottnavi.catalog.domain.enums.MediaType;
+import com.ottnavi.catalog.service.ExclusiveTitleCacheService;
 import com.ottnavi.catalog.service.StaleTitleQueryService;
 import com.ottnavi.catalog.service.model.StaleTitle;
 import com.ottnavi.home.service.HomeCacheEvictor;
@@ -26,9 +27,10 @@ class RetentionHomeCacheEvictTest {
 	private final StaleTitleQueryService staleTitleQueryService = mock(StaleTitleQueryService.class);
 	private final TitleRetentionService titleRetentionService = mock(TitleRetentionService.class);
 	private final HomeCacheEvictor homeCacheEvictor = mock(HomeCacheEvictor.class);
+	private final ExclusiveTitleCacheService exclusiveTitleCacheService = mock(ExclusiveTitleCacheService.class);
 	private final RetentionService service = new RetentionService(new RetentionProperties(5, 180, 500),
 			staleTitleQueryService, titleRetentionService, mock(BatchHistoryPurger.class), mock(PlanPurgeService.class),
-			mock(CacheManager.class), homeCacheEvictor, Clock.fixed(Instant.parse("2026-10-18T00:00:00Z"), ZoneId.of("Asia/Seoul")));
+			mock(CacheManager.class), homeCacheEvictor, exclusiveTitleCacheService, Clock.fixed(Instant.parse("2026-10-18T00:00:00Z"), ZoneId.of("Asia/Seoul")));
 
 	@Test
 	void 작품을_삭제했으면_홈_캐시를_비운다() {
@@ -42,6 +44,7 @@ class RetentionHomeCacheEvictTest {
 
 		// then
 		verify(homeCacheEvictor).evictAll();
+		verify(exclusiveTitleCacheService).evictAll();
 	}
 
 	@Test
@@ -56,5 +59,6 @@ class RetentionHomeCacheEvictTest {
 
 		// then
 		verify(homeCacheEvictor, never()).evictAll();
+		verify(exclusiveTitleCacheService, never()).evictAll();
 	}
 }
