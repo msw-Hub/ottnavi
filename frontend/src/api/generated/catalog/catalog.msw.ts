@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 44개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -18,6 +18,7 @@ import type {
 } from 'msw';
 
 import type {
+  CommonResponseExclusiveTitlePage,
   CommonResponseGenreList,
   CommonResponseNewlyAvailableTitleList,
   CommonResponsePopularityRanking,
@@ -27,6 +28,8 @@ import type {
   CommonResponseWishlistedTitleList
 } from '../model';
 
+
+export const getListServiceExclusiveTitlesResponseMock = (): CommonResponseExclusiveTitlePage => ({"success":true,"data":{"content":[{"mediaType":"tv","tmdbId":1396,"title":"브레이킹 배드","releaseYear":2008,"posterPath":"/ggFHVNu6YYI5L9pCfOacjizRGt.jpg","exclusiveSeasonNumbers":[1,2],"comparedServiceCount":6,"unknownElsewhereCount":1}],"page":0,"size":20,"totalElements":1,"totalPages":1,"ottServiceId":1,"isJudged":true,"dataAsOf":"2026-10-18"}})
 
 export const getSearchTitlesResponseMock = (): CommonResponseTitleSearchPage => ({"success":true,"data":{"content":[{"mediaType":"movie","tmdbId":496243,"title":"기생충","releaseYear":2019,"posterPath":"/mSi0gskYpmf1FbXngM37s2HppXh.jpg","availabilities":[{"ottServiceId":1,"status":"NOT_AVAILABLE"},{"ottServiceId":2,"status":"NOT_AVAILABLE"},{"ottServiceId":3,"status":"UNKNOWN"},{"ottServiceId":4,"status":"AVAILABLE"},{"ottServiceId":5,"status":"AVAILABLE"},{"ottServiceId":6,"status":"AVAILABLE"},{"ottServiceId":7,"status":"UNKNOWN"}]}],"page":0,"size":20,"totalElements":1,"totalPages":1,"isExternalCollectFailed":false,"dataAsOf":"2026-10-08"}})
 
@@ -44,6 +47,18 @@ export const getListGenreTitlesResponseMock = (): CommonResponseTitleExplorePage
 
 export const getListPersonTitlesResponseMock = (): CommonResponseTitleExplorePage => ({"success":true,"data":{"content":[{"mediaType":"movie","tmdbId":496243,"title":"기생충","releaseYear":2019,"posterPath":"/mSi0gskYpmf1FbXngM37s2HppXh.jpg","availabilities":[{"ottServiceId":1,"status":"AVAILABLE"}]}],"page":0,"size":20,"totalElements":1,"totalPages":1,"dataAsOf":"2026-10-18"}})
 
+
+export const getListServiceExclusiveTitlesMockHandler = (overrideResponse?: CommonResponseExclusiveTitlePage | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseExclusiveTitlePage> | CommonResponseExclusiveTitlePage), options?: RequestHandlerOptions) => {
+  return http.get('/api/public/ott-services/:ottServiceId/exclusive-titles', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListServiceExclusiveTitlesResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 
 export const getSearchTitlesMockHandler = (overrideResponse?: CommonResponseTitleSearchPage | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseTitleSearchPage> | CommonResponseTitleSearchPage), options?: RequestHandlerOptions) => {
   return http.get('/api/public/titles', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
@@ -141,6 +156,7 @@ export const getListPersonTitlesMockHandler = (overrideResponse?: CommonResponse
   }, options)
 }
 export const getCatalogMock = () => [
+  getListServiceExclusiveTitlesMockHandler(),
   getSearchTitlesMockHandler(),
   getGetTitleDetailMockHandler(),
   getListPopularityRankingsMockHandler(),

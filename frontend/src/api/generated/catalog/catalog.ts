@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 44개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -27,6 +27,7 @@ import type {
 import type {
   BadGatewayResponse,
   BadRequestResponse,
+  CommonResponseExclusiveTitlePage,
   CommonResponseGenreList,
   CommonResponseNewlyAvailableTitleList,
   CommonResponsePopularityRanking,
@@ -39,6 +40,7 @@ import type {
   ListNewlyAvailableTitlesParams,
   ListPersonTitlesParams,
   ListPopularityRankingsParams,
+  ListServiceExclusiveTitlesParams,
   ListWishlistedTitlesParams,
   NotFoundResponse,
   SearchTitlesParams,
@@ -67,6 +69,112 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+/**
+ * "확인된 범위에서 7개 서비스 중 이 서비스에서만 구독으로 볼 수 있는 작품"을 인기도(TMDB 인기도) 높은 순으로 한 페이지 돌려준다(PRD FR-04). 비로그인 공개 API(요청 제한 적용).
+ * 수집이 끝날 때 미리 계산해 서버 캐시에 두며, 캐시가 비어 있으면 그 자리에서 계산한다. 독점은 시즌(시청 단위) 단위로 판정하므로 드라마는 독점 시즌 번호(`exclusiveSeasonNumbers`)를 함께 준다.
+ * 다른 서비스가 "없음"이거나 "모름"이면 독점으로 본다. "모름"인 서비스 수는 `unknownElsewhereCount`로 알려 화면이 "다른 곳에도 있을 수 있음"을 표시하게 한다.
+ * 쿠팡플레이 영화처럼 구조적으로 알 수 없는 서비스는 비교에서 빼므로(`comparedServiceCount`에 세지 않는다) 영화는 보통 5곳, 드라마는 6곳과 비교한다.
+ * 데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`, 쿠팡플레이)는 404가 아니라 `isJudged: false`와 빈 목록이다. 없는 서비스 ID만 404다.
+ * 오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `OTT_SERVICE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 서비스별 독점 목록 조회
+ */
+export const listServiceExclusiveTitles = (
+    ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseExclusiveTitlePage>(
+      {url: `/public/ott-services/${ottServiceId}/exclusive-titles`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListServiceExclusiveTitlesQueryKey = (ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams,) => {
+    return [
+    `/public/ott-services/${ottServiceId}/exclusive-titles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListServiceExclusiveTitlesQueryOptions = <TData = Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>>(ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListServiceExclusiveTitlesQueryKey(ottServiceId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listServiceExclusiveTitles>>> = ({ signal }) => listServiceExclusiveTitles(ottServiceId,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: ottServiceId !== null && ottServiceId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListServiceExclusiveTitlesQueryResult = NonNullable<Awaited<ReturnType<typeof listServiceExclusiveTitles>>>
+export type ListServiceExclusiveTitlesQueryError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListServiceExclusiveTitles<TData = Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ ottServiceId: number,
+    params: undefined |  ListServiceExclusiveTitlesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listServiceExclusiveTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listServiceExclusiveTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListServiceExclusiveTitles<TData = Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listServiceExclusiveTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listServiceExclusiveTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListServiceExclusiveTitles<TData = Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 서비스별 독점 목록 조회
+ */
+
+export function useListServiceExclusiveTitles<TData = Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError = ErrorType<BadRequestResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ ottServiceId: number,
+    params?: ListServiceExclusiveTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listServiceExclusiveTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListServiceExclusiveTitlesQueryOptions(ottServiceId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
 
 /**
  * 제목(한국어·원제)에 검색어가 들어간 작품을 찾는다(대소문자 구분 없는 부분 일치). 비로그인 공개 API(요청 제한 적용).
