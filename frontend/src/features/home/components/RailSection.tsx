@@ -9,17 +9,18 @@ import { withJosa } from '@/lib/josa'
 // JustWatch 공식 사이트 주소(출처 링크. SourceAttribution과 같은 주소)
 const JUSTWATCH_URL = 'https://www.justwatch.com/'
 
-// 목록 하나의 불러오기 상태. 1차안은 정적 샘플이라 항상 ready지만, API로 바꿨을 때 그릴 모양을 미리 정해 둔다
+// 목록 하나의 불러오기 상태(API 응답에 따라 홈 화면이 정한다)
 export type RailStatus = 'ready' | 'loading' | 'error' | 'empty'
 
 interface RailSectionProps {
   heading: string // 목록 제목(h2)
   description?: ReactNode // 제목 아래 한 줄: 무엇을 기준으로 뽑았는지(예: "TMDB 인기도 기준")
   moreTo?: string // "더보기"로 갈 주소. 없으면 더보기를 숨긴다
-  dataAsOf: string // 이 목록의 데이터 기준일('YYYY-MM-DD')
+  dataAsOf: string | null // 이 목록의 데이터 기준일('YYYY-MM-DD'). 아직 모르면(불러오는 중·스냅샷 없음) null → "정보 없음"
   status?: RailStatus // 불러오기 상태(기본 ready)
   emptyTitle?: string // 빈 상태 제목
   emptyDescription?: string // 빈 상태 안내
+  error?: unknown // 오류 상태일 때 실패 원인(ApiError면 안내 문장을 거기서 꺼낸다. 429면 "잠시 후 다시" 문구가 된다)
   onRetry?: () => void // 오류 상태의 "다시 시도"
   children: ReactNode // 목록(보통 ServiceTabs + ScrollRail). status가 ready일 때만 그린다
 }
@@ -40,11 +41,12 @@ export function RailSection({
   status = 'ready',
   emptyTitle = '보여 줄 작품이 없습니다',
   emptyDescription,
+  error,
   onRetry,
   children,
 }: RailSectionProps) {
   const headingId = useId()
-  const dataAsOfText = formatDataAsOf(dataAsOf)
+  const dataAsOfText = formatDataAsOf(dataAsOf) // 모르거나 해석할 수 없으면 null
 
   return (
     // grid-cols-1(= minmax(0, 1fr)): 그리드 칸의 최소 폭을 0으로 둬, 안의 가로 스크롤 줄이 카드 전체 폭만큼 칸을 넓히지 않게 한다
@@ -75,6 +77,7 @@ export function RailSection({
         heading={heading}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+        error={error}
         onRetry={onRetry}
       >
         {children}
@@ -92,7 +95,7 @@ export function RailSection({
           <span className="sr-only">(새 탭에서 열림)</span>
         </a>{' '}
         (TMDB를 통해 제공) · 데이터 기준일{' '}
-        {dataAsOfText ? (
+        {dataAsOf && dataAsOfText ? (
           <time dateTime={dataAsOf} className="font-semibold text-foreground">
             {dataAsOfText}
           </time>
@@ -110,6 +113,7 @@ interface RailBodyProps {
   heading: string
   emptyTitle: string
   emptyDescription?: string
+  error?: unknown
   onRetry?: () => void
   children: ReactNode
 }
@@ -120,13 +124,18 @@ function RailBody({
   heading,
   emptyTitle,
   emptyDescription,
+  error,
   onRetry,
   children,
 }: RailBodyProps) {
   if (status === 'loading') return <RailSkeleton heading={heading} />
   if (status === 'error') {
     return (
-      <ErrorState title={`${withJosa(heading, '을/를')} 불러오지 못했습니다`} onRetry={onRetry} />
+      <ErrorState
+        title={`${withJosa(heading, '을/를')} 불러오지 못했습니다`}
+        error={error}
+        onRetry={onRetry}
+      />
     )
   }
   if (status === 'empty') return <EmptyState title={emptyTitle} description={emptyDescription} />
@@ -135,7 +144,7 @@ function RailBody({
 
 // 가로 줄 자리에 카드 모양 회색 칸 5개를 보인다. 칸은 장식이라 낭독기에서 숨기고, 무엇을 불러오는지는 role="status" 글자로 알린다.
 // 깜빡임(animate-pulse)은 움직임 줄이기를 켜지 않은 사용자에게만 보인다(motion-safe)
-function RailSkeleton({ heading }: { heading: string }) {
+export function RailSkeleton({ heading }: { heading: string }) {
   return (
     <div>
       <p role="status" className="sr-only">

@@ -3,17 +3,13 @@ import { CheckIcon, SearchIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { DataAsOf } from '@/components/common/DataAsOf'
 import { EmptyState } from '@/components/common/EmptyState'
+import { ErrorState } from '@/components/common/ErrorState'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { Button } from '@/components/ui/button'
 import { HomeTitleCard } from '@/features/home/components/HomeTitleCard'
-import type { HomeGenre, HomeTitle } from '@/features/home/mockTypes'
-import {
-  HOME_DATA_AS_OF,
-  HOME_GENRE_LABELS,
-  HOME_NEW_ARRIVALS,
-  HOME_SERVICES,
-  HOME_TITLES,
-} from '@/features/home/sampleData'
+import { RailSkeleton } from '@/features/home/components/RailSection'
+import { useExploreTitles, useGenres } from '@/features/home/hooks/useHomeLists'
+import { useOttServices } from '@/hooks/useOttServices'
 import { cn } from '@/lib/utils'
 
 // 작품 구분 칩. 'all'은 구분하지 않음
@@ -33,41 +29,63 @@ function chipClassName(isSelected: boolean) {
   )
 }
 
+// 주소의 ?genre= 값(TMDB 장르 ID)을 숫자로 바꾼다. 숫자가 아니거나 1 미만이면 null(고르지 않음)
+function parseGenreId(raw: string | null): number | null {
+  if (raw === null || !/^[1-9]\d{0,8}$/.test(raw)) return null
+  return Number(raw)
+}
+
 /**
- * 탐색(`/explore`) 화면 본문이다(홈 1차안, 얇은 자리). 이름 검색 입력, 작품 구분·장르 칩, "새로 볼 수 있게 된 작품만" 칩, 결과 바둑판이 있다.
+ * 탐색(`/explore`) 화면 본문이다. 제목 검색 입력, 작품 구분·장르 칩, "새로 볼 수 있게 된 작품만" 칩, 결과 바둑판이 있다.
  *
- * 1차안 한계: 정적 샘플 작품 18개 안에서만 거른다. 인물 검색은 PRD 9절 고도화 후보(우리 DB의 출연진 상위 10명에서 찾기, 범위 미정)라
- * 지금은 작품 제목만 찾는다는 것을 입력창 아래에 밝힌다.
+ * 결과를 받는 방법(useExploreTitles): 검색어가 있으면 작품 검색 API, 없고 장르를 골랐으면 장르별 작품 API(TMDB 장르),
+ * 없고 "새로 볼 수 있게 된 작품만"이면 새 작품 API, 아무것도 안 골랐으면 오늘의 인기 순위(전체)를 보인다.
+ * 서로 다른 API라 한 번에 한 조건만 적용된다: 검색을 하면 장르·새 작품 선택이 풀리고, 장르나 새 작품을 고르면 검색어가 지워진다
+ * (눌러 놓은 칩이 결과에 반영되지 않는 어긋남을 막으려는 것이다). 작품 구분(영화/드라마) 칩만 받은 결과를 화면에서 거른다.
+ * 인물 검색은 PRD 9절 고도화 후보라 입력창 아래에 준비 중이라고 밝힌다(출연자별 작품 API는 계약에 있고 아직 화면에 연결하지 않았다).
  * 고른 값(?q=, ?type=, ?genre=, ?view=new)을 주소에 두는 이유: 홈의 "더보기"가 바로 이 상태로 열고, 새로고침·공유에도 유지되게 하려는 것이다.
  */
 export function ExploreScreen() {
   const [searchParams, setSearchParams] = useSearchParams()
   const query = (searchParams.get('q') ?? '').trim()
   const type = searchParams.get('type') ?? 'all'
-  const genre = searchParams.get('genre') as HomeGenre | null
+  const genreId = parseGenreId(searchParams.get('genre'))
   const isNewOnly = searchParams.get('view') === 'new'
 
-  // 주소 파라미터 하나를 바꾸거나(값) 지운다(null). 다른 파라미터는 그대로 둔다
-  function updateParam(key: string, value: string | null) {
+  const servicesQuery = useOttServices()
+  const genresQuery = useGenres()
+  const explore = useExploreTitles({ query, genreId, isNewOnly })
+
+  // 주소 파라미터를 바꾼다. updates의 값이 null이면 지운다. 다른 파라미터(작품 구분, 목업 확인용 ?mockScenario 등)는 그대로 둔다
+  function updateParams(updates: Record<string, string | null>) {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
-        if (value === null) next.delete(key)
-        else next.set(key, value)
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === null) next.delete(key)
+          else next.set(key, value)
+        }
         return next
       },
       { replace: true },
     )
   }
 
-  // 이름 검색 제출: 입력값을 주소의 ?q=에 넣는다(빈 값이면 지운다)
+  // 이름 검색 제출: 입력값을 주소의 ?q=에 넣는다(빈 값이면 지운다). 검색은 장르·새 작품 조건과 함께 쓸 수 없어 둘을 푼다
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const value = String(new FormData(event.currentTarget).get('q') ?? '').trim()
-    updateParam('q', value || null)
+    // 빈 값이면 검색어만 지운다(고른 장르·새 작품 조건이 안내 없이 풀리지 않게)
+    if (!value) {
+      updateParams({ q: null })
+      return
+    }
+    updateParams({ q: value, genre: null, view: null })
   }
 
-  const results = filterTitles(HOME_TITLES, { query, type, genre, isNewOnly })
+  // 작품 구분은 받은 결과에서 화면이 거른다
+  const results = explore.items.filter((title) => type === 'all' || title.mediaType === type)
+  const services = servicesQuery.data ?? []
 
   return (
     <section aria-labelledby="explore-title" className="flex flex-col gap-6">
@@ -115,87 +133,98 @@ export function ExploreScreen() {
               key={option.value}
               label={option.label}
               isSelected={type === option.value}
-              onClick={() => updateParam('type', option.value === 'all' ? null : option.value)}
+              onClick={() => updateParams({ type: option.value === 'all' ? null : option.value })}
             />
           ))}
         </ChipGroup>
         <ChipGroup label="장르">
           <ToggleChip
             label="전체 장르"
-            isSelected={genre === null}
-            onClick={() => updateParam('genre', null)}
+            isSelected={genreId === null}
+            onClick={() => updateParams({ genre: null })}
           />
-          {(Object.keys(HOME_GENRE_LABELS) as HomeGenre[]).map((value) => (
+          {/* 장르 칩은 TMDB 장르 목록 API(이름 가나다순)에서 온다. 받는 중·실패일 때는 "전체 장르"만 남고 아래 줄에 안내가 붙는다 */}
+          {(genresQuery.data ?? []).map((genre) => (
             <ToggleChip
-              key={value}
-              label={HOME_GENRE_LABELS[value]}
-              isSelected={genre === value}
-              onClick={() => updateParam('genre', value)}
+              key={genre.genreId}
+              label={genre.name}
+              isSelected={genreId === genre.genreId}
+              onClick={() => updateParams({ genre: String(genre.genreId), q: null, view: null })}
             />
           ))}
         </ChipGroup>
+        {genresQuery.isError && (
+          <p role="status" className="text-sm text-muted-foreground">
+            장르 목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.
+          </p>
+        )}
         <ChipGroup label="보기">
           <ToggleChip
             label="새로 볼 수 있게 된 작품만"
             isSelected={isNewOnly}
-            onClick={() => updateParam('view', isNewOnly ? null : 'new')}
+            onClick={() =>
+              updateParams(isNewOnly ? { view: null } : { view: 'new', q: null, genre: null })
+            }
           />
         </ChipGroup>
       </div>
 
-      {/* 결과 개수는 거를 때마다 바뀌어 낭독기에 알린다(role="status", 급하지 않은 알림) */}
-      <p role="status" className="text-sm font-semibold tabular-nums">
-        작품 {results.length}편
-      </p>
-      {results.length === 0 ? (
-        <EmptyState
-          title="조건에 맞는 작품이 없습니다"
-          description="장르나 작품 구분을 바꾸거나 검색어를 지워 보세요. 아직 수집되지 않은 작품은 보이지 않을 수 있습니다."
+      {explore.isPending ? (
+        <RailSkeleton heading="탐색 결과" />
+      ) : explore.isError ? (
+        <ErrorState
+          title="작품을 불러오지 못했습니다"
+          error={explore.error}
+          onRetry={explore.refetch}
         />
       ) : (
-        <ul
-          aria-label="탐색 결과"
-          className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
-        >
-          {results.map((title) => (
-            <li key={`${title.mediaType}-${title.tmdbId}`}>
-              <HomeTitleCard title={title} services={HOME_SERVICES} />
-            </li>
-          ))}
-        </ul>
+        <>
+          {/* 결과 개수는 거를 때마다 바뀌어 낭독기에 알린다(role="status", 급하지 않은 알림). 더 받을 페이지가 있으면 "이상"으로 쓴다 */}
+          <p role="status" className="text-sm font-semibold tabular-nums">
+            작품 {results.length}편{explore.hasNextPage ? ' 이상' : ''}
+          </p>
+          {results.length === 0 ? (
+            <EmptyState
+              title="조건에 맞는 작품이 없습니다"
+              description="장르나 작품 구분을 바꾸거나 검색어를 지워 보세요. 아직 수집되지 않은 작품은 보이지 않을 수 있습니다."
+            />
+          ) : (
+            <ul
+              aria-label="탐색 결과"
+              className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
+            >
+              {results.map((title) => (
+                <li key={`${title.mediaType}-${title.tmdbId}`}>
+                  <HomeTitleCard title={title} services={services} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {explore.hasNextPage && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                className="h-11 px-6"
+                disabled={explore.isFetchingNextPage}
+                onClick={explore.fetchNextPage}
+              >
+                {explore.isFetchingNextPage ? '불러오는 중…' : '더보기'}
+              </Button>
+            </div>
+          )}
+        </>
       )}
 
       <div className="grid gap-1.5 border-t border-border pt-4">
         <SourceAttribution />
-        <DataAsOf value={HOME_DATA_AS_OF} />
+        <DataAsOf value={explore.dataAsOf} />
         <p className="text-sm text-muted-foreground">
           제공 여부는 확인된 범위이며, 실제 서비스 상황과 다를 수 있습니다.
         </p>
       </div>
     </section>
-  )
-}
-
-interface TitleFilter {
-  query: string // 제목에 들어 있어야 하는 글자(빈 값이면 거르지 않음)
-  type: string // 'all' | 'movie' | 'tv'
-  genre: HomeGenre | null // 장르(null이면 거르지 않음)
-  isNewOnly: boolean // 새로 볼 수 있게 된 작품만
-}
-
-// 샘플 작품을 조건으로 거른다(1차안 전용. 실제로는 서버가 걸러 내려줄 값이다)
-function filterTitles(titles: HomeTitle[], filter: TitleFilter): HomeTitle[] {
-  const newIds = new Set(HOME_NEW_ARRIVALS.map((entry) => entry.title.tmdbId))
-  return titles.filter(
-    (title) =>
-      // 1. 제목 글자
-      (filter.query === '' || title.title.includes(filter.query)) &&
-      // 2. 작품 구분
-      (filter.type === 'all' || title.mediaType === filter.type) &&
-      // 3. 장르
-      (filter.genre === null || title.genres.includes(filter.genre)) &&
-      // 4. 새로 볼 수 있게 된 작품
-      (!filter.isNewOnly || newIds.has(title.tmdbId)),
   )
 }
 

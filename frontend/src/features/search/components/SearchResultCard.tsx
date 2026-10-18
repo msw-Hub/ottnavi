@@ -87,7 +87,7 @@ export function SearchResultCard({ item, services }: SearchResultCardProps) {
 
 /*
  * 이전 구조(가로 카드 + 영화 하트 찜 버튼)의 하트 부분. 카드에서 찜을 뺐으므로 쓰지 않지만 참고용으로 남긴다.
- * 이를 되살리려면 useWishlistItem(features/search/hooks), WishlistButton(variant="icon")을 다시 import해야 한다.
+ * 이를 되살리려면 useWishlistItem(hooks/useWishlistItem, 공용으로 옮김), WishlistButton(variant="icon")을 다시 import해야 한다.
  *
  * function MovieWishlist({ item }: { item: TitleSearchItem }) {
  *   const wishlist = useWishlistItem(

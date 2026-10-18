@@ -1325,6 +1325,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 홈의 독점 줄은 Task 078(독점 API) 뒤에 연결한다. 108에서는 인기·찜·새 작품 줄만 먼저 연결
 - 완료 기준
   - V-FS: 목록이 API 응답과 같고 콘솔 에러 0건(화면이 바뀌므로 V-F 포함). RTL 테스트로 목업 연결 확인.
+- 결과(2026-10-18, 브랜치 `feature/f-home-explore-api`, 구현 완료·사용자 화면 확인 대기): 홈 인기 순위(서비스 탭·오늘/최근 7일, 서버 `notice`와 `daysCounted` 표시)·찜 많은 작품(빈 목록이면 줄 숨김)·새로 볼 수 있게 된 작품(입고 "확인"/공개 "공개" 구분)을 실제 API 훅(`features/home/hooks/useHomeLists.ts`)에 연결했다. 줄마다 로딩·빈·오류(429 포함)를 따로 그린다. 카드 찜은 영화만 찜 API(공용 `hooks/useWishlistItem.ts`, 검색 기능 폴더에서 옮김), 드라마는 상세로 보낸다. 내 플랜 카드도 현재 플랜 API로 교체(문구 "계산일"→"저장일"). 탐색은 레이아웃·문구를 유지하고 장르 칩을 `GET /genres`로, 장르 선택을 `genres/{id}/titles`로, 검색을 작품 검색 API로, 아무것도 안 고르면 오늘 인기 순위를 보인다(조건은 한 번에 하나만 적용: 검색하면 장르·새 작품 선택이 풀림). 독점 줄은 홈에서 그리지 않는다(Task 078 뒤 `ExclusivesRail` 재연결). `sampleData.ts`·`mockTypes.ts`·`?homePreview=` 제거, 목업은 `mocks/homeHandlers.ts`·`fixtures/home.ts`(시나리오 `home-empty`·`rate-limit`·`error`). 우리 DB에 없는 작품 카드는 "제공 정보 수집 전"으로 보인다. 출연자별 작품(`people/titles`)은 화면 자리가 없어 연결하지 않았다(생성 훅 `useListPersonTitles` 있음). `SettingsForm` 저장 후·`useLogout` 이동은 이미 홈(`/`)이라 변경 없음.
 
 ---
 

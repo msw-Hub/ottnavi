@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 44개이고 43개가 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution` 포함). 탈퇴 `withdrawMe`(`DELETE /me`)는 Task 081이 `x-planned: true`로 추가했고 구현은 Task 082다. 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -21,6 +21,7 @@ export * from './adminProductPrice';
 export * from './adminProductPriceRequest';
 export * from './adminProvider';
 export * from './adminProviderList';
+export * from './arrivalType';
 export * from './availabilityStatus';
 export * from './badGatewayResponse';
 export * from './badRequestResponse';
@@ -44,19 +45,25 @@ export * from './commonResponseCollectExecutionAccepted';
 export * from './commonResponseCollectExecutionChangePage';
 export * from './commonResponseCollectExecutionPage';
 export * from './commonResponseCurrentPlan';
+export * from './commonResponseGenreList';
+export * from './commonResponseNewlyAvailableTitleList';
 export * from './commonResponseOttServiceList';
 export * from './commonResponsePlanBenchmark';
 export * from './commonResponsePlanChangeHistoryList';
 export * from './commonResponsePlanDraftList';
 export * from './commonResponsePlanRecalcExecutionAccepted';
+export * from './commonResponsePopularityExecutionAccepted';
+export * from './commonResponsePopularityRanking';
 export * from './commonResponseRetentionExecutionAccepted';
 export * from './commonResponseSavedPlan';
 export * from './commonResponseServicePrice';
 export * from './commonResponseServicePriceList';
 export * from './commonResponseTitleDetail';
+export * from './commonResponseTitleExplorePage';
 export * from './commonResponseTitleSearchPage';
 export * from './commonResponseUpdatedWishlistItem';
 export * from './commonResponseUserSettings';
+export * from './commonResponseWishlistedTitleList';
 export * from './commonResponseWishlistItemList';
 export * from './conflictResponse';
 export * from './createAdminProductRequest';
@@ -65,10 +72,18 @@ export * from './createPlanRequest';
 export * from './currentPlan';
 export * from './fieldError';
 export * from './forbiddenResponse';
+export * from './genre';
 export * from './internalErrorResponse';
 export * from './listCollectExecutionChangesParams';
 export * from './listCollectExecutionsParams';
+export * from './listGenreTitlesParams';
+export * from './listNewlyAvailableTitlesParams';
+export * from './listPersonTitlesParams';
+export * from './listPopularityRankingsParams';
+export * from './listWishlistedTitlesParams';
 export * from './mediaType';
+export * from './newlyAvailableTitle';
+export * from './newlyAvailableTitleList';
 export * from './notFoundResponse';
 export * from './ottService';
 export * from './ottServiceCode';
@@ -97,6 +112,10 @@ export * from './planTitleChange';
 export * from './planTitleChangeType';
 export * from './planTitlePlacement';
 export * from './planType';
+export * from './popularityExecutionAccepted';
+export * from './popularityPeriod';
+export * from './popularityRanking';
+export * from './popularityRankingItem';
 export * from './priceSource';
 export * from './problemDetail';
 export * from './productType';
@@ -112,6 +131,7 @@ export * from './serviceSubscriptionStatus';
 export * from './setMyServicePriceRequest';
 export * from './sizeParamParameter';
 export * from './titleDetail';
+export * from './titleExplorePage';
 export * from './titleSearchItem';
 export * from './titleSearchPage';
 export * from './titleSeason';
@@ -127,6 +147,8 @@ export * from './updateWishlistItemRequest';
 export * from './userSettings';
 export * from './userSubscription';
 export * from './watchPreset';
+export * from './wishlistedTitle';
+export * from './wishlistedTitleList';
 export * from './wishlistItem';
 export * from './wishlistItemList';
 export * from './wishlistPriority';

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 44개이고 43개가 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution` 포함). 탈퇴 `withdrawMe`(`DELETE /me`)는 Task 081이 `x-planned: true`로 추가했고 구현은 Task 082다. 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -27,9 +27,19 @@ import type {
 import type {
   BadGatewayResponse,
   BadRequestResponse,
+  CommonResponseGenreList,
+  CommonResponseNewlyAvailableTitleList,
+  CommonResponsePopularityRanking,
   CommonResponseTitleDetail,
+  CommonResponseTitleExplorePage,
   CommonResponseTitleSearchPage,
+  CommonResponseWishlistedTitleList,
   InternalErrorResponse,
+  ListGenreTitlesParams,
+  ListNewlyAvailableTitlesParams,
+  ListPersonTitlesParams,
+  ListPopularityRankingsParams,
+  ListWishlistedTitlesParams,
   NotFoundResponse,
   SearchTitlesParams,
   TooManyRequestsResponse
@@ -251,6 +261,593 @@ export function useGetTitleDetail<TData = Awaited<ReturnType<typeof getTitleDeta
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetTitleDetailQueryOptions(mediaType,tmdbId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 서비스별 인기 순위를 `TODAY`(가장 최근 스냅샷 하루) 또는 `WEEK`(최근 7일 스냅샷의 TMDB 인기도 평균)로 돌려준다. 비로그인 공개 API(요청 제한 적용).
+ * 순위는 TMDB `discover`(한국, 서비스 제공처 필터, 인기순)를 하루 한 번 받아 쌓은 일별 스냅샷으로 만든다. **TMDB 인기도 기준이며 OTT 공식 순위가 아니다**(`notice`에 화면 표기용 문구를 담는다). 서비스마다 영화·드라마를 합쳐 인기도 높은 순 상위 `limit`개이고, `ottServiceId`를 생략하면 7개 서비스 전체에서 같은 작품을 한 번만 세어 순위를 매긴다.
+ * `WEEK`는 가장 최근 스냅샷 날짜까지 7일 범위에서 스냅샷이 있는 날 수(`daysCounted`)로 나눈 평균이고, 그날 상위권에 없던 작품은 그날을 0으로 센다(한 번 반짝 오른 작품이 부풀려지지 않는다). 공개 직후 7일 미만이면 `daysCounted`가 7보다 작다. `ottServiceId`를 지정하면 최신 날짜와 `daysCounted` 모두 그 서비스의 기록만으로 구한다(다른 서비스만 기록된 날은 세지 않는다). 동률이면 가장 최근 날 인기도, TMDB ID 순이다. 스냅샷이 하나도 없으면 `items`는 빈 배열, `snapshotDate`는 null이다(화면은 줄을 숨긴다).
+ * 작품 정보(`title`)는 우리 DB에 수집된 작품이면 서비스별 제공 상태(`availabilities`)가 채워지고, 아직 수집되지 않은 작품은 `availabilities`가 빈 배열이다(그런 작품의 상세는 `TITLE_NOT_FOUND`(404)일 수 있다).
+ * 응답은 브라우저가 약 1분 캐시할 수 있다.
+ * 오류: `VALIDATION_FAILED`(400, `period` 값·`limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 서비스별 인기 순위 조회
+ */
+export const listPopularityRankings = (
+    params?: ListPopularityRankingsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponsePopularityRanking>(
+      {url: `/public/popularity-rankings`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListPopularityRankingsQueryKey = (params?: ListPopularityRankingsParams,) => {
+    return [
+    `/public/popularity-rankings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPopularityRankingsQueryOptions = <TData = Awaited<ReturnType<typeof listPopularityRankings>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(params?: ListPopularityRankingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPopularityRankingsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPopularityRankings>>> = ({ signal }) => listPopularityRankings(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPopularityRankingsQueryResult = NonNullable<Awaited<ReturnType<typeof listPopularityRankings>>>
+export type ListPopularityRankingsQueryError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListPopularityRankings<TData = Awaited<ReturnType<typeof listPopularityRankings>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: undefined |  ListPopularityRankingsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPopularityRankings>>,
+          TError,
+          Awaited<ReturnType<typeof listPopularityRankings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPopularityRankings<TData = Awaited<ReturnType<typeof listPopularityRankings>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListPopularityRankingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPopularityRankings>>,
+          TError,
+          Awaited<ReturnType<typeof listPopularityRankings>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPopularityRankings<TData = Awaited<ReturnType<typeof listPopularityRankings>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListPopularityRankingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 서비스별 인기 순위 조회
+ */
+
+export function useListPopularityRankings<TData = Awaited<ReturnType<typeof listPopularityRankings>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListPopularityRankingsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPopularityRankings>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPopularityRankingsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 찜한 사용자 수가 많은 작품을 많은 순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+ * 사용자 수는 작품 단위로 센다(드라마는 시즌을 여러 개 찜해도 한 명). "다 봤음"으로 체크한 찜은 세지 않고, **숫자만 노출**하며 누가 찜했는지는 알 수 없다. 사용자가 `minUserCount`명보다 적은 작품은 목록에서 뺀다(개인 식별 방지, 설정값 `app.home.min-wishlist-users`, 기본 3). 조건을 채운 작품이 없으면 `items`는 빈 배열이고 화면은 줄을 숨긴다.
+ * 동률이면 먼저 저장된 작품이 앞에 온다. `dataAsOf`는 제공 상태의 데이터 기준일(KST)이다.
+ * 오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 찜 많은 작품 조회
+ */
+export const listWishlistedTitles = (
+    params?: ListWishlistedTitlesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseWishlistedTitleList>(
+      {url: `/public/wishlisted-titles`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListWishlistedTitlesQueryKey = (params?: ListWishlistedTitlesParams,) => {
+    return [
+    `/public/wishlisted-titles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWishlistedTitlesQueryOptions = <TData = Awaited<ReturnType<typeof listWishlistedTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(params?: ListWishlistedTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWishlistedTitlesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWishlistedTitles>>> = ({ signal }) => listWishlistedTitles(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListWishlistedTitlesQueryResult = NonNullable<Awaited<ReturnType<typeof listWishlistedTitles>>>
+export type ListWishlistedTitlesQueryError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListWishlistedTitles<TData = Awaited<ReturnType<typeof listWishlistedTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: undefined |  ListWishlistedTitlesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWishlistedTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listWishlistedTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListWishlistedTitles<TData = Awaited<ReturnType<typeof listWishlistedTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListWishlistedTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listWishlistedTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listWishlistedTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListWishlistedTitles<TData = Awaited<ReturnType<typeof listWishlistedTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListWishlistedTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 찜 많은 작품 조회
+ */
+
+export function useListWishlistedTitles<TData = Awaited<ReturnType<typeof listWishlistedTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListWishlistedTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listWishlistedTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListWishlistedTitlesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 최근 서비스에서 새로 볼 수 있게 된 작품을 최신순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+ * 두 경우를 묶는다. (1) `ARRIVAL`(입고): 최근 14일 안에 제공 상태가 없음·모름에서 있음(AVAILABLE)으로 바뀐 기록이 있는 작품. (2) `RELEASE`(공개): 우리가 처음 수집하며 바로 있음으로 적재된 작품이지만 공개일(영화 개봉일, 드라마는 시즌 공개일)이 최근 30일 이내인 작품. 첫 적재인데 공개일을 모르면 제외한다.
+ * `availableSince`는 `ARRIVAL`이면 있음으로 바뀐 것을 확인한 날(KST), `RELEASE`면 공개일이다. 실제 서비스에 들어온 날이 아니라 **우리가 확인한 범위**의 날짜다. 같은 작품이 같은 서비스에 여러 번 해당하면(예: 시즌 여러 개) 가장 최근 하나만 담는다.
+ * `ottServiceId`를 주면 그 서비스만 돌려준다. 결과가 없으면 `items`는 빈 배열이다.
+ * 오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 새로 볼 수 있게 된 작품 조회
+ */
+export const listNewlyAvailableTitles = (
+    params?: ListNewlyAvailableTitlesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseNewlyAvailableTitleList>(
+      {url: `/public/newly-available-titles`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListNewlyAvailableTitlesQueryKey = (params?: ListNewlyAvailableTitlesParams,) => {
+    return [
+    `/public/newly-available-titles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListNewlyAvailableTitlesQueryOptions = <TData = Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(params?: ListNewlyAvailableTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListNewlyAvailableTitlesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listNewlyAvailableTitles>>> = ({ signal }) => listNewlyAvailableTitles(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListNewlyAvailableTitlesQueryResult = NonNullable<Awaited<ReturnType<typeof listNewlyAvailableTitles>>>
+export type ListNewlyAvailableTitlesQueryError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListNewlyAvailableTitles<TData = Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: undefined |  ListNewlyAvailableTitlesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listNewlyAvailableTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listNewlyAvailableTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListNewlyAvailableTitles<TData = Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListNewlyAvailableTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listNewlyAvailableTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listNewlyAvailableTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListNewlyAvailableTitles<TData = Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListNewlyAvailableTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 새로 볼 수 있게 된 작품 조회
+ */
+
+export function useListNewlyAvailableTitles<TData = Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params?: ListNewlyAvailableTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listNewlyAvailableTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListNewlyAvailableTitlesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 탐색 화면의 장르 선택에 쓸 장르 목록이다. 우리 DB에 작품이 하나 이상 연결된 장르만 이름 가나다순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+ * 오류: `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 장르 목록 조회
+ */
+export const listGenres = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseGenreList>(
+      {url: `/public/genres`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListGenresQueryKey = () => {
+    return [
+    `/public/genres`
+    ] as const;
+    }
+
+
+export const getListGenresQueryOptions = <TData = Awaited<ReturnType<typeof listGenres>>, TError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGenresQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGenres>>> = ({ signal }) => listGenres(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListGenresQueryResult = NonNullable<Awaited<ReturnType<typeof listGenres>>>
+export type ListGenresQueryError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListGenres<TData = Awaited<ReturnType<typeof listGenres>>, TError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGenres>>,
+          TError,
+          Awaited<ReturnType<typeof listGenres>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListGenres<TData = Awaited<ReturnType<typeof listGenres>>, TError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGenres>>,
+          TError,
+          Awaited<ReturnType<typeof listGenres>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListGenres<TData = Awaited<ReturnType<typeof listGenres>>, TError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 장르 목록 조회
+ */
+
+export function useListGenres<TData = Awaited<ReturnType<typeof listGenres>>, TError = ErrorType<TooManyRequestsResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenres>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListGenresQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 장르(`genreId`)에 속한 작품을 인기도 높은 순으로 한 페이지 돌려준다. **우리 DB에 수집된 작품만** 대상이라 "7개 서비스에서 확인된 범위"이며 TMDB를 호출하지 않는다. 비로그인 공개 API(요청 제한 적용).
+ * 없는 `genreId`는 404가 아니라 빈 결과다. 페이지 크기 기본 20. 응답은 브라우저가 약 1분 캐시할 수 있다.
+ * 오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 장르별 작품 조회
+ */
+export const listGenreTitles = (
+    genreId: number,
+    params?: ListGenreTitlesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseTitleExplorePage>(
+      {url: `/public/genres/${genreId}/titles`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListGenreTitlesQueryKey = (genreId: number,
+    params?: ListGenreTitlesParams,) => {
+    return [
+    `/public/genres/${genreId}/titles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListGenreTitlesQueryOptions = <TData = Awaited<ReturnType<typeof listGenreTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(genreId: number,
+    params?: ListGenreTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGenreTitlesQueryKey(genreId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGenreTitles>>> = ({ signal }) => listGenreTitles(genreId,params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: genreId !== null && genreId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListGenreTitlesQueryResult = NonNullable<Awaited<ReturnType<typeof listGenreTitles>>>
+export type ListGenreTitlesQueryError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListGenreTitles<TData = Awaited<ReturnType<typeof listGenreTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ genreId: number,
+    params: undefined |  ListGenreTitlesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGenreTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listGenreTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListGenreTitles<TData = Awaited<ReturnType<typeof listGenreTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ genreId: number,
+    params?: ListGenreTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listGenreTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listGenreTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListGenreTitles<TData = Awaited<ReturnType<typeof listGenreTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ genreId: number,
+    params?: ListGenreTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 장르별 작품 조회
+ */
+
+export function useListGenreTitles<TData = Awaited<ReturnType<typeof listGenreTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ genreId: number,
+    params?: ListGenreTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listGenreTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListGenreTitlesQueryOptions(genreId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 이름이 `name`과 같은(대소문자 구분 없음) 출연자가 나온 작품을 인기도 높은 순으로 한 페이지 돌려준다. 우리 DB에 저장된 출연진(작품당 출연 순서 상위 10명)만 조회하며 TMDB 인물 검색은 쓰지 않는다. 비로그인 공개 API(요청 제한 적용).
+ * 그래서 결과는 "7개 서비스에서 확인된 범위"이고, 같은 이름의 다른 사람이 섞일 수 있으며 출연 순서 10번째 밖의 출연작은 빠진다(화면이 안내 문구로 알린다).
+ * 오류: `VALIDATION_FAILED`(400, 이름 없음·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 인물(출연자)별 작품 조회
+ */
+export const listPersonTitles = (
+    params: ListPersonTitlesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseTitleExplorePage>(
+      {url: `/public/people/titles`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListPersonTitlesQueryKey = (params?: ListPersonTitlesParams,) => {
+    return [
+    `/public/people/titles`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListPersonTitlesQueryOptions = <TData = Awaited<ReturnType<typeof listPersonTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(params: ListPersonTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPersonTitlesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPersonTitles>>> = ({ signal }) => listPersonTitles(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListPersonTitlesQueryResult = NonNullable<Awaited<ReturnType<typeof listPersonTitles>>>
+export type ListPersonTitlesQueryError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>
+
+
+export function useListPersonTitles<TData = Awaited<ReturnType<typeof listPersonTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: ListPersonTitlesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPersonTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listPersonTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPersonTitles<TData = Awaited<ReturnType<typeof listPersonTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: ListPersonTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPersonTitles>>,
+          TError,
+          Awaited<ReturnType<typeof listPersonTitles>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListPersonTitles<TData = Awaited<ReturnType<typeof listPersonTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: ListPersonTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 인물(출연자)별 작품 조회
+ */
+
+export function useListPersonTitles<TData = Awaited<ReturnType<typeof listPersonTitles>>, TError = ErrorType<BadRequestResponse | TooManyRequestsResponse | InternalErrorResponse>>(
+ params: ListPersonTitlesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listPersonTitles>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListPersonTitlesQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
