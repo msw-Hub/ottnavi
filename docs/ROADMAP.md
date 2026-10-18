@@ -44,10 +44,10 @@
 | 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
-| 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 2/3 | 🔄 진행 중 (106 화면 1차안은 PR #75로 병합, 107 홈·탐색 API는 PR #84로 병합, 108 대기) |
-| 4 | 추가 기능 개발 | 9/24 | 🔄 진행 중 (082 탈퇴 API(병합 전), 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
+| 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 3/3 | ✅ 완료 (106 화면 1차안은 PR #75, 107 홈·탐색 API는 PR #84, 108 홈·탐색 실제 API 연결은 PR #86으로 병합) |
+| 4 | 추가 기능 개발 | 10/24 | 🔄 진행 중 (084 탈퇴 화면 실제 API 연결(구현 완료·병합 전), 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 77/108 | |
+| 합계 | | 79/108 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -1288,7 +1288,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 7b. Phase 3b — 공개 전 추가 화면(홈·랭킹·탐색) · 2/3
+## 7b. Phase 3b — 공개 전 추가 화면(홈·랭킹·탐색) · 3/3
 
 **목표.** PRD 9절 고도화 후보(공통 추천 목록·랭킹·탐색)를 첫 공개 범위로 당겨 홈 화면과 탐색 화면을 만든다(2026-10-17 사용자 결정, PRD 11절 42번). 4.4 순서(목업 → 계약·백엔드 → 교체)를 따른다.
 
@@ -1312,12 +1312,12 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B/V-API: 스냅샷 적재·평균 계산, 첫 적재분 제외, 최소 인원 미만 처리 테스트. `OpenApiContractTest` 통과
   - 매일 수집이 돌아야 하므로 실제 운영 적재는 Task 093(cron 활성화)에 의존한다.
-- 결과(2026-10-18, 브랜치 `feature/b9-home-explore`, 병합 전): 공개 조회 6개(`GET /api/public/popularity-rankings`·`wishlisted-titles`·`newly-available-titles`·`genres`·`genres/{genreId}/titles`·`people/titles`)와 관리자 `POST /api/admin/popularity/executions`(202·409, 배치 토큰 허용)를 구현했다. 인기 수집 Job(`popularityJob`, Step 2개: 수집 → 14일 지난 스냅샷 삭제, 같은 날 재실행은 교체라 멱등)은 수집·재계산·정리와 서로 409로 막는다. 워크플로 `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(Task 093에서 켠다).
+- 결과(2026-10-18, 브랜치 `feature/b9-home-explore`, PR #84로 병합): 공개 조회 6개(`GET /api/public/popularity-rankings`·`wishlisted-titles`·`newly-available-titles`·`genres`·`genres/{genreId}/titles`·`people/titles`)와 관리자 `POST /api/admin/popularity/executions`(202·409, 배치 토큰 허용)를 구현했다. 인기 수집 Job(`popularityJob`, Step 2개: 수집 → 14일 지난 스냅샷 삭제, 같은 날 재실행은 교체라 멱등)은 수집·재계산·정리와 서로 409로 막는다. 워크플로 `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(Task 093에서 켠다).
   - 결정(2026-10-18 사용자, 11절 39번): 새로 볼 수 있게 된 작품 = 입고(최근 14일 안에 없음·모름 → 있음) 또는 공개(첫 적재라도 공개일 30일 이내, 공개일 모르면 제외), 같은 작품·서비스는 최근 한 건. 찜 많은 작품 = 작품 단위 사용자 수·"다 봤음" 제외·3명 미만 제외·빈 목록이면 프론트가 줄을 숨김. 인기 7일 평균 = 스냅샷이 있는 날 수로 나누고 없던 날은 0. 장르·인물 탐색은 우리 DB만(인물은 이름 완전 일치, 대소문자 무시). 기준 수치는 `app.home.*`·`app.popularity.*` 설정값, 평균 규칙은 `PopularityRankingRules` 한 곳이다.
   - 응답 캐시(2026-10-18 사용자 결정, 같은 브랜치): 공개 조회 5개를 Redis(`homePopularity` 60분·`homeNewArrivals` 30분·`homeWishlisted` 10분·`homeGenres` 24시간·`homeGenreTitles` 30분, `app.home.cache.*`)에 캐시하고 브라우저에 `Cache-Control: public, max-age=60`을 준다. 출연자별 작품은 캐시하지 않는다. 수집·정리 Job 종료 때 5개 모두, 인기 수집 Job 종료 때 인기 순위를 비운다. 상세는 TECH 3절.
   - 넘길 내용: Task 108(프론트 연결)이 목업과 계약의 차이 6가지를 반영한다(HANDOFF 참고). 순위에는 우리 DB에 없는 작품이 나올 수 있다(`availabilities`가 빈 배열). 구독형(flatrate)만 쓴다.
 
-#### Task 108: 홈·탐색 실제 API 연결로 첫 화면 완성 ⬜ `[v0.1.0 포함]`
+#### Task 108: 홈·탐색 실제 API 연결로 첫 화면 완성 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: FR-22, FR-23, SCR-19~21 · 선행: 107, 106 · 브랜치(제안): `feature/f-home-api`
 - 구현 사항
   - [ ] 인기·찜·새 작품 줄을 실제 API에 연결, 홈 카드 찜(임시 상태)을 찜 API로 교체, 429·빈 상태·오류 안내
@@ -1325,11 +1325,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 홈의 독점 줄은 Task 078(독점 API) 뒤에 연결한다. 108에서는 인기·찜·새 작품 줄만 먼저 연결
 - 완료 기준
   - V-FS: 목록이 API 응답과 같고 콘솔 에러 0건(화면이 바뀌므로 V-F 포함). RTL 테스트로 목업 연결 확인.
-- 결과(2026-10-18, 브랜치 `feature/f-home-explore-api`, 구현 완료·사용자 화면 확인 대기): 홈 인기 순위(서비스 탭·오늘/최근 7일, 서버 `notice`와 `daysCounted` 표시)·찜 많은 작품(빈 목록이면 줄 숨김)·새로 볼 수 있게 된 작품(입고 "확인"/공개 "공개" 구분)을 실제 API 훅(`features/home/hooks/useHomeLists.ts`)에 연결했다. 줄마다 로딩·빈·오류(429 포함)를 따로 그린다. 카드 찜은 영화만 찜 API(공용 `hooks/useWishlistItem.ts`, 검색 기능 폴더에서 옮김), 드라마는 상세로 보낸다. 내 플랜 카드도 현재 플랜 API로 교체(문구 "계산일"→"저장일"). 탐색은 레이아웃·문구를 유지하고 장르 칩을 `GET /genres`로, 장르 선택을 `genres/{id}/titles`로, 검색을 작품 검색 API로, 아무것도 안 고르면 오늘 인기 순위를 보인다(조건은 한 번에 하나만 적용: 검색하면 장르·새 작품 선택이 풀림). 독점 줄은 홈에서 그리지 않는다(Task 078 뒤 `ExclusivesRail` 재연결). `sampleData.ts`·`mockTypes.ts`·`?homePreview=` 제거, 목업은 `mocks/homeHandlers.ts`·`fixtures/home.ts`(시나리오 `home-empty`·`rate-limit`·`error`). 우리 DB에 없는 작품 카드는 "제공 정보 수집 전"으로 보인다. 출연자별 작품(`people/titles`)은 화면 자리가 없어 연결하지 않았다(생성 훅 `useListPersonTitles` 있음). `SettingsForm` 저장 후·`useLogout` 이동은 이미 홈(`/`)이라 변경 없음.
+- 결과(2026-10-18, 브랜치 `feature/f-home-explore-api`, PR #86으로 병합, 사용자 화면 확인은 남음): 홈 인기 순위(서비스 탭·오늘/최근 7일, 서버 `notice`와 `daysCounted` 표시)·찜 많은 작품(빈 목록이면 줄 숨김)·새로 볼 수 있게 된 작품(입고 "확인"/공개 "공개" 구분)을 실제 API 훅(`features/home/hooks/useHomeLists.ts`)에 연결했다. 줄마다 로딩·빈·오류(429 포함)를 따로 그린다. 카드 찜은 영화만 찜 API(공용 `hooks/useWishlistItem.ts`, 검색 기능 폴더에서 옮김), 드라마는 상세로 보낸다. 내 플랜 카드도 현재 플랜 API로 교체(문구 "계산일"→"저장일"). 탐색은 레이아웃·문구를 유지하고 장르 칩을 `GET /genres`로, 장르 선택을 `genres/{id}/titles`로, 검색을 작품 검색 API로, 아무것도 안 고르면 오늘 인기 순위를 보인다(조건은 한 번에 하나만 적용: 검색하면 장르·새 작품 선택이 풀림). 독점 줄은 홈에서 그리지 않는다(Task 078 뒤 `ExclusivesRail` 재연결). `sampleData.ts`·`mockTypes.ts`·`?homePreview=` 제거, 목업은 `mocks/homeHandlers.ts`·`fixtures/home.ts`(시나리오 `home-empty`·`rate-limit`·`error`). 우리 DB에 없는 작품 카드는 "제공 정보 수집 전"으로 보인다. 출연자별 작품(`people/titles`)은 화면 자리가 없어 연결하지 않았다(생성 훅 `useListPersonTitles` 있음). `SettingsForm` 저장 후·`useLogout` 이동은 이미 홈(`/`)이라 변경 없음.
 
 ---
 
-## 8. Phase 4 — 추가 기능 개발 · 9/24
+## 8. Phase 4 — 추가 기능 개발 · 10/24
 
 **목표.**
 - PRD 2단계(O1~O4)와 3단계 일부(Q3 LLM, Q4 정확도 안내·반응형·접근성)를 4.4 순서(목업 → 계약·백엔드 → 교체)로 구현한다.
@@ -1493,7 +1493,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] (082 범위: cascade로 알림 행 삭제 확인까지) PENDING 알림 미발송(Task 072의 발송 직전 재확인과 연동). Task 080 결정과 무관하게 진행 가능. **2026-10-17 개정**: 알림(072)이 공개 뒤로 이월돼 082의 선행에서 072를 뺐다. 082는 `users` 삭제 cascade로 알림 행이 지워지는지만 확인하고, 발송 직전 재확인·경합 테스트는 Task 072에서 이어서 한다
 - 완료 기준
   - V-B: 탈퇴 후 사용자 데이터 0행(알림 행 포함), `calc_run` 보존·`plan_id` NULL. 탈퇴·outbox 점유 경합 시 미발송은 Task 072로 이월.
-- 기록: 2026-10-18 구현(브랜치 `feature/o4-withdraw-api`, 병합 전). `DELETE /api/me`(204·401)를 `user`에 구현했다. 비트랜잭션 `UserWithdrawService`가 `UserWithdrawWriter`(짧은 트랜잭션: `users` 행 `FOR UPDATE` 잠금 → 벌크 JPQL 삭제, 하위 행은 DB `ON DELETE CASCADE`, `calc_run.plan_id`는 FK `SET NULL`이라 별도 UPDATE 없음)를 부르고, **커밋 뒤에** `RefreshTokenStore.revokeAllOf(userId)`로 Redis 계열을 지운 다음 컨트롤러가 `rt` 쿠키를 만료시킨다. 쿠키 `Path=/api/auth`라 탈퇴 요청에는 `rt`가 실려 오지 않으므로 토큰이 아니라 사용자 ID로 폐기한다. Redis 삭제가 실패하면 로그(error)만 남기고 204로 응답한다(DB는 이미 지워졌고, 남은 계열은 재발급 때 401로 거절되며 TTL 14일로도 사라진다). 사용자 단위 Redis 캐시는 아직 없어(캐시는 작품·홈·계산 결과처럼 모두에게 같은 값) 지울 것이 없다. 이미 탈퇴한 계정으로 다시 호출하면 401이다. 블랙리스트는 두지 않았고, `UserWithdrawApiTest`가 탈퇴 직후 같은 AT로 설정 저장·찜 추가 401, 설정 조회 200 빈 응답, 같은 RT 재발급 401과 Redis 키 삭제, 탈퇴·찜 추가 동시 실행(8회) 뒤 찜 0행, `rt` 쿠키 만료, 소유 행 0행·`calc_run` 보존을 고정한다. 계약은 `x-planned`를 지우고 헤더의 operation 개수를 "44개 모두 구현"으로 고쳤다(응답 필드 변경 없음). 쓰기 API 전수 점검 결과 `lockUser` 없이 사용자 데이터를 새로 넣는 곳은 없었다(TECH 4절).
+- 기록: 2026-10-18 구현(브랜치 `feature/o4-withdraw-api`, PR #85로 병합). `DELETE /api/me`(204·401)를 `user`에 구현했다. 비트랜잭션 `UserWithdrawService`가 `UserWithdrawWriter`(짧은 트랜잭션: `users` 행 `FOR UPDATE` 잠금 → 벌크 JPQL 삭제, 하위 행은 DB `ON DELETE CASCADE`, `calc_run.plan_id`는 FK `SET NULL`이라 별도 UPDATE 없음)를 부르고, **커밋 뒤에** `RefreshTokenStore.revokeAllOf(userId)`로 Redis 계열을 지운 다음 컨트롤러가 `rt` 쿠키를 만료시킨다. 쿠키 `Path=/api/auth`라 탈퇴 요청에는 `rt`가 실려 오지 않으므로 토큰이 아니라 사용자 ID로 폐기한다. Redis 삭제가 실패하면 로그(error)만 남기고 204로 응답한다(DB는 이미 지워졌고, 남은 계열은 재발급 때 401로 거절되며 TTL 14일로도 사라진다). 사용자 단위 Redis 캐시는 아직 없어(캐시는 작품·홈·계산 결과처럼 모두에게 같은 값) 지울 것이 없다. 이미 탈퇴한 계정으로 다시 호출하면 401이다. 블랙리스트는 두지 않았고, `UserWithdrawApiTest`가 탈퇴 직후 같은 AT로 설정 저장·찜 추가 401, 설정 조회 200 빈 응답, 같은 RT 재발급 401과 Redis 키 삭제, 탈퇴·찜 추가 동시 실행(8회) 뒤 찜 0행, `rt` 쿠키 만료, 소유 행 0행·`calc_run` 보존을 고정한다. 계약은 `x-planned`를 지우고 헤더의 operation 개수를 "44개 모두 구현"으로 고쳤다(응답 필드 변경 없음). 쓰기 API 전수 점검 결과 `lockUser` 없이 사용자 데이터를 새로 넣는 곳은 없었다(TECH 4절).
 
 #### Task 083: 6개월 갱신 점검과 데이터 정리 작업 구현으로 약관 보관 기한 준수 ✅ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O4, FR-18, 6절 라이선스 · 선행: 080 · 브랜치: `feature/o4-data-retention`(실제 작업 브랜치 `feature/o4-withdraw-cleanup`)
@@ -1504,10 +1504,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: 기준을 넘긴 데이터만 정리되고, 찜(`wishlist_item`)과 ACTIVE·DRAFT 플랜의 `plan_item`이 참조하는 `watch_unit`은 삭제되지 않는(FK 위반 없음) 테스트가 통과한다.
 - 기록: 2026-10-18 구현·테스트 완료(미커밋, 브랜치 `feature/o4-withdraw-cleanup`). 구현: 새 패키지 `retention`(Job `retentionJob`의 Step 3개 = 작품 점검·배치 이력 정리·계산 기록 정리, 앞 Step이 실패해도 다음 Step 진행), `POST /api/admin/retention/executions`(202·409, ADMIN JWT 또는 배치 토큰, 새 오류 코드 없이 `BATCH_ALREADY_RUNNING` 재사용), `.github/workflows/retention.yml`(`workflow_dispatch`만 켜고 `schedule`은 주석). 정리·재계산·수집은 서로 실행 중이면 시작을 막는다(네 방향 모두 409). 마이그레이션 없음. 사용자 결정 Q1~Q5를 추천안으로 확정(2026-10-18): Q1 사라진 작품이 든 ARCHIVED 플랜은 통째 삭제, Q2 찜이 그 작품뿐이라 재계산할 수 없는 ACTIVE도 삭제, Q3 `calc_run`은 `plan_id` NULL·180일 지난 행을 구분 없이 삭제(비교 측정 행 포함), Q4 한 번에 가장 오래된 순 500건 상한(`app.retention.max-titles-per-run`), Q5 점검 조회 API 없이 로그만. 테스트: retention 관련 통합 18건(작품 점검 6·이력 정리 3·Job과 409 6·API 3)·단위 5건을 추가했고 전체 빌드 `./gradlew.bat build` 958건 중 실패 0·오류 0·건너뜀 1(기존 `EngineBenchmarkGenerator`). TMDB 404는 코드(`TmdbClient`의 404 → `TmdbNotFoundException`)와 일반 문서로만 확인했다: 삭제된 ID의 404와 삭제 빈도는 운영 수집 뒤 `tmdb.call{result=not_found}`로 실측한다. 실서버와 `retention.yml` 실행은 확인하지 못했다(`main` 병합 뒤 확인). 알려진 동작: `.on("*")`로 다음 Step에 넘어가면 실패한 Step의 상태가 ABANDONED로 바뀌지만 종료 코드는 FAILED로 남고 Job은 COMPLETED로 끝난다.
 
-#### Task 084: 탈퇴 화면 실제 API 연결로 O4 완성 ⬜ `[v0.1.0 포함]`
+#### Task 084: 탈퇴 화면 실제 API 연결로 O4 완성 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O4, SCR-13 · 선행: 082 · 브랜치: `feature/o4-withdrawal-api`
 - 완료 기준
   - V-FS: 테스트 계정 탈퇴 → 로그아웃·메모리 토큰 제거 → 재로그인 시 신규 계정(온보딩)으로 시작한다.
+- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o4-withdrawal-api`, 병합 전, 실서버 V-FS는 사용자 몫). 081이 이미 생성 훅 `useWithdrawMe`로 만들어 둔 `useWithdraw`가 계약(204·401·500)과 그대로 맞아 화면·훅 코드는 바꾸지 않았다. `npm run api:generate`로 생성물만 최신 계약(설명 문구)에 맞췄다. 실제 API 모드(`VITE_USE_MOCK=false`) 흐름을 `withdrawRealApi.test.tsx`로 고정했다: 204(요청에 Access Token 첨부, 토큰 비움, 첫 화면, 완료 토스트), 401+재발급 401(로그인 화면, 같은 요청 재전송 없음, 완료 토스트 없음), 401+재발급 성공(새 토큰으로 한 번만 재전송해 성공), 429·500(이동·정리 없이 대화상자 안 안내, 다시 시도 가능). `rt` 쿠키 만료는 브라우저·서버 몫이라 테스트로 확인하지 못했다(실서버 V-FS에서 확인).
 
 #### Task 085: Gemini API 무료 등급 키 발급으로 LLM 연동 준비 ⬜ `[3단계 이월]`
 - 태그: [H] · PRD: Q3, 6절 LLM · 선행: 없음 · 기한: 2026-11-19(3단계 착수 전)
