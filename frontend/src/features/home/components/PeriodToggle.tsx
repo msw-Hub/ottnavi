@@ -1,11 +1,11 @@
 import { CheckIcon } from 'lucide-react'
+import type { PopularityPeriod } from '@/api/generated/model'
 import { POPULARITY_PERIOD_OPTIONS } from '@/features/home/homeDisplay'
-import type { HomePopularityPeriod } from '@/features/home/mockTypes'
 import { cn } from '@/lib/utils'
 
 interface PeriodToggleProps {
-  value: HomePopularityPeriod // 지금 고른 기간
-  onChange: (period: HomePopularityPeriod) => void // 기간을 바꿨을 때
+  value: PopularityPeriod // 지금 고른 기간
+  onChange: (period: PopularityPeriod) => void // 기간을 바꿨을 때
 }
 
 /**

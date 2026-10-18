@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+ * - operation은 44개이고 43개가 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution` 포함). 탈퇴 `withdrawMe`(`DELETE /me`)는 Task 081이 `x-planned: true`로 추가했고 구현은 Task 082다. 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -41,6 +41,7 @@ import type {
   CommonResponseCollectExecutionPage,
   CommonResponsePlanBenchmark,
   CommonResponsePlanRecalcExecutionAccepted,
+  CommonResponsePopularityExecutionAccepted,
   CommonResponseRetentionExecutionAccepted,
   ConflictResponse,
   CreateAdminProductRequest,
@@ -1304,6 +1305,75 @@ export const useCreateRetentionExecution = <TError = ErrorType<UnauthorizedRespo
         TContext
       > => {
       return useMutation(getCreateRetentionExecutionMutationOptions(options), queryClient);
+    }
+    /**
+ * 인기 순위 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 하루 1회 GitHub Actions cron이 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
+ * 하는 일: 서비스 7곳 × 영화·드라마별로 TMDB `discover`(한국, 서비스 제공처 필터, 인기순) 첫 쪽(상위 20개)을 받아 오늘(KST) 날짜의 인기 스냅샷으로 저장한다(약 14번 호출). 같은 날 다시 실행하면 그 날짜의 스냅샷을 덮어쓰고(중복 행이 쌓이지 않는다), 14일이 지난 스냅샷은 지운다. 한 서비스·매체의 호출이 실패하면 그 조각만 건너뛰고 나머지는 저장한다(건너뛴 조각의 이전 스냅샷은 그대로 남는다).
+ * 수집·재계산·정리·인기 수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 인기 수집 실행 중에는 수집·재계산·정리 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+ * @summary 인기 순위 수집 실행 요청
+ */
+export const createPopularityExecution = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponsePopularityExecutionAccepted>(
+      {url: `/admin/popularity/executions`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreatePopularityExecutionMutationKey = () => ['createPopularityExecution'] as const;
+
+export const getCreatePopularityExecutionMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPopularityExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPopularityExecution>>, TError,void, TContext> => {
+
+const mutationKey = getCreatePopularityExecutionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPopularityExecution>>, void> = () => {
+
+
+          return  createPopularityExecution(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePopularityExecutionMutationResult = NonNullable<Awaited<ReturnType<typeof createPopularityExecution>>>
+
+    export type CreatePopularityExecutionMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
+
+
+    /**
+ * @summary 인기 순위 수집 실행 요청
+ */
+export const useCreatePopularityExecution = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPopularityExecution>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createPopularityExecution>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreatePopularityExecutionMutationOptions(options), queryClient);
     }
     /**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.

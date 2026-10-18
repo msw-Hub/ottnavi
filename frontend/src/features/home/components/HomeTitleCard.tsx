@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import type { OttService, TitleSearchItem } from '@/api/generated/model'
 import { DataInsufficientTag } from '@/components/common/DataInsufficientTag'
 import { PosterImage } from '@/components/common/PosterImage'
 import { ProviderStatusBadge } from '@/components/common/ProviderStatusBadge'
 import { CardWishlistAction } from '@/features/home/components/CardWishlistAction'
-import type { HomeService, HomeTitle } from '@/features/home/mockTypes'
+import { getTmdbImageUrl } from '@/lib/tmdbImage'
 import { cn } from '@/lib/utils'
 
 // 작품 구분 글자(features/search/constants의 MEDIA_TYPE_LABELS와 같은 글자. 기능 폴더끼리 import하지 않아 따로 둔다)
@@ -14,8 +15,8 @@ const MEDIA_TYPE_TEXT = { movie: '영화', tv: '드라마' } as const
 const MAX_SERVICE_CHIPS = 2
 
 interface HomeTitleCardProps {
-  title: HomeTitle // 보여 줄 작품
-  services: HomeService[] // 서비스 7곳(상태 목록의 서비스 ID를 이름으로 바꾸는 데 쓴다)
+  title: TitleSearchItem // 보여 줄 작품(작품 검색 API와 같은 모양)
+  services: OttService[] // 서비스 7곳(상태 목록의 서비스 ID를 이름으로 바꾸는 데 쓴다)
   focusServiceId?: number // 이 목록이 한 서비스 기준이면 그 서비스 ID. 주면 그 서비스의 제공 상태 배지를, 안 주면 "볼 수 있는 곳" 칩을 보인다
   rank?: number // 순위 목록이면 순위(1부터). 주면 포스터 왼쪽에 큰 숫자로 보인다
   rankLabel?: string // 순위 앞에 낭독기가 읽을 말(예: "인기", "찜"). 화면에는 숫자만 보인다
@@ -46,6 +47,8 @@ export function HomeTitleCard({
 }: HomeTitleCardProps) {
   const detailPath = `/titles/${title.mediaType}/${title.tmdbId}`
   const hasRank = rank !== undefined
+  // 포스터는 TMDB 상대 경로(posterPath)를 w342 크기 주소로 바꿔 쓴다. 경로가 없으면 null → "포스터 없음" 대체 표시
+  const posterUrl = getTmdbImageUrl(title.posterPath, 'w342')
 
   return (
     <article
@@ -73,11 +76,13 @@ export function HomeTitleCard({
       )}
 
       <div className={cn('relative', hasRank && 'col-start-2 row-start-1')}>
-        <PosterImage title={title.title} posterUrl={title.posterUrl} />
+        <PosterImage title={title.title} posterUrl={posterUrl} />
         <div className="absolute top-1 right-1">
           <CardWishlistAction
             title={title.title}
             mediaType={title.mediaType}
+            tmdbId={title.tmdbId}
+            posterPath={title.posterPath}
             detailPath={detailPath}
           />
         </div>
@@ -97,7 +102,10 @@ export function HomeTitleCard({
         <p className="text-xs text-muted-foreground tabular-nums">
           {MEDIA_TYPE_TEXT[title.mediaType]} · {title.releaseYear ?? '연도 미상'}
         </p>
-        {focusServiceId !== undefined ? (
+        {title.availabilities.length === 0 ? (
+          // 우리 DB에 아직 없는 작품(인기 순위는 TMDB 결과를 그대로 담아 이런 작품이 나올 수 있다): 있음/없음/모름 어느 쪽으로도 단정하지 않는다
+          <p className="text-xs text-muted-foreground">제공 정보 수집 전</p>
+        ) : focusServiceId !== undefined ? (
           <FocusServiceStatus title={title} services={services} serviceId={focusServiceId} />
         ) : (
           <AvailableServiceChips title={title} services={services} />
@@ -109,8 +117,8 @@ export function HomeTitleCard({
 }
 
 interface CardStatusProps {
-  title: HomeTitle
-  services: HomeService[]
+  title: TitleSearchItem
+  services: OttService[]
 }
 
 // 한 서비스 기준 목록: "넷플릭스 [✓ 있음]"처럼 서비스 이름과 3상태 배지를 함께 보인다
