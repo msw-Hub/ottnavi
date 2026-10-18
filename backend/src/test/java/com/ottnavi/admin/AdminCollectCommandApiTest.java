@@ -160,12 +160,47 @@ class AdminCollectCommandApiTest extends AdminCollectApiTestSupport {
 	}
 
 	@Test
-	void DAILY는_400_VALIDATION_FAILED_tier다() throws Exception {
-		// given, when, then
+	void DAILY와_WEEKLY도_202로_시작하고_같은_날짜의_ALL과_별개의_실행이다() throws Exception {
+		// given: 같은 날짜의 ALL을 먼저 완료시킨다
+		awaitFinished(executionIdOf(postCreate(createBody(DAY, "ALL")).andExpect(status().isAccepted())));
+
+		// when: 같은 날짜의 DAILY를 요청한다
+		var daily = postCreate(createBody(DAY, "DAILY"));
+		daily.andExpect(status().isAccepted());
+		long dailyId = executionIdOf(daily);
+		awaitFinished(dailyId);
+
+		// then: ALL이 완료돼도 막히지 않고 끝까지 돈다. 그 뒤 WEEKLY도 별개의 실행이다
+		assertThat(collectExecutionQuery.findById(dailyId).orElseThrow().batchStatus()).isEqualTo(BatchStatus.COMPLETED);
+		long weeklyId = executionIdOf(postCreate(createBody(DAY, "WEEKLY")).andExpect(status().isAccepted()));
+		awaitFinished(weeklyId);
+		assertThat(collectExecutionQuery.findById(weeklyId).orElseThrow().batchStatus()).isEqualTo(BatchStatus.COMPLETED);
+
+		// then: 같은 tier를 한 번 더 요청하면 이미 완료로 409이다
 		postCreate(createBody(DAY, "DAILY"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.errorCode").value("BATCH_ALREADY_COMPLETED"));
+	}
+
+	@Test
+	void 모르는_tier는_400_VALIDATION_FAILED_tier다() throws Exception {
+		// given, when, then
+		postCreate(createBody(DAY, "MONTHLY"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
 				.andExpect(jsonPath("$.fieldErrors[0].field").value("tier"));
+	}
+
+	@Test
+	void ALL이_실행_중이면_같은_날짜의_DAILY도_409_BATCH_ALREADY_RUNNING이다() throws Exception {
+		// given: 제공처 목록 응답을 늦춰 ALL이 아직 실행 중이게 한다
+		stubSuccessfulCollection(1500);
+		postCreate(createBody(DAY, "ALL")).andExpect(status().isAccepted());
+
+		// when, then: tier가 달라도 수집은 동시에 하나만 돈다
+		postCreate(createBody(DAY, "DAILY"))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.errorCode").value("BATCH_ALREADY_RUNNING"));
 	}
 
 	@Test

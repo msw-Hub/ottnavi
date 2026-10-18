@@ -20,7 +20,7 @@ export type ExclusiveTitlePage = PageMeta & {
   content: ExclusiveTitle[];
   /** 요청한 서비스 ID */
   ottServiceId: number;
-  /** 독점을 판정했는지. 데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`)는 false이고 `content`가 비며 `totalElements`는 0이다. 화면은 목록 대신 "데이터 부족" 안내를 보인다 */
+  /** 독점 목록을 판정했는지. 현재는 모든 서비스가 true다(계약 호환을 위해 필드를 남겼다). 데이터 충분도가 낮은 서비스(`dataQuality`가 `INSUFFICIENT`)는 일부 구간(쿠팡플레이 영화)을 판정에서 빼고, 그 서비스의 `dataQuality`로 화면이 안내한다 */
   isJudged: boolean;
   /** 독점을 계산한 제공 상태의 데이터 기준일(KST) */
   dataAsOf: string;

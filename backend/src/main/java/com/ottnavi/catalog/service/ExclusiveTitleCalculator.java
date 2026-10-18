@@ -10,7 +10,6 @@ import com.ottnavi.catalog.domain.rule.ExclusiveTitleGroup;
 import com.ottnavi.catalog.service.model.ExclusiveTitleItem;
 import com.ottnavi.catalog.service.model.ExclusiveTitleList;
 import com.ottnavi.provider.domain.entity.OttService;
-import com.ottnavi.provider.domain.enums.DataQuality;
 import com.ottnavi.provider.service.OttServiceQueryService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -73,13 +72,10 @@ public class ExclusiveTitleCalculator {
         // 4. 데이터 기준일: 판정에 쓴 제공 상태 중 가장 오래된 확인 시각의 날짜(없으면 오늘)
         LocalDate dataAsOf = dataAsOf(rows);
 
-        // 5. 서비스마다 목록을 만든다. 데이터 부족 서비스는 판정하지 않고 빈 목록(judged=false)으로 둔다
+        // 5. 서비스마다 목록을 만든다. 데이터 부족 서비스(쿠팡플레이)도 같은 규칙으로 판정한다.
+        //    쿠팡플레이 영화는 모두 모름(구조적 공백)이라 있음이 아니므로 규칙상 독점 영화가 나오지 않고, 드라마 시즌만 판정된다(2026-10-19 사용자 결정)
         Map<Long, ExclusiveTitleList> result = new LinkedHashMap<>();
         for (OttService service : services) {
-            if (service.getDataQuality() == DataQuality.INSUFFICIENT) {
-                result.put(service.getId(), new ExclusiveTitleList(service.getId(), false, dataAsOf, List.of()));
-                continue;
-            }
             List<ExclusiveTitleGroup> groups = groupsByService.get(service.getId());
             if (groups == null) {
                 groups = List.of();

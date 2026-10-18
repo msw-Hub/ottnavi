@@ -56,6 +56,26 @@ public interface TitleRepository extends JpaRepository<Title, Long> {
     /** 마지막 수집 시각이 기준보다 이른 작품을 가장 오래된 순(같으면 id 순)으로 조회한다. 한 번에 처리할 건수는 Pageable로 자른다 */
     List<Title> findByFetchedAtBeforeOrderByFetchedAtAscIdAsc(Instant cutoff, Pageable pageable);
 
+    /**
+     * 찜 행(wishlist_item)이 하나라도 있는데 WEEKLY인 작품을 DAILY로 바꾼다. 바뀐 작품 수를 돌려준다.
+     * 찜은 시청 단위(watch_unit)에 걸리므로 watch_unit.title_id로 작품을 찾는다. "다 봤음" 여부는 보지 않는다.
+     * 벌크 SQL이라 영속성 컨텍스트를 건드리지 않고 updated_at을 직접 채운다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE title SET refresh_tier = 'DAILY', updated_at = now() "
+            + "WHERE refresh_tier = 'WEEKLY' AND EXISTS ("
+            + "SELECT 1 FROM watch_unit u JOIN wishlist_item w ON w.watch_unit_id = u.id WHERE u.title_id = title.id)",
+            nativeQuery = true)
+    int promoteWishlistedToDaily();
+
+    /** 찜 행이 하나도 없는데 DAILY인 작품을 WEEKLY로 되돌린다(찜 삭제·회원 탈퇴 뒤). 바뀐 작품 수를 돌려준다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE title SET refresh_tier = 'WEEKLY', updated_at = now() "
+            + "WHERE refresh_tier = 'DAILY' AND NOT EXISTS ("
+            + "SELECT 1 FROM watch_unit u JOIN wishlist_item w ON w.watch_unit_id = u.id WHERE u.title_id = title.id)",
+            nativeQuery = true)
+    int demoteUnwishlistedToWeekly();
+
     /** 작품 한 행을 벌크로 지운다. 하위 행(시청 단위·장르·출연진)은 호출 전에 먼저 지워야 한다(FK가 막는다) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Title t where t.id = :titleId")

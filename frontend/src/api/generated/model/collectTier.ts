@@ -11,7 +11,7 @@
  */
 
 /**
- * 수집 범위(TECH 3절). MVP는 ALL만 실행할 수 있고 DAILY·WEEKLY는 2단계에서 연다
+ * 수집 범위(TECH 3절). ALL 전체 일괄(수동 전체 실행), DAILY 찜한 작품만(후보 발견 생략), WEEKLY 후보 발견 + 나머지 작품(Task 077)
  */
 export type CollectTier = typeof CollectTier[keyof typeof CollectTier];
 

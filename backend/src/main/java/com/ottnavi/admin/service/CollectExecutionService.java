@@ -64,6 +64,7 @@ public class CollectExecutionService {
 	/**
 	 * 수집을 새로 시작하고 새 실행 ID를 돌려준다. 같은 날짜·범위의 최신 실행이 실패면 재시작한다.
 	 * 예: targetDate=null, tier=ALL, scope=null → 오늘(KST) 기준 전체 수집으로 시작.
+	 * tier=DAILY는 찜한 작품만, WEEKLY는 후보 발견 + 나머지 작품만 상세를 받는다(Task 077). 같은 날짜라도 tier가 다르면 다른 실행이다.
 	 * scope가 있으면(로컬 전용) 그 범위의 Step만 실행하며, 중복·재시작 판정은 scope별로 따로 한다.
 	 */
 	public long start(LocalDate targetDateOrNull, CollectTier tier, CollectScope scope) {
@@ -74,21 +75,16 @@ public class CollectExecutionService {
 			targetDate = today;
 		}
 
-		// 2. MVP는 ALL만 실행한다
-		if (tier != CollectTier.ALL) {
-			throw new FieldValidationException("tier", "MVP는 ALL만 실행할 수 있습니다.");
-		}
-
-		// 3. 날짜 규칙: 운영은 오늘만, local은 미래만 막는다
+		// 2. 날짜 규칙: 운영은 오늘만, local은 미래만 막는다(tier는 DAILY·WEEKLY·ALL 모두 받는다, Task 077)
 		validateDate(targetDate, today);
 
-		// 4. 실행 범위 규칙: 운영은 전체만, local은 일부 범위도 허용
+		// 3. 실행 범위 규칙: 운영은 전체만, local은 일부 범위도 허용
 		validateScope(scope);
 
-		// 5. 사전 검사와 시작을 한 덩어리로 직렬화한다
+		// 4. 사전 검사와 시작을 한 덩어리로 직렬화한다
 		launchLock.lock();
 		try {
-			// 6. 같은 날짜·범위·scope의 최신 실행과 그 상태
+			// 5. 같은 날짜·tier·scope의 최신 실행과 그 상태
 			Optional<CollectExecutionRecord> latest = collectExecutionQuery.findLatest(targetDate, tier, scope);
 			CollectExecutionStatus latestStatus = null;
 			long sameInstanceId = -1;
@@ -97,16 +93,16 @@ public class CollectExecutionService {
 				sameInstanceId = latest.get().instanceId();
 			}
 
-			// 7. 다른 날짜·범위의 수집이 실행 중인지(scope가 달라도 전체 동시 실행은 금지)
+			// 6. 다른 날짜·범위의 수집이 실행 중인지(tier·scope가 달라도 전체 동시 실행은 금지)
 			CollectViewContext context = collectExecutionQueryService.createContext();
 			CollectExecutionRecord otherRunning = context.findRunningOtherThan(sameInstanceId);
 
-			// 8. 판정 결과가 거절이면 예외로 바꾼다
+			// 7. 판정 결과가 거절이면 예외로 바꾼다
 			LaunchVerdict verdict = CollectExecutionRules.judgeLaunch(latestStatus, otherRunning != null);
 			throwIfRejected(verdict, otherRunning);
 			throwIfRecalcRunning();
 
-			// 9. 실패한 최신 실행이 있으면 재시작, 없으면 새로 시작
+			// 8. 실패한 최신 실행이 있으면 재시작, 없으면 새로 시작
 			long executionId;
 			if (latestStatus == CollectExecutionStatus.FAILED) {
 				executionId = restartLaunch(latest.get().executionId());
@@ -114,7 +110,7 @@ public class CollectExecutionService {
 				executionId = startLaunch(targetDate, tier, scope);
 			}
 
-			// 10. 정상 흐름 기록
+			// 9. 정상 흐름 기록
 			log.info("수집 실행을 접수했다: executionId={}, targetDate={}, tier={}, scope={}",
 					executionId, targetDate, tier, scope);
 			return executionId;

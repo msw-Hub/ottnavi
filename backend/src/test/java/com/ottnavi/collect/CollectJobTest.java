@@ -225,15 +225,11 @@ class CollectJobTest extends IntegrationTestSupport {
     }
 
     @Test
-    void ALL이_아닌_tier나_없는_targetDate는_시작하지_않는다() {
+    void 모르는_tier나_없는_targetDate는_시작하지_않는다() {
         LocalDate day = LocalDate.of(2026, 1, 1);
         JobParameters noDate = new JobParametersBuilder().addString(CollectJobParameters.TIER, "ALL").toJobParameters();
 
-        // 이 Task는 ALL만 실행한다. DAILY·WEEKLY는 enum에 있어도 2단계(Task 077)까지 거부한다
-        assertThatThrownBy(() -> start(CollectJobParameters.of(day, CollectTier.DAILY)))
-                .isInstanceOf(InvalidJobParametersException.class);
-        assertThatThrownBy(() -> start(CollectJobParameters.of(day, CollectTier.WEEKLY)))
-                .isInstanceOf(InvalidJobParametersException.class);
+        // DAILY·WEEKLY·ALL만 받는다(Task 077). 그 밖의 값과 targetDate 없음은 거부한다
         assertThatThrownBy(() -> start(new JobParametersBuilder().addLocalDate(CollectJobParameters.TARGET_DATE, day)
                 .addString(CollectJobParameters.TIER, "MONTHLY").toJobParameters()))
                 .isInstanceOf(InvalidJobParametersException.class);

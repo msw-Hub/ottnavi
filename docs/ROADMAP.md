@@ -45,9 +45,9 @@
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 3/3 | ✅ 완료 (106 화면 1차안은 PR #75, 107 홈·탐색 API는 PR #84, 108 홈·탐색 실제 API 연결은 PR #86으로 병합) |
-| 4 | 추가 기능 개발 | 10/24 | 🔄 진행 중 (084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
+| 4 | 추가 기능 개발 | 13/24 | 🔄 진행 중 (079 번들·독점 화면 실제 API 연결 PR #90, 077 계층별 갱신 PR #91, 078 독점 목록 API PR #88, 084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 79/108 | |
+| 합계 | | 82/108 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -1329,7 +1329,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 8. Phase 4 — 추가 기능 개발 · 10/24
+## 8. Phase 4 — 추가 기능 개발 · 13/24
 
 **목표.**
 - PRD 2단계(O1~O4)와 3단계 일부(Q3 LLM, Q4 정확도 안내·반응형·접근성)를 4.4 순서(목업 → 계약·백엔드 → 교체)로 구현한다.
@@ -1442,33 +1442,41 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: 번들 정답 케이스(설계 문서 5절 예시)와 상한 초과 GREEDY 전환 테스트가 통과한다. V-API: 번들 상품 저장 → 플랜 계산 통합 테스트(`PlanBundleApiTest`)가 통과한다.
 - 기록(2026-10-17, 구현·전체 빌드 완료, PR 번호 미정): 설계·흐름은 `docs/guides/BUNDLE_PRICE_MODE_FLOW.md`. 사용자 확정: 1) 모드는 내 설정 체크 "가장 저렴한 요금제로 계산할래요"(기본 끔). 2) 구독 입력은 서비스 단위 그대로이며 번들 구독 입력은 만들지 않는다(번들 이용자는 포함 서비스를 각각 구독 중으로 입력, 한계는 HANDOFF에 이월). 3) S6 확장은 0번째 달에서만 겹치는 번들을 뺀다(1·2번째 달은 번들이 후보로 남고 구독 중 단품과의 동시 선택은 S1b가 막음). 4) 모드를 바꿔도 저장된 ACTIVE 플랜은 그대로이고 다음 계산·재계산부터 반영한다. 5) 계약이 깨지는 변경(`ottServiceId` → `ottServiceIds`)이라 프론트도 같은 PR에서 바뀌어야 한다. 마이그레이션 순서 제약은 4.2를 본다.
 
-#### Task 077: 계층별 갱신 구현으로 수집 호출량 절감 ⬜ `[v0.1.0 포함]`
+#### Task 077: 계층별 갱신 구현으로 수집 호출량 절감 ✅ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-18(계층), 5.5 · 선행: 056 · 브랜치: `feature/o3-tiered-refresh`
 - 구현 사항
-  - [ ] DAILY(찜에 있는 작품) 매일, WEEKLY(나머지) 주 1회로 Job 대상 분리(`tier` 파라미터)
-  - [ ] 찜 추가·삭제 시 `refresh_tier` 갱신(Task 056에서 이관)
-  - [ ] `collect.yml` cron을 tier별로 분리(실행 확인은 Task 102)
+  - [x] DAILY(찜에 있는 작품) 매일, WEEKLY(나머지) 주 1회로 Job 대상 분리(`tier` 파라미터)
+  - [x] 수집 시작 때 `refresh_tier` 재맞춤(2026-10-19 정정: 찜 추가·삭제 훅은 만들지 않는다. 첫 Step이 벌크 쿼리로 전체를 한 번에 맞추므로 탈퇴로 찜이 사라져도 다음 수집에 WEEKLY로 돌아온다)
+  - [x] `collect.yml` cron을 tier별로 분리(DAILY 월~토 03:17 KST, WEEKLY 일 03:17 KST, 주석 상태 유지. 실행 확인은 Task 102)
 - 완료 기준
-  - V-B: tier별 대상 선정과 찜 추가·삭제 시 `refresh_tier` 변경 테스트가 통과한다.
+  - V-B: tier별 대상 선정과 `refresh_tier` 재맞춤(찜 있음→DAILY, 없음→WEEKLY, 찜 삭제 후 복귀, 여러 사용자·여러 시즌) 테스트가 통과한다.
+- 기록(2026-10-19, PR #91로 병합): 사용자 확정 설계. 1) `tier=DAILY`는 제공처 목록·후보 Step을 건너뛰고 `refresh_tier=DAILY` 작품의 상세(영화·드라마)·판정 Step만 돈다. 2) `tier=WEEKLY`는 전체 Step 흐름을 돌되 상세·판정 대상이 `refresh_tier=WEEKLY` 작품이다(후보 발견은 하므로 신규 작품이 들어온다). 3) `tier=ALL`은 기존과 같다. 4) 흐름: `scopeDecider`(AVAILABILITY_TV면 시즌 판정만, 기존 그대로) → `refreshTierStep` → `CollectTierDecider`(DAILY면 영화 상세 Step으로, 그 밖은 제공처 목록부터 전체). 5) 재맞춤은 `collect/step/refresh`의 Tasklet이 `catalog`의 `TitleRefreshTierService`를 불러 `TitleRepository`의 네이티브 벌크 UPDATE 두 개(찜 행이 있는데 WEEKLY → DAILY, 찜 행이 없는데 DAILY → WEEKLY, 이미 맞는 작품은 건드리지 않음)를 실행하고 건수를 `log.info`로 남긴다. "다 봤음"(`watched_at`)은 보지 않는다. scope=AVAILABILITY_TV 실행은 재맞춤하지 않는다(기존 Step 구성 유지). 6) 상세 Reader(`DetailStepConfig`)의 쿼리에 `refreshTier in :refreshTiers`를 걸고, 값은 Step 시작 때 `TierReaderParameterListener`가 Job 파라미터 tier로 채운다(@StepScope 대신 Reader 싱글톤 + beforeStep). 7) 관리자 수집 API가 `DAILY`·`WEEKLY`를 받는다(계약 설명만 수정, 필드·enum은 그대로). 같은 날짜라도 tier가 다르면 다른 실행이고 동시에 돌 수 없다(`BATCH_ALREADY_RUNNING`). 수집 완료 이벤트(재계산·독점 목록 갱신·캐시 비우기)는 손대지 않았고 DAILY·WEEKLY 실행에서도 COMPLETED면 그대로 발행된다. 8) 시각 점검: 인기 순위 수집(popularity.yml 05:47 KST 매일)은 일요일에 WEEKLY 수집이 아직 돌고 있으면 409로 거절된다(Task 093 활성화 때 일요일 시각을 조정할지 확인).
 
-#### Task 078: 독점 목록 사전 계산과 공개 API 구현으로 서비스별 독점 조회 제공 ⬜ `[v0.1.0 포함]`
+#### Task 078: 독점 목록 사전 계산과 공개 API 구현으로 서비스별 독점 조회 제공 ✅ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-04 · 선행: 075, 044, 049 · 브랜치: `feature/o3-exclusive-titles`
 - 구현 사항
   - [x] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
   - [x] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
 - 완료 기준
   - V-B: 독점 판정·공백 제외·데이터 부족 테스트. V-API: 서비스별 목록.
-- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o3-exclusive-titles`, 병합 전). `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`)를 `catalog`에 구현했다. 응답은 `PageMeta` 5개 필드 + `ottServiceId`·`isJudged`·`dataAsOf`, 항목 `ExclusiveTitle`(`mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`, `comparedServiceCount`, `unknownElsewhereCount`)이며 Task 075 승인안과 같다. 없는 서비스는 404 `OTT_SERVICE_NOT_FOUND`(신규, `error-codes.md`에 행 추가).
+- 기록: 2026-10-18 구현·테스트 완료(브랜치 `feature/o3-exclusive-titles`, PR #88로 병합). `GET /api/public/ott-services/{ottServiceId}/exclusive-titles?page&size`(operationId `listServiceExclusiveTitles`)를 `catalog`에 구현했다. 응답은 `PageMeta` 5개 필드 + `ottServiceId`·`isJudged`·`dataAsOf`, 항목 `ExclusiveTitle`(`mediaType`, `tmdbId`, `title`, `releaseYear`, `posterPath`, `exclusiveSeasonNumbers`, `comparedServiceCount`, `unknownElsewhereCount`)이며 Task 075 승인안과 같다. 없는 서비스는 404 `OTT_SERVICE_NOT_FOUND`(신규, `error-codes.md`에 행 추가).
   - 판정(`ExclusiveRules`, 순수 규칙): 시청 단위(영화 1편·시즌 1개)마다 AVAILABLE인 서비스가 정확히 하나면 그 서비스의 독점이다. 다른 서비스의 없음·모름은 모두 "다른 곳에 없음"으로 본다(모름 수는 `unknownElsewhereCount`). 모름 중 이유가 `STRUCTURAL_GAP`(쿠팡플레이 영화)인 서비스는 비교에서 빼서 `comparedServiceCount`에 세지 않는다(영화 5, 드라마 6). 판정 행이 없는 서비스는 모름으로 센다. 광고형(`in_ad_tier`)도 구독 제공(AVAILABLE)이다(Task 076: 저가형은 시청 범위를 제한하지 않음). 드라마는 독점 시즌만 `exclusiveSeasonNumbers`(오름차순)에 담고, 비교·모름 수는 독점 시즌 중 가장 큰 값이다. 정렬은 TMDB 인기도 내림차순(없으면 뒤, 동률은 작품 ID).
-  - 데이터 부족 서비스(`dataQuality=INSUFFICIENT`, 쿠팡플레이)는 판정하지 않고 `isJudged=false`·빈 목록의 200이다(404 아님). 그 서비스를 기준으로 한 독점은 만들지 않지만, 쿠팡플레이에 있는 작품은 다른 서비스 독점에서 정상적으로 빠진다.
+  - 데이터 부족 서비스(`dataQuality=INSUFFICIENT`, 쿠팡플레이)도 같은 규칙으로 판정한다(2026-10-19 후속 변경, PRD 11절 44번). 쿠팡플레이 영화는 모두 모름(구조적 공백)이라 독점 영화가 나오지 않고 드라마 시즌만 목록에 나오며, `isJudged`는 계약 호환을 위해 남기고 항상 true다. 쿠팡플레이에 있는 작품은 다른 서비스 독점에서 정상적으로 빠진다(기존 동작).
+  - 후속 변경 기록(2026-10-19): `ExclusiveTitleCalculator`의 INSUFFICIENT 건너뛰기 분기를 없앴다. `ExclusiveRulesTest`에 쿠팡플레이 영화·시즌 케이스 2개를 추가하고 `ExclusiveTitleApiTest`의 쿠팡플레이 테스트를 새 동작으로 바꿨다. 계약은 구조 변경 없이 `isJudged`와 operation 설명만 고쳤다(프론트는 `dataQuality`로 "영화는 판정하지 못했다"를 안내, Task 079).
   - 캐시: 서비스마다 `ExclusiveTitleList` 전체를 `exclusiveTitles`에 저장(키 서비스 ID, TTL `app.exclusive.cache.ttl` 기본 24h). 수집 Job이 COMPLETED로 끝나면 `ExclusiveTitlesRefreshListener`가 7개를 새로 계산해 채우고, 실패·중단이면 비운다. 정리 Job(`RetentionService`)이 작품을 갱신·삭제하면 비운다. 조회 API는 캐시를 읽고, 비어 있으면(재시작·만료·비운 뒤) 7개를 즉석에서 계산해 채운다. 매월 재계산 Job은 제공 상태를 바꾸지 않아 연결하지 않았다. 조회 경로는 Redis 읽기·쓰기 실패 시 DB 계산 결과로 응답한다.
   - 테스트: `ExclusiveRulesTest`(판정 8), `ExclusiveTitleApiTest`(목록·페이지·쿠팡플레이·404/400·캐시 적중/갱신/폴백 4), `OpenApiContractTest`, `ErrorCodeDocumentTest`, `RetentionHomeCacheEvictTest`(독점 캐시 비우기 확인 추가).
   - 프론트(Task 079)에 넘길 내용: 응답 모양은 위와 같고, 목업 임시 타입 `ExclusiveTitle`/`ExclusiveTitlePage`는 생성 타입으로 바꾸며 `posterUrl` 대신 `posterPath`(TMDB 상대 경로)를 쓴다. `errorMessages.ts`의 `TECH_ERROR_MESSAGES`에 `OTT_SERVICE_NOT_FOUND`("서비스를 찾을 수 없습니다.")를 추가해야 한다(`errorMessages.test.ts`가 `error-codes.md` 행과 대조). 홈의 독점 줄은 이 API의 첫 페이지(`size`를 작게)로 연결한다.
 
-#### Task 079: 번들·독점 화면 실제 API 연결로 O3 완성 ⬜ `[v0.1.0 포함]`
+#### Task 079: 번들·독점 화면 실제 API 연결로 O3 완성 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, SCR-03, SCR-14 · 선행: 076, 078 · 브랜치: `feature/o3-bundle-exclusive-api`
+- 구현 사항
+  - [x] 독점 화면(SCR-03)과 홈 독점 줄을 `listServiceExclusiveTitles` 생성 훅에 연결, 샘플(`sampleData.ts`)·임시 타입(`mockTypes.ts`)·`?exclusivesPreview=` 제거, 포스터는 `posterPath`(TMDB 상대 경로)
+  - [x] 쿠팡플레이는 드라마만 판정한 목록을 보이고 탭 아래에 "영화는 판정하지 못했다" 작은 안내(PRD 11절 44번)
+  - [x] 번들 등록 화면(`?productsPreview=`)·요금 화면(`?pricingPreview=`)의 미리보기 잔여 주석 정리
 - 완료 기준
   - V-FS: 탭 전환·쿠팡플레이 안내를 확인했고, 번들 등록 후 계산 결과에 번들이 상품 하나로 나온다.
+- 기록(2026-10-19, PR #90으로 병합): 1) 독점 목록은 서비스 탭 7개 아래 가로 한 줄이다(`ExclusiveTitleRail`). 한 번에 24편(`size=24`)을 받고 오른쪽 끝에 가까워지면 다음 쪽을 자동으로 불러온다(IntersectionObserver). 640px 이상은 좌우 화살표, 마우스는 누른 채 끌어 넘기고(5px 넘으면 드래그로 보고 직후 클릭은 막음) 손가락·트랙패드·Shift+휠은 브라우저 기본 동작이며 가로 스크롤바는 숨겼다. 끝 카드에서 줄이 되돌아가고 화살표가 남던 문제는 드래그를 놓을 때 맞춤 위치를 최대 스크롤 위치로 자르고 끝 판정 허용 오차를 2px로 고쳐 해결했고 사용자가 브라우저에서 확인했다. 2) 카드는 포스터·제목·"영화/드라마 · 연도 · 시즌"만 보이고(하단 "다른 N곳 없음·모름" 줄은 사용자 의견으로 삭제), 포스터 왼쪽 위에 인기순 순위 숫자를 굵게 보인다(모서리 칸 안, 접근성 문구 "인기 N위"). "24 / 30편" 같은 불러온 편수 표시는 헷갈려 삭제했다. 3) 산정 기준 상자 문구는 "모름인 경우도 포함돼요. 그곳에서도 볼 수 있을 수 있어요."로 줄였다. 4) 홈 독점 줄은 선택 서비스의 첫 쪽 `size=10`이고 쿠팡플레이는 같은 안내를 보인다. 5) 목업은 넷플릭스 30편(2쪽)·쿠팡플레이 드라마 3편이다. 6) 테스트: 독점 화면 테스트(탭 전환·쿠팡플레이 안내·다음 쪽 이어 붙기·실패 시 받은 목록 유지·마우스 드래그·끝 정착·순위), 홈 독점 줄 테스트. 전체 프론트 587건 통과(에이전트 보고, 결과는 마지막 수정 전 실행)
+  - 확인하지 못한 것: 번들 등록 뒤 계산 결과에서 번들이 상품 하나로 나오는지, 실서버 탭 전환·쿠팡플레이 안내(실서버 몫), 순위 100위 이상·"999+"·밝은 포스터·화면 낭독기, Playwright 합성 드래그는 이 환경에서 인식되지 않아 드래그는 사용자가 직접 확인했다.
 
 #### Task 080: 탈퇴·데이터 정리 관련 결정으로 O4 구현 범위 확정 ⬜ `[v0.1.0 포함]`
 - 태그: [H] · PRD: O4, FR-07, FR-18(6개월), TECH T-1 · 선행: 없음 · 기한: 묶음 4 착수 전(2026-10-17 개정, 이전 기한 2026-11-05)

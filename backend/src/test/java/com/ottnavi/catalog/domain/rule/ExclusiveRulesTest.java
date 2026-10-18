@@ -121,8 +121,32 @@ class ExclusiveRulesTest {
 		// given: 드라마 시즌이 쿠팡플레이(7)에만 있음
 		List<ExclusiveSourceRow> rows = season(20, 200, 1, 7);
 
-		// when, then: 판정 자체는 7번 독점으로 나온다(데이터 부족 서비스를 목록에서 가리는 일은 서비스 계층이 한다)
+		// when, then: 7번 독점으로 나온다(데이터 부족 서비스도 같은 규칙으로 판정한다)
 		assertThat(ExclusiveRules.findExclusiveTitles(rows, SERVICE_IDS)).containsOnlyKeys(7L);
+	}
+
+	@Test
+	void 쿠팡플레이_영화는_모름_구조적_공백이라_어떤_경우에도_쿠팡플레이_독점이_아니다() {
+		// given: 영화가 어느 서비스에도 없고, 쿠팡플레이(7)는 구조적 공백(모름)
+		List<ExclusiveSourceRow> rows = withStatus(movie(10, 100, 1), 1, AvailabilityStatus.NOT_AVAILABLE, null);
+
+		// when, then: 있음이 하나도 없으니 독점이 없다
+		assertThat(ExclusiveRules.findExclusiveTitles(rows, SERVICE_IDS)).isEmpty();
+
+		// given: 넷플릭스에만 있는 영화(쿠팡플레이는 구조적 공백)
+		List<ExclusiveSourceRow> netflixOnly = movie(11, 101, 1);
+
+		// when, then: 독점은 넷플릭스(1)에만 나오고 쿠팡플레이(7)에는 나오지 않는다
+		assertThat(ExclusiveRules.findExclusiveTitles(netflixOnly, SERVICE_IDS)).doesNotContainKey(7L);
+	}
+
+	@Test
+	void 쿠팡플레이에_있는_드라마_시즌은_다른_서비스의_독점에서_빠진다() {
+		// given: 시즌이 넷플릭스(1)와 쿠팡플레이(7) 모두 있음
+		List<ExclusiveSourceRow> rows = withStatus(season(20, 200, 1, 1), 7, AvailabilityStatus.AVAILABLE, null);
+
+		// when, then
+		assertThat(ExclusiveRules.findExclusiveTitles(rows, SERVICE_IDS)).isEmpty();
 	}
 
 	@Test

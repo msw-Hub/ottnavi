@@ -16,7 +16,8 @@ import java.util.List;
  * @param totalElements 이 서비스 독점으로 확인된 작품 전체 수
  * @param totalPages    전체 페이지 수
  * @param ottServiceId  서비스 ID
- * @param isJudged      독점을 판정했는지. 데이터 부족 서비스는 false이고 목록이 빈다
+ * @param isJudged      독점 목록을 판정했는지. 현재는 모든 서비스가 true다.
+ *                      데이터 충분도가 낮은 서비스(INSUFFICIENT)는 일부 구간(쿠팡플레이 영화)을 판정에서 빼고, 그 서비스의 data_quality로 화면이 안내한다
  * @param dataAsOf      제공 상태의 데이터 기준일(KST)
  */
 public record ExclusiveTitlePageResponse(
