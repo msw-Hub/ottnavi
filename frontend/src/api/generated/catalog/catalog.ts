@@ -75,7 +75,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * 수집이 끝날 때 미리 계산해 서버 캐시에 두며, 캐시가 비어 있으면 그 자리에서 계산한다. 독점은 시즌(시청 단위) 단위로 판정하므로 드라마는 독점 시즌 번호(`exclusiveSeasonNumbers`)를 함께 준다.
  * 다른 서비스가 "없음"이거나 "모름"이면 독점으로 본다. "모름"인 서비스 수는 `unknownElsewhereCount`로 알려 화면이 "다른 곳에도 있을 수 있음"을 표시하게 한다.
  * 쿠팡플레이 영화처럼 구조적으로 알 수 없는 서비스는 비교에서 빼므로(`comparedServiceCount`에 세지 않는다) 영화는 보통 5곳, 드라마는 6곳과 비교한다.
- * 데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`, 쿠팡플레이)는 404가 아니라 `isJudged: false`와 빈 목록이다. 없는 서비스 ID만 404다.
+ * 데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`, 쿠팡플레이)도 같은 규칙으로 판정한다. 쿠팡플레이 영화는 구조적으로 알 수 없어 판정하지 않으므로 목록에는 드라마(시즌)만 나오고, 화면은 서비스 목록의 `dataQuality`로 "영화는 판정하지 못했다"를 안내한다. 없는 서비스 ID만 404다.
  * 오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `OTT_SERVICE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
  * @summary 서비스별 독점 목록 조회
  */
