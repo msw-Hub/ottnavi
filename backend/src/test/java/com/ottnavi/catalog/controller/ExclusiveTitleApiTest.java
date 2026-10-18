@@ -163,6 +163,28 @@ class ExclusiveTitleApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void page가_음수이거나_size가_0이면_400_VALIDATION_FAILED이다() throws Exception {
+		String url = "/api/public/ott-services/" + serviceIds.get("NETFLIX") + "/exclusive-titles";
+		mockMvc.perform(get(url).param("page", "-1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+		mockMvc.perform(get(url).param("size", "0"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+	}
+
+	@Test
+	void 마지막_페이지를_넘기면_빈_content와_실제_전체_건수를_200으로_돌려준다() throws Exception {
+		mockMvc.perform(get("/api/public/ott-services/" + serviceIds.get("NETFLIX") + "/exclusive-titles")
+						.param("page", "5"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.page").value(5))
+				.andExpect(jsonPath("$.data.content", hasSize(0)))
+				.andExpect(jsonPath("$.data.totalElements").value(greaterThanOrEqualTo(2)))
+				.andExpect(jsonPath("$.data.totalPages").value(greaterThanOrEqualTo(1)));
+	}
+
+	@Test
 	void 캐시가_있으면_DB가_바뀌어도_그대로이고_수집_성공_뒤에_새로_채우며_실패하면_비운다() throws Exception {
 		String url = "/api/public/ott-services/" + serviceIds.get("NETFLIX") + "/exclusive-titles";
 		Cache cache = cacheManager.getCache(RedisConfig.EXCLUSIVE_TITLES);
