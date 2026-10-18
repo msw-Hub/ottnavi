@@ -149,6 +149,26 @@ export function ExclusiveTitleRail({
   } | null>(null)
   // 끌기가 끝난 직후 따라오는 click을 한 번 막기 위한 표시. 끌었는데 놓은 자리의 카드 링크가 눌려 상세로 가버리는 사고를 막는다
   const suppressClickRef = useRef(false)
+  // 끌기를 놓은 뒤 snap을 되살리려고 걸어 둔 것(scrollend 리스너와 0.6초 타이머). 둘 중 하나가 먼저 오면 나머지는 지운다.
+  // ref에 둔 이유: 새 끌기가 시작되거나 줄이 사라질 때 앞 끌기의 예약을 취소하려면 id를 기억해야 한다
+  // (안 지우면 첫 끌기의 타이머가 두 번째 끌기 뒤의 부드러운 이동 도중에 터져 snap이 끼어들어 화면이 튈 수 있다)
+  const pendingRestoreRef = useRef<{
+    list: HTMLUListElement
+    onScrollEnd: () => void
+    timerId: ReturnType<typeof setTimeout>
+  } | null>(null)
+
+  // 예약해 둔 snap 되살림을 취소한다. 예약이 없으면 아무 일도 하지 않는다
+  function cancelPendingRestore() {
+    const pending = pendingRestoreRef.current
+    if (!pending) return
+    clearTimeout(pending.timerId)
+    pending.list.removeEventListener('scrollend', pending.onScrollEnd)
+    pendingRestoreRef.current = null
+  }
+
+  // 줄이 화면에서 사라질 때(탭 전환·화면 이동) 남은 예약을 정리한다
+  useEffect(() => cancelPendingRestore, [])
 
   // 1. 마우스 왼쪽 버튼을 누른 순간: 기준 위치만 적어 둔다. 여기서 바로 포인터 캡처를 하면 click의 대상이 줄로 바뀌어 카드 링크가 안 눌린다
   function handlePointerDown(event: ReactPointerEvent<HTMLUListElement>) {
@@ -166,10 +186,25 @@ export function ExclusiveTitleRail({
     const drag = dragRef.current
     const list = event.currentTarget
     if (!drag || drag.pointerId !== event.pointerId) return
+
+    // 버튼이 이미 떼어진 상태로 움직임이 오면 "누른 채"가 아니다. 5px 안에서 마우스가 줄 밖으로 나가 버튼을 놓으면
+    // 아직 캡처 전이라 pointerup이 오지 않아 끌기 상태가 남는데, 그대로 두면 줄로 돌아온 뒤 버튼 없이 움직여도 줄이 따라온다
+    // (이미 끌기로 확정됐다면 캡처 덕에 pointerup이 오는 것이 정상이지만, 만일을 위해 같은 마무리를 거친다)
+    if (event.buttons === 0) {
+      if (drag.isDragging) {
+        finishDrag(event)
+      } else {
+        dragRef.current = null
+      }
+      return
+    }
+
     const deltaX = event.clientX - drag.startX
     if (!drag.isDragging) {
       if (Math.abs(deltaX) < DRAG_THRESHOLD_PX) return
       drag.isDragging = true
+      // 앞 끌기가 걸어 둔 snap 되살림이 남아 있으면 취소한다. 이번 끌기가 끝나면 finishDrag가 새로 예약한다
+      cancelPendingRestore()
       // 끌기가 확정된 뒤에야 캡처한다: 줄 밖으로 마우스가 나가도 끌기가 이어지게 하려는 것
       list.setPointerCapture?.(event.pointerId)
       // scroll-snap이 켜져 있으면 끄는 도중 카드 끝으로 계속 되돌려져 끌림이 뚝뚝 끊긴다. 끌기 동안만 끈다(인라인 값이 클래스보다 우선)
@@ -222,6 +257,7 @@ export function ExclusiveTitleRail({
     // 맞추는 동안은 snap을 계속 꺼 두고(부드러운 이동 도중 snap이 끼어들어 튀는 것 방지), 이동이 끝나면 되살린다
     // (그 사이 새 끌기가 시작됐다면 되살리지 않는다. 늦게 온 scrollend가 새 끌기의 snap 끄기를 풀어 버리는 것을 막는다)
     const restoreSnap = () => {
+      cancelPendingRestore() // scrollend와 타이머 중 먼저 온 쪽이 나머지를 지운다
       if (dragRef.current?.isDragging) return
       list.style.removeProperty('scroll-snap-type')
     }
@@ -232,9 +268,13 @@ export function ExclusiveTitleRail({
       return
     }
     list.scrollTo({ left: target, behavior: 'smooth' })
+    // 이전: list.addEventListener('scrollend', restoreSnap, { once: true }) 와 setTimeout(restoreSnap, 600)을 걸고 따로 정리하지 않았다
+    // 지금은 id를 ref에 기억해 새 끌기·언마운트 때 취소할 수 있게 한다(앞 예약이 남아 있으면 먼저 지운다)
+    cancelPendingRestore()
     list.addEventListener('scrollend', restoreSnap, { once: true })
     // scrollend를 모르는 브라우저·이미 그 자리인 경우 대비. 늦어도 0.6초 뒤에는 되살린다
-    setTimeout(restoreSnap, 600)
+    const timerId = setTimeout(restoreSnap, 600)
+    pendingRestoreRef.current = { list, onScrollEnd: restoreSnap, timerId }
   }
 
   // 끌기 직후의 click은 캡처 단계에서 막는다(카드 링크로 가지 않게)

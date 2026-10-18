@@ -260,7 +260,7 @@ describe('서비스별 독점 목록', () => {
       const { list, link } = await renderFirstPage()
 
       fireEvent.pointerDown(list, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 100 })
-      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, clientX: 97 })
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 1, clientX: 97 })
       fireEvent.pointerUp(list, { pointerType: 'mouse', pointerId: 1, clientX: 97 })
       fireEvent.click(link)
 
@@ -273,7 +273,7 @@ describe('서비스별 독점 목록', () => {
       list.scrollLeft = 300 // jsdom은 레이아웃이 없어 scrollLeft를 직접 읽고 쓴다
 
       fireEvent.pointerDown(list, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 200 })
-      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, clientX: 150 })
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 1, clientX: 150 })
       // 마우스가 왼쪽으로 50px 갔으니 줄은 그만큼 오른쪽으로 넘어간다(300 + 50)
       expect(list.scrollLeft).toBe(350)
       fireEvent.pointerUp(list, { pointerType: 'mouse', pointerId: 1, clientX: 150 })
@@ -286,6 +286,19 @@ describe('서비스별 독점 목록', () => {
       })
       fireEvent.click(link)
       expect(screen.getByTestId('location')).toHaveTextContent(/^\/titles\//)
+    })
+
+    it('누른 뒤 버튼이 떼어진 채 움직임이 오면(줄 밖에서 놓은 경우) 끌기를 버려 줄이 마우스를 따라오지 않는다', async () => {
+      const { list } = await renderFirstPage()
+      list.scrollLeft = 300
+
+      // 5px 안에서 움직인 뒤 줄 밖으로 나가 버튼을 놓으면 pointerup이 오지 않는다. 이후 버튼 없이 움직임만 온다
+      fireEvent.pointerDown(list, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 200 })
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 1, clientX: 198 })
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 0, clientX: 150 })
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 0, clientX: 50 })
+
+      expect(list.scrollLeft).toBe(300) // 따라오지 않았다
     })
 
     // jsdom에는 레이아웃이 없다. 줄의 폭(scrollWidth·clientWidth)과 카드 위치(getBoundingClientRect)를 지정해 끝 근처 계산을 재현한다.
@@ -310,7 +323,7 @@ describe('서비스별 독점 목록', () => {
       list.scrollLeft = 1990 // 최대 위치(2000) 직전. 앞 카드 경계(1936)가 가까워 보이는 자리다
 
       fireEvent.pointerDown(list, { pointerType: 'mouse', button: 0, pointerId: 1, clientX: 100 })
-      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, clientX: 90 }) // 줄이 10px 더 넘어가 2000
+      fireEvent.pointerMove(list, { pointerType: 'mouse', pointerId: 1, buttons: 1, clientX: 90 }) // 줄이 10px 더 넘어가 2000
       fireEvent.pointerUp(list, { pointerType: 'mouse', pointerId: 1, clientX: 90 })
 
       expect(list.scrollLeft).toBe(2000) // 자르지 않던 때는 1936으로 되돌아갔다
