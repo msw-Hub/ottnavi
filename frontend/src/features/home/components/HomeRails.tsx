@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import type { UseQueryResult } from '@tanstack/react-query'
-import type { OttService, PopularityPeriod, TitleSearchItem } from '@/api/generated/model'
+import type {
+  ExclusiveTitle,
+  OttService,
+  PopularityPeriod,
+  TitleSearchItem,
+} from '@/api/generated/model'
 import { DataInsufficientTag } from '@/components/common/DataInsufficientTag'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -21,6 +26,7 @@ import {
 import {
   useNewlyAvailableTitles,
   usePopularityRanking,
+  useServiceExclusiveTitles,
   useWishlistedTitles,
 } from '@/features/home/hooks/useHomeLists'
 import { withJosa } from '@/lib/josa'
@@ -31,6 +37,8 @@ const POPULAR_RANKING_LIMIT = 10
 const WISHLISTED_LIMIT = 10
 // 새로 볼 수 있게 된 작품 줄에 보일 개수
 const NEW_ARRIVALS_LIMIT = 20
+// 서비스 독점 작품 줄에 보일 개수(독점 목록 첫 쪽의 크기)
+const EXCLUSIVES_LIMIT = 10
 
 // 데이터 부족 서비스(쿠팡플레이)를 고른 탭 위에 한 번 붙이는 안내(랭킹 화면도 쓴다)
 export function InsufficientServiceNote({ service, text }: { service: OttService; text: string }) {
@@ -276,56 +284,90 @@ export function NewArrivalsRail({ servicesQuery }: NewArrivalsRailProps) {
 }
 
 interface ExclusivesRailProps {
-  services: OttService[] // 서비스 7곳
-  dataAsOf: string | null // 데이터 기준일
-  status?: RailStatus // 불러오기 상태
-  getExclusives: (serviceId: number) => TitleSearchItem[] // 서비스별 독점 작품(확인된 범위)
+  servicesQuery: ServicesQuery // 서비스 7곳(탭과 카드의 서비스 이름)
+}
+
+// 독점 작품 한 건을 홈 카드가 받는 모양(작품 검색 항목)으로 바꾼다.
+// 독점 목록은 "이 서비스에서 구독으로 볼 수 있음"이 정의 자체라 그 서비스의 제공 상태를 AVAILABLE 한 줄로 채운다
+// (카드가 "넷플릭스 [있음]" 배지를 그리려면 availabilities가 필요하고, 비어 있으면 "제공 정보 수집 전"으로 읽히기 때문이다)
+function toHomeCardTitle(title: ExclusiveTitle, ottServiceId: number): TitleSearchItem {
+  return {
+    mediaType: title.mediaType,
+    tmdbId: title.tmdbId,
+    title: title.title,
+    releaseYear: title.releaseYear,
+    posterPath: title.posterPath,
+    availabilities: [{ ottServiceId, status: 'AVAILABLE' }],
+  }
 }
 
 /**
  * "서비스 독점 작품" 줄. 확인된 범위에서 7곳 중 그 서비스에서만 볼 수 있는 작품이다(PRD FR-04 정의).
  *
- * 현재 홈(HomeScreen)은 이 줄을 그리지 않는다: 독점 목록 API(Task 078)가 아직 없어 보여 줄 실제 데이터가 없기 때문이다.
- * Task 078이 끝나면 getExclusives를 그 API 훅으로 바꿔 HomeScreen에 다시 넣는다(컴포넌트 모양은 그때 쓰려고 남겨 둔다).
- *
+ * 고른 서비스의 독점 목록 첫 쪽(10편)을 독점 API에서 받는다. 더 많이 보려면 "더보기"로 독점 목록 화면(SCR-03)에 간다.
  * "전체" 탭이 없는 이유: 독점은 서비스마다의 개념이라 모아 보면 뜻이 흐려진다.
- * 쿠팡플레이는 데이터가 부족해 목록 대신 안내만 보인다(PRD SCR-03). 더보기는 독점 목록 화면(SCR-03, 2단계)으로 간다.
+ * 쿠팡플레이(데이터 부족)는 서버가 드라마 독점은 판정해 목록이 그대로 나오고, 탭 위에 "드라마만 확인했어요" 작은 안내만 붙는다.
+ * 서버가 isJudged=false로 답하면(구버전 응답) 목록 대신 안내만 보인다(PRD SCR-03). 서비스 코드로 따로 판정하지 않고
+ * 서버의 판정 값을 그대로 따라, 판정 기준이 바뀌어도 화면을 고치지 않게 한다.
+ *
+ * 상태를 두 겹으로 나눈 이유는 인기 순위 줄과 같다: 서비스 목록이 없으면 탭 자체를 못 그리므로 줄 전체(RailSection)가 로딩·오류를 맡고,
+ * 독점 목록의 로딩·오류·빈 상태는 탭 안쪽에서 그린다.
  */
-export function ExclusivesRail({ services, dataAsOf, status, getExclusives }: ExclusivesRailProps) {
-  const [tab, setTab] = useState<string>(services[0]?.code ?? '') // 첫 서비스(넷플릭스)부터. 독점에는 "전체" 탭이 없다
-  const service = findServiceByTab(services, tab)
-  const exclusives = service ? getExclusives(service.ottServiceId) : []
+export function ExclusivesRail({ servicesQuery }: ExclusivesRailProps) {
+  // 고른 탭. 서비스 목록이 오기 전에는 고를 수 없어 null로 두고, 아직 안 골랐으면 첫 서비스(넷플릭스)를 쓴다(독점에는 "전체" 탭이 없다)
+  const [pickedTab, setPickedTab] = useState<string | null>(null)
+  const services = servicesQuery.data ?? []
+  const service = findServiceByTab(services, pickedTab ?? '') ?? services[0] ?? null
+  const tab = service?.code ?? ''
+  const exclusives = useServiceExclusiveTitles(service?.ottServiceId ?? null, EXCLUSIVES_LIMIT)
 
   return (
     <RailSection
       heading="서비스 독점 작품"
       description="확인된 범위에서 7곳 중 이 서비스에서만 볼 수 있는 작품"
-      moreTo="/exclusives"
-      dataAsOf={dataAsOf}
-      status={status}
-      emptyTitle="독점 작품 정보를 준비 중입니다"
+      moreTo={`/exclusives?service=${tab}`}
+      dataAsOf={exclusives.data?.dataAsOf ?? null}
+      status={resolveRailStatus(servicesQuery)}
+      error={servicesQuery.error}
+      onRetry={() => void servicesQuery.refetch()}
     >
       <ServiceTabs
         label="독점 작품 서비스 선택"
         value={tab}
-        onValueChange={setTab}
+        onValueChange={setPickedTab}
         options={buildServiceTabOptions(services, false)}
       >
-        {service?.dataQuality === 'INSUFFICIENT' ? (
+        {/* 쿠팡플레이는 서버가 드라마 독점은 판정하고 영화만 판정하지 못한다. 목록은 그대로 보이고 "드라마만 확인했다"는 범위만 위에 알린다
+            (독점 화면 ServicePanel과 같은 취지·문구. 기능 폴더끼리 import하지 않아 홈의 InsufficientServiceNote를 쓴다) */}
+        {service?.dataQuality === 'INSUFFICIENT' && (
+          <InsufficientServiceNote
+            service={service}
+            text="영화 제공 정보를 받지 못해 드라마만 확인했어요."
+          />
+        )}
+        {!service || exclusives.isPending ? (
+          <RailSkeleton heading="서비스 독점 작품" />
+        ) : exclusives.isError ? (
+          <ErrorState
+            title="서비스 독점 작품을 불러오지 못했습니다"
+            error={exclusives.error}
+            onRetry={() => void exclusives.refetch()}
+          />
+        ) : !exclusives.data.isJudged ? (
           <EmptyState
             title={`${withJosa(service.name, '은/는')} 독점 여부를 판단하지 않아요`}
             description="제공 정보가 부족해 다른 서비스에 없는지 확인할 수 없기 때문이에요. 작품마다의 제공 상태는 상세 화면에서 볼 수 있어요."
           />
-        ) : exclusives.length === 0 ? (
+        ) : exclusives.data.content.length === 0 ? (
           <EmptyState title="이 서비스의 독점으로 확인된 작품이 없습니다" />
         ) : (
-          <ScrollRail key={tab} label={`${service?.name ?? ''} 독점 작품`}>
-            {exclusives.map((title) => (
+          <ScrollRail key={tab} label={`${service.name} 독점 작품`}>
+            {exclusives.data.content.map((title) => (
               <ScrollRailItem key={`${title.mediaType}-${title.tmdbId}`}>
                 <HomeTitleCard
-                  title={title}
+                  title={toHomeCardTitle(title, service.ottServiceId)}
                   services={services}
-                  focusServiceId={service?.ottServiceId}
+                  focusServiceId={service.ottServiceId}
                 />
               </ScrollRailItem>
             ))}
