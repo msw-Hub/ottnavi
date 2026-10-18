@@ -34,11 +34,14 @@ public class TmdbClient {
     private static final String REGION = "KR";                        // PRD: 한국 제공처만 본다
     private static final String LANGUAGE_KO = "ko-KR";
     private static final String MONETIZATION_FLATRATE = "flatrate";   // 후보 수집은 구독형만
+    private static final String SORT_POPULARITY_DESC = "popularity.desc";   // 인기 순위 스냅샷은 TMDB 인기도 높은 순
 
     // tmdb.call 카운터: 이름과 태그 값. 값 집합은 닫혀 있다(작품 ID·검색어·URL·페이지 번호는 태그로 쓰지 않는다, 3.6절)
     private static final String METRIC_NAME = "tmdb.call";
     private static final String EP_DISCOVER_MOVIE = "discover_movie";
     private static final String EP_DISCOVER_TV = "discover_tv";
+    private static final String EP_DISCOVER_POPULAR_MOVIE = "discover_popular_movie";
+    private static final String EP_DISCOVER_POPULAR_TV = "discover_popular_tv";
     private static final String EP_SEARCH_MOVIE = "search_movie";
     private static final String EP_SEARCH_TV = "search_tv";
     private static final String EP_MOVIE_DETAIL = "movie_detail";
@@ -72,6 +75,18 @@ public class TmdbClient {
     public TmdbPage<TmdbTvSummary> discoverTvs(String withWatchProviders, int page) {
         return call(EP_DISCOVER_TV,
                 () -> api.discoverTvs(withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, page));
+    }
+
+    /** 제공처별 KR 구독 영화를 인기도 높은 순(popularity.desc)으로 한 쪽 가져온다. 서비스별 인기 순위 스냅샷이 쓴다 */
+    public TmdbPage<TmdbMovieSummary> discoverPopularMovies(String withWatchProviders, int page) {
+        return call(EP_DISCOVER_POPULAR_MOVIE, () -> api.discoverPopularMovies(
+                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC, page));
+    }
+
+    /** 제공처별 KR 구독 드라마를 인기도 높은 순으로 한 쪽 가져온다 */
+    public TmdbPage<TmdbTvSummary> discoverPopularTvs(String withWatchProviders, int page) {
+        return call(EP_DISCOVER_POPULAR_TV, () -> api.discoverPopularTvs(
+                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC, page));
     }
 
     /** 영화를 제목으로 검색한다 (성인물 제외). query는 사용자 입력이라 로그·태그에 쓰지 않는다 */

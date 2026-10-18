@@ -2,7 +2,7 @@
 
 초안 v0.4 · 2026-10-13 · PostgreSQL 15+ (Supabase 17.6, 로컬 compose도 17.6) · Spring Data JPA + Flyway
 
-서비스 테이블 24개를 다섯 영역으로 나눴다. 라이브러리가 관리하는 테이블(`BATCH_*`, `shedlock`)은 이 숫자에서 뺐다. 모든 테이블은 내부 대리키(`id BIGINT`)를 기본키로 쓰고(예외: 외부 ID를 그대로 쓰는 `tmdb_provider`·`genre`, 부모의 PK를 그대로 쓰는 `user_setting`, 복합키인 `product_component`·`title_genre`), TMDB 값은 매핑 컬럼과 유니크 제약으로 보관한다. 영화와 드라마 시즌은 `watch_unit`(시청 단위)으로 통일해 찜, 제공 상태, 계산이 모두 이 테이블을 기준으로 동작한다.
+서비스 테이블 25개를 다섯 영역으로 나눴다. 라이브러리가 관리하는 테이블(`BATCH_*`, `shedlock`)은 이 숫자에서 뺐다. 모든 테이블은 내부 대리키(`id BIGINT`)를 기본키로 쓰고(예외: 외부 ID를 그대로 쓰는 `tmdb_provider`·`genre`, 부모의 PK를 그대로 쓰는 `user_setting`, 복합키인 `product_component`·`title_genre`), TMDB 값은 매핑 컬럼과 유니크 제약으로 보관한다. 영화와 드라마 시즌은 `watch_unit`(시청 단위)으로 통일해 찜, 제공 상태, 계산이 모두 이 테이블을 기준으로 동작한다.
 
 - 공통 감사 컬럼 `created_at`, `updated_at`(TIMESTAMPTZ)은 표에서 생략한다.
 - 키 표기: **PK** 기본키, **FK** 외래키, **UK** 유니크 제약
@@ -199,6 +199,25 @@ erDiagram
 | genre | id INT PK, name | TMDB 장르 ID를 그대로 PK로 사용. 애니메이션(16) 판별 |
 | title_genre | PK(title_id, genre_id) | N:M 연결 테이블 |
 | title_cast | id PK, title_id FK, cast_order, person_tmdb_id, name, character_name NULL, profile_path NULL | 상위 10명만 저장. `UNIQUE(title_id, cast_order)`. 인물 테이블은 두지 않음 |
+
+### popularity_snapshot — 서비스별 인기 순위 일별 스냅샷 (V9, Task 107)
+
+홈·랭킹의 "서비스별 인기 순위"(오늘 / 최근 7일 평균) 재료다. 인기 수집 Job이 하루 1회 TMDB `discover`(한국, 서비스 제공처 필터, 인기순) 상위 작품을 서비스·매체별로 쌓고, 공개 조회 API가 읽는다. 다른 테이블이 이 표를 참조하지 않는다.
+
+| 컬럼 | 타입 | 키 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK | |
+| snapshot_date | DATE | UK | 스냅샷 날짜(KST) |
+| ott_service_id | BIGINT | FK, UK | 어느 서비스의 순위인지 |
+| media_type | VARCHAR(10) | UK | MOVIE / TV (CHECK) |
+| tmdb_id | INT | UK | TMDB 작품 ID. 우리 `title`에 없는 작품도 들어올 수 있어 FK 없이 값만 둔다 |
+| title | VARCHAR(300) | | 한국어 제목(순위에 보이려고 함께 저장) |
+| poster_path | VARCHAR(200) | | NULL 허용 |
+| release_date | DATE | | NULL 허용. 영화 개봉일 / 드라마 첫 방영일 |
+| popularity | NUMERIC(12,3) | | TMDB 인기도(그날 값). 7일 평균의 재료 |
+
+- `UNIQUE(snapshot_date, ott_service_id, media_type, tmdb_id)`. 선두 컬럼이 날짜라 날짜 범위 조회와 오래된 날짜 삭제도 이 인덱스를 쓴다.
+- 같은 날 재실행은 그 날짜·서비스·매체 행을 지우고 다시 넣는다(멱등). 보관은 오늘 포함 14일이고 지난 날짜는 수집 Job의 두 번째 Step이 벌크 삭제한다. TMDB 데이터 보관 제한(6개월)보다 훨씬 짧다.
 
 ---
 
@@ -409,7 +428,7 @@ erDiagram
 - **CHECK 제약(Task 032 D3 확정).** 열끼리의 규칙과 enum 값 목록, 변하지 않는 하한만 DB에 둔다. 열끼리의 규칙: `tmdb_provider`(MAPPED ⇔ 서비스), `user_subscription`(구독 중 ⇔ 요금제·결제일), `plan`(DRAFT ⇔ `activated_at` NULL, `must_completed <= must_total`), `watch_unit`(SEASON ⇔ 시즌 번호), `availability`(UNKNOWN ⇔ `unknown_reason`), `plan_item`(UNSCHEDULED ⇔ `reason`), `plan_month`(`confirmed` ⇔ `month_index = 0`). 하한: `monthly_budget`·`monthly_watch_minutes`·`monthly_price`·`total_cost`·`all_subscribe_cost`·`plan_month.cost`·`applied_price` 등 금액·분 열은 `>= 0`, `plan_assignment.minutes`는 `> 0`. 입력 상·하한(120~44640분, 100만 원)은 계약 검증에 맡기고 DB에 넣지 않는다(바뀔 때 마이그레이션이 필요해서).
 - **같은 트랜잭션에서 지우고 다시 넣기.** Hibernate는 같은 트랜잭션 안에서 `delete` 뒤 `save`로 같은 유니크 키를 넣으면 INSERT를 DELETE보다 먼저 실행해 유니크 위반이 난다. 대상은 `user_subscription`의 전체 교체(설정 PUT)와 출연진·장르 재수집이다. 벌크 JPQL 삭제를 트랜잭션 첫 동작으로 먼저 하거나, 기존 행과 비교해 갱신한다(TECH 6절).
 - **같은 플랜·같은 사용자 소속은 앱이 보장한다(Task 034 CodeRabbit #54 결정).** `plan_assignment`의 `plan_item_id`와 `plan_month_id`는 각각 존재하는지만 DB가 확인하므로, 서로 다른 플랜의 찜과 달을 한 행으로 묶어도 DB는 막지 않는다. `plan.previous_plan_id`도 다른 사용자의 플랜을 가리킬 수 있다. 쓰는 곳이 plan 서비스 하나뿐이고 계산 결과를 한 트랜잭션으로 통째로 저장하므로 DB 제약(복합 FK, `plan_id` 중복 컬럼)은 두지 않는다. 대신 서비스가 한 플랜의 찜·달만 묶고 `previous_plan_id`는 같은 `user_id`의 플랜만 가리키게 하며, 통합 테스트로 확인한다(Task 064, 069).
-- **삭제 정책.** FK `ON DELETE CASCADE`로 DB가 하위 행을 지운다(확정, TECH T-1). 사용자가 탈퇴하면 `users` 행 하나를 지워 C·D·E 영역의 사용자 행이 함께 삭제되고, DRAFT를 덮어쓸 때도 같은 규칙을 쓴다. calc_run은 통계용으로 남기고 plan_id만 NULL로 바꾼다. JPA 엔티티에는 cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`)를 걸지 않고 plan 삭제는 벌크 JPQL로 한다. FK 동작은 Flyway 스크립트가 기준이고(`ddl-auto=validate`는 FK의 ON DELETE까지 검사하지 않는다), Testcontainers 테스트로 고정한다.
+- **삭제 정책.** FK `ON DELETE CASCADE`로 DB가 하위 행을 지운다(확정, TECH T-1). 사용자가 탈퇴하면 `users` 행 하나를 지워 C·D·E 영역의 사용자 행이 함께 삭제되고, DRAFT를 덮어쓸 때도 같은 규칙을 쓴다. calc_run은 통계용으로 남기고 plan_id만 NULL로 바꾼다. `popularity_snapshot`은 사용자·작품과 무관해 CASCADE 대상이 아니고, 보관 14일이 지난 날짜를 인기 수집 Job이 벌크로 지운다. JPA 엔티티에는 cascade 삭제(`CascadeType.REMOVE`, `orphanRemoval`)를 걸지 않고 plan 삭제는 벌크 JPQL로 한다. FK 동작은 Flyway 스크립트가 기준이고(`ddl-auto=validate`는 FK의 ON DELETE까지 검사하지 않는다), Testcontainers 테스트로 고정한다.
 - **`plan.change_summary` 형식(Task 069, 확정).** 기존 TEXT 컬럼 안의 JSON이다(마이그레이션 없음). 매월 재계산이 이전 플랜과 달라진 점과 그 이유를 기록할 때만 새 ACTIVE 플랜에 남기고, 직접 저장한 플랜과 변화·이유가 없는 재계산은 NULL이다. 변경 내역 API는 이 값이 있는 플랜을 최신순 최대 6건 내려준다(`changeId`=plan.id, `changedAt`=activated_at, `planType`·`dataAsOf`는 plan 열에서 읽는다). 형식:
   ```json
   {"v":1,"summary":"11월 구독이 넷플릭스에서 디즈니+로 바뀌었어요 (외 1건)",

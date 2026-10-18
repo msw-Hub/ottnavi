@@ -54,6 +54,31 @@ class TmdbClientTest extends TmdbTestSupport {
                 .withoutQueryParam("api_key"));   // 토큰을 쿼리로 보내지 않는다 (Task 004: api_key 쿼리는 401)
     }
 
+    // Task 107: 인기 순위 스냅샷용 discover. 후보 수집과 같은 경로에 sort_by=popularity.desc가 붙는다
+    @Test
+    void 인기순_discover는_영화와_드라마_모두_sort_by를_보내고_DTO로_매핑된다() {
+        wireMock.stubFor(get(urlPathEqualTo(DISCOVER_MOVIE_PATH))
+                .withQueryParam("with_watch_providers", equalTo("8|1796"))
+                .withQueryParam("watch_region", equalTo("KR"))
+                .withQueryParam("with_watch_monetization_types", equalTo("flatrate"))
+                .withQueryParam("language", equalTo("ko-KR"))
+                .withQueryParam("sort_by", equalTo("popularity.desc"))
+                .withQueryParam("page", equalTo("1"))
+                .willReturn(okJson("discover-movie.json")));
+        wireMock.stubFor(get(urlPathEqualTo("/3/discover/tv"))
+                .withQueryParam("with_watch_providers", equalTo("8|1796"))
+                .withQueryParam("sort_by", equalTo("popularity.desc"))
+                .willReturn(okJson("discover-tv.json")));
+
+        TmdbPage<TmdbMovieSummary> movies = tmdbClient.discoverPopularMovies("8|1796", 1);
+        TmdbPage<TmdbTvSummary> tvs = tmdbClient.discoverPopularTvs("8|1796", 1);
+
+        assertThat(movies.results().get(0).popularity()).isEqualTo(87.5);
+        assertThat(tvs.results().get(0).name()).isEqualTo("테스트 드라마 1");
+        assertThat(callCount("discover_popular_movie", "success")).isEqualTo(1.0);
+        assertThat(callCount("discover_popular_tv", "success")).isEqualTo(1.0);
+    }
+
     // T2: 나머지 호출을 하나씩. 경로와 쿼리 이름이 맞는지 스텁을 엄격하게 쓴다
     @Test
     void t2_discoverTvs_정상_응답이_DTO로_매핑된다() {

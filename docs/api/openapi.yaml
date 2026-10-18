@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 35개이고 모두 구현됐다(`listOttServices`, 작품 검색·상세 2개, 수집 관리자 API 5개, 제공처 매핑 관리 API 2개, 토큰 재발급·로그아웃 2개, 내 설정 2개, 찜 4개, 관리자 상품·가격 7개, 내 서비스 요금 3개, 플랜 계산·초안 조회·저장·현재 플랜 조회 4개, 비교 측정 1개, 변경 내역 조회·재계산 수동 실행 2개). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다(지금은 해당 operation이 없다).
+    - operation은 44개이고 43개가 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution` 포함). 탈퇴 `withdrawMe`(`DELETE /me`)는 Task 081이 `x-planned: true`로 추가했고 구현은 Task 082다. 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -12,7 +12,7 @@ servers:
     description: 상대 경로. 배포는 Vercel rewrite, 로컬은 Vite proxy가 백엔드로 전달한다
 tags:
   - name: catalog
-    description: 작품 검색·상세 (공개)
+    description: 작품 검색·상세, 홈·탐색 공통 목록 (공개)
   - name: user
     description: 내 설정·구독 상태 (`/api/me/**`)
   - name: wishlist
@@ -122,6 +122,231 @@ paths:
           $ref: '#/components/responses/InternalError'
         '502':
           $ref: '#/components/responses/BadGateway'
+
+  # ===== catalog: 홈·탐색 공통 목록 (공개, Task 107. 개인화 없이 모두에게 같은 목록) =====
+  /public/popularity-rankings:
+    get:
+      tags:
+        - catalog
+      operationId: listPopularityRankings
+      security: []
+      summary: 서비스별 인기 순위 조회
+      description: |
+        서비스별 인기 순위를 `TODAY`(가장 최근 스냅샷 하루) 또는 `WEEK`(최근 7일 스냅샷의 TMDB 인기도 평균)로 돌려준다. 비로그인 공개 API(요청 제한 적용).
+        순위는 TMDB `discover`(한국, 서비스 제공처 필터, 인기순)를 하루 한 번 받아 쌓은 일별 스냅샷으로 만든다. **TMDB 인기도 기준이며 OTT 공식 순위가 아니다**(`notice`에 화면 표기용 문구를 담는다). 서비스마다 영화·드라마를 합쳐 인기도 높은 순 상위 `limit`개이고, `ottServiceId`를 생략하면 7개 서비스 전체에서 같은 작품을 한 번만 세어 순위를 매긴다.
+        `WEEK`는 가장 최근 스냅샷 날짜까지 7일 범위에서 스냅샷이 있는 날 수(`daysCounted`)로 나눈 평균이고, 그날 상위권에 없던 작품은 그날을 0으로 센다(한 번 반짝 오른 작품이 부풀려지지 않는다). 공개 직후 7일 미만이면 `daysCounted`가 7보다 작다. `ottServiceId`를 지정하면 최신 날짜와 `daysCounted` 모두 그 서비스의 기록만으로 구한다(다른 서비스만 기록된 날은 세지 않는다). 동률이면 가장 최근 날 인기도, TMDB ID 순이다. 스냅샷이 하나도 없으면 `items`는 빈 배열, `snapshotDate`는 null이다(화면은 줄을 숨긴다).
+        작품 정보(`title`)는 우리 DB에 수집된 작품이면 서비스별 제공 상태(`availabilities`)가 채워지고, 아직 수집되지 않은 작품은 `availabilities`가 빈 배열이다(그런 작품의 상세는 `TITLE_NOT_FOUND`(404)일 수 있다).
+        응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `VALIDATION_FAILED`(400, `period` 값·`limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: period
+          in: query
+          description: 순위 기간. 기본 `TODAY`
+          required: false
+          schema:
+            $ref: '#/components/schemas/PopularityPeriod'
+        - name: ottServiceId
+          in: query
+          description: 서비스 내부 ID. 생략하면 7개 서비스 전체 순위
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          description: 돌려줄 순위 개수(기본 20, 최대 20)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 20
+            default: 20
+      responses:
+        '200':
+          description: 인기 순위
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePopularityRanking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/wishlisted-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listWishlistedTitles
+      security: []
+      summary: 찜 많은 작품 조회
+      description: |
+        찜한 사용자 수가 많은 작품을 많은 순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        사용자 수는 작품 단위로 센다(드라마는 시즌을 여러 개 찜해도 한 명). "다 봤음"으로 체크한 찜은 세지 않고, **숫자만 노출**하며 누가 찜했는지는 알 수 없다. 사용자가 `minUserCount`명보다 적은 작품은 목록에서 뺀다(개인 식별 방지, 설정값 `app.home.min-wishlist-users`, 기본 3). 조건을 채운 작품이 없으면 `items`는 빈 배열이고 화면은 줄을 숨긴다.
+        동률이면 먼저 저장된 작품이 앞에 온다. `dataAsOf`는 제공 상태의 데이터 기준일(KST)이다.
+        오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: limit
+          in: query
+          description: 돌려줄 작품 수(기본 10, 최대 20)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        '200':
+          description: 찜 많은 작품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseWishlistedTitleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/newly-available-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listNewlyAvailableTitles
+      security: []
+      summary: 새로 볼 수 있게 된 작품 조회
+      description: |
+        최근 서비스에서 새로 볼 수 있게 된 작품을 최신순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        두 경우를 묶는다. (1) `ARRIVAL`(입고): 최근 14일 안에 제공 상태가 없음·모름에서 있음(AVAILABLE)으로 바뀐 기록이 있는 작품. (2) `RELEASE`(공개): 우리가 처음 수집하며 바로 있음으로 적재된 작품이지만 공개일(영화 개봉일, 드라마는 시즌 공개일)이 최근 30일 이내인 작품. 첫 적재인데 공개일을 모르면 제외한다.
+        `availableSince`는 `ARRIVAL`이면 있음으로 바뀐 것을 확인한 날(KST), `RELEASE`면 공개일이다. 실제 서비스에 들어온 날이 아니라 **우리가 확인한 범위**의 날짜다. 같은 작품이 같은 서비스에 여러 번 해당하면(예: 시즌 여러 개) 가장 최근 하나만 담는다.
+        `ottServiceId`를 주면 그 서비스만 돌려준다. 결과가 없으면 `items`는 빈 배열이다.
+        오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: ottServiceId
+          in: query
+          description: 서비스 내부 ID. 생략하면 7개 서비스 전체
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          description: 돌려줄 작품 수(기본 20, 최대 50)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: 새로 볼 수 있게 된 작품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNewlyAvailableTitleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/genres:
+    get:
+      tags:
+        - catalog
+      operationId: listGenres
+      security: []
+      summary: 장르 목록 조회
+      description: |
+        탐색 화면의 장르 선택에 쓸 장르 목록이다. 우리 DB에 작품이 하나 이상 연결된 장르만 이름 가나다순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 장르 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseGenreList'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/genres/{genreId}/titles:
+    get:
+      tags:
+        - catalog
+      operationId: listGenreTitles
+      security: []
+      summary: 장르별 작품 조회
+      description: |
+        장르(`genreId`)에 속한 작품을 인기도 높은 순으로 한 페이지 돌려준다. **우리 DB에 수집된 작품만** 대상이라 "7개 서비스에서 확인된 범위"이며 TMDB를 호출하지 않는다. 비로그인 공개 API(요청 제한 적용).
+        없는 `genreId`는 404가 아니라 빈 결과다. 페이지 크기 기본 20. 응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: genreId
+          in: path
+          description: TMDB 장르 ID(장르 목록 API의 `genreId`)
+          required: true
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 장르별 작품 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleExplorePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/people/titles:
+    get:
+      tags:
+        - catalog
+      operationId: listPersonTitles
+      security: []
+      summary: 인물(출연자)별 작품 조회
+      description: |
+        이름이 `name`과 같은(대소문자 구분 없음) 출연자가 나온 작품을 인기도 높은 순으로 한 페이지 돌려준다. 우리 DB에 저장된 출연진(작품당 출연 순서 상위 10명)만 조회하며 TMDB 인물 검색은 쓰지 않는다. 비로그인 공개 API(요청 제한 적용).
+        그래서 결과는 "7개 서비스에서 확인된 범위"이고, 같은 이름의 다른 사람이 섞일 수 있으며 출연 순서 10번째 밖의 출연작은 빠진다(화면이 안내 문구로 알린다).
+        오류: `VALIDATION_FAILED`(400, 이름 없음·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: name
+          in: query
+          description: 출연자 이름. 앞뒤 공백을 뺀 뒤 1자 이상
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 인물별 작품 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleExplorePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # ===== wishlist =====
   /me/wishlist-items:
@@ -1084,6 +1309,37 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  # ===== admin: 인기 순위 수집 (배치 토큰 범위 /admin/popularity/**, Task 107) =====
+  /admin/popularity/executions:
+    post:
+      tags:
+        - admin
+      operationId: createPopularityExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 인기 순위 수집 실행 요청
+      description: |
+        인기 순위 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 하루 1회 GitHub Actions cron이 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
+        하는 일: 서비스 7곳 × 영화·드라마별로 TMDB `discover`(한국, 서비스 제공처 필터, 인기순) 첫 쪽(상위 20개)을 받아 오늘(KST) 날짜의 인기 스냅샷으로 저장한다(약 14번 호출). 같은 날 다시 실행하면 그 날짜의 스냅샷을 덮어쓰고(중복 행이 쌓이지 않는다), 14일이 지난 스냅샷은 지운다. 한 서비스·매체의 호출이 실패하면 그 조각만 건너뛰고 나머지는 저장한다(건너뛴 조각의 이전 스냅샷은 그대로 남는다).
+        수집·재계산·정리·인기 수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 인기 수집 실행 중에는 수집·재계산·정리 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+      responses:
+        '202':
+          description: 실행 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePopularityExecutionAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /admin/plan-benchmarks:
     post:
       tags:
@@ -1172,7 +1428,7 @@ components:
       type: http
       scheme: bearer
       description: |
-        관리자 배치 토큰(`ADMIN_BATCH_TOKEN`, JWT 아님). GitHub Actions cron이 `Authorization: Bearer`로 보낸다. 별도 필터가 상수 시간 비교로 검사하고 `/admin/collect/**`(와 2단계 `/admin/plans/monthly/**`)에서만 유효하다(TECH 4절). 관리자 Access Token(JWT)과는 OR 관계다(둘 중 하나만 맞으면 통과한다).
+        관리자 배치 토큰(`ADMIN_BATCH_TOKEN`, JWT 아님). GitHub Actions cron이 `Authorization: Bearer`로 보낸다. 별도 필터가 상수 시간 비교로 검사하고 `/admin/collect/**`, `/admin/plans/monthly/**`, `/admin/retention/**`, `/admin/popularity/**`에서만 유효하다(TECH 4절). 관리자 Access Token(JWT)과는 OR 관계다(둘 중 하나만 맞으면 통과한다).
         cron은 Vercel을 거치지 않고 백엔드에 직접 호출하므로 오리진 비밀 헤더(`x-origin-secret`)도 함께 보낸다(TECH 3절). 이 헤더는 인프라 경계 검사라 operation 파라미터로 적지 않는다.
   parameters:
     PageParam:
@@ -4004,6 +4260,321 @@ components:
         success: true
         data:
           executionId: 21
+    PopularityExecutionAccepted:
+      type: object
+      description: 인기 순위 수집 실행 접수 결과(202)
+      required:
+        - executionId
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 새 수집 실행 ID(Spring Batch jobExecutionId)
+    CommonResponsePopularityExecutionAccepted:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PopularityExecutionAccepted'
+      example:
+        success: true
+        data:
+          executionId: 31
+
+    # ----- catalog: 홈·탐색 공통 목록 (Task 107) -----
+    PopularityPeriod:
+      type: string
+      description: 인기 순위 기간. TODAY 가장 최근 스냅샷 하루 / WEEK 최근 7일 스냅샷의 인기도 평균
+      enum:
+        - TODAY
+        - WEEK
+    PopularityRankingItem:
+      type: object
+      description: 인기 순위의 한 줄
+      required:
+        - rank
+        - title
+      properties:
+        rank:
+          type: integer
+          format: int32
+          description: 순위(1부터)
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+    PopularityRanking:
+      type: object
+      description: 서비스(또는 전체)의 인기 순위
+      required:
+        - period
+        - ottServiceId
+        - snapshotDate
+        - daysCounted
+        - notice
+        - items
+      properties:
+        period:
+          $ref: '#/components/schemas/PopularityPeriod'
+        ottServiceId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 요청한 서비스 ID. 전체 순위면 null
+        snapshotDate:
+          type: string
+          format: date
+          nullable: true
+          description: 사용한 가장 최근 스냅샷 날짜(KST, 데이터 기준일). 스냅샷이 없으면 null
+        daysCounted:
+          type: integer
+          format: int32
+          description: 평균에 쓴 스냅샷 날 수. 스냅샷이 없으면 0, 있으면 TODAY는 1, WEEK는 1~7
+        notice:
+          type: string
+          description: 화면에 함께 적을 기준 안내 문구. 예 "TMDB 인기도 기준, OTT 공식 순위 아님"
+        items:
+          type: array
+          description: 인기도 높은 순위(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/PopularityRankingItem'
+    CommonResponsePopularityRanking:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PopularityRanking'
+      example:
+        success: true
+        data:
+          period: TODAY
+          ottServiceId: 1
+          snapshotDate: '2026-10-18'
+          daysCounted: 1
+          notice: TMDB 인기도 기준, OTT 공식 순위 아님
+          items:
+            - rank: 1
+              title:
+                mediaType: tv
+                tmdbId: 93405
+                title: 오징어 게임
+                releaseYear: 2021
+                posterPath: /dDlEmu3EZ0Pgg93K2SVNLCjCSvE.jpg
+                availabilities:
+                  - ottServiceId: 1
+                    status: AVAILABLE
+    WishlistedTitle:
+      type: object
+      description: 찜이 많은 작품 한 줄
+      required:
+        - title
+        - wishlistUserCount
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+        wishlistUserCount:
+          type: integer
+          format: int32
+          description: 이 작품을 찜한 사용자 수("다 봤음" 제외, 작품 단위). 최소 인원 미만 작품은 목록에 없다
+    WishlistedTitleList:
+      type: object
+      required:
+        - minUserCount
+        - dataAsOf
+        - items
+      properties:
+        minUserCount:
+          type: integer
+          format: int32
+          description: 목록에 넣는 최소 찜 사용자 수(이보다 적은 작품은 뺀다)
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일(KST)
+        items:
+          type: array
+          description: 찜 사용자 수 많은 순(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/WishlistedTitle'
+    CommonResponseWishlistedTitleList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/WishlistedTitleList'
+      example:
+        success: true
+        data:
+          minUserCount: 3
+          dataAsOf: '2026-10-18'
+          items:
+            - title:
+                mediaType: movie
+                tmdbId: 496243
+                title: 기생충
+                releaseYear: 2019
+                posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+                availabilities:
+                  - ottServiceId: 1
+                    status: AVAILABLE
+              wishlistUserCount: 12
+    ArrivalType:
+      type: string
+      description: 새로 볼 수 있게 된 이유. ARRIVAL 입고(없음·모름에서 있음으로 바뀜을 확인) / RELEASE 공개(첫 수집부터 있음이지만 공개일이 최근)
+      enum:
+        - ARRIVAL
+        - RELEASE
+    NewlyAvailableTitle:
+      type: object
+      description: 새로 볼 수 있게 된 작품 한 줄
+      required:
+        - title
+        - ottServiceId
+        - arrivalType
+        - availableSince
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 새로 볼 수 있게 된 서비스
+        arrivalType:
+          $ref: '#/components/schemas/ArrivalType'
+        availableSince:
+          type: string
+          format: date
+          description: 기준 날짜(KST). ARRIVAL이면 있음으로 바뀐 것을 확인한 날, RELEASE면 공개일(실제 서비스 입고일이 아니라 우리가 확인한 범위의 날짜)
+    NewlyAvailableTitleList:
+      type: object
+      required:
+        - dataAsOf
+        - items
+      properties:
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일(KST)
+        items:
+          type: array
+          description: 기준 날짜가 최근인 순(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/NewlyAvailableTitle'
+    CommonResponseNewlyAvailableTitleList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NewlyAvailableTitleList'
+      example:
+        success: true
+        data:
+          dataAsOf: '2026-10-18'
+          items:
+            - title:
+                mediaType: movie
+                tmdbId: 496243
+                title: 기생충
+                releaseYear: 2019
+                posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+                availabilities:
+                  - ottServiceId: 4
+                    status: AVAILABLE
+              ottServiceId: 4
+              arrivalType: ARRIVAL
+              availableSince: '2026-10-15'
+    Genre:
+      type: object
+      description: 탐색용 장르 하나(TMDB 장르)
+      required:
+        - genreId
+        - name
+      properties:
+        genreId:
+          type: integer
+          format: int32
+          description: TMDB 장르 ID
+        name:
+          type: string
+          description: 한국어 장르 이름
+    CommonResponseGenreList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Genre'
+      example:
+        success: true
+        data:
+          - genreId: 16
+            name: 애니메이션
+          - genreId: 80
+            name: 범죄
+    TitleExplorePage:
+      description: 탐색 결과 한 페이지(페이지네이션 고정 형태 + 데이터 기준일)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - dataAsOf
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/TitleSearchItem'
+            dataAsOf:
+              type: string
+              format: date
+              description: 제공 상태의 데이터 기준일(KST)
+    CommonResponseTitleExplorePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TitleExplorePage'
+      example:
+        success: true
+        data:
+          content:
+            - mediaType: movie
+              tmdbId: 496243
+              title: 기생충
+              releaseYear: 2019
+              posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+              availabilities:
+                - ottServiceId: 1
+                  status: AVAILABLE
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          dataAsOf: '2026-10-18'
 
     # ----- auth -----
     AccessToken:
