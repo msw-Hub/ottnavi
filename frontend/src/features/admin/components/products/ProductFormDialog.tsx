@@ -49,7 +49,6 @@ interface ProductFormDialogProps {
   onClose: () => void // 닫기(취소·저장 성공·Esc)
   onCreated: (productId: number) => void // 등록에 성공했을 때. 새 OTT 구독상품을 바로 골라 이력을 보여 준다
   openerRef: RefObject<HTMLElement | null> // 대화상자를 연 버튼. 닫히면 포커스를 여기로 돌려준다
-  // 이전(Task 075 1차안): isBundlePreview(목업 미리보기에서만 번들·등급을 고르게 함). Task 076에서 계약이 번들·저가형을 받아 항상 보인다
 }
 
 // "저가형" 체크 칸 모양. 등록·수정 대화상자가 같이 쓴다. 줄 전체가 label이라 글자를 눌러도 켜지고, 높이 44px(min-h-11)는 터치 크기 기준이다

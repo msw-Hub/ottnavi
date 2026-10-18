@@ -6,7 +6,9 @@ import {
   ScaleIcon,
   SearchIcon,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import type { OttService } from '@/api/generated/model'
 import { DataAsOf } from '@/components/common/DataAsOf'
 import { DataInsufficientTag } from '@/components/common/DataInsufficientTag'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -16,25 +18,21 @@ import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { Button } from '@/components/ui/button'
 import { ExclusiveServiceTabs } from '@/features/exclusives/components/ExclusiveServiceTabs'
 import { ExclusiveTitleCard } from '@/features/exclusives/components/ExclusiveTitleCard'
-import type { ExclusiveService } from '@/features/exclusives/mockTypes'
 import {
-  EXCLUSIVE_SERVICES,
-  EXCLUSIVES_DATA_AS_OF,
-  getSampleExclusiveTitles,
-} from '@/features/exclusives/sampleData'
+  ExclusiveTitleRail,
+  ExclusiveTitleRailItem,
+  ExclusiveTitleRailSkeleton,
+} from '@/features/exclusives/components/ExclusiveTitleRail'
+// import { EXCLUSIVE_PAGE_SIZE, useExclusiveTitles } from '@/features/exclusives/hooks/useExclusiveTitles' // "24 / 30편" 표시를 되살릴 때 EXCLUSIVE_PAGE_SIZE까지 푼다
+import { useExclusiveTitles } from '@/features/exclusives/hooks/useExclusiveTitles'
+import { useOttServices } from '@/hooks/useOttServices'
 import { withJosa } from '@/lib/josa'
-import { isMockMode } from '@/lib/mockScenario'
 
 // 고른 서비스 탭을 담는 주소 파라미터 이름(?service=NETFLIX). 새로고침·공유 때 같은 탭이 열리게 URL에 둔다(frontend.md 화면 위치는 URL)
 const SERVICE_PARAM = 'service'
 
-// 목업 모드에서 상태 화면을 확인하는 주소 파라미터 이름과 값(?exclusivesPreview=…). 1차안 검토용이다(변경 내역 화면과 같은 방식)
-const EXCLUSIVES_PREVIEW_PARAM = 'exclusivesPreview'
-type ExclusivesPreview = 'list' | 'empty' | 'loading' | 'error'
-const EXCLUSIVES_PREVIEWS: ExclusivesPreview[] = ['list', 'empty', 'loading', 'error']
-
 /**
- * SCR-03 서비스별 독점 작품 화면의 본문이다(Task 075 1차안). pages/ExclusivesPage는 이 컴포넌트를 연결만 한다.
+ * SCR-03 서비스별 독점 작품 화면의 본문이다. pages/ExclusivesPage는 이 컴포넌트를 연결만 한다.
  *
  * 이 화면이 하는 일: 국내 OTT 7곳 중 한 곳에서만 구독으로 볼 수 있다고 확인된 작품을 서비스별로 보여 준다.
  * "이 서비스를 구독하면 여기서만 볼 수 있는 게 뭐지?"에 답해 구독할 곳을 고르는 근거가 된다.
@@ -43,28 +41,28 @@ const EXCLUSIVES_PREVIEWS: ExclusivesPreview[] = ['list', 'empty', 'loading', 'e
  * 1. 제목·한 줄 설명·데이터 기준일: 독점이 "확인된 범위"라는 것과 언제 데이터인지를 목록보다 먼저 알린다(PRD FR-04, 5.6).
  * 2. 산정 기준 상자: 결과를 확정처럼 읽지 않게 핵심 기준 두 가지(모름 포함 / 영화는 쿠팡플레이 비교 제외)는 항상 보이고,
  *    나머지 세부 기준은 접어 둔다(모바일에서 목록이 너무 아래로 밀리지 않게).
- * 3. 서비스 탭 7개 → 고른 서비스의 작품 수 요약 → 작품 카드 격자. 쿠팡플레이는 목록 대신 데이터 부족 안내(PRD SCR-03).
+ * 3. 서비스 탭 7개 → 고른 서비스의 작품 수 요약 → 옆으로 넘기는 작품 가로 줄.
+ *    데이터 부족 서비스(쿠팡플레이)는 요약 줄 위에 "드라마만 확인했다"는 작은 안내를 붙인다(목록은 그대로 보인다).
  * 4. 맨 아래 출처(JustWatch)와 "확인된 범위" 안내.
  *
- * 데이터: 1차안은 정적 샘플(sampleData.ts)을 쓴다. API(Task 078)가 생기면 서비스별 조회 훅의 결과를 넘기면 된다.
- * 상태 화면 확인(목업 모드 전용): 주소에 ?exclusivesPreview=empty|loading|error를 붙이면 고른 탭의 목록 칸이 그 상태로 보인다.
- * 운영에서는 이 파라미터를 읽지 않는다.
+ * 데이터: 서비스 탭은 서비스 목록 API, 작품은 서비스별 독점 목록 API(listServiceExclusiveTitles)에서 받는다.
+ * 한 번에 24편씩 받고, 줄의 오른쪽 끝 가까이 넘기면 다음 쪽을 스스로 불러와 줄 뒤에 이어 붙인다. 탭을 바꾸면 그 서비스의 첫 쪽·첫 위치부터 다시 시작한다.
+ * 이전: 아래로 펼쳐지는 격자 + 맨 아래 "더보기" 버튼이었다. 다른 OTT 앱처럼 옆으로 넘기는 편이 낫다는 사용자 의견으로 바꿨다.
+ * 서버가 isJudged=false로 답하면(예전 응답) 목록 대신 데이터 부족 안내를 보이는 분기도 남겨 두었다.
  */
 export function ExclusivesScreen() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const servicesQuery = useOttServices()
+  const services = servicesQuery.data ?? []
 
-  // 1. 주소의 서비스 코드로 탭을 고른다. 없거나 모르는 코드면 첫 서비스(넷플릭스)다
+  // 1. 주소의 서비스 코드로 탭을 고른다. 없거나 모르는 코드면 첫 서비스(넷플릭스)다. 서비스 목록이 오기 전에는 null이다
   const service =
-    EXCLUSIVE_SERVICES.find((entry) => entry.code === searchParams.get(SERVICE_PARAM)) ??
-    EXCLUSIVE_SERVICES[0]
+    services.find((entry) => entry.code === searchParams.get(SERVICE_PARAM)) ?? services[0] ?? null
 
-  // 2. 목업 모드에서만 상태 확인용 파라미터를 읽는다. 모르는 값이면 목록 있음으로 본다
-  const rawPreview = isMockMode() ? searchParams.get(EXCLUSIVES_PREVIEW_PARAM) : null
-  const preview: ExclusivesPreview = EXCLUSIVES_PREVIEWS.includes(rawPreview as ExclusivesPreview)
-    ? (rawPreview as ExclusivesPreview)
-    : 'list'
+  // 2. 고른 서비스의 독점 목록. 서비스가 정해지기 전에는 요청을 보내지 않는다
+  const exclusives = useExclusiveTitles(service?.ottServiceId ?? null)
 
-  // 3. 탭을 바꾸면 주소의 서비스 코드만 바꾼다(확인용 파라미터는 이어받는다). 뒤로 가기 기록을 쌓지 않으려고 replace로 바꾼다
+  // 3. 탭을 바꾸면 주소의 서비스 코드만 바꾼다(다른 파라미터는 이어받는다). 뒤로 가기 기록을 쌓지 않으려고 replace로 바꾼다
   function selectService(code: string) {
     setSearchParams(
       (prev) => {
@@ -73,6 +71,29 @@ export function ExclusivesScreen() {
         return next
       },
       { replace: true },
+    )
+  }
+
+  // 4. 탭 영역. 서비스 목록이 없으면 탭 자체를 못 그리므로 화면이 로딩·오류·빈 상태를 맡고, 탭이 뜬 뒤의 상태는 ServicePanel이 맡는다
+  //    (그래야 탭을 바꿔 새로 받는 동안에도 탭이 사라지지 않는다)
+  let tabsContent: ReactNode
+  if (servicesQuery.isPending) {
+    tabsContent = <LoadingState message="서비스 목록을 불러오고 있어요" />
+  } else if (servicesQuery.isError) {
+    tabsContent = (
+      <ErrorState
+        title="서비스 목록을 불러오지 못했어요"
+        error={servicesQuery.error}
+        onRetry={() => void servicesQuery.refetch()}
+      />
+    )
+  } else if (!service) {
+    tabsContent = <EmptyState title="보여 줄 서비스가 없어요" />
+  } else {
+    tabsContent = (
+      <ExclusiveServiceTabs services={services} value={service.code} onValueChange={selectService}>
+        <ServicePanel service={service} exclusives={exclusives} />
+      </ExclusiveServiceTabs>
     )
   }
 
@@ -85,27 +106,13 @@ export function ExclusivesScreen() {
           국내 OTT 7곳 중 <strong className="font-semibold text-foreground">한 곳에서만</strong>{' '}
           구독으로 볼 수 있다고 확인된 작품이에요. 어디를 구독할지 고를 때 참고해 주세요.
         </p>
-        <DataAsOf value={EXCLUSIVES_DATA_AS_OF} />
+        {/* 기준일은 서버가 독점을 계산한 날이다. 목록을 받기 전에는 "기준일 정보 없음"으로 보인다 */}
+        <DataAsOf value={exclusives.data?.dataAsOf ?? null} />
       </div>
 
       <CriteriaNote />
 
-      <ExclusiveServiceTabs
-        services={EXCLUSIVE_SERVICES}
-        value={service.code}
-        onValueChange={selectService}
-      >
-        <ServicePanel
-          service={service}
-          preview={preview}
-          onRetry={() => {
-            // 1차안: "다시 시도"는 확인용 파라미터를 지워 목록 화면으로 돌아간다. 실제 화면은 조회 훅의 refetch를 넘긴다
-            const next = new URLSearchParams(searchParams)
-            next.delete(EXCLUSIVES_PREVIEW_PARAM)
-            setSearchParams(next)
-          }}
-        />
-      </ExclusiveServiceTabs>
+      {tabsContent}
 
       <div className="grid gap-1.5 border-t border-border pt-4">
         <SourceAttribution />
@@ -144,10 +151,11 @@ function CriteriaNote() {
         <li className="flex items-start gap-2">
           {/* 아이콘은 줄마다 뜻을 보조한다. 같은 뜻의 글자가 있어 낭독기에는 숨긴다 */}
           <CircleHelpIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          {/* 이전 뒷문장: "그곳에서도 볼 수 있을 수 있어서 작품마다 "모름"이 몇 곳인지 함께 적었어요."
+              카드의 "다른 N곳: 없음·모름" 줄을 빼면서(2차안) 문장도 줄였다 */}
           <span>
             다른 서비스의 제공 여부가 <strong className="font-semibold">모름</strong>인 경우도
-            포함돼요. 그곳에서도 볼 수 있을 수 있어서 작품마다 &quot;모름&quot;이 몇 곳인지 함께
-            적었어요.
+            포함돼요. 그곳에서도 볼 수 있을 수 있어요.
           </span>
         </li>
         <li className="flex items-start gap-2">
@@ -174,10 +182,9 @@ function CriteriaNote() {
           <li>
             드라마는 시즌마다 따로 판단해요. 일부 시즌만 독점일 수 있어 카드에 시즌을 적었어요.
           </li>
-          <li>
-            쿠팡플레이는 제공 정보가 부족해 쿠팡플레이의 독점 여부는 판단하지 않아요(드라마 비교에는
-            포함해요).
-          </li>
+          {/* 이전: "쿠팡플레이는 제공 정보가 부족해 쿠팡플레이의 독점 여부는 판단하지 않아요(드라마 비교에는 포함해요)."
+              서버가 쿠팡플레이도 드라마 독점은 판정하게 바뀌어 문구를 맞췄다 */}
+          <li>쿠팡플레이는 영화 제공 정보를 받지 못해, 쿠팡플레이 독점은 드라마만 확인해요.</li>
           <li>매일 수집이 끝난 뒤 다시 계산해요. 순서는 TMDB 인기도 순이에요.</li>
         </ol>
       </details>
@@ -186,33 +193,61 @@ function CriteriaNote() {
 }
 
 interface ServicePanelProps {
-  service: ExclusiveService // 지금 고른 서비스
-  preview: ExclusivesPreview // 1차안 상태 확인 값(목업 모드에서만 list 외의 값이 온다)
-  onRetry: () => void // 오류 상태의 "다시 시도"
+  service: OttService // 지금 고른 서비스
+  exclusives: ReturnType<typeof useExclusiveTitles> // 고른 서비스의 독점 목록 조회 결과(지금까지 받은 쪽들, 로딩·오류 상태 포함)
 }
 
-// 고른 탭 안의 내용: 데이터 부족 안내 → 로딩 → 오류 → 빈 상태 → 작품 격자 순으로 고른다
-function ServicePanel({ service, preview, onRetry }: ServicePanelProps) {
-  // 1. 데이터 부족 서비스(쿠팡플레이)는 목록 대신 안내를 보인다(PRD FR-04, SCR-03). 확인용 상태보다 먼저 본다
-  if (service.dataQuality === 'INSUFFICIENT') {
-    return <InsufficientNotice serviceName={service.name} />
-  }
+/**
+ * 고른 탭 안의 내용이다. 데이터 부족 서비스(쿠팡플레이)면 맨 위에 작은 안내를 붙이고, 그 아래는 상태에 따라 하나를 고른다.
+ *
+ * 쿠팡플레이 안내를 목록 "대신"이 아니라 목록 "위"에 둔 이유: 서버가 쿠팡플레이도 드라마 독점은 판정하게 바뀌어(영화만 판정 불가)
+ * 목록은 그대로 보이고, "영화는 빠졌다"는 범위만 알려 주면 된다. 서비스 목록의 dataQuality로 고르므로 로딩·빈 상태에서도 같은 안내가 보인다.
+ */
+function ServicePanel({ service, exclusives }: ServicePanelProps) {
+  return (
+    // grid-cols-1(= minmax(0, 1fr)): 칸의 최소 폭을 0으로 둬, 안의 가로 줄이 카드 전체 폭만큼 화면을 넓히지 않게 한다(홈 RailSection과 같은 이유)
+    <div className="grid grid-cols-1 gap-3">
+      {service.dataQuality === 'INSUFFICIENT' && (
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm break-keep text-muted-foreground">
+          {/* "데이터 부족" 태그는 아이콘 + 글자라 색만으로 구분하지 않는다(홈·랭킹의 데이터 부족 안내와 같은 모양) */}
+          <DataInsufficientTag />
+          <span>
+            {withJosa(service.name, '은/는')} 영화 제공 정보를 받지 못해 드라마만 확인했어요.
+          </span>
+        </p>
+      )}
+      <ServicePanelBody service={service} exclusives={exclusives} />
+    </div>
+  )
+}
 
-  // 2. 확인용 상태별 본문
-  if (preview === 'loading') {
-    return <LoadingState message={`${service.name} 독점 작품을 불러오고 있어요`} />
+// 탭 안의 본문: 로딩 → 오류 → (구버전 응답) 판정 안 함 안내 → 빈 상태 → 작품 가로 줄 순으로 고른다
+function ServicePanelBody({ service, exclusives }: ServicePanelProps) {
+  // 1. 처음 받는 중이거나 처음 받기에 실패한 경우. (다음 쪽을 받다 실패한 경우는 받아 둔 목록을 지우지 않으려고 아래에서 따로 다룬다)
+  if (exclusives.isPending) {
+    // 이전: 가운데 동그라미 로딩(LoadingState). 목록이 가로 한 줄이 되어 자리 모양을 맞춘 회색 카드 줄로 바꿨다
+    // return <LoadingState message={`${service.name} 독점 작품을 불러오고 있어요`} />
+    return <ExclusiveTitleRailSkeleton message={`${service.name} 독점 작품을 불러오고 있어요`} />
   }
-  if (preview === 'error') {
+  if (!exclusives.data) {
+    // 받는 중도 아닌데 받은 것이 없으면 처음 받기에 실패한 것이다
     return (
       <ErrorState
         title="독점 작품을 불러오지 못했어요"
-        message="잠시 후 다시 시도해 주세요."
-        onRetry={onRetry}
+        error={exclusives.error}
+        onRetry={() => void exclusives.refetch()}
       />
     )
   }
+  const { items: titles, totalElements, isJudged } = exclusives.data
 
-  const titles = preview === 'empty' ? [] : getSampleExclusiveTitles(service.ottServiceId)
+  // 2. 서버가 독점을 판정하지 않았다고 답한 경우(isJudged=false)만 목록 대신 큰 안내를 보인다.
+  //    지금 서버는 쿠팡플레이도 드라마는 판정해 이 길로 오지 않는다. 예전 응답이 와도 화면이 깨지지 않게 남겨 둔 분기다
+  if (!isJudged) {
+    return <InsufficientNotice serviceName={service.name} />
+  }
+
+  // 3. 판정은 했지만 독점 작품이 없는 경우
   if (titles.length === 0) {
     return (
       <EmptyState
@@ -230,25 +265,51 @@ function ServicePanel({ service, preview, onRetry }: ServicePanelProps) {
     )
   }
 
-  // 3. 작품 격자. 375px에서 두 칸(카드 약 160px)이고 넓어질수록 칸을 늘린다
+  // 4. 작품 가로 줄. 요약 줄의 편수는 전체 수다.
+  //    이전: 오른쪽에 지금까지 불러온 수 "24 / 30편"(여러 쪽짜리일 때만)과 낭독기용 "전체 N편 중 M편을 불러왔어요"를 보였다.
+  //    사용자 결정(2026-10-19)으로 뺐다. 다시 넣으려면 아래 주석과 위 import의 EXCLUSIVE_PAGE_SIZE를 푼다
+  // const isMultiPage = totalElements > EXCLUSIVE_PAGE_SIZE
   return (
-    <div className="grid gap-3">
-      <p className="text-sm text-muted-foreground tabular-nums">
-        <strong className="font-semibold text-foreground">{service.name}</strong> 독점으로 확인된
-        작품 {titles.length}편 · 인기순
-      </p>
-      <ul
-        aria-label={`${service.name} 독점 작품`}
-        className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+    <div className="grid grid-cols-1 gap-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="text-sm text-muted-foreground tabular-nums">
+          <strong className="font-semibold text-foreground">{service.name}</strong> 독점으로 확인된
+          작품 {totalElements}편 · 인기순
+        </p>
+        {/* {isMultiPage && (
+          <p className="text-xs text-muted-foreground tabular-nums">
+            <span aria-hidden="true">
+              {titles.length} / {totalElements}편
+            </span>
+            <span className="sr-only">
+              전체 {totalElements}편 중 {titles.length}편을 불러왔어요
+            </span>
+          </p>
+        )} */}
+      </div>
+      <ExclusiveTitleRail
+        label={`${service.name} 독점 작품`}
+        itemCount={titles.length}
+        hasMore={exclusives.hasNextPage}
+        isLoadingMore={exclusives.isFetchingNextPage}
+        isLoadMoreError={exclusives.isFetchNextPageError}
+        onLoadMore={() => void exclusives.fetchNextPage()}
       >
-        {titles.map((title) => (
-          <li key={`${title.mediaType}-${title.tmdbId}`}>
-            <ExclusiveTitleCard title={title} />
-          </li>
+        {/* 순위 = 지금까지 불러온 목록에서의 위치(1부터). 서버가 인기도 내림차순(동률은 작품 ID)으로 주므로
+            다음 쪽이 뒤에 붙어도 25, 26…으로 이어진다. 요약 줄의 "인기순"이 이 숫자의 뜻을 이미 말한다 */}
+        {titles.map((title, index) => (
+          <ExclusiveTitleRailItem key={`${title.mediaType}-${title.tmdbId}`}>
+            <ExclusiveTitleCard title={title} rank={index + 1} />
+          </ExclusiveTitleRailItem>
         ))}
-      </ul>
+      </ExclusiveTitleRail>
     </div>
   )
+
+  // 이전: 아래로 이어 붙이는 격자 + "더보기" 버튼. 다른 OTT 앱처럼 옆으로 넘겨 보는 한 줄로 바꿨다(사용자 의견, 1차안)
+  // 격자: <ul className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"> 안에 카드를 <li>로 늘어놓았다
+  // 더보기: hasNextPage일 때 <Button variant="outline" size="lg" className="h-11 px-6">, 받는 중에는 disabled + "불러오는 중…",
+  //         다음 쪽 실패 때는 버튼 위에 <p role="alert" className="text-center text-sm text-destructive">다음 작품을 불러오지 못했어요. 다시 눌러 주세요.</p>
 }
 
 /**

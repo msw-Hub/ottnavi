@@ -4,6 +4,7 @@ import {
   getListGenreTitlesQueryKey,
   getListNewlyAvailableTitlesQueryKey,
   getListPopularityRankingsQueryKey,
+  getListServiceExclusiveTitlesQueryKey,
   getListWishlistedTitlesQueryKey,
   getSearchTitlesQueryKey,
   listGenreTitles,
@@ -11,6 +12,7 @@ import {
   useListGenres,
   useListNewlyAvailableTitles,
   useListPopularityRankings,
+  useListServiceExclusiveTitles,
   useListWishlistedTitles,
 } from '@/api/generated/catalog/catalog'
 import type {
@@ -92,6 +94,26 @@ export function useNewlyAvailableTitles(
       select: (res) => res.data,
       staleTime: HOME_LIST_STALE_TIME_MS,
       enabled: isEnabled,
+    },
+  })
+}
+
+/**
+ * 한 서비스의 독점 작품 첫 쪽만 받는다(홈의 "서비스 독점 작품" 줄용, 계약 listServiceExclusiveTitles).
+ * ottServiceId가 null이면 요청을 보내지 않는다(서비스 목록이 오기 전). 독점 화면(features/exclusives)은 "더 보기"로 이어 붙이는
+ * 다른 훅을 쓴다. 기능 폴더끼리 import하지 않는 규칙 때문에 홈은 홈 전용 훅을 따로 둔다.
+ */
+export function useServiceExclusiveTitles(ottServiceId: number | null, size: number) {
+  const params = { size }
+  return useListServiceExclusiveTitles(ottServiceId ?? 0, params, {
+    query: {
+      queryKey: [
+        ...getListServiceExclusiveTitlesQueryKey(ottServiceId ?? 0, params),
+        getMockRequestParams(),
+      ],
+      select: (res) => res.data,
+      staleTime: HOME_LIST_STALE_TIME_MS,
+      enabled: ottServiceId !== null,
     },
   })
 }

@@ -1,5 +1,6 @@
 import { delay, http, HttpResponse, type RequestHandler } from 'msw'
 import type {
+  CommonResponseExclusiveTitlePage,
   CommonResponseGenreList,
   CommonResponseNewlyAvailableTitleList,
   CommonResponsePopularityRanking,
@@ -7,6 +8,12 @@ import type {
   CommonResponseWishlistedTitleList,
   TitleSearchItem,
 } from '@/api/generated/model'
+import {
+  getMockExclusiveTitles,
+  MOCK_EXCLUSIVES_DATA_AS_OF,
+  MOCK_SERVICE_ID_MAX,
+  // MOCK_UNJUDGED_SERVICE_ID, // 판정하지 않는 서비스가 없어져 쓰지 않는다(fixtures/exclusives 참고)
+} from '@/mocks/fixtures/exclusives'
 import {
   MOCK_GENRES,
   MOCK_HOME_DATA_AS_OF,
@@ -31,7 +38,8 @@ import { hasMockScenario, problemResponse } from '@/mocks/handlerUtils'
  * - 장르 목록:      GET /api/public/genres
  * - 장르별 작품:    GET /api/public/genres/:genreId/titles?page=&size=
  * - 출연자별 작품:  GET /api/public/people/titles?name=  (화면에 아직 연결하지 않아 빈 페이지만 돌려준다)
- * 시나리오(X-Mock-Scenario 헤더): rate-limit(429 요청 제한), error(500), home-empty(찜 많은 작품·인기 순위·새 작품이 모두 빈 목록, 서비스 초기 모습).
+ * - 서비스별 독점:  GET /api/public/ott-services/:ottServiceId/exclusive-titles?page=&size=  (Task 079. 같은 홈 공개 조회 파일에 함께 둔다)
+ * 시나리오(X-Mock-Scenario 헤더): rate-limit(429 요청 제한), error(500), home-empty(찜 많은 작품·인기 순위·새 작품·독점이 모두 빈 목록, 서비스 초기 모습).
  */
 
 // 숫자 쿼리 값을 읽는다. 없거나 정수가 아니면 undefined
@@ -175,6 +183,65 @@ export const homeHandlers: RequestHandler[] = [
       toExplorePage(items, readInt(url, 'page') ?? 0, readInt(url, 'size') ?? 20),
     )
   }),
+
+  // 서비스별 독점 목록(Task 079). 홈의 독점 줄(size=10)과 독점 화면(size=24, 더보기로 page를 올림)이 함께 쓴다.
+  // 없는 서비스는 404다. 쿠팡플레이(데이터 부족)도 드라마 독점 목록을 isJudged=true로 돌려준다(영화만 판정하지 못함).
+  // isJudged=false는 구버전 응답 대비 분기라 테스트가 server.use로 따로 만든다
+  http.get(
+    '/api/public/ott-services/:ottServiceId/exclusive-titles',
+    async ({ request, params }) => {
+      await delay()
+      const failed = scenarioError(request)
+      if (failed) return failed
+
+      // 1. 경로·쪽 값 검증(서버와 같게): 서비스 ID는 1 이상 정수, page는 0 이상, size는 1~100. 어긋나면 400
+      const url = new URL(request.url)
+      const page = readInt(url, 'page') ?? 0
+      const size = readInt(url, 'size') ?? 20
+      const isIdValid = /^[1-9]\d{0,15}$/.test(String(params.ottServiceId))
+      if (!isIdValid || page < 0 || size < 1 || size > 100) {
+        return problemResponse(
+          request,
+          400,
+          'Bad Request',
+          'VALIDATION_FAILED',
+          '요청 값이 올바르지 않습니다.',
+        )
+      }
+
+      // 2. 목업이 모르는 서비스 ID는 404 OTT_SERVICE_NOT_FOUND
+      const ottServiceId = Number(params.ottServiceId)
+      if (ottServiceId > MOCK_SERVICE_ID_MAX) {
+        return problemResponse(
+          request,
+          404,
+          'Not Found',
+          'OTT_SERVICE_NOT_FOUND',
+          '서비스를 찾을 수 없습니다.',
+        )
+      }
+
+      // 3. 모든 서비스가 판정된 목록이다(쿠팡플레이도 드라마는 판정). 빈 시나리오(home-empty)는 빈 목록
+      // 이전: 쿠팡플레이는 판정하지 않아 isJudged=false와 빈 목록이었다
+      // const isJudged = ottServiceId !== MOCK_UNJUDGED_SERVICE_ID
+      const isJudged = true
+      const all = hasMockScenario(request, 'home-empty') ? [] : getMockExclusiveTitles(ottServiceId)
+      const body: CommonResponseExclusiveTitlePage = {
+        success: true,
+        data: {
+          content: all.slice(page * size, page * size + size),
+          page,
+          size,
+          totalElements: all.length,
+          totalPages: Math.ceil(all.length / size),
+          ottServiceId,
+          isJudged,
+          dataAsOf: MOCK_EXCLUSIVES_DATA_AS_OF,
+        },
+      }
+      return HttpResponse.json(body)
+    },
+  ),
 
   http.get('/api/public/people/titles', async ({ request }) => {
     await delay()

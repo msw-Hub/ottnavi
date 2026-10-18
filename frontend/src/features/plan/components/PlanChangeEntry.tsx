@@ -427,7 +427,7 @@ function formatPlacement(
 
 /*
  * 4. 절감액 변화(삭제, 2026-10-17 사용자 결정). 두 플랜이 다루는 3개월이 한 달씩 달라 비교가 부정확해 화면에서 뺐다.
- * 참고용으로 코드를 남긴다(되살리려면 PiggyBankIcon import와 mockTypes의 previousSavings·currentSavings도 함께 되돌린다).
+ * 참고용으로 코드를 남긴다(되살리려면 PiggyBankIcon import도 함께 되돌린다. 절감액 필드는 변경 내역 계약에 없다).
  *
  * // 0 이하는 아낀 것이 없으므로 결과 화면(PlanSummary)처럼 "절감 없음"으로 쓴다
  * function SavingsSection({ previous, current }: { previous: number; current: number }) {

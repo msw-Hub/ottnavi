@@ -22,9 +22,6 @@ import { useCalculatePlan } from '@/hooks/usePlanDrafts'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { formatDataAsOf, formatMinutes, formatWon } from '@/lib/format'
 
-// 이전(Task 075 1차안): 목업 모드 + ?pricingPreview=bundle일 때만 샘플 번들 줄을 덧붙였다.
-// Task 076에서 계약에 번들·저가형이 생겨 API 응답을 그대로 그린다. 요금 목록 모양은 시안 A(서비스당 카드 한 장)로 확정해 PricingGroupCard가 맡는다
-
 // 화면 안에서 "계산하기" 버튼에 넘기는 계산 진행 상태와 시작 함수
 interface PricingCalculation {
   isPending: boolean // 계산이 진행 중인지

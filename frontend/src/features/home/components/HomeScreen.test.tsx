@@ -74,11 +74,10 @@ describe('홈 화면', () => {
       '서비스별 인기 순위',
       '찜이 많은 작품',
       '최근 새로 볼 수 있게 된 작품',
+      '서비스 독점 작품',
     ]) {
       expect(await screen.findByRole('heading', { level: 2, name: heading })).toBeInTheDocument()
     }
-    // 독점 줄은 독점 API(Task 078) 전까지 그리지 않는다
-    expect(screen.queryByRole('heading', { name: '서비스 독점 작품' })).not.toBeInTheDocument()
 
     // 순위 숫자는 장식이 아니라 글자로 읽힌다
     const ranking = await screen.findByRole('list', { name: '전체 인기 순위' })
@@ -91,9 +90,61 @@ describe('홈 화면', () => {
     expect(screen.getByText(/TMDB 인기도 기준, OTT 공식 순위 아님 · 오늘/)).toBeInTheDocument()
     // 출처·기준일: 목록 3줄마다 한 줄씩
     await waitFor(() =>
-      expect(screen.getAllByText(/제공처 정보 출처/).length).toBeGreaterThanOrEqual(3),
+      expect(screen.getAllByText(/제공처 정보 출처/).length).toBeGreaterThanOrEqual(4),
     )
-    expect(screen.getAllByText(/데이터 기준일/).length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText(/데이터 기준일/).length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('독점 작품 줄은 첫 서비스의 독점 첫 쪽(10편)을 보이고, 쿠팡플레이는 "드라마만 확인" 안내와 함께 목록을 보인다', async () => {
+    const user = userEvent.setup()
+    renderHome()
+
+    // 넷플릭스 독점은 30편이지만 줄에는 첫 쪽 10편만 온다. 카드는 포스터 이미지 주소가 TMDB 상대 경로에서 만들어진다
+    const list = await screen.findByRole('list', { name: '넷플릭스 독점 작품' })
+    expect(within(list).getAllByRole('article')).toHaveLength(10)
+    // 더보기는 같은 서비스 탭이 열린 독점 목록 화면으로 간다
+    const section = list.closest('section') as HTMLElement
+    expect(within(section).getByRole('link', { name: /더보기/ })).toHaveAttribute(
+      'href',
+      '/exclusives?service=NETFLIX',
+    )
+
+    const tabs = within(section).getByRole('tablist', { name: '독점 작품 서비스 선택' })
+    await user.click(within(tabs).getByRole('tab', { name: /쿠팡플레이/ }))
+    expect(
+      await within(section).findByText(
+        '쿠팡플레이는 영화 제공 정보를 받지 못해 드라마만 확인했어요.',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      await within(section).findByRole('list', { name: '쿠팡플레이 독점 작품' }),
+    ).toBeInTheDocument()
+  })
+
+  it('독점 작품 줄에서 서버가 판정하지 않았다고 답하면(구버전 isJudged=false) 목록 대신 안내를 보인다', async () => {
+    server.use(
+      mswHttp.get('/api/public/ott-services/:ottServiceId/exclusive-titles', () =>
+        HttpResponse.json({
+          success: true,
+          data: {
+            content: [],
+            page: 0,
+            size: 10,
+            totalElements: 0,
+            totalPages: 0,
+            ottServiceId: 7,
+            isJudged: false,
+            dataAsOf: '2026-10-16',
+          },
+        }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderHome()
+
+    const tabs = await screen.findByRole('tablist', { name: '독점 작품 서비스 선택' })
+    await user.click(within(tabs).getByRole('tab', { name: /쿠팡플레이/ }))
+    expect(await screen.findByText(/독점 여부를 판단하지 않아요/)).toBeInTheDocument()
   })
 
   it('인기 순위 기간을 최근 7일로 바꾸면 기준 문구에 며칠치인지 밝히고 순위가 바뀐다', async () => {

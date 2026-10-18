@@ -21,9 +21,6 @@ import { getTodayDateString } from '@/lib/dateUtils'
 // 고른 OTT 구독상품을 담는 주소 검색 파라미터 이름. 예: /admin/products?product=101
 const SELECTED_PRODUCT_PARAM = 'product'
 
-// 이전(Task 075 1차안): 목업 모드 + ?productsPreview=bundle일 때만 샘플 번들·광고형 상품을 덧붙였다.
-// Task 076에서 계약에 번들·저가형이 생겨 API 응답을 그대로 그린다(미리보기 파라미터와 샘플 제거)
-
 /**
  * SCR-14 OTT 구독상품·월 구독요금 관리 화면의 본문이다(Task 029).
  *
