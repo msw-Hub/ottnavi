@@ -69,6 +69,13 @@ export function WishlistButton({
     const wasPending = wasPendingRef.current
     wasPendingRef.current = isPending
     if (!shouldRestoreFocusRef.current || isOpen || isPending) return
+    // 요청이 길어 사용자가 그사이 Tab이나 클릭으로 포커스를 다른 곳에 두었다면 그 포커스를 뺏지 않는다(코드래빗 지적).
+    // 포커스가 body이면 눌렀던 버튼이 사라져 포커스를 잃은 것이고, 이 버튼 안이면 되돌릴 필요가 없으니 그 두 경우만 복원한다.
+    const active = document.activeElement
+    if (active && active !== document.body && !containerRef.current?.contains(active)) {
+      shouldRestoreFocusRef.current = false
+      return
+    }
     triggerRef.current?.focus()
     if (wasPending) shouldRestoreFocusRef.current = false
   }, [isOpen, isPending])

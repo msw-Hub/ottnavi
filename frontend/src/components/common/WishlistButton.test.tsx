@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
@@ -6,24 +6,28 @@ import type { WishlistPriority } from '@/components/common/displayTypes'
 import { WishlistButton } from '@/components/common/WishlistButton'
 
 // 찜 해제 요청이 "요청 중(버튼 disabled) → 끝나면 찜하기 상태"로 가는 흐름을 흉내 내는 테스트용 틀
-function Harness() {
+function Harness({ delayMs = 20 }: { delayMs?: number }) {
   const [priority, setPriority] = useState<WishlistPriority | null>('WANT')
   const [isPending, setIsPending] = useState(false)
   return (
-    <WishlistButton
-      targetName="시즌 3"
-      priority={priority}
-      isPending={isPending}
-      onAdd={() => {}}
-      onChangePriority={() => {}}
-      onRemove={() => {
-        setIsPending(true)
-        setTimeout(() => {
-          setPriority(null)
-          setIsPending(false)
-        }, 20)
-      }}
-    />
+    <>
+      <WishlistButton
+        targetName="시즌 3"
+        priority={priority}
+        isPending={isPending}
+        onAdd={() => {}}
+        onChangePriority={() => {}}
+        onRemove={() => {
+          setIsPending(true)
+          setTimeout(() => {
+            setPriority(null)
+            setIsPending(false)
+          }, delayMs)
+        }}
+      />
+      {/* 요청 중에 사용자가 포커스를 옮겨 갈 다른 컨트롤 */}
+      <button type="button">다른 버튼</button>
+    </>
   )
 }
 
@@ -38,5 +42,19 @@ describe('WishlistButton 키보드 포커스', () => {
 
     // 2. 요청이 끝나 "찜하기" 버튼이 되면 포커스가 거기에 있다(문서 맨 앞으로 날아가지 않는다)
     await waitFor(() => expect(screen.getByRole('button', { name: '시즌 3 찜하기' })).toHaveFocus())
+  })
+
+  it('요청 중에 사용자가 포커스를 다른 곳으로 옮겼으면 요청이 끝나도 포커스를 뺏지 않는다', async () => {
+    const user = userEvent.setup()
+    render(<Harness delayMs={80} />)
+
+    // 1. 찜 해제를 누른 뒤 요청이 끝나기 전에 다른 버튼으로 포커스를 옮긴다
+    await user.click(screen.getByRole('button', { name: '시즌 3 찜함 · 보고 싶음' }))
+    await user.click(screen.getByRole('button', { name: /찜 해제/ }))
+    act(() => screen.getByRole('button', { name: '다른 버튼' }).focus())
+
+    // 2. 요청이 끝나 "찜하기" 버튼이 나타나도 포커스는 사용자가 옮긴 곳에 그대로 있다
+    await screen.findByRole('button', { name: '시즌 3 찜하기' })
+    expect(screen.getByRole('button', { name: '다른 버튼' })).toHaveFocus()
   })
 })
