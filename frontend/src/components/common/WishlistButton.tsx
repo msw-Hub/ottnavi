@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { ChevronDownIcon, HeartIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { rememberWishlistFocusTarget } from '@/hooks/useWishlistAddedDialog'
 import { cn } from '@/lib/utils'
 import { WISHLIST_PRIORITY_LABELS, type WishlistPriority } from '@/components/common/displayTypes'
 import { PriorityIcon, PriorityRadioCards } from '@/components/common/WishlistPriority'
@@ -55,24 +56,59 @@ export function WishlistButton({
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [isOpen])
 
+  // 상자 안의 버튼(우선순위 라디오·찜 해제)을 눌러 상자가 닫힌 뒤 포커스를 트리거 버튼으로 돌려줘야 하는지(Task 090 키보드 점검).
+  // 값이 바뀌어도 다시 그릴 필요가 없어 useRef다. 눌린 버튼은 상자와 함께 사라지고, 요청 중에는 트리거도 disabled라 포커스를 잃는다.
+  const shouldRestoreFocusRef = useRef(false)
+  const wasPendingRef = useRef(false) // 직전 렌더에서 요청 중이었는지(요청이 "끝나는 순간"을 알아내려는 값)
+
+  // 상자가 닫히고 요청이 끝나 트리거가 다시 눌릴 수 있게 되면 포커스를 돌려준다. 의존성은 이 두 값이 바뀔 때만 확인하려는 것이다.
+  // 상자가 닫힌 직후에 한 번 주고(요청이 시작되기 전 짧은 순간), 요청이 시작되면 트리거가 disabled가 되어 브라우저가 포커스를 거두므로,
+  // 요청이 끝나는 순간(요청 중 → 아님)에 다시 주고 마친다. 한 번만 주면 요청 중에 포커스가 사라져 Tab이 문서 맨 앞부터 다시 시작했다.
+  // 트리거를 눌러 상자를 열 때 이 값을 꺼 두므로(아래 onClick), 요청이 없던 경우에도 나중에 포커스를 가로채지 않는다.
+  useEffect(() => {
+    const wasPending = wasPendingRef.current
+    wasPendingRef.current = isPending
+    if (!shouldRestoreFocusRef.current || isOpen || isPending) return
+    // 요청이 길어 사용자가 그사이 Tab이나 클릭으로 포커스를 다른 곳에 두었다면 그 포커스를 뺏지 않는다(코드래빗 지적).
+    // 포커스가 body이면 눌렀던 버튼이 사라져 포커스를 잃은 것이고, 이 버튼 안이면 되돌릴 필요가 없으니 그 두 경우만 복원한다.
+    const active = document.activeElement
+    if (active && active !== document.body && !containerRef.current?.contains(active)) {
+      shouldRestoreFocusRef.current = false
+      return
+    }
+    triggerRef.current?.focus()
+    if (wasPending) shouldRestoreFocusRef.current = false
+  }, [isOpen, isPending])
+
   const isIcon = variant === 'icon'
   // 아이콘 모양: 터치 영역 44x44px, 아이콘 20px. 배경 없는 ghost라 카드 위에서 하트만 보인다
   const triggerClassName = isIcon ? 'size-11 rounded-full p-0' : 'h-11'
 
   if (priority === null) {
+    // 감싸는 div와 버튼의 자리를 "찜함" 상태(아래 return)와 똑같이 맞췄다(Task 090 키보드 점검).
+    // 구조가 다르면 찜이 된 순간 React가 버튼을 새 요소로 다시 만들어, 팝업(WishlistAddedDialog)이 닫힐 때
+    // Radix가 포커스를 돌려줄 "처음 눌렀던 버튼"이 사라진다. 그러면 키보드 사용자는 포커스를 잃고 Tab이 문서 맨 앞부터 다시 시작한다.
+    // 구조가 같으면 같은 버튼 요소가 글자·이름만 바뀌어 유지되므로 포커스가 그대로 돌아온다.
     return (
-      <Button
-        type="button"
-        variant={isIcon ? 'ghost' : 'outline'}
-        className={triggerClassName}
-        // 화면 글자는 "찜하기"이고, 접근 가능한 이름에 작품(시즌) 이름을 더한다(보이는 글자가 이름 안에 그대로 있어 음성 제어도 된다)
-        aria-label={`${targetName} 찜하기`}
-        onClick={onAdd}
-        disabled={isPending}
-      >
-        <HeartIcon aria-hidden="true" className={cn(isIcon && 'size-5')} />
-        {!isIcon && '찜하기'}
-      </Button>
+      <div ref={containerRef} className="relative w-fit">
+        <Button
+          ref={triggerRef}
+          type="button"
+          variant={isIcon ? 'ghost' : 'outline'}
+          className={triggerClassName}
+          // 화면 글자는 "찜하기"이고, 접근 가능한 이름에 작품(시즌) 이름을 더한다(보이는 글자가 이름 안에 그대로 있어 음성 제어도 된다)
+          aria-label={`${targetName} 찜하기`}
+          onClick={(event) => {
+            // 팝업이 닫힐 때 이 버튼으로 포커스를 돌려주려고 누른 버튼을 기억한다(hooks/useWishlistAddedDialog)
+            rememberWishlistFocusTarget(event.currentTarget)
+            onAdd()
+          }}
+          disabled={isPending}
+        >
+          <HeartIcon aria-hidden="true" className={cn(isIcon && 'size-5')} />
+          {!isIcon && '찜하기'}
+        </Button>
+      </div>
     )
   }
 
@@ -93,7 +129,10 @@ export function WishlistButton({
         aria-label={`${targetName} 찜함 · ${WISHLIST_PRIORITY_LABELS[priority]}`}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => {
+          shouldRestoreFocusRef.current = false
+          setIsOpen((current) => !current)
+        }}
         disabled={isPending}
       >
         <HeartIcon aria-hidden="true" className={cn('fill-current', isIcon && 'size-5')} />
@@ -125,6 +164,7 @@ export function WishlistButton({
             legend="우선순위 · 계산이 챙기는 순서"
             value={priority}
             onChange={(nextPriority) => {
+              shouldRestoreFocusRef.current = true
               onChangePriority(nextPriority)
               setIsOpen(false)
             }}
@@ -134,6 +174,7 @@ export function WishlistButton({
             variant="ghost"
             className="h-11 justify-start"
             onClick={() => {
+              shouldRestoreFocusRef.current = true
               onRemove()
               setIsOpen(false)
             }}

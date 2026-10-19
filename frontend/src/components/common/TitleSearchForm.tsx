@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { SearchIcon } from 'lucide-react'
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,17 @@ export function TitleSearchForm({ variant = 'compact', className }: TitleSearchF
   const currentQuery = searchParams.get('q') ?? ''
   const isHero = variant === 'hero'
 
+  // 입력창의 글자를 상태로 두고, 주소의 검색어가 바뀌면(뒤로 가기·다른 검색) 렌더 중에 바로 맞춘다("props에서 파생된 상태" 패턴).
+  // 이전에는 <input key={currentQuery} defaultValue=…>로 검색어가 바뀔 때마다 입력창을 새로 만들었는데,
+  // 새로 만들면 키보드 포커스가 사라져 Enter로 검색한 뒤 Tab이 문서 맨 앞부터 다시 시작했다(Task 090 키보드 점검).
+  // 상태로 맞추면 입력창이 그대로 유지돼 포커스가 남는다.
+  const [inputValue, setInputValue] = useState(currentQuery)
+  const [syncedQuery, setSyncedQuery] = useState(currentQuery)
+  if (currentQuery !== syncedQuery) {
+    setSyncedQuery(currentQuery)
+    setInputValue(currentQuery)
+  }
+
   // 제출 시 입력값을 읽어 검색 화면으로 이동한다.
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     // 1. 기본 form 제출은 페이지 전체를 새로 불러오므로 막고, 라우터 이동으로 바꾼다
@@ -50,9 +61,8 @@ export function TitleSearchForm({ variant = 'compact', className }: TitleSearchF
     >
       {/*
         relative: 입력창 안 왼쪽에 돋보기 아이콘을 얹는 기준점이다(아이콘은 장식이라 낭독기에서 숨긴다).
-        입력창을 제어 컴포넌트(useState) 대신 defaultValue로 두고 key에 현재 검색어를 넣었다.
-        단순히 useState로 두면 뒤로 가기로 주소의 검색어가 바뀌어도 입력창 글자는 그대로 남는다.
-        key가 바뀌면 React가 입력창을 새로 만들어 주소의 검색어로 다시 채우므로 둘이 어긋나지 않는다.
+        입력창은 useState로 둔 제어 컴포넌트이고, 주소의 검색어가 바뀌면 위에서 상태를 맞춘다(뒤로 가기 때도 어긋나지 않는다).
+        이전: defaultValue + key={currentQuery}(입력창을 새로 만들어 맞추는 방식)였으나 제출 때 포커스가 사라져 바꿨다.
       */}
       <div className="relative min-w-0 flex-1">
         <SearchIcon
@@ -63,10 +73,10 @@ export function TitleSearchForm({ variant = 'compact', className }: TitleSearchF
           )}
         />
         <input
-          key={currentQuery}
           type="search"
           name="q"
-          defaultValue={currentQuery}
+          value={inputValue}
+          onChange={(event) => setInputValue(event.target.value)}
           aria-label="작품 제목 검색"
           placeholder={isHero ? '작품 제목을 검색해 보세요' : '작품 제목 검색'} // hero 문구는 375px 폭(입력창 약 250px)에서 잘리지 않는 길이로 줄였다
           // hero: 높이 48px(h-12)·글자 16px. 홈의 첫 행동이라 눈에 띄고 손가락으로 누르기 쉽게 크게 둔다.
