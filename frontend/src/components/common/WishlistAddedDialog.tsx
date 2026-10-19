@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import {
   closeWishlistAddedDialog,
+  takeWishlistFocusTarget,
   useWishlistAddedDialogInfo,
 } from '@/hooks/useWishlistAddedDialog'
 import { useWishlistAddedPriority } from '@/hooks/useWishlistAddedPriority'
@@ -55,6 +56,14 @@ export function WishlistAddedDialog() {
     >
       <DialogContent
         showCloseButton={false}
+        // 닫을 때 방금 누른 "찜하기" 버튼으로 포커스를 돌려준다(이유는 hooks/useWishlistAddedDialog의 focusReturnTarget 주석).
+        // 기억해 둔 버튼이 없으면 Radix 기본 동작(열기 전에 포커스를 가진 요소)에 맡긴다
+        onCloseAutoFocus={(event) => {
+          const target = takeWishlistFocusTarget()
+          if (!target) return
+          event.preventDefault()
+          target.focus()
+        }}
         // 모바일은 아래 붙은 시트(위쪽만 둥글게, 안전 영역 여백), sm 이상은 기본 가운데 카드로 되돌린다
         className="top-auto bottom-0 left-0 max-w-none translate-x-0 translate-y-0 gap-5 rounded-b-none p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] data-open:slide-in-from-bottom-8 sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-w-sm sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:pb-5 sm:data-open:slide-in-from-bottom-0"
       >

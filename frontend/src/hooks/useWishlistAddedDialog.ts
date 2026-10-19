@@ -34,6 +34,29 @@ function getSnapshot() {
   return current
 }
 
+/*
+ * 팝업을 닫을 때 키보드 포커스를 돌려줄 버튼(방금 누른 "찜하기" 버튼).
+ *
+ * 왜 따로 기억하는가(Task 090 키보드 점검): Radix Dialog는 "팝업이 열리는 순간 포커스를 가진 요소"로 포커스를 돌려준다.
+ * 그런데 찜하기 버튼은 요청 중(isPending)에 disabled가 되고, 포커스를 가진 버튼이 disabled가 되면 브라우저가 포커스를 잃게 한다.
+ * 그래서 팝업이 열리는 시점에는 포커스를 가진 요소가 없어 닫아도 돌아갈 곳이 없었다(Tab이 문서 맨 앞부터 다시 시작).
+ * 버튼을 누르는 순간에 요소를 기억해 두면 닫을 때 그 버튼으로 돌려줄 수 있다.
+ * 팝업을 띄우지 않은 요청(오류 등)에서 기억한 값이 남을 수 있어, 닫을 때 꺼내며 비우고 화면에 붙어 있는 요소일 때만 쓴다.
+ */
+let focusReturnTarget: HTMLElement | null = null
+
+/** "찜하기"를 누른 버튼을 기억한다(팝업이 닫힐 때 포커스를 돌려주려는 것) */
+export function rememberWishlistFocusTarget(element: HTMLElement) {
+  focusReturnTarget = element
+}
+
+/** 기억해 둔 버튼을 꺼내며 비운다. 이미 화면에서 사라진 요소면 null이다 */
+export function takeWishlistFocusTarget(): HTMLElement | null {
+  const target = focusReturnTarget
+  focusReturnTarget = null
+  return target?.isConnected ? target : null
+}
+
 /** 팝업을 연다. 이미 열려 있으면 내용만 바꾼다(중복으로 쌓이지 않음) */
 export function openWishlistAddedDialog(info: WishlistAddedInfo) {
   current = info

@@ -1,4 +1,6 @@
+import { useRef } from 'react'
 import { Link, Outlet, useLocation } from 'react-router'
+import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
 import { HeaderPrimaryNav } from '@/app/HeaderPrimaryNav'
 import { TitleSearchForm } from '@/components/common/TitleSearchForm'
@@ -18,6 +20,9 @@ import { isMockMode } from '@/lib/mockScenario'
 export function RootLayout() {
   // 개발용 이동 링크가 목업 확인용 주소 파라미터(?mockScenario=… 등)를 이어 붙이도록 현재 주소의 쿼리를 읽는다
   const { search } = useLocation()
+  // 머리글의 실제 높이를 재서 토스트 위치 변수에 반영한다(줄 수가 바뀌어도 토스트가 머리글을 덮지 않게, Task 090)
+  const headerRef = useRef<HTMLElement>(null)
+  useMeasuredHeaderHeight(headerRef)
   return (
     <div className="flex min-h-svh flex-col">
       {/* 키보드 사용자가 헤더 링크를 매번 거치지 않고 본문으로 바로 가도록 하는 링크. 포커스를 받을 때만 보인다 */}
@@ -44,7 +49,7 @@ export function RootLayout() {
           들어가지 못하고 둘째 줄로 내려가며, 남는 폭을 모두 차지한다(flex-1).
           이전(order 사용): 모바일 [로고 ... 계정] / [검색창] / [메뉴] — 계정이 보이는 위치(윗줄)보다 Tab 순서에서 늦게 잡혔다.
       */}
-      <header className="min-h-(--header-height) border-b bg-card">
+      <header ref={headerRef} className="min-h-(--header-height) border-b bg-card">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap sm:gap-x-4">
           <Link
             to="/"

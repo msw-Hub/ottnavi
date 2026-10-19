@@ -47,7 +47,13 @@ const TOASTER_CLASS_NAME = 'toaster group md:[--width:var(--container-md)]!'
  * offset·mobileOffset이 같은 변수를 쓰므로 601~639px에서도 두 줄 머리글을 덮지 않는다.
  * 둘 다 top만 정하고, 정하지 않은 좌우·아래는 sonner 기본값(큰 화면 24px, 모바일 16px)이 그대로 들어간다.
  */
-const TOASTER_TOP_OFFSET = { top: 'calc(var(--header-height) + var(--spacing) * 3)' }
+/*
+ * 실제로 잰 머리글 높이(--header-height-measured, hooks/useMeasuredHeaderHeight)를 먼저 쓰고, 없으면(첫 렌더 전·테스트)
+ * tokens.css의 --header-height로 대신한다. 머리글이 세 줄(약 131px)이 되어도 토스트가 머리글을 덮지 않게 하려는 것이다(Task 090).
+ */
+const TOASTER_TOP_OFFSET = {
+  top: 'calc(var(--header-height-measured, var(--header-height)) + var(--spacing) * 3)',
+}
 
 /*
  * 토스트 하나하나에 붙이는 클래스(sonner의 toastOptions.classNames). 디자인 결정 "세트 1"(Task 036·037).
