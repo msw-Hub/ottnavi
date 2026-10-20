@@ -45,7 +45,7 @@ reviews:
         - enum은 EnumType.STRING, 연관은 단방향 LAZY, NUMERIC은 BigDecimal이다. DB DEFAULT는 Hibernate가 INSERT에 쓰지 않으니 create가 직접 채운다.
     - path: "backend/src/main/java/**/{domain/rule,engine}/**"
       instructions: |
-        - 순수 Java다. 프레임워크·DB·TMDB를 부르지 않는다(engine은 다른 패키지도 참조하지 않는다). rule 클래스 위에 "이런 입력 → 이런 출력" 예시 Javadoc이 있는지 본다.
+        - 순수 Java다. Spring 어노테이션·Lombok 외의 프레임워크 의존을 넣지 않고 DB·TMDB를 부르지 않는다(engine은 다른 패키지도 참조하지 않는다). rule 클래스 위에 "이런 입력 → 이런 출력" 예시 Javadoc이 있는지 본다.
         - 판정·계산 규칙은 PRD의 어느 규칙인지 주석이 있고, 경계값과 정답이 알려진 테스트가 있는지 본다.
     - path: "backend/src/main/java/**/dto/**"
       instructions: |
