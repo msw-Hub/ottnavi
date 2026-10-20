@@ -113,7 +113,7 @@
 
 **Task 069(매월 재계산) 이월 항목(2026-10-17)**
 
-1. `CollectExecutionQueryTest`의 "복구하면 중단된 실행은 FAILED와 RECOVERED 종료 코드로 바뀐다" 테스트가 간헐 실패했다(2회: PR #77 CI에서 1회, Task 069 로컬 첫 전체 실행 1회, 실제 값은 COMPLETED). 재현하지 못했다(단독 재실행 3회·전체 재실행 통과). Job 스레드의 마지막 갱신이 테스트의 상태 되돌리기를 덮어쓰는 경합으로 의심한다. 069 병합 뒤 별도 작업으로 대기 조건을 고치길 권한다.
+1. `CollectExecutionQueryTest`의 "복구하면 중단된 실행은 FAILED와 RECOVERED 종료 코드로 바뀐다" 테스트가 간헐 실패했다(2회: PR #77 CI에서 1회, Task 069 로컬 첫 전체 실행 1회, 실제 값은 COMPLETED). 재현하지 못했다(단독 재실행 3회·전체 재실행 통과). Job 스레드의 마지막 갱신이 테스트의 상태 되돌리기를 덮어쓰는 경합으로 의심한다. **해결됨(PR #93, 대기 조건 수정).**
 2. 남은 102개 시즌(56개 작품)의 `NO_KR_DATA` 개별 원인은 TMDB 직접 조회로 확인하지 못했다.
 3. 재수집 중 TMDB 호출 수는 확인하지 못했다(시즌 조회 20,057회만 확정).
 4. 095↔101 순환 선행은 해소됐다(101의 선행을 095에서 067로 변경, ROADMAP 반영 완료).
@@ -144,7 +144,7 @@
 
 **Task 107 이월(2026-10-18)**
 
-1. **인기 수집 cron은 Task 093에서 켠다**: `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(UTC 20:47 제안 = KST 05:47). 수집(18:17 UTC)·재계산이 끝난 뒤 시각으로 잡아 겹치지 않게 한다. 겹치면 인기 수집이 409를 받거나, 인기 수집이 도는 중에 끝난 수집의 자동 재계산이 warn만 남기고 건너뛴다(수동 재실행 API로 복구). 매일 쌓여야 7일 평균이 의미가 있어 공개 직후에는 7일 미만 평균이 나온다.
+1. **인기 수집 cron은 Task 093에서 켠다**: `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(UTC 17:47 = KST 02:47로 조정함, 수집 18:17 UTC보다 30분 앞이라 일요일 주간 수집과 겹치지 않는다. 소요 시간은 093에서 측정). 겹치면 인기 수집이 409를 받거나, 인기 수집이 도는 중에 끝난 수집의 자동 재계산이 warn만 남기고 건너뛴다(수동 재실행 API로 복구). 매일 쌓여야 7일 평균이 의미가 있어 공개 직후에는 7일 미만 평균이 나온다.
 2. **순위에 우리 DB에 없는 작품이 나올 수 있다**: 스냅샷은 TMDB 결과를 그대로 저장하므로 아직 수집되지 않은 작품도 순위에 나오고, 그 카드는 `availabilities`가 빈 배열이며 상세로 가면 `TITLE_NOT_FOUND`(404)일 수 있다. 프론트 108이 빈 제공 상태 카드를 어떻게 보일지 정한다.
 3. **프론트 108이 반영할 목업↔계약 차이 6가지**: (1) 목업 `genres`(화면용 7개 묶음 칩)는 API 카드에 없고 탐색은 TMDB 장르(`/public/genres`, 이름 가나다순)와 `/public/genres/{genreId}/titles`를 쓴다. (2) `posterUrl` → `posterPath`(상대 경로, URL은 프론트가 조립). (3) 인기 순위는 `HomeTitle[]`이 아니라 `{period, ottServiceId, snapshotDate, daysCounted, notice, items[{rank, title}]}`이고 "전체" 탭은 `ottServiceId` 생략이다. (4) 새로 볼 수 있게 된 작품에 `arrivalType`(ARRIVAL 입고/RELEASE 공개)이 추가되고 `availableSince`는 유형에 따라 확인일 또는 공개일이다. (5) 찜 많은 작품 응답에 `minUserCount`·`dataAsOf`가 추가되고 항목은 `{title, wishlistUserCount}`로 목업과 같다. (6) 기준일 `HOME_DATA_AS_OF` 상수 대신 응답마다 `dataAsOf`(순위는 `snapshotDate`)를 쓴다.
 4. **구독형(flatrate)만 쓰는 한계**: 후보 수집과 같은 `with_watch_monetization_types=flatrate`로 받으므로 구독 외(대여·구매·광고) 노출이 큰 서비스(쿠팡플레이 등)는 순위가 비거나 짧아 보일 수 있다.
@@ -173,10 +173,10 @@
 **Task 077 이월(2026-10-19, PR #91 병합)**
 
 1. **새 찜은 다음 수집 시작 때 DAILY**: 찜 추가·삭제 훅은 만들지 않기로 했다(사용자 결정). 막 찜한 작품은 최대 하루 늦게 매일 갱신으로 들어온다. 신규 작품은 후보 발견이 WEEKLY에서만 돌아 최대 주 1회 반영된다.
-2. **일요일 인기 수집 겹침**: `popularity.yml`(매일 KST 05:47)이 일요일에는 WEEKLY 수집(KST 03:17 시작, 수 시간)과 겹쳐 409로 거절될 수 있다. Task 093에서 cron을 켤 때 일요일 인기 수집 시각을 조정한다.
+2. **일요일 인기 수집 겹침(해결, 시각 조정)**: `popularity.yml` 시각을 매일 KST 02:47(UTC 17:47)로 앞당겨 WEEKLY 수집(KST 03:17 시작, 수 시간)보다 먼저 끝나게 했다. 인기 수집이 30분 안에 끝나는지는 Task 093에서 cron을 켤 때 측정한다.
 3. **호출량 절감 규모 미측정**: 테스트는 작은 데이터다(Task 100·102).
 4. **`scope=AVAILABILITY_TV`(로컬 전용) 실행은 재맞춤 Step을 돌지 않는다.** 같은 날 완료된 DAILY가 있으면 같은 날짜 DAILY는 다시 못 돈다(`BATCH_ALREADY_COMPLETED`, 기존 규칙).
-5. **간헐 실패 테스트가 7번째**: `AdminCollectRecoveryApiTest`가 PR #91 CI에서 다시 실패했고 `gh run rerun --failed`로 재실행해 통과했다(앞선 6번째는 077 작업 중 6번 중 2번 실패, 마지막 전체 빌드는 통과). 별도 작업으로 두 클래스(`CollectExecutionQueryTest`, `AdminCollectRecoveryApiTest`)의 대기 조건을 고치는 것을 권한다.
+5. **간헐 실패 테스트가 7번째**: `AdminCollectRecoveryApiTest`가 PR #91 CI에서 다시 실패했고 `gh run rerun --failed`로 재실행해 통과했다(앞선 6번째는 077 작업 중 6번 중 2번 실패, 마지막 전체 빌드는 통과). **해결됨(PR #93)**: 두 클래스(`CollectExecutionQueryTest`, `AdminCollectRecoveryApiTest`)의 대기 조건을 고쳤다.
 6. **테스트 종료 때 "Error while closing item reader" WARN**이 보인다. `develop` CI 로그에도 이미 있다(CI 로그 66건, 077 PR은 67건)이라 077로 생긴 경고가 아니다.
 
 **Task 079 이월(2026-10-19, PR #90 병합)**
