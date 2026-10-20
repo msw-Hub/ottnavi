@@ -1,4 +1,5 @@
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
+import { PageTitle } from '@/components/common/PageTitle'
 
 /**
  * 라우트에서 난 오류를 받아 안내 화면을 그리는 전역 오류 경계다.
@@ -22,6 +23,7 @@ export function RouteErrorBoundary() {
 
   return (
     <section role="alert" className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-16">
+      <PageTitle name={isNotFound ? '페이지를 찾을 수 없음' : '오류가 발생했습니다'} />
       <h1 className="text-2xl font-semibold">
         {isNotFound ? '페이지를 찾을 수 없음' : '화면을 표시하지 못함'}
       </h1>

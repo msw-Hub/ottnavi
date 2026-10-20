@@ -1,0 +1,14 @@
+# 크롤러에게 주는 안내(힌트)다. 보안 수단이 아니다: 이 파일을 따르지 않는 크롤러가 있고, 누구나 이 파일을 읽을 수 있다.
+# 로그인·관리자 화면의 접근 제어는 서버(백엔드 권한 검사)가 한다.
+# 아래 경로는 로그인 뒤에만 의미가 있거나 검색에 보일 이유가 없는 화면이다(src/app/router.tsx 기준).
+User-agent: *
+Disallow: /admin
+Disallow: /settings
+Disallow: /wishlist
+Disallow: /plan
+Disallow: /pricing
+Disallow: /auth
+Disallow: /login
+
+# ottnavi.shop은 도메인 구매 전의 예정 주소다(ROADMAP Task 005·094). 달라지면 함께 고친다.
+Sitemap: https://ottnavi.shop/sitemap.xml

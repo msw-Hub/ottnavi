@@ -1,4 +1,5 @@
 // import { ComingSoon } from '@/components/common/ComingSoon'
+import { PageTitle } from '@/components/common/PageTitle'
 import { WithdrawScreen } from '@/features/auth/components/WithdrawScreen'
 import { useWithdraw } from '@/features/auth/hooks/useWithdraw'
 
@@ -12,5 +13,10 @@ import { useWithdraw } from '@/features/auth/hooks/useWithdraw'
  */
 export function WithdrawPage() {
   const { withdraw, isPending, errorMessage } = useWithdraw()
-  return <WithdrawScreen onWithdraw={withdraw} isPending={isPending} errorMessage={errorMessage} />
+  return (
+    <>
+      <PageTitle name="회원 탈퇴" />
+      <WithdrawScreen onWithdraw={withdraw} isPending={isPending} errorMessage={errorMessage} />
+    </>
+  )
 }

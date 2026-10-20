@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/common/PageTitle'
 import { HomeScreen } from '@/features/home/components/HomeScreen'
 
 /**
@@ -5,5 +6,10 @@ import { HomeScreen } from '@/features/home/components/HomeScreen'
  * 화면 조립은 features/home에 있고, 이 파일은 연결만 한다(pages는 얇게, frontend.md).
  */
 export function HomePage() {
-  return <HomeScreen />
+  return (
+    <>
+      <PageTitle />
+      <HomeScreen />
+    </>
+  )
 }

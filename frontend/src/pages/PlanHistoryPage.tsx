@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/common/PageTitle'
 import { PlanHistoryScreen } from '@/features/plan/components/PlanHistoryScreen'
 
 /**
@@ -8,5 +9,10 @@ import { PlanHistoryScreen } from '@/features/plan/components/PlanHistoryScreen'
  * 변경 내역 API 연결(Task 070)로 그 분기를 없앴다.
  */
 export function PlanHistoryPage() {
-  return <PlanHistoryScreen />
+  return (
+    <>
+      <PageTitle name="플랜 변경 내역" />
+      <PlanHistoryScreen />
+    </>
+  )
 }
