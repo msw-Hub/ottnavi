@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import com.ottnavi.support.CollectAwait;
 import com.ottnavi.support.IntegrationTestSupport;
 import java.time.LocalDate;
 import java.util.List;
@@ -267,17 +268,12 @@ class CollectExecutionQueryTest extends IntegrationTestSupport {
                 .willReturn(json("{\"id\":1,\"results\":{}}")));
     }
 
-    /** 비동기로 시작한 실행이 끝날 때까지 기다린다(최대 60초) */
+    /** 비동기로 시작한 실행이 끝날 때까지 기다린다(최대 60초). Job 스레드가 끝난 뒤에야 돌아온다 */
     private void waitUntilFinished(long executionId) throws InterruptedException {
-        long deadline = System.currentTimeMillis() + 60_000;
-        while (System.currentTimeMillis() < deadline) {
+        CollectAwait.until(() -> {
             JobExecution execution = jobRepository.getJobExecution(executionId);
-            if (execution != null && !execution.getStatus().isRunning() && execution.getEndTime() != null) {
-                return;
-            }
-            Thread.sleep(100);
-        }
-        throw new IllegalStateException("수집이 60초 안에 끝나지 않았다: " + executionId);
+            return execution != null && !execution.getStatus().isRunning() && execution.getEndTime() != null;
+        }, 60_000, "수집이 끝나지 않았다: " + executionId);
     }
 
     private static ResponseDefinitionBuilder json(String body) {

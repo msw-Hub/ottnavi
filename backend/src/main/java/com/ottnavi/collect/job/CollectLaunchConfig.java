@@ -20,11 +20,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 @Configuration
 public class CollectLaunchConfig {
 
+    /** 수집 실행 스레드 이름 접두사. 시험이 Job 스레드 종료를 기다릴 때도 이 값을 쓴다 */
+    public static final String EXECUTOR_THREAD_PREFIX = "collect-";
+
     @Bean(defaultCandidate = false)
     public JobOperator collectJobOperator(JobRepository jobRepository, Job collectJob,
                                           PlatformTransactionManager transactionManager) throws Exception {
         // 1. 동시에 한 건만 돌리는 비동기 실행기(전체 동시 실행 금지의 보조 장치)
-        SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("collect-");
+        SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor(EXECUTOR_THREAD_PREFIX);
         taskExecutor.setConcurrencyLimit(1);
 
         // 2. 수집 Job만 담은 레지스트리(restart가 Job 이름으로 Job을 찾는다)

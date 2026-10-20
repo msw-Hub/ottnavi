@@ -11,6 +11,7 @@ import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.jayway.jsonpath.JsonPath;
 import com.ottnavi.collect.job.CollectExecutionQuery;
 import com.ottnavi.collect.job.CollectExecutionRecord;
+import com.ottnavi.support.CollectAwait;
 import com.ottnavi.support.IntegrationTestSupport;
 import java.util.List;
 import java.util.Optional;
@@ -159,43 +160,41 @@ public abstract class AdminCollectApiTestSupport extends IntegrationTestSupport 
 		return id.longValue();
 	}
 
-	/** 수집이 끝날 때까지 기다린다(100ms 간격, 최대 30초). 종료 시각까지 기록된 뒤에 돌아온다 */
+	/**
+	 * 수집이 끝날 때까지 기다린다(100ms 간격, 최대 30초). 종료 시각이 기록되고 Job 스레드가 끝난 뒤에 돌아온다.
+	 * END_TIME이 보여도 Job 스레드가 afterJob 뒤 마지막 저장을 한 번 더 하므로 스레드가 끝날 때까지 기다려야 한다
+	 * (그 저장은 synchronizeStatus가 버전을 맞춰 덮어쓰므로, 그 전에 DB를 고치면 되돌려진다)
+	 */
 	protected void awaitFinished(long executionId) throws Exception {
-		long deadline = System.currentTimeMillis() + 30_000;
-		while (System.currentTimeMillis() < deadline) {
+		CollectAwait.until(() -> {
 			Optional<CollectExecutionRecord> found = collectExecutionQuery.findById(executionId);
-			if (found.isPresent()) {
-				String status = found.get().batchStatus().name();
-				// endTime이 있어야 Job 종료 리스너(afterJob) 뒤의 마지막 갱신까지 끝난 것이다. 그 전에 DB를 고치면 덮어쓰인다
-				boolean isRunning = "STARTING".equals(status) || "STARTED".equals(status) || "STOPPING".equals(status);
-				if (!isRunning && found.get().endTime() != null) {
-					return;
-				}
+			if (found.isEmpty()) {
+				return false;
 			}
-			Thread.sleep(100);
-		}
-		throw new IllegalStateException("수집이 30초 안에 끝나지 않았다: " + executionId);
+			String status = found.get().batchStatus().name();
+			boolean isRunning = "STARTING".equals(status) || "STARTED".equals(status) || "STOPPING".equals(status);
+			return !isRunning && found.get().endTime() != null;
+		}, 30_000, "수집이 끝나지 않았다: " + executionId);
 	}
 
-	/** 실행 중인 수집이 없어질 때까지 기다린다. markAsCrashed로 흉내 낸 실행(생성 시각 2000년)은 세지 않는다 */
+	/**
+	 * 실행 중인 수집이 없어질 때까지 기다린다. markAsCrashed로 흉내 낸 실행(생성 시각 2000년)은 세지 않는다.
+	 * 상태가 끝났어도 Job 스레드가 마지막 저장을 하는 중일 수 있어 스레드 종료까지 함께 기다린다
+	 * (시험 사이 DELETE와 그 저장이 겹치지 않게 한다)
+	 */
 	protected void awaitNoLiveExecutions() throws Exception {
-		long deadline = System.currentTimeMillis() + 30_000;
-		while (System.currentTimeMillis() < deadline) {
+		CollectAwait.until(() -> {
 			Integer live = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM BATCH_JOB_EXECUTION "
 					+ "WHERE STATUS IN ('STARTING', 'STARTED', 'STOPPING') AND CREATE_TIME > '2001-01-01'",
 					Integer.class);
-			if (live != null && live == 0) {
-				return;
-			}
-			Thread.sleep(100);
-		}
-		throw new IllegalStateException("실행 중인 수집이 30초 안에 끝나지 않았다");
+			return live != null && live == 0;
+		}, 30_000, "실행 중인 수집이 끝나지 않았다");
 	}
 
 	/**
 	 * JVM이 죽어 STARTED로 남은 실행을 흉내 낸다: 실행과 마지막 Step을 실행 중 상태로 되돌리고 생성 시각을 과거로 둔다.
-	 * VERSION을 올려 두는 이유: Job 스레드가 종료 리스너(afterJob) 뒤에 하는 마지막 갱신은 낙관적 락(VERSION 비교)으로
-	 * 실행하므로, 버전이 달라지면 그 갱신이 실패해 여기서 바꾼 값을 덮어쓰지 못한다(시간 경쟁 방지).
+	 * 호출하기 전에 awaitFinished로 Job 스레드가 끝나길 기다려야 한다. 스레드가 남아 있으면 마지막 저장이
+	 * 버전을 맞춰 이 값을 COMPLETED로 덮어쓴다(VERSION을 올려도 막히지 않는다. VERSION 증가는 해가 없어 그대로 둔다).
 	 */
 	protected void markAsCrashed(long executionId) {
 		jdbcTemplate.update("UPDATE BATCH_JOB_EXECUTION SET STATUS = 'STARTED', END_TIME = NULL, "
