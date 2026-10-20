@@ -1608,6 +1608,12 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`respectOriginCacheControl: false`, 또는 Task 021 기록에서 효과가 확인된 방식)를 Task 021 기록 기준으로 점검
   - [ ] `VITE_USE_MOCK=false`, 운영 빌드에 MSW 미포함 확인
+  - [ ] (2026-10-20 추가) 검색 노출 마무리. 파비콘·탭 제목·description·Open Graph·`robots.txt`·`sitemap.xml`·`canonical`은 `feature/f-favicon-seo-basics` PR에서 **예정 주소 `https://ottnavi.shop`(Task 005)을 넣어** 먼저 처리했다(사용자 결정: 주소가 이미 정해져 있어 미루지 않는다). 아래는 **도메인을 실제로 구매·연결한 뒤 확인하고 고칠 것**
+    - [ ] 구매한 주소가 `https://ottnavi.shop`과 같은지 확인(www 유무 포함). 다르면 `index.html`의 `canonical`·`og:url`·`og:image`, `public/robots.txt`의 `Sitemap:` 줄, `public/sitemap.xml`의 주소를 한꺼번에 바꾼다(`Grep "ottnavi.shop"`으로 찾는다). 만료되어 `*.vercel.app`으로 돌아갈 때도 같은 곳을 바꾼다(Task 005)
+    - [ ] 연결 전에는 `ottnavi.shop`이 열리지 않으므로, 연결 전에 검색 엔진에 등록하지 않는다(`canonical`이 열리지 않는 주소를 가리키게 된다)
+    - [ ] `.vercel.app` 주소와 커스텀 도메인이 같은 사이트를 보여 주므로 커스텀 도메인으로 영구 리다이렉트하거나 `canonical`로 정리(Vercel 문서 "Avoiding duplicate-content SEO with vercel.app URLs")
+    - [ ] 화면이 늘면 `sitemap.xml`의 공개 화면 목록을 갱신(로그인 필요 화면과 관리자 화면은 제외)
+    - [ ] 작품 상세처럼 동적 화면의 검색 노출(서버 렌더링·사전 렌더링)은 공개 뒤 3단계에서 따로 판단한다(지금 SPA는 크롤러에게 빈 화면일 수 있다)
 - 완료 기준
   - `develop` 미리보기 배포에서 `/api/public/ott-services` 응답이 V-DEPLOY "헤더·경로"를 만족한다(Preview 환경 `ORIGIN_SECRET`, Task 015).
   - 운영 빌드 산출물(`frontend/dist/`)에 MSW 워커·핸들러가 포함되지 않음을 확인했다. 화면 확인은 운영 배포 후 Task 095에서 한다.
@@ -1621,6 +1627,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] ④ 첫 운영 수집 적재(R-14 확정): `collect.yml` `workflow_dispatch` 202·재실행 409(Task 047 이관분), SCR-16에서 완료·처리 건수 확인. 다음 날 cron 실행 기록 확인
   - [ ] ⑤ 스모크: V-DEPLOY 전체(인증, 기능, 헤더·경로)와 요청 제한 429, 주요 화면 로드(Task 094에서 넘긴 화면 확인)
   - [ ] (2026-10-17 추가) 첫 공개 범위 확인: 홈·랭킹·탐색(인기 순위가 매일 쌓이는지), 변경 내역과 매월 재계산, 번들·광고형 계산, 독점 목록, 탈퇴, tier별 수집 cron(Task 077)의 실행 기록
+  - [ ] (2026-10-20 추가, [H]) 검색 엔진 등록: 도메인 연결과 Task 094의 검색 노출 마무리 확인이 끝난 뒤 Google Search Console에 **URL 접두어 속성**으로 등록(소유 확인은 `index.html` HTML 태그 방식, 도메인 속성은 DNS가 필요하다)하고 `sitemap.xml` 제출. 네이버 서치어드바이저도 같은 순서(`vercel.app` 주소로 되는지는 확인하지 못했으므로 커스텀 도메인으로 등록). 도메인을 바꾸는 시점이면 속성을 새로 만든다
   - [ ] MVP 완료 기준 ①~④ 체크, `main`에 `v0.1.0` 태그
 - 완료 기준
   - V-H: 스모크 항목별 결과와 날짜를 기록했다. 이 Task 완료가 **MVP 완료 지점**이다.
