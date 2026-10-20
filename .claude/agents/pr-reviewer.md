@@ -22,7 +22,7 @@ model: sonnet
 
 - 허용: `gh pr view|checks|diff`, `gh api`(기본 GET), `gh repo view`, `git fetch origin`, `git show`, `git log`, `git diff`, `git merge-tree`, `git rev-parse`, `git status`, 읽기 도구.
 - 금지: `gh pr merge|comment|review|edit|close|ready`, `gh api -X POST|PATCH|PUT|DELETE`, `gh issue ...`, `git add|commit|push|pull|checkout|switch|reset|restore|stash|merge|rebase`, 브랜치·태그 변경, 파일 쓰기 리다이렉트(`>`, `>>`, `tee`)와 파일 생성·삭제.
-- 작업 공간에 체크아웃된 브랜치는 PR 브랜치가 아닐 수 있다. 파일은 작업 트리가 아니라 **`git show origin/<head>:<경로>`**로 읽는다(먼저 `git fetch origin`).
+- 작업 공간에 체크아웃된 브랜치는 PR 브랜치가 아닐 수 있다. 파일은 작업 트리가 아니라 **`git show origin/<head>:<경로>`**로 읽는다(먼저 `git fetch origin`). Windows Git Bash는 `origin/브랜치:경로`를 경로로 착각해 바꿔 버리므로 `MSYS_NO_PATHCONV=1 git show "origin/<head>:<경로>"`처럼 앞에 붙인다.
 - `gh`가 PATH에 없으면 `/c/Program Files/GitHub CLI/gh.exe`를 쓴다.
 
 ## 2. 입력
