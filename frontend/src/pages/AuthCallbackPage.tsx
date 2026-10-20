@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/common/PageTitle'
 import { AuthCallbackScreen } from '@/features/auth/components/AuthCallbackScreen'
 
 /**
@@ -7,5 +8,10 @@ import { AuthCallbackScreen } from '@/features/auth/components/AuthCallbackScree
  * 가드 안에 두면 토큰을 받기도 전에 로그인 화면으로 되돌려 보내는 순환이 생긴다.
  */
 export function AuthCallbackPage() {
-  return <AuthCallbackScreen />
+  return (
+    <>
+      <PageTitle name="로그인 중" />
+      <AuthCallbackScreen />
+    </>
+  )
 }

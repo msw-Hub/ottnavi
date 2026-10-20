@@ -1,3 +1,4 @@
+import { PageTitle } from '@/components/common/PageTitle'
 import { ExclusivesScreen } from '@/features/exclusives/components/ExclusivesScreen'
 
 /**
@@ -7,5 +8,10 @@ import { ExclusivesScreen } from '@/features/exclusives/components/ExclusivesScr
  * 이전: 독점 목록 API가 없던 동안 운영에서는 준비 중 화면(ComingSoon)을, 목업에서만 정적 샘플을 보였다. API 연결로 그 분기를 없앴다.
  */
 export function ExclusivesPage() {
-  return <ExclusivesScreen />
+  return (
+    <>
+      <PageTitle name="독점 작품" />
+      <ExclusivesScreen />
+    </>
+  )
 }

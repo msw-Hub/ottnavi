@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
+import { PageTitle } from '@/components/common/PageTitle'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -89,13 +90,20 @@ export function TitleDetailScreen() {
     )
   }
 
-  return <TitleDetailContent detail={detail.data} services={services.data} />
+  // 성공했을 때만 작품명을 탭 제목에 쓴다. 이 분기와 StateLayout 분기는 동시에 그려지지 않아 <title>은 항상 하나다
+  return (
+    <>
+      <PageTitle name={detail.data.title} />
+      <TitleDetailContent detail={detail.data} services={services.data} />
+    </>
+  )
 }
 
 // 성공 전 상태(주소 오류·로딩·오류)가 함께 쓰는 틀. 화면 제목(h1)을 항상 남긴다
 function StateLayout({ children }: { children: ReactNode }) {
   return (
     <section className="flex flex-col gap-5">
+      <PageTitle name="작품 상세" />
       <h1 className="text-2xl font-semibold">작품 상세</h1>
       {children}
     </section>

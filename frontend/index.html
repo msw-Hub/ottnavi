@@ -2,9 +2,52 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OTT내비</title>
+
+    <!--
+      아이콘: 브라우저마다 고르는 형식이 달라 세 가지를 모두 연결한다.
+      .ico(16·32·48)는 오래된 브라우저·검색 결과 용, svg는 최신 브라우저 탭 용(선명), 32px png는 svg를 못 쓰는 환경 용,
+      apple-touch-icon(180px)은 iOS 홈 화면 추가 용이다. 파일은 public/에 있다(Vite가 그대로 복사한다).
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!--
+      이 <title>·description·Open Graph는 홈 기준 기본값이다. 링크 미리보기와 검색 크롤러는 JS를 실행하지 않고 이 HTML만 보는 경우가 많아서
+      HTML에 직접 적는다(SPA라 화면별로 달라지는 값은 JS가 그린 뒤에만 바뀐다). 화면별 탭 제목은 components/common/PageTitle이 맡는다.
+      canonical은 여기 두지 않는다: 모든 화면 HTML이 이 파일 하나라 넣으면 전 화면이 홈을 가리키게 된다.
+      주소 ottnavi.shop은 도메인 구매 전의 예정 주소다(ROADMAP Task 005). 달라지면 Task 094의 목록대로 한꺼번에 고친다.
+    -->
+    <title>OTT내비 – 찜한 작품으로 짜는 3개월 OTT 구독 플랜</title>
+    <meta
+      name="description"
+      content="찜한 작품과 월 예산·월 시청 시간으로 국내 OTT 7곳 중 어느 달에 어디를 구독할지 3개월 플랜을 계산합니다. 제공 여부는 TMDB(JustWatch) 기준으로 확인된 범위입니다."
+    />
+    <!-- 브라우저 주소창 색. styles/tokens.css의 --card(#081022)와 같은 값 -->
+    <meta name="theme-color" content="#081022" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OTT내비" />
+    <meta property="og:title" content="OTT내비 – 찜한 작품으로 짜는 3개월 OTT 구독 플랜" />
+    <meta
+      property="og:description"
+      content="찜한 작품과 월 예산·월 시청 시간으로 국내 OTT 7곳 중 어느 달에 어디를 구독할지 3개월 플랜을 계산합니다. 제공 여부는 TMDB(JustWatch) 기준으로 확인된 범위입니다."
+    />
+    <meta property="og:image" content="https://ottnavi.shop/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="https://ottnavi.shop/" />
+    <meta property="og:locale" content="ko_KR" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="OTT내비 – 찜한 작품으로 짜는 3개월 OTT 구독 플랜" />
+    <meta
+      name="twitter:description"
+      content="찜한 작품과 월 예산·월 시청 시간으로 국내 OTT 7곳 중 어느 달에 어디를 구독할지 3개월 플랜을 계산합니다. 제공 여부는 TMDB(JustWatch) 기준으로 확인된 범위입니다."
+    />
+    <meta name="twitter:image" content="https://ottnavi.shop/og-image.png" />
   </head>
   <body>
     <div id="root"></div>

@@ -171,6 +171,21 @@
 }
 
 /*
+ * 파비콘·홈 화면 아이콘·링크 미리보기 이미지(frontend/public/favicon.svg, favicon.ico, favicon-32/48.png,
+ * apple-touch-icon.png, og-image.png)에 쓴 브랜드 색 대응표(나비 C안).
+ * 이 파일들은 CSS 변수를 읽지 못하는 별도 이미지라 토큰 값을 hex로 옮겨 넣었다. 새 색 체계가 아니라 아래 토큰의 값이다.
+ * 토큰 값을 바꾸면 이 표와 public의 이미지도 함께 다시 만든다(자동으로 따라 바뀌지 않는다).
+ * - 바탕 타일:        --card               oklch(0.175 0.04 264)  → #081022
+ * - 타일 테두리(svg):  --border             oklch(0.28 0.045 264)  → #1d283f
+ * - 왼쪽 날개(이번 달): --primary            oklch(0.79 0.09 230)   → #7bc6e9
+ * - 오른쪽 날개(다음 달): --priority-must-bg oklch(0.83 0.13 70)    → #fdb862
+ * - 몸통·더듬이:      --foreground         oklch(0.96 0.006 258)  → #eff2f6
+ * - 미리보기 이미지 바탕: --background      oklch(0.125 0.035 264) → #020614
+ * - 미리보기 소개 문구: --info              oklch(0.88 0.07 230)   → #a8e1fd
+ * hex는 oklch → sRGB 변환식으로 계산한 값이다(소수 반올림 차이로 브라우저 표시와 1 정도 다를 수 있다).
+ */
+
+/*
  * 위 토큰을 Tailwind 클래스로 쓸 수 있게 연결한다(예: bg-status-available-bg, text-status-unknown).
  * inline을 붙이는 이유: 클래스가 var(--status-...)를 그대로 참조하게 해, :root 값을 바꾸면 클래스 결과도 바로 바뀐다
  * (Tailwind v4 문서 "Referencing other variables", context7 /tailwindlabs/tailwindcss.com 확인).
