@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
+import { PageTitle } from '@/components/common/PageTitle'
 import { SettingsForm } from '@/features/onboarding/components/SettingsForm'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useOttServices } from '@/hooks/useOttServices'
@@ -33,6 +34,8 @@ export function SettingsScreen() {
 
   return (
     <section className="flex flex-col gap-5">
+      {/* 탭 제목도 화면 제목과 맞춘다. 첫 방문인지는 이 컴포넌트가 설정을 불러와야 알아서 여기서 정한다(불러오는 동안은 "내 설정") */}
+      <PageTitle name={isFirstVisit ? '시작하기' : '내 설정'} />
       <div className="mx-auto grid w-full max-w-2xl gap-1">
         <h1 className="text-2xl font-semibold">{isFirstVisit ? '시작하기' : '내 설정'}</h1>
         <p className="text-muted-foreground">

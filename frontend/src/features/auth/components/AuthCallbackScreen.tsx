@@ -5,6 +5,7 @@ import { getGetMySettingsQueryKey, getMySettings } from '@/api/generated/user/us
 import { refreshSession } from '@/api/http'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
+import { PageTitle } from '@/components/common/PageTitle'
 import { clearLoginReturnTo, readLoginReturnTo } from '@/lib/loginReturn'
 import { isMockMode, MOCK_SCENARIO_PARAM } from '@/lib/mockScenario'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
@@ -129,6 +130,8 @@ export function AuthCallbackScreen() {
   if (isRefreshFailed || hasLoginError) {
     return (
       <section className="mx-auto flex w-full max-w-md flex-col gap-4">
+        {/* 탭 제목도 화면 제목과 맞춘다. 실패 여부는 이 컴포넌트만 알아서 여기서 정한다(pages는 얇게 두려고 상태를 올리지 않는다) */}
+        <PageTitle name="로그인하지 못했습니다" />
         <h1 className="text-2xl font-semibold">로그인하지 못했습니다</h1>
         {/* 상자 제목은 화면 제목(h1 "로그인하지 못했습니다")과 같은 말을 되풀이하지 않고 다음에 할 일을 말한다(057 검수 제안 1) */}
         <ErrorState
@@ -142,6 +145,7 @@ export function AuthCallbackScreen() {
 
   return (
     <section className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <PageTitle name="로그인 중" />
       <h1 className="text-2xl font-semibold">로그인 처리 중</h1>
       <LoadingState message="로그인을 확인하는 중입니다" />
     </section>

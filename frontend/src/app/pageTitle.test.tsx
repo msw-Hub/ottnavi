@@ -81,6 +81,17 @@ describe('화면별 탭 제목', () => {
     await waitFor(() => expect(document.title).toBe('페이지를 찾을 수 없음 · OTT내비'))
   })
 
+  it('첫 방문(온보딩 전) 내 설정은 화면 제목처럼 "시작하기"로 바뀐다', async () => {
+    // 목업 서버는 온보딩 전이면 isOnboardingDone=false인 빈 설정을 돌려준다. 설정을 불러온 뒤에야 첫 방문인 줄 알아서 제목이 바뀐다
+    renderAt('/settings')
+    await waitFor(() => expect(document.title).toBe('시작하기 · OTT내비'))
+  })
+
+  it('로그인 실패 화면은 "로그인하지 못했습니다" 제목을 쓴다', async () => {
+    renderAt('/auth/callback?error=login_failed')
+    await waitFor(() => expect(document.title).toBe('로그인하지 못했습니다 · OTT내비'))
+  })
+
   it('작품 조회가 실패하면 "작품 상세" 제목으로 돌아간다', async () => {
     server.use(
       mswHttp.get('/api/public/titles/:mediaType/:tmdbId', () =>
