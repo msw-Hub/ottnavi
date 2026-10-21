@@ -41,13 +41,13 @@
 
 | Phase | 이름 | 완료/전체 | 상태 |
 |---|---|---|---|
-| 1 | 프로젝트 초기 설정 (골격 구축) | 22/23 | 🔄 진행 중 |
+| 1 | 프로젝트 초기 설정 (골격 구축) | 23/23 | ✅ 완료 (마지막 Task 005 도메인 구매를 2026-10-21 마쳤다) |
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 3/3 | ✅ 완료 (106 화면 1차안은 PR #75, 107 홈·탐색 API는 PR #84, 108 홈·탐색 실제 API 연결은 PR #86으로 병합) |
 | 4 | 추가 기능 개발 | 16/24 | 🔄 진행 중 (079 번들·독점 화면 실제 API 연결 PR #90, 077 계층별 갱신 PR #91, 078 독점 목록 API PR #88, 084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
 | 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 85/108 | |
+| 합계 | | 86/108 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -337,7 +337,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - **O3 참고 자료(MVP는 STANDARD 단품만이라 사용하지 않는다. O3 착수 때 다시 확인)**: Netflix 광고형 7,000·프리미엄 17,000. TVING 광고형 스탠다드 5,500·베이직 9,500. wavve 광고형 스탠다드 5,500·베이직 7,900. 번들(조사일 2026-10-05): 티빙+웨이브 더블 스탠다드 15,000, 티빙+웨이브 더블 광고형 스탠다드 7,000, 웨이브+티빙 더블 베이직 13,500, 디즈니+티빙 스탠다드 18,000(부가세 포함), 디즈니+티빙+웨이브 스탠다드 21,500(부가세 포함). 쿠팡 패스: 프리미엄 3,900, 스포츠 12,400(와우 회원가, 일반 회원가 19,300).
   - **매핑되지 않은 KR 제공처 31개**: 7개 서비스 밖이다. 이 중 국내 구독 후보로 볼 만한 것은 Amazon Prime Video(119), Google Play Movies(3)이며 둘 다 범위 밖이다. 나머지는 해외 소규모·다큐·독립영화 서비스다(상위 30개: JustWatch TV 2285, GuideDoc 100, Curiosity Stream 190, DOCSVILLE 475, Plex 538, WOW Presents Plus 546, Magellan TV 551, BroadwayHD 554, Filmzie 559, Dekkoo 444, True Story 567, DocAlliance Films 569, Hoichoi 315, Eventive 677, Cultpix 692, Takflix 1771, Sun Nxt 309, Crunchyroll 283, Jolt Film 2330, FOUND TV 2478, MUBI 11, Bloodstream 2555, MovieMe 2565, KableOne 2603, CaixaForum+ 2620, Artiflix 2623, Artify 2685, Pijama Films 2765, Filmtap 2782. 표시 우선순위 순).
 
-#### Task 005: 도메인 ottnavi.shop 1년 구매로 운영 주소 확보 ⬜
+#### Task 005: 도메인 ottnavi.shop 1년 구매로 운영 주소 확보 ✅
 - 태그: [H] · PRD: 11절 기획 확정(도메인), R11-3 · 선행: 없음 · 기한: Task 092 착수 직전, 2026-11-04 이전(1년 사용 기간이 구매일부터 시작하므로 구매를 미룬다. 구매 전에는 `*.vercel.app`·Cloudtype 기본 주소를 쓴다)
 - 구현 사항
   - [ ] 포트폴리오용이라 **1년만 쓰는 것을 기준**으로 한다. 등록업체별 **첫해 가격**을 비교하고(갱신 가격은 기록만 한다), 도메인 월 환산 비용(첫해 가격 ÷ 12)을 Cloudtype 구독료(512MB당 월 6,600원)와 합쳐 저예산 범위인지 확인한다(고정 상한은 두지 않는다)
@@ -346,6 +346,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] 만료 한 달 전 알림을 남기고, 만료되면 `*.vercel.app` 기본 주소로 돌아가도록 `APP_FRONTEND_ORIGIN`·`OAUTH2_REDIRECT_BASE_URL`·Google OAuth 운영 리디렉션 URI·`vercel.json`의 주소만 바꾸면 되는지(코드 변경 없음)를 포트폴리오 문서에 적어 둔다
 - 완료 기준
   - V-H: 업체·첫해 가격(·갱신 가격 참고)·구매일·만료일을 기록했다.
+- 기록(2026-10-21, 사용자 직접): 업체 카페24(등록기관 Gabia), 구매일 2026-10-21(KST), 만료 2027-10-20(조회 화면은 UTC 기준 2027-10-20 23:59, KST로는 10-21 08:59). 첫해 가격은 수수료 포함 550원(월 환산 약 46원)이고 자동 연장은 취소했다(그래서 이 가격이 1년 전체). 갱신 가격은 확인하지 않았다. 계정 2단계 인증을 켰다. 카페24는 별도 WHOIS 개인정보 보호 서비스가 없지만, 등록기관 RDAP 조회로 등록자·기술 담당자 연락처(이름·전화·주소)가 기본으로 가려져 있음을 확인했다(2026-10-21). 연장 안내가 등록기관(Gabia) 이름으로 올 수 있으며 링크는 누르지 않고 카페24 사이트에 직접 접속해 확인한다. 도메인·HTTPS 구조 설명은 `docs/guides/DOMAIN_HTTPS_FLOW.md`.
 
 #### Task 006: 백엔드 Gradle 프로젝트 골격 생성으로 빌드 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 없음 · 브랜치: `main` 직접 커밋(초기 세팅)
@@ -1590,16 +1591,20 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [H] · PRD: B8·F8, R11-3, R11-4 · 선행: 005, 067 · 기한: 2026-11-04
 - 구현 사항
   - [ ] Cloudtype Hobby(512MB당 월 6,600원, 메모리는 실측 후 결정) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
-  - [ ] `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` 확정, Google OAuth 운영 리다이렉트 URI(`https://{도메인}/api/login/oauth2/code/google`)·승인된 출처 추가
+  - [ ] `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` 확정, Google OAuth 운영 리다이렉트 URI(`https://{도메인}/api/login/oauth2/code/google`) 추가. **승인된 JavaScript 원본(출처)은 필요 없다**: 프론트가 `window.location.assign('/api/oauth2/authorization/google')`로 이동만 하고 구글 JS 라이브러리를 쓰지 않는 서버 측 authorization code 흐름이기 때문이다
   - [ ] 운영 환경 변수 최종 점검(Task 015 위치표, Task 020 등록분). 첫 배포 때 미룬 Google OAuth·TMDB·메일 값을 채운다
+  - [ ] **새 환경 변수 체크리스트(이름만, 값은 Cloudtype 웹 설정 페이지 `Environment variables`에 직접 입력. `Build Variables`에 넣으면 앱이 값을 받지 못한다)**. 기존 7개(`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `ORIGIN_SECRET`)에 더해 `APP_FRONTEND_ORIGIN`(`https://ottnavi.shop`, 끝에 `/` 없이), `OAUTH2_REDIRECT_BASE_URL`(같은 값), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `JWT_SECRET`(운영용, Base64 32바이트 이상, 개발용과 다른 값), `ADMIN_BATCH_TOKEN`(운영용, GitHub 시크릿과 같은 값), `TMDB_API_KEY`(읽기 액세스 토큰, 비어도 기동은 되지만 수집이 안 된다). 알림 메일은 3단계라 지금 필요 없다. **새 코드는 기본값이 없는 변수가 비면 기동하지 못하므로 `develop` → `main` 병합(Task 095) 전에 모두 등록한다.** 같은 값이어야 하는 것: `ORIGIN_SECRET`(Cloudtype·GitHub·Vercel), `ADMIN_BATCH_TOKEN`(Cloudtype 운영용 = GitHub)
+  - [ ] GitHub Actions 시크릿 `BACKEND_BASE_URL` 등록(현재 `ADMIN_BATCH_TOKEN`·`ORIGIN_SECRET`만 있다). 값은 `vercel.json`에 있는 Cloudtype 공개 주소(https, 경로 없이). Hobby 전환 뒤 기본 주소가 바뀌면 `vercel.json`의 주소도 함께 고친다
 - 완료 기준
   - V-H: 전환일, 도메인 연결 결과, 등록 URI를 기록했다.
+- 진행(2026-10-21): `ottnavi.shop`을 Vercel에 추가하고(Production, `www` 리다이렉트는 켜지 않음. canonical·sitemap이 `www` 없는 주소 기준) 카페24 DNS에 A 레코드 `@`를 입력했다. `nslookup`으로 반영, `https://ottnavi.shop`이 `200`·`Server: Vercel`·HSTS로 응답하는 것을 확인했다. 구글 OAuth 리디렉션 URI `https://ottnavi.shop/api/login/oauth2/code/google`을 추가했다. 아직 남은 것: Cloudtype Hobby 전환(사용자는 배포 시점에 맞춰 진행), 환경 변수 등록, `BACKEND_BASE_URL` 시크릿. 운영 구글 로그인은 한 번도 확인하지 못했고 Task 095 스모크에서 본다. 검색 엔진 등록은 095 전까지 하지 않는다.
 
 #### Task 093: 백엔드 운영 설정 점검과 수집 cron 활성화로 자동 운영 준비 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: B8, FR-18, R11-4 · 선행: 092, 047 · 브랜치: `feature/b8-prod-config`
 - 구현 사항
   - [ ] prod 프로필 최종 점검(`ddl-auto=validate`, 풀 약 5, `forward-headers-strategy=framework`, 오리진 비밀 헤더 검사 켬)
-  - [ ] `collect.yml`의 `schedule` 활성화(Cloudtype 직접 호출 + 두 헤더). 매일 수집이 Supabase 7일 비활성 일시정지도 막는다
+  - [x] (2026-10-21, `feature/docs-cron-enable-domain`) 세 워크플로의 `schedule` 주석을 풀었다: `collect.yml`(DAILY·WEEKLY 두 cron), `popularity.yml`(KST 02:47), `retention.yml`(주 1회). Cloudtype 직접 호출 + 두 헤더. 매일 수집이 Supabase 7일 비활성 일시정지도 막는다. schedule은 기본 브랜치(`main`) 파일만 실행되므로 `develop`에서는 돌지 않고 Task 095 병합 때 한꺼번에 켜진다. 그 전에 Hobby 전환, 환경 변수(Task 092), GitHub 시크릿 `BACKEND_BASE_URL`이 준비돼야 첫 실행이 실패하지 않는다
+  - [ ] 인기 수집이 30분 안에 끝나는지(WEEKLY 수집 시작 KST 03:17 전), 호출량, `calculateAll` 시간을 cron을 켠 뒤 측정해 기록
 - 완료 기준
   - PR 수준: YAML 문법 유효, prod 프로필로 로컬 기동(환경 변수는 로컬 값) 성공. `main` 반영 후 cron·배포 확인은 Task 095.
 

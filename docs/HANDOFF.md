@@ -140,11 +140,11 @@
 1. **정리가 못 끝내는 작품이 쌓일 가능성**: 갱신을 건너뛴(`REFRESH_SKIPPED`, 시즌 404 등) 작품이나 보류(`DEFERRED`)된 작품은 `fetched_at`이 그대로라 다음 실행에서도 가장 오래된 순으로 맨 앞에 다시 뽑힌다. 같은 이유로 계속 건너뛰는 작품이 1회 상한(`app.retention.max-titles-per-run`=500)만큼 쌓이면 뒤의 오래된 작품이 처리되지 않는다(CodeRabbit PR #82 지적, 사용자 결정 A: 이번에는 두고 기록). 고치려면 재시도 표시 컬럼(새 마이그레이션) 또는 커서 방식이 필요하다. 운영 정리 실행 요약 로그의 "갱신 못 함·보류" 건수가 상한 가까이 쌓이는지 보고 필요하면 설계한다.
 2. **TMDB 404 확정과 빈도 미확인**: 삭제된 TMDB ID가 404를 주는지와 빈도는 문서로 확정하지 못했다. 운영 수집이 돈 뒤 `tmdb.call{endpoint=movie_detail, result=not_found}` 카운터와 warn 로그로 실측해 ROADMAP에 기록한다.
 3. **정리 Job의 Step 상태**: 앞 Step이 실패해 다음으로 넘어가면 그 Step은 `ABANDONED`(종료 코드 `FAILED`)로 남고 Job 전체는 `COMPLETED`다. 실패는 error 로그와 Step 종료 코드로만 드러난다.
-4. **`retention.yml`·실서버 미확인**: `schedule`은 주석이다. `main` 병합 뒤 `workflow_dispatch`로 한 번 돌려 확인하고, 수집 cron(Task 093)을 켤 때 함께 켠다.
+4. **`retention.yml`·실서버 미확인**: `schedule`은 2026-10-21에 풀었지만 `main` 병합(Task 095) 전에는 돌지 않는다. 병합 뒤 `workflow_dispatch`로 한 번 돌려 확인한다.
 
 **Task 107 이월(2026-10-18)**
 
-1. **인기 수집 cron은 Task 093에서 켠다**: `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(UTC 17:47 = KST 02:47로 조정함, 수집 18:17 UTC보다 30분 앞이라 일요일 주간 수집과 겹치지 않는다. 소요 시간은 093에서 측정). 겹치면 인기 수집이 409를 받거나, 인기 수집이 도는 중에 끝난 수집의 자동 재계산이 warn만 남기고 건너뛴다(수동 재실행 API로 복구). 매일 쌓여야 7일 평균이 의미가 있어 공개 직후에는 7일 미만 평균이 나온다.
+1. **인기 수집 cron은 `main` 병합(Task 095) 때 켜진다**: `popularity.yml`의 schedule은 2026-10-21에 풀었고 `main` 전에는 돌지 않는다(UTC 17:47 = KST 02:47로 조정함, 수집 18:17 UTC보다 30분 앞이라 일요일 주간 수집과 겹치지 않는다. 소요 시간은 093에서 측정). 겹치면 인기 수집이 409를 받거나, 인기 수집이 도는 중에 끝난 수집의 자동 재계산이 warn만 남기고 건너뛴다(수동 재실행 API로 복구). 매일 쌓여야 7일 평균이 의미가 있어 공개 직후에는 7일 미만 평균이 나온다.
 2. **순위에 우리 DB에 없는 작품이 나올 수 있다**: 스냅샷은 TMDB 결과를 그대로 저장하므로 아직 수집되지 않은 작품도 순위에 나오고, 그 카드는 `availabilities`가 빈 배열이며 상세로 가면 `TITLE_NOT_FOUND`(404)일 수 있다. 프론트 108이 빈 제공 상태 카드를 어떻게 보일지 정한다.
 3. **프론트 108이 반영할 목업↔계약 차이 6가지**: (1) 목업 `genres`(화면용 7개 묶음 칩)는 API 카드에 없고 탐색은 TMDB 장르(`/public/genres`, 이름 가나다순)와 `/public/genres/{genreId}/titles`를 쓴다. (2) `posterUrl` → `posterPath`(상대 경로, URL은 프론트가 조립). (3) 인기 순위는 `HomeTitle[]`이 아니라 `{period, ottServiceId, snapshotDate, daysCounted, notice, items[{rank, title}]}`이고 "전체" 탭은 `ottServiceId` 생략이다. (4) 새로 볼 수 있게 된 작품에 `arrivalType`(ARRIVAL 입고/RELEASE 공개)이 추가되고 `availableSince`는 유형에 따라 확인일 또는 공개일이다. (5) 찜 많은 작품 응답에 `minUserCount`·`dataAsOf`가 추가되고 항목은 `{title, wishlistUserCount}`로 목업과 같다. (6) 기준일 `HOME_DATA_AS_OF` 상수 대신 응답마다 `dataAsOf`(순위는 `snapshotDate`)를 쓴다.
 4. **구독형(flatrate)만 쓰는 한계**: 후보 수집과 같은 `with_watch_monetization_types=flatrate`로 받으므로 구독 외(대여·구매·광고) 노출이 큰 서비스(쿠팡플레이 등)는 순위가 비거나 짧아 보일 수 있다.
