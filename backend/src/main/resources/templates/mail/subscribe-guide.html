@@ -1,13 +1,30 @@
 <!DOCTYPE html>
-<!-- 플랜 저장 직후 구독 안내(SUBSCRIBE_GUIDE). 본문 내용은 Task 073에서 payload 필드와 함께 채운다 -->
+<!-- 플랜 저장 직후 구독 안내(SUBSCRIBE_GUIDE). payload: summary, joinProducts, cancelReserveProducts, titles, monthCost (SubscribeGuidePayload) -->
 <html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section})}">
 <head>
     <title>저장한 구독 플랜 안내</title>
 </head>
 <body>
 <section>
-    <p>구독 플랜을 저장했어요. 달마다 어떤 서비스를 구독하면 좋은지 OTT내비에서 확인해 보세요.</p>
+    <p>구독 플랜을 저장했어요. 이번 달에는 이렇게 구독하면 좋아요.</p>
     <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}">요약</p>
+
+    <div th:if="${!#lists.isEmpty(payload['joinProducts'])}">
+        <p style="font-weight:bold;margin-bottom:4px;">이번 달 가입할 서비스</p>
+        <div th:replace="~{mail/fragments :: productList(${payload['joinProducts']})}"></div>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(payload['titles'])}">
+        <p style="font-weight:bold;margin-bottom:4px;">이번 달에 볼 작품</p>
+        <div th:replace="~{mail/fragments :: titleList(${payload['titles']})}"></div>
+    </div>
+
+    <p th:if="${payload['monthCost'] != null}">이번 달 비용: <span th:text="${#numbers.formatInteger(payload['monthCost'], 0, 'COMMA')}">0</span>원</p>
+
+    <div th:if="${!#lists.isEmpty(payload['cancelReserveProducts'])}">
+        <p style="font-weight:bold;margin-bottom:4px;">다음 달에는 쓰지 않으니 해지 예약을 권해요</p>
+        <div th:replace="~{mail/fragments :: productList(${payload['cancelReserveProducts']})}"></div>
+    </div>
 </section>
 </body>
 </html>

@@ -1404,12 +1404,13 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [B] · PRD: O2, FR-15, 16 · 선행: 071, 072, 069, 045 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 기한 전제: R11-17, R11-22(2026-11-05) · 브랜치: `feature/o2-notification-api`
 - 구현 사항
   - [ ] 계약 추가(Task 071 변경안), 알림 설정·이력 API(`/api/me/...`, tag `notification`)
-  - [ ] SUBSCRIBE_GUIDE: 저장 커밋 후 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`, ①·③ `REQUIRES_NEW`(R-6 결정: MVP 미생성, 066은 outbox 행을 만들지 않았으므로 여기서 저장 흐름 `PlanActivateService`에 추가)
-  - [ ] MONTHLY 생성(`dedupe_key`)은 월초 재계산 Job 완료 뒤 백엔드가 이어서 실행한다(R-21 확정, 재계산 Job의 완료 리스너). 실패 복구용 관리자 수동 재실행 API는 제안. PLAN_CHANGE(이번 달 확정 플랜 작품이 빠질 때만), `notification_enabled = false`면 미생성
+  - [x] SUBSCRIBE_GUIDE: 저장 커밋 후 `@TransactionalEventListener(AFTER_COMMIT)` + `@Async`, ①·③ `REQUIRES_NEW`(R-6 결정: MVP 미생성, 066은 outbox 행을 만들지 않았으므로 여기서 저장 흐름 `PlanActivateService`에 추가) (2~3단계 구현)
+  - [x] MONTHLY·PLAN_CHANGE 생성(`dedupe_key`)은 **재계산 쓰기 단계(`PlanRecalcWriter.write`)에서 같은 트랜잭션으로 이어서 만든다**(원안은 R-21의 "재계산 Job의 완료 리스너"였으나, 플랜 단위로 재계산과 알림 행이 함께 커밋·롤백되고 이미 가진 스냅샷·근거를 재사용하려고 바꿨다. TECH 2절). 실패 복구용 관리자 수동 재실행 API는 제안(미구현). PLAN_CHANGE(이번 달 확정 달에 배정된 작품이 그 서비스에서 빠질 때만), `notification_enabled = false`면 미생성 (2~3단계 구현)
   - [ ] 월초 알림용 GitHub Actions 워크플로는 만들지 않는다(수집 cron 하나가 시작점)
 - 완료 기준
-  - V-B: `dedupe_key` 중복 차단, 알림 꺼짐 미생성, 월초 재계산 완료 뒤에만 MONTHLY 행 생성, 재실행해도 사용자당 1건.
+  - V-B: `dedupe_key` 중복 차단, 알림 꺼짐 미생성, 월이 바뀐 재계산에서만 MONTHLY 행 생성, 재실행해도 사용자당 1건.
   - V-API: 저장 → 테스트 계정 메일 수신. local에서 `targetDate`를 월 1일로 지정한 수집 → 재계산 → MONTHLY 생성이 이어지는 것을 확인. 실제 cron 경로 확인은 Task 102.
+- 기록(2026-10-21, 2~3단계만 구현, 1단계 API·계약은 아직, 병합은 공개 뒤): 알림 생성 관문 `NotificationCreateService`(설정 확인 → `INSERT ... ON CONFLICT (dedupe_key) DO NOTHING` → ID), 즉시 발송 `dispatchNow`(`claimOne` REQUIRES_NEW로 스케줄러와 경합 방지, `app.notification.immediate-send-enabled`), 가입 안내 `SubscribeGuideListener`(`@Async` + AFTER_COMMIT, 이번 달 가입 상품 1개 이상일 때), MONTHLY·PLAN_CHANGE는 `PlanRecalcWriter`에서 같은 트랜잭션으로 생성, 변경 알림 판정 `PlanChangeAlertRule`(작품이 "시청을 끝내는 달"이 이번 달 확정 달이고 그 서비스에서 이전 플랜 이후 빠짐). 메일 템플릿 3종을 payload 필드로 채웠다. 아직 안 한 것: 알림 설정 PUT·이력 조회 API와 계약, `ONBOARDING_REQUIRED` 오류 코드, 관리자 수동 재실행.
 
 #### Task 074: 알림 화면 실제 API 연결로 O2 완성 ⬜ `[3단계 이월]`
 - 태그: [F] · PRD: O2, SCR-12, 16 · 선행: 073 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 브랜치: `feature/o2-notification-api-connect`

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<!-- 알림 메일 본문 공용 조각(Task 073). 모두 th:text만 써서 HTML 이스케이프를 유지한다. 값이 없으면(옛 payload 등) 아무것도 그리지 않는다 -->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- 상품 목록: 상품 이름 · 포함 서비스 · 월 요금 -->
+<ul th:fragment="productList(items)" th:if="${!#lists.isEmpty(items)}" style="padding-left:20px;line-height:1.7;">
+    <li th:each="item : ${items}">
+        <span th:text="${item['productName']}">상품</span>
+        (<span th:text="${#strings.listJoin(item['serviceNames'], ', ')}">서비스</span>)
+        · 월 <span th:text="${#numbers.formatInteger(item['appliedPrice'], 0, 'COMMA')}">0</span>원
+    </li>
+</ul>
+
+<!-- 작품 목록: 제목(시즌) · 서비스 -->
+<ul th:fragment="titleList(items)" th:if="${!#lists.isEmpty(items)}" style="padding-left:20px;line-height:1.7;">
+    <li th:each="item : ${items}">
+        <span th:text="${item['title']}">작품</span><span th:if="${item['seasonNumber'] != null}" th:text="' 시즌 ' + ${item['seasonNumber']}"> 시즌 1</span>
+        · <span th:text="${item['serviceName']}">서비스</span>
+    </li>
+</ul>
+
+<!-- 문장 목록: 바뀐 이유 등 -->
+<ul th:fragment="textList(items)" th:if="${!#lists.isEmpty(items)}" style="padding-left:20px;line-height:1.7;">
+    <li th:each="item : ${items}" th:text="${item}">문장</li>
+</ul>
+
+</body>
+</html>

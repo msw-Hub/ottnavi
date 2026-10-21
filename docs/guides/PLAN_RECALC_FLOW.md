@@ -77,7 +77,8 @@
 | 4 | `PlanRecalcWriter.write` (쓰기 트랜잭션 한 번): 사용자 행을 잠근다 → 읽을 때 본 ACTIVE가 그대로인지 다시 확인(아니면 건너뜀) → 이전 ACTIVE를 `archive()`하고 `flush()`(사용자당 ACTIVE 1개 인덱스 때문에 새 것보다 먼저 반영) → `Plan.createRecalculated`로 새 ACTIVE 저장(`previous_plan_id`=이전 플랜) |
 | 5 | 이전·새 플랜을 같은 모양의 값(`PlanSnapshot`)으로 읽고(`PlanSnapshotLoader`), 이유 근거를 모아(`PlanChangeEvidenceAssembler`: 이전 플랜 이후의 제공 상태 변경, 그 뒤 "다 봤음"으로 체크된 작품, 서비스 이름) `PlanChangeDetector.detect`로 비교한다 |
 | 6 | 기록할 변경이 있으면 `recordChangeSummary(JSON)`로 `plan.change_summary`에 남긴다 |
-| 7 | 오래된 ARCHIVED를 벌크로 지운다. 변경 기록이 있는 최근 6개와 바로 이전 1개는 남긴다 |
+| 7 | 같은 트랜잭션에서 알림 행을 만든다(Task 073). 월이 바뀐 재계산이면 MONTHLY, 월이 그대로이고 변경 요약이 있으며 이번 달 확정 달에 배정된 작품이 그 서비스에서 빠졌으면 PLAN_CHANGE. 알림을 끈 사용자는 만들지 않고, 같은 키는 `ON CONFLICT DO NOTHING`으로 한 번만 만든다. 알림 생성이 실패하면 이 플랜의 재계산도 되돌아간다 |
+| 8 | 오래된 ARCHIVED를 벌크로 지운다. 변경 기록이 있는 최근 6개와 바로 이전 1개는 남긴다 |
 
 **변경 요약을 기록하는 조건** (`PlanChangeDetector`, 순수 Java):
 1. 두 플랜이 함께 다루는 달(겹치는 달)에서 상품 집합이나 같은 상품의 적용 가격이 다르거나, 작품의 자리(시청 완료 달 + 그 달의 서비스)가 바뀐 변화가 1건 이상 있어야 한다. 새 플랜에만 있는 달만 생긴 경우는 변화로 세지 않는다.

@@ -7,6 +7,11 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+  task:
+    execution:                    # @Async 실행기(가입 안내 알림 생성·즉시 발송, Task 073). Boot 자동 구성 실행기를 쓴다
+      thread-name-prefix: async-
+      pool:
+        core-size: 2              # 메일 한 통을 보내는 동안 다른 요청이 막히지 않을 만큼만. 큐는 기본(무제한)
   jackson:
     deserialization:
       accept-float-as-int: false  # 정수 필드에 소수(9900.5)가 오면 버림으로 통과시키지 않고 400으로 거절한다
@@ -118,6 +123,7 @@ app:
     # 정상 SMTP 기준 한 통은 수 초다. batch-size와 lockAtMostFor는 이 가정이 느슨하다는 점을 감안해 잡은 값이다
     # 한 번의 실행이 락 시간 안에 끝나야 다른 서버가 같은 행을 중복 점유하지 않는다
     scheduler-enabled: true             # 발송 스케줄러 사용 여부. 테스트는 IntegrationTestSupport에서 끈다
+    immediate-send-enabled: true        # 플랜 저장 직후 가입 안내를 바로 발송 시도할지. false면 행만 만들고 스케줄러가 보낸다. 테스트는 끈다
     poll-interval-ms: 60000             # 스케줄러 실행 간격(이전 실행이 끝난 뒤부터 센다)
     batch-size: 10                      # 한 번에 점유하는 행 수
     lease: 5m                           # 점유한 행을 다시 집지 않는 시간(next_attempt_at = now + lease). 발송 중 앱이 죽어도 이 시간 뒤 다시 집힌다
