@@ -126,4 +126,22 @@ class NotificationOutboxTest {
         // then
         assertThat(outbox.getLastError()).hasSize(500);
     }
+
+    @Test
+    void 점유한_시도_횟수가_같고_대기_상태일_때만_내_점유로_판정한다() {
+        // given
+        NotificationOutbox outbox = newOutbox();
+        outbox.claim(NOW, LEASE);
+
+        // when & then: 같은 세대는 내 점유
+        assertThat(outbox.isClaimedBy(1)).isTrue();
+
+        // 다른 발송기가 임대 만료 뒤 다시 점유하면 내 점유가 아니다
+        outbox.claim(NOW, LEASE);
+        assertThat(outbox.isClaimedBy(1)).isFalse();
+
+        // 이미 발송을 마친 행은 세대가 같아도 내 점유가 아니다
+        outbox.markSent(NOW);
+        assertThat(outbox.isClaimedBy(2)).isFalse();
+    }
 }

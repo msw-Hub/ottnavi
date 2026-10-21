@@ -57,12 +57,12 @@ class NotificationSendSchedulerTest extends IntegrationTestSupport {
 
     @Test
     void 스케줄러가_켜져_있으면_대기_알림을_스스로_발송하고_락_기록을_남긴다() throws Exception {
-        // given: 기동 직후 첫 실행의 락(lockAtLeastFor 30초)이 남아 있으면 다음 실행이 막히므로 락 표를 비운다
+        // given: 행을 먼저 저장한 뒤 락을 푼다. 순서가 반대면 그 사이 300ms 주기 실행이 빈 표를 보고 끝나며 30초 락을 다시 건다
         assertThat(scheduler).isNotNull();
-        jdbc.update("UPDATE shedlock SET lock_until = lock_until - interval '1 hour'");
         NotificationOutbox outbox = NotificationOutbox.create(userId, NotificationType.MONTHLY, "k-scheduler",
                 "{\"userName\":\"테스터\"}", Instant.now().minusSeconds(60));
         Long id = outboxRepository.saveAndFlush(outbox).getId();
+        jdbc.update("UPDATE shedlock SET lock_until = lock_until - interval '1 hour'");
 
         // when: 스케줄러가 깨어나 보낼 때까지 기다린다
         String status = "PENDING";

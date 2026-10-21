@@ -92,6 +92,14 @@ public class NotificationOutbox extends BaseTimeEntity {
 		this.nextAttemptAt = now.plus(lease);
 	}
 
+	/**
+	 * 지금도 그 점유가 내 것인지 판정한다. 대기 상태이고 시도 횟수가 점유 때 값과 같을 때만 true다.
+	 * 임대가 끝나 다른 발송기가 다시 점유했으면 시도 횟수가 더 커져 있어 false가 된다.
+	 */
+	public boolean isClaimedBy(int claimedAttemptCount) {
+		return this.status == NotificationStatus.PENDING && this.attemptCount == claimedAttemptCount;
+	}
+
 	/** 발송 성공을 기록한다 */
 	public void markSent(Instant now) {
 		this.status = NotificationStatus.SENT;

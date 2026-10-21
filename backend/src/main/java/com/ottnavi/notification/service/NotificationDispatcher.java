@@ -96,12 +96,18 @@ public class NotificationDispatcher {
 
 		// 4. 3단계: 결과를 기록한다
 		if (error == null) {
-			resultRecorder.recordSent(notification.id(), Instant.now(clock));
+			boolean recorded = resultRecorder.recordSent(notification.id(), notification.attemptCount(), Instant.now(clock));
+			if (!recorded) {
+				// 메일은 나갔지만 점유가 바뀌어 기록하지 못했다. 최소 1회 전달 범위이고 기록은 현재 점유자가 맡는다
+				metrics.count(NotificationMetrics.SKIPPED);
+				return;
+			}
 			metrics.count(NotificationMetrics.SENT);
 			log.info("알림을 발송했다: outboxId={}, 유형={}", notification.id(), notification.type());
 			return;
 		}
-		Optional<NotificationStatus> status = resultRecorder.recordFailure(notification.id(), error, Instant.now(clock));
+		Optional<NotificationStatus> status = resultRecorder.recordFailure(notification.id(),
+				notification.attemptCount(), error, Instant.now(clock));
 		if (status.isEmpty()) {
 			metrics.count(NotificationMetrics.SKIPPED);
 		} else if (status.get() == NotificationStatus.FAILED) {
