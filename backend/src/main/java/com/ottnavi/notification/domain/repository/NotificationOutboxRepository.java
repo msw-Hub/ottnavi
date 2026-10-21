@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -60,4 +62,15 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
 	/** dedupe_key로 행 ID를 찾는다(방금 넣은 행의 ID를 얻는 용도) */
 	@Query("select n.id from NotificationOutbox n where n.dedupeKey = :dedupeKey")
 	Optional<Long> findIdByDedupeKey(@Param("dedupeKey") String dedupeKey);
+
+	/** 사용자 본인의 알림을 최신순(같으면 ID 큰 순)으로 한 페이지 읽는다. 이력 조회 API용이다 */
+	Page<NotificationOutbox> findByUserIdOrderByCreatedAtDescIdDesc(Long userId, Pageable pageable);
+
+	/** since 이후에 만들어진 알림 중 그 상태의 건수. 관리자 발송 상태 요약용이다 */
+	long countByStatusAndCreatedAtGreaterThanEqual(NotificationStatus status, Instant since);
+
+	/** since 이후에 발송에 성공한 알림 중 가장 늦은 sentAt. 없으면 빈 값이다 */
+	@Query("select max(n.sentAt) from NotificationOutbox n "
+			+ "where n.status = com.ottnavi.notification.domain.enums.NotificationStatus.SENT and n.sentAt >= :since")
+	Optional<Instant> findLatestSentAtSince(@Param("since") Instant since);
 }

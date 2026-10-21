@@ -37,6 +37,9 @@ public enum ErrorCode {
 	PLAN_DRAFT_NOT_FOUND(HttpStatus.NOT_FOUND, "계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요."),
 	PLAN_DRAFT_STALE(HttpStatus.CONFLICT, "데이터가 갱신되어 플랜을 다시 계산하고 있습니다."),
 
+	// 알림
+	ONBOARDING_REQUIRED(HttpStatus.CONFLICT, "내 설정을 먼저 저장해 주세요."), // 내 설정(온보딩)을 저장한 적이 없어 알림 설정을 저장할 수 없음
+
 	// 수집(관리자)
 	BATCH_ALREADY_RUNNING(HttpStatus.CONFLICT, "수집이 이미 실행 중입니다."),
 	BATCH_ALREADY_COMPLETED(HttpStatus.CONFLICT, "해당 날짜의 수집은 이미 완료되었습니다."),

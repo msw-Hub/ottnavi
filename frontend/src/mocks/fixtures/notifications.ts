@@ -1,6 +1,6 @@
 /*
  * 알림 설정·발송 이력(SCR-12, Task 071)과 관리자 알림 상태 요약(SCR-16) 목업 데이터다.
- * 계약(제안)의 NotificationHistoryItem·AdminNotificationSummary 모양 그대로이고 mocks/notificationHandlers.ts가 돌려준다.
+ * 계약의 NotificationHistoryItem·AdminNotificationSummary 모양 그대로이고 mocks/notificationHandlers.ts가 돌려준다.
  *
  * - 이력은 최신순이다. "더 보기"를 눈으로 확인할 수 있도록 페이지 크기(10)보다 많은 23건을 둔다.
  * - 유형 3종(가입 안내 / 월초 안내 / 플랜 변경)과 상태 3종(대기 / 발송 / 실패)이 모두 한 번 이상 나오도록 맨 위 4건을 직접 골랐고,
