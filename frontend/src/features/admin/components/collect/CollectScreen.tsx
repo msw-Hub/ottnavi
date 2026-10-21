@@ -12,6 +12,7 @@ import {
   CollectRunTable,
   type RunFocusRequest,
 } from '@/features/admin/components/collect/CollectRunTable'
+import { NotificationSummary } from '@/features/admin/components/collect/NotificationSummary'
 import { RecoverRunDialog } from '@/features/admin/components/collect/RecoverRunDialog'
 import { noticeFromError, type RunNotice } from '@/features/admin/components/collect/runNotice'
 import { COLLECT_TIER_LABELS, findLastSuccess } from '@/features/admin/collectRules'
@@ -45,7 +46,7 @@ function CollectSkeleton() {
 /**
  * SCR-16 수집 실행·이력 화면의 본문이다(Task 029).
  *
- * 위에서 아래로: 제목 → 마지막 성공 수집 한 줄 → 수동 실행 양식 → 실행 이력(+[새로 고침]) → JustWatch 출처.
+ * 위에서 아래로: 제목 → 마지막 성공 수집 한 줄 → 알림 발송 상태(최근 7일) → 수동 실행 양식 → 실행 이력(+[새로 고침]) → JustWatch 출처.
  *
  * 실행 결과 안내(notice)를 이 화면이 들고 있는 이유: 수동 실행(양식)과 [다시 실행](이력 행)이 같은 안내 띠를 써야 해서다.
  * 한 곳에서 접수·충돌 안내를 보여 주면 운영자가 "방금 누른 것이 어떻게 됐는지"를 같은 자리에서 본다.
@@ -179,6 +180,19 @@ export function CollectScreen() {
             ? '아직 성공한 수집이 없습니다.'
             : '마지막 성공 수집을 확인하는 중입니다.'}
       </p>
+
+      {/* 알림 발송 상태 요약(Task 071). 특정 수집 실행이 아니라 최근 7일 전체 알림 기준이라 실행 상세(펼침) 안이 아니라
+          화면 상단 한 곳에 둔다. 이전: CollectRunDetail의 "알림 발송 상태" 칸에 있어 펼친 실행의 결과처럼 보였다.
+          수동 실행 양식과 같은 카드 모양(rounded-xl border bg-card p-4)으로 맞춰 화면 안의 상자 모양을 한 가지로 유지한다 */}
+      <section
+        aria-labelledby="notification-summary-heading"
+        className="grid gap-2 rounded-xl border border-border bg-card p-4 text-sm"
+      >
+        <h2 id="notification-summary-heading" className="text-lg font-semibold">
+          알림 발송 상태
+        </h2>
+        <NotificationSummary />
+      </section>
 
       <CollectRunForm
         today={today}

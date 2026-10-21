@@ -407,7 +407,7 @@ describe('복구와 다시 실행', () => {
 })
 
 describe('변경된 작품 펼침', () => {
-  it('성공한 행을 펼치면 신규 글자와 이전 → 이후 상태, 재계산 대상 플랜 수와 알림 발송 상태 요약이 보이고 한 번에 하나만 열린다', async () => {
+  it('성공한 행을 펼치면 신규 글자와 이전 → 이후 상태, 재계산 대상 플랜 수가 보이고 한 번에 하나만 열린다', async () => {
     const user = userEvent.setup()
     renderCollect()
     const table = await findTable()
@@ -417,9 +417,12 @@ describe('변경된 작품 펼침', () => {
     expect(toggle4).toHaveAttribute('aria-expanded', 'true')
     expect(await within(table).findByText('기생충')).toBeInTheDocument()
     expect(within(table).getAllByText('신규').length).toBeGreaterThan(0) // 이전 상태가 없는 작품
-    // 재계산 대상 플랜 수는 API 값(recalcTargetCount)대로 보이고, 알림 발송 상태는 최근 7일 요약(Task 071)으로 보인다
+    // 재계산 대상 플랜 수는 API 값(recalcTargetCount)대로 보인다.
+    // 알림 발송 상태 요약(최근 7일 전체 기준)은 실행 상세가 아니라 화면 상단 카드로 옮겨 펼침 안에는 없다
     expect(within(table).getByText('8개')).toBeInTheDocument()
-    expect(await within(table).findByText('발송 41건')).toBeInTheDocument()
+    const summaryRegion = screen.getByRole('region', { name: '알림 발송 상태' })
+    expect(await within(summaryRegion).findByText('발송 41건')).toBeInTheDocument()
+    expect(within(table).queryByText('발송 41건')).not.toBeInTheDocument()
 
     const toggle1 = within(runRow(table, 1)).getByRole('button', { name: /^변경 3건/ })
     await user.click(toggle1)
@@ -427,7 +430,7 @@ describe('변경된 작품 펼침', () => {
     expect(toggle4).toHaveAttribute('aria-expanded', 'false') // 앞에 열린 것은 닫힌다
     expect(within(table).queryByText('기생충 ')).not.toBeInTheDocument()
     expect(within(table).getByText('7개')).toBeInTheDocument()
-    expect(within(table).getAllByText('발송 41건')).toHaveLength(1)
+    // 이전: expect(within(table).getAllByText('발송 41건')).toHaveLength(1) (요약이 펼침 안에 있을 때)
   })
 
   it('실행 중인 행을 펼치면 끝나면 보인다는 안내만 나온다', async () => {
@@ -457,6 +460,8 @@ describe('빈 상태·오류', () => {
     expect(
       await screen.findByText('불러오지 못했습니다', {}, { timeout: 8000 }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
+    // 상단 알림 요약 카드도 같은 시나리오로 실패해 [다시 시도]가 하나 더 있으므로 실행 이력 영역 안에서 찾는다
+    const historyRegion = screen.getByRole('region', { name: '실행 이력' })
+    expect(within(historyRegion).getByRole('button', { name: '다시 시도' })).toBeInTheDocument()
   }, 15000)
 })
