@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<!-- 월초 재계산 결과 안내(MONTHLY). 본문 내용은 Task 073에서 payload 필드와 함께 채운다 -->
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>이번 달 구독 플랜</title>
+</head>
+<body>
+<section>
+    <p>이번 달 구독 플랜을 다시 계산했어요. OTT내비에서 달라진 내용을 확인해 보세요.</p>
+    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}">요약</p>
+</section>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<!-- 플랜 저장 직후 구독 안내(SUBSCRIBE_GUIDE). 본문 내용은 Task 073에서 payload 필드와 함께 채운다 -->
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>저장한 구독 플랜 안내</title>
+</head>
+<body>
+<section>
+    <p>구독 플랜을 저장했어요. 달마다 어떤 서비스를 구독하면 좋은지 OTT내비에서 확인해 보세요.</p>
+    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}">요약</p>
+</section>
+</body>
+</html>

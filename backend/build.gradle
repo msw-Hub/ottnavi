@@ -49,6 +49,9 @@ dependencies {
 	implementation 'com.bucket4j:bucket4j_jdk17-redis-common:8.21.0'
 	implementation 'com.bucket4j:bucket4j_jdk17-lettuce:8.21.0'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+	// 메일·템플릿 (Task 072)
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	// Lombok (결정 2)
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -57,6 +60,7 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'com.icegreen:greenmail-junit5:2.1.14'   // Task 072: 메일 발송 테스트용 가짜 SMTP 서버(Maven Central 2.1.x 최신)
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testImplementation 'org.wiremock:wiremock-standalone:3.13.2'

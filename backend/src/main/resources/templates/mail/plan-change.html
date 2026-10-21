@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<!-- 확정된 플랜의 작품이 빠지는 등 변경 알림(PLAN_CHANGE). 본문 내용은 Task 073에서 payload 필드와 함께 채운다 -->
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>구독 플랜 변경 안내</title>
+</head>
+<body>
+<section>
+    <p>저장한 구독 플랜에 바뀐 내용이 있어요. OTT내비에서 변경된 부분을 확인해 보세요.</p>
+    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}">요약</p>
+</section>
+</body>
+</html>

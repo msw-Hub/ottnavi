@@ -8,6 +8,11 @@ spring:
     redis:
       host: 127.0.0.1
       port: ${REDIS_PORT:6379}
+  mail:
+    host: ${MAIL_HOST:}             # 비워 두면 JavaMailSender가 만들어지지 않는다. provider=log가 기본이라 메일 계정 없이 기동된다
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
   security:
     oauth2:
       client:
@@ -22,6 +27,9 @@ app:
   frontend-origin: ${APP_FRONTEND_ORIGIN:http://localhost:5173}   # Origin 검사·로그인 후 이동 주소의 기준
   origin-secret:
     enabled: false                # 로컬은 Vite proxy·직접 호출이라 오리진 비밀 헤더를 검사하지 않는다
+  mail:
+    provider: ${APP_MAIL_PROVIDER:log}   # 실제 발송을 시험하려면 smtp로 바꾸고 MAIL_* 값을 넣는다
+    from: ${MAIL_FROM:ottnavi@localhost}
   admin-batch-token: ${ADMIN_BATCH_TOKEN:local-admin-batch-token}   # 수집 실행 API 배치 토큰. 로컬 전용 기본값
   jwt:
     # 로컬·테스트 전용 개발 키(Base64, 48바이트). 저장소에서 알 수 있는 값이라 운영에서 절대 쓰면 안 된다
