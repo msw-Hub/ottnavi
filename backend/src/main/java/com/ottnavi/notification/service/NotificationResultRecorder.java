@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 알림 처리 3단계: 발송 결과를 짧은 트랜잭션으로 기록한다. 메일을 보내는 동안 행이 지워졌을 수 있어(탈퇴) 행이 없거나 다른 발송기가 다시 점유했으면 기록하지 않고 로그만 남긴다 */
+/** 알림 처리의 기록 단계: 발송 결과를 짧은 트랜잭션으로 기록한다. 메일을 보내는 동안 행이 지워졌을 수 있어(탈퇴) 행이 없거나 다른 발송기가 다시 점유했으면 기록하지 않고 로그만 남긴다 */
 @Slf4j
 @Service
 @Transactional(readOnly = true)

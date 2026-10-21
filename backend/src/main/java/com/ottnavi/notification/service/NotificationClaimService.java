@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 알림 처리 1단계: 발송할 행을 짧은 트랜잭션 안에서 점유한다(TECH 5절).
+ * 알림 처리의 점유 단계: 발송할 행을 짧은 트랜잭션 안에서 점유한다(TECH 5절).
  * 행을 잠가 읽고 시도 횟수와 임대 시각만 기록한 뒤 바로 커밋하므로, 메일을 보내는 동안 DB 연결과 잠금을 붙잡지 않는다.
  */
 @Slf4j

@@ -19,10 +19,10 @@ import org.springframework.stereotype.Service;
  * 점유(NotificationClaimService)와 결과 기록(NotificationResultRecorder)을 각각 짧은 트랜잭션으로 나눴다(TECH 5절, 외부 호출은 트랜잭션 밖).
  *
  * <pre>
- * 1단계 점유(짧은 트랜잭션) → 2단계 발송(트랜잭션 밖: 행·수신 주소 재확인 → 템플릿 → SMTP) → 3단계 결과 기록(짧은 트랜잭션)
+ * 점유(짧은 트랜잭션) → 발송(트랜잭션 밖: 행·수신 주소 재확인 → 템플릿 → SMTP) → 기록(짧은 트랜잭션)
  * </pre>
  *
- * 전달 보장은 최소 1회다. 발송에 성공한 직후 3단계 전에 앱이 죽으면 임대가 끝난 뒤 같은 메일이 한 번 더 나갈 수 있다(허용 범위).
+ * 전달 보장은 최소 1회다. 발송에 성공한 직후 기록 전에 앱이 죽으면 임대가 끝난 뒤 같은 메일이 한 번 더 나갈 수 있다(허용 범위).
  */
 @Slf4j
 @Service
@@ -41,24 +41,24 @@ public class NotificationDispatcher {
 
 	/** 발송할 때가 된 알림을 한 번 훑어 보낸다. 점유한 건수를 돌려준다 */
 	public int dispatchDue() {
-		// 1. 1단계: 발송할 행을 점유한다
+		// 1. 발송할 행을 점유한다(점유 단계)
 		List<ClaimedNotification> claimed = claimService.claimDue(Instant.now(clock));
 		dispatchAll(claimed);
 		return claimed.size();
 	}
 
-	/** 이미 점유한 알림들을 2·3단계로 처리한다. 점유 직후 상태를 시험이 끼어들 수 있게 따로 뺐다 */
+	/** 이미 점유한 알림들을 발송·기록 단계로 처리한다. 점유 직후 상태를 시험이 끼어들 수 있게 따로 뺐다 */
 	void dispatchAll(List<ClaimedNotification> claimed) {
 		if (claimed.isEmpty()) {
 			return;
 		}
 
-		// 2. 행마다 발송한다. 한 건의 예외가 다른 건을 막지 않게 건별로 잡는다
+		// 1. 행마다 발송한다. 한 건의 예외가 다른 건을 막지 않게 건별로 잡는다
 		for (ClaimedNotification notification : claimed) {
 			try {
 				dispatchOne(notification);
 			} catch (Exception e) {
-				// 결과 기록(3단계) 자체가 실패한 경우 등. 임대가 끝나면 행이 다시 집힌다
+				// 결과 기록 자체가 실패한 경우 등. 임대가 끝나면 행이 다시 집힌다
 				log.error("알림 처리 중 예외가 났다: outboxId={}", notification.id(), e);
 			}
 		}
@@ -82,7 +82,7 @@ public class NotificationDispatcher {
 			return;
 		}
 
-		// 3. 템플릿을 채워 메일을 보낸다(트랜잭션 밖). 실패하면 사유를 문자열로 모은다
+		// 3. 템플릿을 채워 메일을 보낸다(발송 단계, 트랜잭션 밖). 실패하면 사유를 문자열로 모은다
 		String error = null;
 		try {
 			RenderedMail rendered = mailRenderer.render(notification.type(), notification.payload());
@@ -94,7 +94,7 @@ public class NotificationDispatcher {
 					e.getClass().getSimpleName());
 		}
 
-		// 4. 3단계: 결과를 기록한다
+		// 4. 결과를 기록한다(기록 단계)
 		if (error == null) {
 			boolean recorded = resultRecorder.recordSent(notification.id(), notification.attemptCount(), Instant.now(clock));
 			if (!recorded) {
