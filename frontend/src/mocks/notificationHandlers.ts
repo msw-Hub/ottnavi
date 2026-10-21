@@ -18,7 +18,7 @@ import {
 /*
  * ===== 알림 설정·발송 이력 목업 핸들러 (Task 071) =====
  * 경로·요청·응답은 계약(docs/api/openapi.yaml)과 같다. 응답 타입은 생성 모델이라 계약과 어긋나면 컴파일에서 걸린다.
- * 실제 API는 Task 073(백엔드)에서 구현됐고 화면 연결은 Task 074에서 한다.
+ * 실제 API는 Task 073에서 구현됐고 화면 연결은 Task 074에서 했다. 화면은 생성 훅(실제 경로)을 쓰고, 이 핸들러는 VITE_USE_MOCK=true일 때와 테스트에서만 요청을 가로챈다.
  *
  * - 알림 설정 조회: GET /api/me/notification-setting   (기본 꺼짐. 켜고 끈 값은 sessionStorage에 남겨 새로고침 뒤에도 유지)
  * - 알림 설정 저장: PUT /api/me/notification-setting   ({ isNotificationEnabled }. 저장한 값을 돌려주고 이후 조회에 반영)
