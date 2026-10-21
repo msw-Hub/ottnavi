@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
+import { BellIcon, InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -296,13 +296,24 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
       {/* 회원 탈퇴 링크(SCR-13, Task 081). 눈에 덜 띄도록 폼 맨 아래 오른쪽 구석에 작은 빨간 글자로만 둔다(사용자 확정).
           첫 방문(온보딩)에는 아직 가입을 마치기 전이라 보이지 않는다. 빨간색만으로 뜻을 전하지 않고 "회원 탈퇴" 글자가 있다.
           높이 44px(min-h-11)는 글자는 작아도 누르는 영역은 터치 크기를 맞추려는 것이다 */}
+      {/* 알림 설정 링크(SCR-12, Task 071): 같은 "계정 관리" 줄의 왼쪽에 둔다. 알림은 설정 행이 있어야 저장되므로(ONBOARDING_REQUIRED)
+          온보딩을 마친 뒤에만 보인다. 이전: 탈퇴 링크만 단독으로 있었다 */}
       {settings.isOnboardingDone && (
-        <Link
-          to="/settings/withdraw"
-          className="inline-flex min-h-11 items-center justify-self-end rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          회원 탈퇴
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-x-4">
+          <Link
+            to="/settings/notifications"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <BellIcon aria-hidden="true" className="size-4" />
+            알림 설정
+          </Link>
+          <Link
+            to="/settings/withdraw"
+            className="inline-flex min-h-11 items-center rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            회원 탈퇴
+          </Link>
+        </div>
       )}
     </form>
   )

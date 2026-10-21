@@ -407,7 +407,7 @@ describe('복구와 다시 실행', () => {
 })
 
 describe('변경된 작품 펼침', () => {
-  it('성공한 행을 펼치면 신규 글자와 이전 → 이후 상태, 재계산 대상 플랜 수와 알림 2단계 자리가 보이고 한 번에 하나만 열린다', async () => {
+  it('성공한 행을 펼치면 신규 글자와 이전 → 이후 상태, 재계산 대상 플랜 수와 알림 발송 상태 요약이 보이고 한 번에 하나만 열린다', async () => {
     const user = userEvent.setup()
     renderCollect()
     const table = await findTable()
@@ -417,9 +417,9 @@ describe('변경된 작품 펼침', () => {
     expect(toggle4).toHaveAttribute('aria-expanded', 'true')
     expect(await within(table).findByText('기생충')).toBeInTheDocument()
     expect(within(table).getAllByText('신규').length).toBeGreaterThan(0) // 이전 상태가 없는 작품
-    // 재계산 대상 플랜 수는 API 값(recalcTargetCount)대로 보이고, 알림 발송 상태만 2단계 자리표시다
+    // 재계산 대상 플랜 수는 API 값(recalcTargetCount)대로 보이고, 알림 발송 상태는 최근 7일 요약(Task 071)으로 보인다
     expect(within(table).getByText('8개')).toBeInTheDocument()
-    expect(within(table).getAllByText('2단계부터 제공')).toHaveLength(1)
+    expect(await within(table).findByText('발송 41건')).toBeInTheDocument()
 
     const toggle1 = within(runRow(table, 1)).getByRole('button', { name: /^변경 3건/ })
     await user.click(toggle1)
@@ -427,7 +427,7 @@ describe('변경된 작품 펼침', () => {
     expect(toggle4).toHaveAttribute('aria-expanded', 'false') // 앞에 열린 것은 닫힌다
     expect(within(table).queryByText('기생충 ')).not.toBeInTheDocument()
     expect(within(table).getByText('7개')).toBeInTheDocument()
-    expect(within(table).getAllByText('2단계부터 제공')).toHaveLength(1)
+    expect(within(table).getAllByText('발송 41건')).toHaveLength(1)
   })
 
   it('실행 중인 행을 펼치면 끝나면 보인다는 안내만 나온다', async () => {

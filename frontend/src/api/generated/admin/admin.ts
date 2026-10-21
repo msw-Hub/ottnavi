@@ -31,6 +31,7 @@ import type {
 import type {
   AdminProductPriceRequest,
   BadRequestResponse,
+  CommonResponseAdminNotificationSummary,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
@@ -1376,6 +1377,100 @@ export const useCreatePopularityExecution = <TError = ErrorType<UnauthorizedResp
       return useMutation(getCreatePopularityExecutionMutationOptions(options), queryClient);
     }
     /**
+ * 관리자 수집 화면(SCR-16)의 알림 발송 상태 요약이다. 최근 7일 동안 만들어진 알림의 상태별 건수와 마지막 발송 시각을 돌려준다. 사용자 이메일이나 본문은 담지 않는다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 알림 발송 상태 요약 조회 (제안)
+ */
+export const getAdminNotificationSummary = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseAdminNotificationSummary>(
+      {url: `/admin/notifications/summary`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminNotificationSummaryQueryKey = () => {
+    return [
+    `/admin/notifications/summary`
+    ] as const;
+    }
+
+
+export const getGetAdminNotificationSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminNotificationSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminNotificationSummary>>> = ({ signal }) => getAdminNotificationSummary(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminNotificationSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminNotificationSummary>>>
+export type GetAdminNotificationSummaryQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 알림 발송 상태 요약 조회 (제안)
+ */
+
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminNotificationSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.
  * 요청 본문은 없다. 같은 입력으로 다시 호출하면 행이 더 쌓이고, 같은 `inputHash`에 EXACT·GREEDY 두 행이 함께 있다. 기록의 `plan_id`는 NULL, 플랜 유형은 추천형이다.
  * ADMIN만 호출할 수 있고 배치 토큰은 허용하지 않는다. 수 초 걸리는 CPU 작업이라 응답이 느리다.
