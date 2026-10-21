@@ -42,6 +42,8 @@ const TECH_ERROR_MESSAGES = {
   PRICE_NOT_CURRENT: '지금 적용 중인 월 구독요금만 확인할 수 있습니다.',
   PRICE_NOT_LATEST: '가장 최근 월 구독요금만 수정하거나 삭제할 수 있습니다.',
   PRICE_LAST_ROW_CANNOT_DELETE: '월 구독요금이 하나뿐이라 삭제할 수 없습니다.',
+  // Task 071: 알림 설정 저장 때 내 설정(온보딩)을 한 번도 저장하지 않은 경우(error-codes.md와 문구를 맞춘다)
+  ONBOARDING_REQUIRED: '내 설정을 먼저 저장해 주세요.',
   WISHLIST_LIMIT_EXCEEDED: '찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요.',
   WISHLIST_ITEM_NOT_FOUND: '찜 항목을 찾을 수 없습니다.',
   SERVICE_PRICE_NOT_FOUND: '이 서비스의 요금 정보를 찾을 수 없습니다.',
