@@ -29,6 +29,15 @@ spring:
     redis:
       timeout: 2s                 # 명령 응답 대기. Redis Cloud 첫 호출이 11.5초 걸린 관측이 있어(Task 020) 운영 값은 측정 후 조정
       connect-timeout: 5s         # 연결 대기
+  mail:                         # Task 072. host·port·계정은 프로필 파일에서 정한다(prod는 기본값 없음). host가 있어야 JavaMailSender가 만들어진다
+    default-encoding: UTF-8
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true      # 587은 평문으로 연결한 뒤 STARTTLS로 암호화한다
+      "[mail.smtp.starttls.required]": true    # STARTTLS를 못 하면 평문으로 보내지 않고 실패시킨다
+      "[mail.smtp.connectiontimeout]": 5000    # ms. 타임아웃이 없으면 응답 없는 서버에서 스레드가 무기한 대기한다(TECH 5절)
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
   cloud:
     openfeign:
       client:
@@ -37,6 +46,10 @@ spring:
             connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
             readTimeout: 5000     # ms
             loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
+management:
+  health:
+    mail:
+      enabled: false                    # 메일 서버 연결 확인을 헬스 체크에서 뺀다. 켜 두면 헬스 체크마다 SMTP에 접속하고, 메일 서버가 느리거나 막히면 서비스 전체가 DOWN(503)으로 보인다
 server:
   forward-headers-strategy: framework   # Cloudtype은 Boot가 아는 클라우드가 아니라 기본값이 NONE(TECH 4절)
 springdoc:
@@ -96,8 +109,22 @@ app:
   exclusive:                  # 서비스별 독점 목록(Task 078, PRD FR-04)
     cache:                      # Redis `exclusiveTitles` 캐시. 수집 Job이 성공하면 새로 계산해 채우고, 실패·정리 뒤에는 비운다
       ttl: 24h                    # 수집이 오래 없을 때의 안전장치. 캐시가 비면 조회 API가 즉석에서 계산해 채운다
+  mail:                                 # 메일 발송 방식(Task 072). SMTP 접속 정보는 spring.mail.*
+    provider: log                       # smtp면 실제 발송, log면 제목만 로그에 남긴다. 기본은 안전한 log이고 prod가 smtp로 바꾼다
+    from: ottnavi@localhost             # 발신 주소. prod는 ${MAIL_FROM}
+    from-name: OTT내비                  # 발신자 표시 이름
+  notification:                         # 알림 outbox 발송기(Task 072, TECH 5절)
+    # 값의 관계: scheduler lockAtMostFor(4분) < lease(5분). SMTP 타임아웃은 응답마다 5초 제한이라 한 통의 상한이 아니고,
+    # 정상 SMTP 기준 한 통은 수 초다. batch-size와 lockAtMostFor는 이 가정이 느슨하다는 점을 감안해 잡은 값이다
+    # 한 번의 실행이 락 시간 안에 끝나야 다른 서버가 같은 행을 중복 점유하지 않는다
+    scheduler-enabled: true             # 발송 스케줄러 사용 여부. 테스트는 IntegrationTestSupport에서 끈다
+    poll-interval-ms: 60000             # 스케줄러 실행 간격(이전 실행이 끝난 뒤부터 센다)
+    batch-size: 10                      # 한 번에 점유하는 행 수
+    lease: 5m                           # 점유한 행을 다시 집지 않는 시간(next_attempt_at = now + lease). 발송 중 앱이 죽어도 이 시간 뒤 다시 집힌다
+    max-attempts: 5                     # 점유 횟수 상한. 이 횟수째 실패하면 FAILED
+    retry-delays: 1m,5m,30m,2h          # n번째 실패 뒤 다음 시도까지의 간격(1회째 실패 → 1분, …). 개수는 max-attempts - 1 이상
   plan-recalc:
-    auto-start: true                    # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
+    auto-start: true                   # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
   collect:
     runtime-defaults:          # TMDB runtime이 비었을 때 쓰는 추정 기본값(분, PRD 11절 25번). 바인딩은 Task 043·044에서 한다
       movie-minutes: 100              # 영화(첫 전체 수집 실측 중앙값 98분, 2026-10-15 보정. 이전 120)

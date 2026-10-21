@@ -1,6 +1,7 @@
 package com.ottnavi.user.service;
 
 import com.ottnavi.global.error.UnauthorizedException;
+import com.ottnavi.user.domain.entity.User;
 import com.ottnavi.user.domain.entity.UserSetting;
 import com.ottnavi.user.domain.entity.UserSubscription;
 import com.ottnavi.user.domain.enums.ServiceSubscriptionStatus;
@@ -35,6 +36,15 @@ public class UserQueryService {
 			return false;
 		}
 		return found.get().isLowestPriceMode();
+	}
+
+	/** 사용자의 이메일을 돌려준다. 사용자가 없으면(탈퇴) 빈 값이다. 알림 발송기가 발송 직전에 수신 주소를 다시 확인하는 용도다 */
+	public Optional<String> findEmail(Long userId) {
+		Optional<User> found = userRepository.findById(userId);
+		if (found.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(found.get().getEmail());
 	}
 
 	/**
