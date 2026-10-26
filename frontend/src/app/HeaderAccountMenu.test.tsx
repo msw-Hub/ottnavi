@@ -90,13 +90,21 @@ describe('HeaderAccountMenu', () => {
 
   it('로그아웃 항목을 고르면 로그아웃하고 토큰을 비운 뒤 첫 화면으로 간다', async () => {
     const user = userEvent.setup()
-    server.use(mswHttp.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })))
+    let logoutCalls = 0
+    server.use(
+      mswHttp.post('/api/auth/logout', () => {
+        logoutCalls += 1
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
     renderMenu('/somewhere')
 
     await user.click(screen.getByRole('button', { name: '내 메뉴' }))
     await user.click(screen.getByRole('menuitem', { name: '로그아웃' }))
 
     expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+    // 서버에 Refresh Token 폐기를 요청했는지(핸들러만 있으면 호출 여부는 알 수 없다)
+    expect(logoutCalls).toBe(1)
     expect(useAuthStore.getState()).toMatchObject({ status: 'guest', accessToken: null })
   })
 })
