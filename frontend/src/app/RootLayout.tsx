@@ -95,9 +95,9 @@ export function RootLayout() {
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>
           {/*
-            목업 확인용 이동 링크(Task 028). 로그인 후 화면(SCR-07~10)으로 가는 메뉴가 아직 없고(Task 057에서 "내 메뉴"를 만든다),
+            목업 확인용 이동 링크(Task 028). 로그인 후 화면(SCR-07~10)으로 가는 상시 메뉴가 없어서(머리글에는 찜 목록만 있다),
             주소를 직접 입력하면 새로고침으로 목업 로그인·찜 상태가 사라져 화면 사이를 옮겨 다니며 확인할 수 없어 둔다.
-            목업 모드에서만 보이고 운영에서는 그려지지 않는다. Task 057에서 실제 메뉴가 생기면 이 줄은 지운다.
+            목업 모드에서만 보이고 운영에서는 그려지지 않는다. 상시 "내 메뉴"가 생기면 이 줄은 지운다.
           */}
           {isMockMode() && (
             <nav aria-label="개발용 이동" className="flex flex-wrap items-center gap-x-3 gap-y-1">
