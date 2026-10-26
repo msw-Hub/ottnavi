@@ -1604,6 +1604,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [ ] prod 프로필 최종 점검(`ddl-auto=validate`, 풀 약 5, `forward-headers-strategy=framework`, 오리진 비밀 헤더 검사 켬)
   - [x] (2026-10-21, `feature/docs-cron-enable-domain`) 세 워크플로의 `schedule` 주석을 풀었다: `collect.yml`(DAILY·WEEKLY 두 cron), `popularity.yml`(KST 02:47), `retention.yml`(주 1회). Cloudtype 직접 호출 + 두 헤더. 매일 수집이 Supabase 7일 비활성 일시정지도 막는다. schedule은 기본 브랜치(`main`) 파일만 실행되므로 `develop`에서는 돌지 않고 Task 095 병합 때 한꺼번에 켜진다. 그 전에 Hobby 전환, 환경 변수(Task 092), GitHub 시크릿 `BACKEND_BASE_URL`이 준비돼야 첫 실행이 실패하지 않는다
+  - [x] (2026-10-26, `feature/docs-predeploy-cleanup`) 예약 실행 안전장치: 세 워크플로의 작업에 `if: github.event_name == 'workflow_dispatch' || vars.CRON_ENABLED == 'true'`를 달았다. `main` 병합 직후에는 예약 실행이 건너뛰기(skipped)로 끝나고, 수동 실행은 항상 돈다. **095에서 첫 수집·스모크로 안정화를 확인한 뒤** GitHub 저장소 Settings → Secrets and variables → Actions → Variables에서 `CRON_ENABLED=true`를 만들어 켠다(코드 변경·배포 불필요, 지우면 다시 멈춘다).
   - [ ] 인기 수집이 30분 안에 끝나는지(WEEKLY 수집 시작 KST 03:17 전), 호출량, `calculateAll` 시간을 cron을 켠 뒤 측정해 기록
 - 완료 기준
   - PR 수준: YAML 문법 유효, prod 프로필로 로컬 기동(환경 변수는 로컬 값) 성공. `main` 반영 후 cron·배포 확인은 Task 095.
