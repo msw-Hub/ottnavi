@@ -1,0 +1,35 @@
+{
+  "backdrop_path": "/test-tv-backdrop-1.jpg",
+  "created_by": [],
+  "episode_run_time": [60],
+  "first_air_date": "2023-03-01",
+  "genres": [
+    { "id": 18, "name": "드라마" }
+  ],
+  "homepage": "",
+  "id": 800001,
+  "in_production": true,
+  "name": "테스트 드라마 1",
+  "number_of_episodes": 24,
+  "number_of_seasons": 2,
+  "original_language": "ko",
+  "original_name": "테스트 드라마 원제 1",
+  "overview": "가짜 줄거리 A",
+  "popularity": 120.4,
+  "poster_path": "/test-tv-poster-1.jpg",
+  "seasons": [
+    { "air_date": "2022-12-25", "episode_count": 2, "id": 810000, "name": "스페셜", "overview": "", "poster_path": null, "season_number": 0, "vote_average": 0 },
+    { "air_date": "2023-03-01", "episode_count": 12, "id": 810001, "name": "시즌 1", "overview": "", "poster_path": "/test-season-1.jpg", "season_number": 1, "vote_average": 8.0 },
+    { "air_date": "2024-03-01", "episode_count": 12, "id": 810002, "name": "시즌 2", "overview": "", "poster_path": "/test-season-2.jpg", "season_number": 2, "vote_average": 8.2 }
+  ],
+  "status": "Returning Series",
+  "type": "Scripted",
+  "vote_average": 8.1,
+  "vote_count": 560,
+  "credits": {
+    "cast": [
+      { "id": 7101, "name": "테스트 배우 3", "character": "테스트 역할 3", "order": 0, "profile_path": "/test-profile-3.jpg" }
+    ],
+    "crew": []
+  }
+}

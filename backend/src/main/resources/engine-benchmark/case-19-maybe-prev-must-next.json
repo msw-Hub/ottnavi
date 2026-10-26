@@ -1,0 +1,70 @@
+{
+  "name" : "case-19-maybe-prev-must-next",
+  "note" : "시즌 순서 ⑤ 앞 시즌이 MAYBE이고 뒤 시즌이 MUST(끌어올림, 소규모, 상품 2개). 월 예산 10,000원, 월 시청 150분. 서비스1은 9,000원, 서비스2는 4,000원이라 합치면 예산을 넘어 한 달에 하나만 구독한다. 작품H 1시즌(MAYBE 100분, 서비스1)·2시즌(MUST 100분, 서비스1·2), 영화Z(WANT 50분, 서비스1). 기본 정렬은 MUST인 2시즌→영화Z(WANT)→1시즌(MAYBE)이라 2시즌이 가장 먼저지만 1시즌이 끌어올려져 1시즌→2시즌→영화Z 순으로 배정된다. 손계산: 한 달이 150분이라 1시즌(100분)과 2시즌(100분)은 한 달에 못 담고(200분), 2시즌은 1시즌이 끝난 달 이후의 다른 달에 보아야 한다. 1시즌을 본 달 남은 50분에 영화Z(50분)가 정확히 들어간다. 즉 꼭 시청 완료 1개(2시즌)를 위해서는 앞 시즌인 MAYBE 1시즌도 반드시 본다(점수 1 + 영화Z 2 = 3). 서비스1을 구독한 달(1시즌·영화Z)과 그 뒤 달에 2시즌을 보는 서비스가 필요하다. 추천형·절약형(점수 하한 3 충족)은 최저 비용 13,000원(서비스1 한 달 + 서비스2 한 달) 조합 중 조기 시청이 가장 좋은 [[1],[2],[]]이고, 간편형은 가입 횟수가 가장 적은 서비스1만 두 달 연속 [[1],[1],[]](가입 1회, 18,000원)을 고른다. 세 유형 모두 꼭 1개, 점수 3이고 미배정 작품이 없다. 이 규칙이 없다면 2시즌(MUST)과 영화Z가 먼저 달을 채우고 1시즌이 늦게 끝나 시즌 순서가 깨진다. 기대값은 OracleAssigner 기반 전수 탐색으로 생성했다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 150,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 4000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품H 1시즌",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 1
+  }, {
+    "id" : 2,
+    "name" : "작품H 2시즌",
+    "priority" : "MUST",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false,
+    "titleId" : 1,
+    "seasonNumber" : 2
+  }, {
+    "id" : 3,
+    "name" : "영화Z",
+    "priority" : "WANT",
+    "requiredMinutes" : 50,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 13000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 13000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 1 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 18000
+    }
+  },
+  "expectedUnitReasons" : {
+    "RECOMMENDED" : { },
+    "SAVER" : { },
+    "SIMPLE" : { }
+  }
+}

@@ -7,15 +7,36 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+  jackson:
+    deserialization:
+      accept-float-as-int: false  # 정수 필드에 소수(9900.5)가 오면 버림으로 통과시키지 않고 400으로 거절한다
   jpa:
     open-in-view: false           # 권장(로드맵 목록에는 없음)
     hibernate:
       ddl-auto: validate
+  security:
+    oauth2:
+      client:
+        registration:
+          google:   # client-id·secret·redirect-uri는 프로필 파일에서 정한다(local은 더미 기본값, prod는 기본값 없음)
+            scope: openid,email,profile   # 이메일·이름을 받는다(구글 기본 scope와 같지만 명시)
   batch:
     jdbc:
       initialize-schema: never    # BATCH_* 테이블은 Flyway V4(Task 033)가 만든다
     job:
       enabled: false              # 기동 시 Job 자동 실행 금지, 관리자 API로만 실행
+  data:
+    redis:
+      timeout: 2s                 # 명령 응답 대기. Redis Cloud 첫 호출이 11.5초 걸린 관측이 있어(Task 020) 운영 값은 측정 후 조정
+      connect-timeout: 5s         # 연결 대기
+  cloud:
+    openfeign:
+      client:
+        config:
+          tmdb: # Task 041의 @FeignClient(name = "tmdb")와 맞춘다
+            connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
+            readTimeout: 5000     # ms
+            loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
 server:
   forward-headers-strategy: framework   # Cloudtype은 Boot가 아는 클라우드가 아니라 기본값이 NONE(TECH 4절)
 springdoc:
@@ -23,5 +44,63 @@ springdoc:
     version: openapi_3_0                # 계약(openapi.yaml 3.0.3)과 nullable 표기를 맞춘다. 기본값은 3.1(TECH 6절)
   default-produces-media-type: application/json   # 미지정 시 응답 media type이 */*로 나와 계약과 어긋난다
 app:
+  auth:
+    cookie-secure: true              # Refresh Token·인가 요청 쿠키의 Secure 속성. localhost는 브라우저가 보안 컨텍스트로 보므로 true로 둔다
+  jwt:
+    refresh-ttl: 14d                 # Refresh Token 수명. 교체할 때마다 다시 이만큼(TECH T-7)
+    refresh-reuse-grace: 10s         # 직전 Refresh Token을 재사용으로 보지 않는 유예(동시 요청·응답 유실 대비)
   origin-secret:
     enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
+  rate-limit:                           # 공개 API 요청 제한(Task 049, PRD R11-12). 키는 방문자 IP(remoteAddr), 버킷은 Redis에 둔다
+    enabled: true                       # 테스트에서만 끈다(IntegrationTestSupport). local 포함 기본 켜짐
+    general:                            # /api/public/**, /api/auth/**, /api/oauth2/**, /api/login/** 에 IP별로 건다
+      capacity: 20                      # 통 크기: 순간에 몰아 보낼 수 있는 최대 요청 수(한도의 약 1/3)
+      refill-tokens: 60                 # refill-period마다 채워지는 토큰 수 (→ IP당 분당 60회)
+      refill-period: 1m
+    single-fetch:                       # 단건 수집(DB에 없어 TMDB를 부르는 검색)에만 거는 한도. Task 050이 쓴다. Redis 오류면 거부(fail-closed)
+      capacity: 3                       # 순간에 몰아 보낼 수 있는 최대 요청 수(한도의 약 1/3)
+      refill-tokens: 10                 # refill-period마다 채워지는 토큰 수 (→ IP당 분당 10회)
+      refill-period: 1m
+  tmdb:
+    base-url: https://api.themoviedb.org/3
+    api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
+    rate-limit:
+      capacity: 10          # 통 크기(순간에 몰아 쓸 수 있는 최대 호출 수)
+      refill-tokens: 25     # 이 시간마다 채워지는 토큰 수 (→ 초당 25회)
+      refill-period: 1s
+      max-wait: 2s          # 토큰이 없을 때 최대 기다리는 시간. 넘으면 포기(D1 확정)
+    retry:
+      max-attempts: 3          # 첫 시도 포함 총 시도 횟수 (429·5xx)
+      io-max-attempts: 2       # 타임아웃·연결 오류의 총 시도 횟수 (D2 확정)
+      initial-backoff: 500ms   # 첫 재시도 전 대기. 이후 두 배씩
+      max-backoff: 4s          # 지수 대기의 상한
+      max-retry-after: 5s      # 서버가 이보다 오래 기다리라고 하면 기다리지 않고 포기한다
+  retention:
+    stale-months: 5             # 마지막 수집이 이보다 오래된 작품을 TMDB에 다시 묻는다(TMDB 약관 6개월 보관 기한 대비, Task 083)
+    history-retention-days: 180 # BATCH_* 이력과 플랜과 끊긴 calc_run을 이 일수가 지나면 지운다
+    max-titles-per-run: 500     # 한 번 실행에 점검할 작품 수 상한(가장 오래된 순). 나머지는 다음 주 실행에서 처리한다
+  popularity:                 # 서비스별 인기 순위 스냅샷(Task 107)
+    top-n: 20                   # 서비스·매체(영화/드라마)마다 저장하는 상위 작품 수(TMDB discover 한 쪽이 20개라 20이 최대)
+    retention-days: 14          # 스냅샷 보관 일수(오늘 포함). 이보다 오래된 날짜는 인기 수집 Job이 지운다
+  home:                       # 홈 공통 목록 규칙(Task 107, PRD 11절 39번)
+    min-wishlist-users: 3       # "찜 많은 작품"에 넣는 최소 찜 사용자 수. 이보다 적은 작품은 목록에서 뺀다
+    arrival-days: 14            # "새로 볼 수 있게 된 작품": 없음·모름 → 있음으로 바뀐 것을 확인한 최근 일수(입고)
+    release-days: 30            # 첫 적재 작품은 공개일(영화 개봉일/드라마 시즌 방영일)이 이 일수 안이면 새 작품(공개)
+    cache:                      # 홈·탐색 공개 응답 캐시(Redis). 수집·인기 수집·정리 Job이 끝나면 비운다. 출연자별 작품은 캐시하지 않는다
+      popularity-ttl: 60m         # 인기 순위
+      new-arrivals-ttl: 30m       # 새로 볼 수 있게 된 작품
+      wishlisted-ttl: 10m         # 찜 많은 작품(찜이 바뀔 때마다 비우지 않고 이 시간에 맡긴다)
+      genres-ttl: 24h             # 장르 목록
+      genre-titles-ttl: 30m       # 장르별 작품
+      browser-seconds: 60         # 브라우저 Cache-Control: public, max-age 값(초). Vercel 엣지 캐시용 s-maxage는 쓰지 않는다
+  exclusive:                  # 서비스별 독점 목록(Task 078, PRD FR-04)
+    cache:                      # Redis `exclusiveTitles` 캐시. 수집 Job이 성공하면 새로 계산해 채우고, 실패·정리 뒤에는 비운다
+      ttl: 24h                    # 수집이 오래 없을 때의 안전장치. 캐시가 비면 조회 API가 즉석에서 계산해 채운다
+  plan-recalc:
+    auto-start: true                    # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
+  collect:
+    runtime-defaults:          # TMDB runtime이 비었을 때 쓰는 추정 기본값(분, PRD 11절 25번). 바인딩은 Task 043·044에서 한다
+      movie-minutes: 100              # 영화(첫 전체 수집 실측 중앙값 98분, 2026-10-15 보정. 이전 120)
+      episode-minutes: 43             # 드라마 회차(실측 중앙값 약 42.7분, 2026-10-15 보정. 이전 45)
+      animation-episode-minutes: 24   # 애니메이션 회차
+    allow-target-date-override: false   # 수집 기준일(targetDate) 직접 지정 허용. 운영은 항상 오늘(KST)만, local에서만 true

@@ -1,44 +1,96 @@
 package com.ottnavi.global.security;
 
+import com.ottnavi.global.security.jwt.JwtAuthenticationFilter;
+import com.ottnavi.global.security.jwt.JwtProperties;
+import com.ottnavi.global.security.jwt.JwtTokenProvider;
+import com.ottnavi.global.security.oauth.CookieOAuth2AuthorizationRequestRepository;
+import com.ottnavi.global.security.oauth.NoOpOAuth2AuthorizedClientRepository;
+import com.ottnavi.global.security.oauth.OAuth2LoginFailureHandler;
+import com.ottnavi.global.security.oauth.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.config.Customizer;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
 /**
- * 임시 보안 설정: 전 경로 허용.
- * TODO Task 053에서 실제 규칙(/api/public/**·인증 경로 허용, 그 외 /api/** 인증, /api/admin/** ADMIN)으로 교체한다.
+ * 보안 설정: 세션 없는 JWT 인증과 경로별 인가 규칙(TECH 4절, PRD R11-21).
+ * 인증 필터는 배치 토큰 → JWT 순이다. 둘 다 빈으로 두지 않고 여기서 new로 체인에만 넣는다
+ * (빈으로 두면 Spring Boot가 서블릿 필터로 한 번 더 등록해 두 번 돈다).
+ * 구글 로그인(oauth2Login)은 경로를 /api 아래로 옮기고, 인가 요청은 서명 쿠키에 담으며, 세션을 만들지 않는다(TECH 4절).
  */
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(JwtProperties.class)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint; // 401 ProblemDetail 응답
-    private final ProblemDetailAccessDeniedHandler accessDeniedHandler;           // 403 ProblemDetail 응답
+	private final ProblemDetailAuthenticationEntryPoint authenticationEntryPoint; // 401 ProblemDetail 응답
+	private final ProblemDetailAccessDeniedHandler accessDeniedHandler;           // 403 ProblemDetail 응답
 
-    /** 세션 없이 모든 요청을 허용하는 임시 필터 체인을 등록한다 */
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .formLogin(AbstractHttpConfigurer::disable)
-                .httpBasic(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // TECH T-8 ②(/api/** 기본 no-store)는 Security 기본 캐시 헤더로 충족한다:
-                // Cache-Control: no-cache, no-store, max-age=0, must-revalidate. 컨트롤러가 Cache-Control을 직접 넣으면 Security는 덮어쓰지 않으므로
-                // 공개 조회 CDN 캐시가 필요해지면 해당 응답에서만 연다. Task 053에서 이 설정을 교체할 때 끄지 않는다(OttServiceApiTest가 검사)
-                .headers(headers -> headers.cacheControl(Customizer.withDefaults()))
-                // 지금은 permitAll이라 호출되지 않지만, Task 053에서 인증 규칙을 넣으면 바로 같은 오류 형식이 적용된다
-                .exceptionHandling(exceptions -> exceptions
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler))
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
-        return http.build();
-    }
+	/** JWT 발급·검증기. 비밀 값이 약하면 여기서 기동이 실패한다 */
+	@Bean
+	public JwtTokenProvider jwtTokenProvider(JwtProperties properties) {
+		return new JwtTokenProvider(properties);
+	}
+
+	/** 세션 없이 JWT로 인증하고, 경로 3분류에 맞춰 인가하는 필터 체인을 등록한다 */
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtTokenProvider jwtTokenProvider,
+			@Value("${app.admin-batch-token}") String batchToken,
+			CookieOAuth2AuthorizationRequestRepository authorizationRequestRepository,
+			OAuth2LoginSuccessHandler loginSuccessHandler, OAuth2LoginFailureHandler loginFailureHandler)
+			throws Exception {
+		JwtAuthenticationFilter jwtFilter = new JwtAuthenticationFilter(jwtTokenProvider);
+		BatchTokenAuthenticationFilter batchTokenFilter = new BatchTokenAuthenticationFilter(batchToken);
+
+		http
+				.csrf(AbstractHttpConfigurer::disable)
+				.formLogin(AbstractHttpConfigurer::disable)
+				.httpBasic(AbstractHttpConfigurer::disable)
+				.logout(AbstractHttpConfigurer::disable)
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+				.requestCache(cache -> cache.requestCache(new NullRequestCache()))
+				// TECH T-8 ②(/api/** 기본 no-store)는 Security 기본 캐시 헤더로 충족한다:
+				// Cache-Control: no-cache, no-store, max-age=0, must-revalidate. 컨트롤러가 Cache-Control을 직접 넣으면 Security는 덮어쓰지 않으므로
+				// 공개 조회 CDN 캐시가 필요해지면 해당 응답에서만 연다. 이 설정을 끄지 않는다(OttServiceApiTest가 검사)
+				.headers(headers -> headers.cacheControl(Customizer.withDefaults()))
+				.exceptionHandling(exceptions -> exceptions
+						.authenticationEntryPoint(authenticationEntryPoint)
+						.accessDeniedHandler(accessDeniedHandler))
+				// 구글 로그인: 경로를 /api 아래로 옮기고(TECH 4절) 인가 요청은 서명 쿠키에 둔다.
+				// loginPage를 지정해 기본 로그인 페이지(/login) 생성을 막고, 구글 토큰은 저장하지 않는다(세션·메모리 미사용)
+				.oauth2Login(oauth2 -> oauth2
+						.loginPage("/api/oauth2/authorization/google")
+						.authorizedClientRepository(new NoOpOAuth2AuthorizedClientRepository())
+						.authorizationEndpoint(endpoint -> endpoint
+								.baseUri("/api/oauth2/authorization")
+								.authorizationRequestRepository(authorizationRequestRepository))
+						.redirectionEndpoint(endpoint -> endpoint.baseUri("/api/login/oauth2/code/*"))
+						.successHandler(loginSuccessHandler)
+						.failureHandler(loginFailureHandler))
+				// 인증 필터 순서: 배치 토큰 → JWT(배치 인증이 채워졌으면 JWT는 건너뛴다)
+				.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterBefore(batchTokenFilter, JwtAuthenticationFilter.class)
+				// 위에서부터 먼저 맞는 규칙이 적용된다
+				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/api/public/**", "/api/auth/**", "/api/oauth2/**", "/api/login/**").permitAll()
+						.requestMatchers("/api/admin/collect/**", "/api/admin/plans/monthly/**",
+								"/api/admin/retention/**", "/api/admin/popularity/**")
+								.hasAnyRole("ADMIN", "BATCH")
+						.requestMatchers("/api/admin/**").hasRole("ADMIN")
+						.requestMatchers("/api/**").authenticated()
+						.requestMatchers("/actuator/health/**", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml",
+								"/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
+						.anyRequest().denyAll());
+		return http.build();
+	}
 }

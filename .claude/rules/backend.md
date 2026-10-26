@@ -6,7 +6,8 @@ paths:
 > 공통 언어/주석 원칙은 `~/.claude/CLAUDE.md`(User instructions)를 따른다. 여기는 ottnavi 백엔드의 Java/Spring Boot 고유 스타일만 다룬다.
 > 요구사항은 `docs/PRD.md`, 스키마는 `docs/ERD.md`, API 계약은 `docs/api/openapi.yaml`을 기준으로 한다.
 
-- Javadoc은 한 줄 요약 위주로 간결하게 한국어로 작성한다.
+- Javadoc은 한국어로 쓴다. 첫 줄에 "무엇을 하는지"를 요약하고, 이유나 "이런 입력 → 이런 출력" 예시가 필요하면 아래에 여러 줄로 덧붙인다. 읽는 사람이 배경을 몰라도 이해되는 것이 우선이다.
+- 어려운 문법은 쓰지 않는다(2026-10-14 사용자 선호). 삼항 연산자(`a ? b : c`), 람다(`->`), 메서드 참조(`::`), `stream()` 체이닝 대신 `if`와 `for`로 풀어 쓴다. 단 Spring Security 설정처럼 라이브러리가 람다를 요구하는 설정 코드는 예외다. 이미 있는 코드는 일부러 바꾸지 않고 그 파일을 고칠 때 함께 바꾼다.
 
 ## 변수 스타일
 
@@ -19,7 +20,24 @@ paths:
 
 ## 주석 스타일 (Java 고유)
 
-- public 메서드 위에는 `/** 한 줄 요약 */` 형태의 Javadoc을 한국어로 붙인다. 매개변수 설명이 필요하면 `@param`으로 추가한다.
+- public 메서드 위에는 Javadoc을 한국어로 붙인다. 첫 줄은 한 줄 요약이고, 이유나 입력 → 출력 예시는 아래에 이어 쓴다. 매개변수 설명이 필요하면 `@param`으로 추가한다.
+- **여러 단계로 이뤄진 메서드는 단계마다 번호를 붙인 한 줄 주석으로 흐름을 나눈다**(2026-10-14 사용자 요청). 대상은 Processor의 `process`, Tasklet의 `execute`, 서비스의 저장·판정 메서드처럼 읽는 순서대로 일이 이어지는 메서드다. 번호는 메서드 안에서 1부터 센다. 주석은 "이 코드가 무엇인가"가 아니라 "이 단계가 흐름에서 맡은 일"을 쓴다. 한두 줄짜리 자명한 메서드와 getter에는 달지 않는다. 형식:
+
+  ```java
+  // 1. 제공처 목록을 모을 공간
+  Map<Integer, DiscoveredProvider> merged = new LinkedHashMap<>();
+
+  // 2. 영화와 드라마 제공처 목록을 각각 조회
+  for (TmdbMediaType mediaType : TmdbMediaType.values()) {
+      ...
+      // 3. 응답이 없으면 다음 매체로
+      ...
+  }
+
+  // 4. 처음 발견한 제공처를 DB에 저장
+  ```
+
+  반복문·분기 안의 단계는 바깥 번호에 이어서 센다(들여쓰기가 깊어져도 번호는 위에서 아래로 증가한다). 이미 있는 코드는 일부러 고치지 않고 그 파일을 고칠 때 함께 단다.
 - 필드 옆에 도메인 의미가 명확하지 않은 경우 한국어로 짧게 부연한다 (예: `private Integer billingDay; // 결제일, 기본 1일`).
 - 관련 있는 핸들러/메서드 여러 개를 묶을 때는 구분용 한 줄 주석으로 섹션을 나눈다 (예: `// TMDB 연동 예외`).
 - 계산 엔진의 규칙(목적함수 우선순위, 배정 규칙, 기본 러닝타임 등)을 구현한 곳에는 PRD 5.4의 어느 규칙인지 주석으로 남긴다.
@@ -42,7 +60,7 @@ paths:
 
 **Service**
 - 클래스에 `@Transactional(readOnly = true)`를 기본으로 걸고, 쓰기 메서드에만 개별 `@Transactional`을 붙인다.
-- 커스텀 예외는 지표 기록 후 `throw e`로 그대로 전파, `GlobalExceptionHandler`가 최종 처리한다.
+- 커스텀 예외는 `throw e`로 그대로 전파하고 `GlobalExceptionHandler`가 최종 처리한다. 서비스 메서드마다 `try/catch`로 실패 지표를 세지 않는다(2026-10-14 사용자 결정). 실패 지표는 외부 호출 창구(예: `TmdbClient`의 `tmdb.call`)나 예외 핸들러 한곳에서 센다. 업무상 알아야 하는 실패(예: 수집 중 작품 건너뜀)는 `log.warn`으로 남긴다.
 - 로그 심각도를 구분해서 찍는다: `log.info`(정상 흐름) / `log.warn`(예상 가능한 실패) / `log.error`(예외 스택 포함).
 - 더티 체킹처럼 암묵적으로 동작하는 부분은 그 이유를 주석으로 명시한다.
 - 외부 호출(TMDB, 메일, LLM)은 트랜잭션 안에서 하지 않는다. 외부 응답을 먼저 받고, DB 반영만 트랜잭션으로 묶는다.
@@ -64,10 +82,14 @@ paths:
 - 기본 생성자는 `protected`로 막아 JPA 프록시 생성만 허용한다.
 - 필수 필드만 받는 생성자와 선택 필드까지 받는 생성자를 오버로드로 함께 둔다.
 - 공통 타임스탬프(`createdAt`/`updatedAt`)는 베이스 엔티티를 상속해서 처리한다.
-- PK는 `Long id` + `GenerationType.IDENTITY`를 기본으로 한다. 예외는 외부 ID를 그대로 PK로 쓰는 `tmdb_provider`, `genre`뿐이다.
+- PK는 `Long id` + `GenerationType.IDENTITY`를 기본으로 한다. 예외는 외부 ID를 그대로 PK로 쓰는 `tmdb_provider`, `genre`, 부모의 PK를 그대로 쓰는 `user_setting`, 복합 PK인 `product_component`·`title_genre`다.
 - enum은 `@Enumerated(EnumType.STRING)`으로 저장한다.
 - 연관관계는 단방향 `@ManyToOne(fetch = LAZY)`를 기본으로 하고, 양방향은 꼭 필요할 때만 둔다.
 - 파생 표시값은 `getXxxString()` 같은 메서드로 엔티티에 둔다.
+- 엔티티 생성은 정적 팩토리 `create(...)`로 하고, 상태 변경은 도메인 메서드로만 한다.
+- DB `DEFAULT`는 Hibernate가 INSERT에 쓰지 않으므로 `create`가 기본값을 직접 채운다.
+- 복합 기본키는 키 클래스(`@Embeddable`, `Serializable`, `equals/hashCode`) + 엔티티의 `@EmbeddedId` + 연관 `@MapsId`로 만든다. 키 클래스에는 리포지토리를 만들지 않는다.
+- NUMERIC 컬럼은 `BigDecimal`로 매핑한다.
 
 **DTO**
 - Request/Response 모두 **record**로 작성한다 (불변).
@@ -86,7 +108,7 @@ paths:
 **계산 엔진 (`engine` 패키지)**
 - Spring 어노테이션, JPA 엔티티, Lombok 이외의 프레임워크 의존을 넣지 않는다. 순수 Java로만 작성한다.
 - 입력과 출력은 엔진 전용 record(시청 단위, 상품, 계산 조건, 결과)로 정의한다. 엔티티와의 변환은 `plan` 서비스가 맡는다.
-- 정확해와 그리디는 같은 인터페이스를 구현해 같은 입력으로 비교할 수 있게 한다.
+- 완전탐색과 그리디는 같은 인터페이스를 구현해 같은 입력으로 비교할 수 있게 한다.
 - 모든 규칙은 정답이 알려진 테스트 케이스로 검증한다.
 
 **배치 (`collect` 패키지)**
@@ -99,8 +121,7 @@ paths:
 **테스트**
 - 기능 하나의 1차 개발이 끝났을 때, 단순하지 않은 기능(분기·계산·상태 전이·외부 연동·동시성이 있는 로직)이라고 판단되면 단위 테스트 작성을 사용자에게 먼저 권유한다. 권유 시 어떤 케이스(정상, 경계, 실패)를 검증할지 한두 줄로 함께 제안하고, 사용자가 동의하면 작성한다.
 - 단순 getter/setter, 위임만 하는 코드, 단순 CRUD처럼 자명한 코드는 권유하지 않는다. 사용자가 묻지 않았는데 테스트를 먼저 작성하지 않는다.
-- 테스트 작성 스타일은 아직 확립하지 않았다. 아래 원칙 외의 구체적인 방식은 Claude가 상황에 맞게 판단하고,
-  이미 같은 프로젝트에 작성된 테스트가 있다면 새 테스트는 그 기존 스타일과 일관되게 맞춘다.
+- 테스트 작성 스타일(2026-10-14 확정): 테스트 메서드 이름은 무엇을 확인하는지 한국어 문장으로 쓴다(`@DisplayName`을 따로 달지 않는다). 본문은 `// given`, `// when`, `// then` 세 구역 주석으로 나누고, 테스트 하나는 한 가지 사실만 확인한다. 클래스가 커져 그룹이 필요할 때만 `@Nested`로 묶는다. 문법은 위의 "어려운 문법은 쓰지 않는다"를 테스트에도 적용한다.
 - 단위 테스트: JUnit 5 + AssertJ + Mockito. 계산 엔진은 Spring 컨텍스트 없이 테스트한다.
 - 통합 테스트: Testcontainers(PostgreSQL, Redis)를 쓴다. H2는 쓰지 않는다 — `NULLS NOT DISTINCT`, 부분 인덱스, `JSONB`, `SKIP LOCKED` 등 PostgreSQL 전용 기능을 검증할 수 없기 때문이다.
 - TMDB 연동은 WireMock으로 테스트하고, 응답 샘플 JSON은 `src/test/resources/tmdb/`에 둔다. 테스트에서 실제 TMDB를 호출하지 않는다.
@@ -138,7 +159,7 @@ paths:
 - **캐시/요청 제한**: Redis(Lettuce), Spring Cache, Bucket4j
 - **외부 연동**: Spring Cloud OpenFeign(2025.1.2 이상, 클라이언트별 timeout 개별 설정)
 - **배치/락**: Spring Batch 6(JDBC JobRepository), ShedLock(JDBC)
-- **메일**: Spring Mail + Gmail SMTP를 잠정 기준으로 하고(Cloudtype 발신 가능 여부는 PRD 11절 11번 결정 전), 발송은 SMTP·HTTPS 메일 API 구현체를 교체할 수 있게 인터페이스로 분리한다. Thymeleaf 템플릿 (2단계)
+- **메일**: Spring Mail + Gmail SMTP를 쓴다(Cloudtype 발신 가능 여부는 PRD 11절 11번, 2026-10-09 Task 022 시험 성공으로 확정). 발송은 SMTP·HTTPS 메일 API 구현체를 교체할 수 있게 인터페이스로 분리한다. Thymeleaf 템플릿 (2단계)
 - **LLM**: Spring AI 2.0 + Gemini 무료 등급, 관리자 기능 전용 (3단계)
 - **모니터링**: Spring Actuator, Micrometer(OTLP) + Loki4j → Grafana Cloud
 - **API 문서**: springdoc-openapi
@@ -161,16 +182,30 @@ com.ottnavi
 │   ├── mail/                  # 메일 발송 (2단계)
 │   └── llm/                   # Spring AI 연동 (3단계)
 ├── {도메인}/                  # catalog, provider, product, user, wishlist, plan, notification
-│   ├── api/                   # 컨트롤러(+Interface), dto/{request,response}
-│   ├── application/           # 서비스
-│   └── domain/                # 엔티티, 리포지토리, enums
+│   ├── controller/            # 컨트롤러 (문서 어노테이션이 많아지면 같은 폴더에 XxxControllerInterface)
+│   ├── dto/                   # 프론트(JSON)와 주고받는 틀
+│   │   ├── request/
+│   │   └── response/
+│   ├── service/               # 서비스 (흐름 조율: 트랜잭션, 도메인 호출)
+│   │   └── model/             # 서버 안에서 서비스와 호출하는 쪽이 주고받는 값 묶음(record)
+│   └── domain/                # 엔티티 영역
+│       ├── entity/            # 엔티티와 복합 키 클래스
+│       ├── repository/        # JPA 리포지토리
+│       ├── enums/             # enum
+│       └── rule/              # 순수 Java 규칙(판정·계산, 프레임워크 의존 없음. catalog)
 ├── engine/                    # 계산 엔진 (순수 Java, 프레임워크 의존 없음)
-├── collect/                   # Spring Batch Job과 Step
+├── collect/                   # Spring Batch 수집 (업무 도메인이 아니라 Job 실행 입구라 domain·service 폴더가 없다)
+│   ├── job/                   # Job 조립, Job 파라미터
+│   └── step/                  # Step 조립, Reader·Writer·Tasklet
 └── admin/                     # 관리자 전용 API (각 도메인 서비스를 호출)
 ```
 
-- 각 도메인은 api → application → domain 순으로 단방향 의존한다.
+- 각 도메인은 controller → service → domain 순으로 단방향 의존한다.
+- `domain/rule`은 순수 업무 규칙, `service`는 흐름 조율(트랜잭션, 도메인 호출)이다. rule 클래스는 입력값만 받아 판단 결과를 돌려주고 DB·TMDB를 부르지 않으므로 DB 없이 테스트한다(예: `AvailabilityJudge`는 시청 단위 종류·한국 제공처·서비스 목록·제공처 대응표를 받아 서비스별 제공 상태를 돌려준다). 이전 프로젝트에서 서비스 메서드 안의 `if`문이던 판단을 따로 뺀 것이다. 각 rule 클래스 위에는 "이런 입력 → 이런 출력" 예시를 Javadoc으로 단다.
+- `service/model`은 서버 안에서 서비스와 호출하는 쪽이 주고받는 값 묶음이고, `dto`는 프론트(JSON)와 주고받는 틀이다(이름을 겹치지 않게 `model`을 쓴다).
+- `enum`은 자바 예약어라 패키지 이름이 될 수 없으므로 하위 패키지는 `enums`를 쓴다.
 - 다른 도메인의 데이터가 필요하면 그 도메인의 서비스를 호출한다. 다른 도메인의 리포지토리를 직접 쓰지 않는다.
 - 외부 API/LLM 호출 책임은 `infra`에 두고, 도메인 서비스는 `infra`의 클라이언트를 호출해 결과를 도메인 모델로 변환한다. 프롬프트 조립은 `infra/llm` 안에서 `XxxPromptService`로 분리한다.
 - `plan`은 `engine`을 호출하는 유일한 도메인이다. `engine`은 다른 패키지를 참조하지 않는다.
 - 공통 응답/예외/보안/요청 제한은 전부 `global`에 모아 도메인 간 중복을 없앤다.
+- 패키지를 만들거나 옮기거나 지우거나 역할이 바뀌면 `docs/guides/PACKAGE_MAP.md`를 같은 PR에서 고친다(폴더 지도와 보조 설명).

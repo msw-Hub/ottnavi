@@ -51,7 +51,7 @@ Task마다 다음을 확인한다.
 - 위험 Task(Cloudtype 배포, OAuth 프록시 쿠키, Spring Batch 설정)가 후반에 몰려 있지 않은가.
 
 ### D. 문서 정합성
-- **TECH 7절 확정 결정(T-1~T-8)**이 해당 Task에 반영되어 있는가(예: 하위 행 FK CASCADE + 벌크 삭제, 수집 배치 chunk 예외, 정확해→그리디 전환, JWT 수명·회전, 오리진 비밀 헤더·`no-store`). T-9 같은 결정 필요 항목이 확정된 것처럼 적히지 않았는가.
+- **TECH 7절 확정 결정(T-1~T-8)**이 해당 Task에 반영되어 있는가(예: 하위 행 FK CASCADE + 벌크 삭제, 수집 배치 chunk 예외, 완전탐색→그리디 전환, JWT 수명·회전, 오리진 비밀 헤더·`no-store`). T-9 같은 결정 필요 항목이 확정된 것처럼 적히지 않았는가.
 - **TECH 6절 호환성 함정**이 해당 Task의 구현 사항·완료 기준에 들어 있는가(예: `spring-boot-starter-flyway`·`batch-jdbc`, orval v8 axios 명시, `vercel.json` rewrite 순서·캐시, Jackson 2·3 혼재, `@Modifying` flush/clear).
 - **ERD**: FK 삭제 동작 표, 참조 컬럼 인덱스, 부분 유니크 인덱스가 Flyway 마이그레이션 Task에 반영되어 있는가. Flyway 소유 범위(`BATCH_*`, `shedlock` 포함)가 맞는가.
 - **rules**: `git.md`(초기 세팅은 `main` 직접 커밋 → `develop` 생성 → 이후 `feature/*` PR), `api-contract.md`(엔드포인트·필드·오류 코드를 바꾸면 같은 커밋에서 `openapi.yaml` 수정), `backend.md`·`frontend.md`의 경로·계층 규칙과 어긋나는 Task가 없는가. 브랜치 이름 예시가 `git.md` 형식인가.

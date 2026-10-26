@@ -10,11 +10,24 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}          # 기본값 없음. 누락 시 기동이 실패한다
+            client-secret: ${GOOGLE_CLIENT_SECRET}  # 기본값 없음
+            # 고정 주소로 만든다(TECH 4절). Vercel 도메인을 가리키며 구글 콘솔의 승인된 리디렉션 URI와 같아야 한다
+            redirect-uri: "${OAUTH2_REDIRECT_BASE_URL}/api/login/oauth2/code/{registrationId}"
 springdoc:
   api-docs:
     enabled: false                # 운영에서 불필요한 기능은 끈다(ROADMAP 4.6)
   swagger-ui:
     enabled: false
 app:
+  frontend-origin: ${APP_FRONTEND_ORIGIN}   # 기본값 없음. 프론트 주소(예: https://ottnavi.vercel.app, 끝에 / 없이)
   origin-secret:
     value: ${ORIGIN_SECRET}       # 기본값 없음. 누락 시 기동이 실패한다(Vercel 주입 값과 같아야 함)
+  admin-batch-token: ${ADMIN_BATCH_TOKEN}   # 기본값 없음. 누락 시 기동이 실패한다(GitHub Actions cron 시크릿과 같아야 함)
+  jwt:
+    secret: ${JWT_SECRET}         # 기본값 없음. 누락되거나 Base64 디코딩 후 32바이트 미만이면 기동이 실패한다

@@ -1,0 +1,73 @@
+{
+  "name" : "case-01-budget-tight",
+  "note" : "예산이 빠듯한 소규모(상품 3개). 월 예산 9,000원이라 서비스1(9,000원)은 한 달에 혼자만 가능하다. 손계산: 추천형은 꼭 볼 작품A(서비스1)와 서비스2·3이 모두 필요해 점수 5, 비용 9,000+5,000+4,000=18,000원이다. 서비스1은 혼자서만 한 달에 담을 수 있어 서비스1과 서비스2·3은 다른 달이고, 같은 점수·비용이면 첫 달부터 바로 보는 조기 시청(꼭 작품A를 가장 이른 달에 시청 완료, 꼭 작품이 점수보다 먼저 비교됨)으로 [[1],[2,3],[]]이다. 절약형·간편형은 점수 하한이 ceil(5*0.7)=4라 서비스3을 빼고 서비스1+2(점수 4, 14,000원, 가입 2회)만 구독하고 조기 시청으로 [[1],[2],[]]이다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 9000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 5000,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 4000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2, 3 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2, 3 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 5,
+      "totalCost" : 18000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 4,
+      "totalCost" : 14000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 4,
+      "totalCost" : 14000
+    }
+  }
+}

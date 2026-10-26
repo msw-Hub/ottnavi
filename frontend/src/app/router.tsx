@@ -1,0 +1,235 @@
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router'
+import { AdminLayout } from '@/app/AdminLayout'
+import { RequireAdmin } from '@/app/guards/RequireAdmin'
+import { RequireAuth } from '@/app/guards/RequireAuth'
+import { RootLayout } from '@/app/RootLayout'
+import { RouteErrorBoundary } from '@/app/RouteErrorBoundary'
+import { RouteLoadingFallback } from '@/app/RouteLoadingFallback'
+
+/*
+ * 개발 모드에서만 등록하는 확인용 화면(Task 026). 운영 화면이 아니라 화면 주소표(경로표)에 넣지 않는다.
+ *
+ * 운영 빌드에 들어가지 않는 이유: Vite는 빌드할 때 import.meta.env.DEV를 false로 바꿔 넣는다.
+ * 그러면 아래 삼항식이 항상 [] 쪽이 되어, 쓰이지 않는 import('@/pages/dev/...')가 빌드 과정에서 제거되고
+ * 확인용 화면 파일 조각(chunk)도 만들어지지 않는다. lazy로 둔 것은 개발 중에도 첫 번들을 가볍게 하기 위함이다.
+ *
+ * router.test.tsx와의 관계: 테스트(Vitest)도 개발 모드라(DEV = true) 이 경로가 등록된다.
+ * 그래서 테스트는 경로표(ROUTE_TABLE)와 별도로 DEV_ROUTE_TABLE을 두고, DEV일 때만 합쳐서 비교한다.
+ * 여기에 경로를 더하면 router.test.tsx의 DEV_ROUTE_TABLE도 함께 고친다.
+ */
+const DEV_ONLY_ROUTES: RouteObject[] = import.meta.env.DEV
+  ? [
+      {
+        path: '__dev/components', // 공통 표시 컴포넌트 확인 화면
+        lazy: {
+          Component: () =>
+            import('@/pages/dev/ComponentsPreviewPage').then((m) => m.ComponentsPreviewPage),
+        },
+      },
+    ]
+  : []
+
+/*
+ * 화면 주소표(사용자 결정 P6). 여기 주소는 브라우저 주소창에 보이는 프론트 화면 주소이며
+ * 백엔드 API 주소(/api/...)와 다르다. 주소를 바꾸거나 더하면 src/app/router.test.tsx의 표도 함께 고쳐야 테스트가 통과한다.
+ *
+ * 페이지를 lazy로 나누는 이유: 각 페이지가 별도 파일 조각(chunk)으로 빌드되어 그 주소에 처음 들어갈 때만 내려받는다.
+ * 특히 관리자 화면 코드가 일반 사용자가 받는 첫 번들에 섞이지 않는다.
+ * React Router 8의 객체형 lazy(`lazy: { Component: ... }`)를 쓰면 페이지 파일이 named export여도 그대로 가져올 수 있다
+ * (frontend.md의 named export 원칙 유지, context7 reactrouter 문서 "Lazy load route properties with lazy" 확인).
+ *
+ * 가드는 "경로 없는 부모 라우트"로 둔다. 부모(RequireAuth·RequireAdmin)가 <Outlet />을 돌려줄 때만 자식 화면이 그려진다.
+ */
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    Component: RootLayout,
+    HydrateFallback: RouteLoadingFallback,
+    // 레이아웃 자체가 실패했을 때를 받는 마지막 오류 경계(이 경우 헤더·푸터 없이 안내만 보인다)
+    ErrorBoundary: RouteErrorBoundary,
+    children: [
+      {
+        // 경로 없는 오류 경계: 화면 하나가 실패해도 헤더·푸터는 남기고 본문(<Outlet />) 자리에만 오류 안내를 그린다.
+        // 위 RootLayout의 경계만 두면 화면 오류 하나로 헤더까지 사라져 다른 화면으로 이동하기 어렵다.
+        ErrorBoundary: RouteErrorBoundary,
+        children: [
+          // 공개 화면
+          {
+            index: true, // 홈 (`/`, 홈 1차안). 이전에는 이 자리가 SCR-01 검색이었다
+            lazy: { Component: () => import('@/pages/HomePage').then((m) => m.HomePage) },
+          },
+          {
+            path: 'search', // SCR-01 검색 (`/search`, 검색어는 ?q=). 홈이 `/`를 쓰게 되어 옮겼다(홈 1차안)
+            lazy: { Component: () => import('@/pages/SearchPage').then((m) => m.SearchPage) },
+          },
+          {
+            path: 'ranking', // 랭킹 (홈 1차안, 홈 "더보기" 목적지. 화면 번호는 아직 없다)
+            lazy: { Component: () => import('@/pages/RankingPage').then((m) => m.RankingPage) },
+          },
+          {
+            path: 'explore', // 탐색 (홈 1차안, 홈 "더보기" 목적지. 화면 번호는 아직 없다)
+            lazy: { Component: () => import('@/pages/ExplorePage').then((m) => m.ExplorePage) },
+          },
+          {
+            path: 'titles/:mediaType/:tmdbId', // SCR-02 작품 상세
+            lazy: {
+              Component: () => import('@/pages/TitleDetailPage').then((m) => m.TitleDetailPage),
+            },
+          },
+          {
+            path: 'exclusives', // SCR-03 독점 목록 (Task 075 1차안: 목업 모드에서만 정적 샘플, 운영은 준비 중)
+            lazy: {
+              Component: () => import('@/pages/ExclusivesPage').then((m) => m.ExclusivesPage),
+            },
+          },
+          {
+            path: 'about', // SCR-04 About
+            lazy: { Component: () => import('@/pages/AboutPage').then((m) => m.AboutPage) },
+          },
+          {
+            path: 'accuracy', // SCR-05 정확도 안내 (3단계, 준비 중)
+            lazy: { Component: () => import('@/pages/AccuracyPage').then((m) => m.AccuracyPage) },
+          },
+          {
+            path: 'login', // SCR-06 로그인
+            lazy: { Component: () => import('@/pages/LoginPage').then((m) => m.LoginPage) },
+          },
+          {
+            // SCR-06 로그인 콜백(TECH 4절). 토큰을 받기 전 단계라 RequireAuth 밖(공개)에 둔다(AuthCallbackPage 주석 참고)
+            path: 'auth/callback',
+            lazy: {
+              Component: () => import('@/pages/AuthCallbackPage').then((m) => m.AuthCallbackPage),
+            },
+          },
+
+          // 로그인이 필요한 화면 (동작은 Task 057, 지금은 통과)
+          {
+            Component: RequireAuth,
+            children: [
+              {
+                path: 'settings', // SCR-07 온보딩·내 설정
+                lazy: {
+                  Component: () => import('@/pages/SettingsPage').then((m) => m.SettingsPage),
+                },
+              },
+              {
+                path: 'wishlist', // SCR-08 찜 목록
+                lazy: {
+                  Component: () => import('@/pages/WishlistPage').then((m) => m.WishlistPage),
+                },
+              },
+              {
+                path: 'pricing', // SCR-09 요금 확인
+                lazy: { Component: () => import('@/pages/PricingPage').then((m) => m.PricingPage) },
+              },
+              {
+                path: 'plan', // SCR-10 플랜 결과
+                lazy: { Component: () => import('@/pages/PlanPage').then((m) => m.PlanPage) },
+              },
+              {
+                path: 'plan/history', // SCR-11 플랜 변경 내역
+                lazy: {
+                  Component: () => import('@/pages/PlanHistoryPage').then((m) => m.PlanHistoryPage),
+                },
+              },
+              {
+                path: 'settings/notifications', // SCR-12 알림 설정 (2단계, 준비 중)
+                lazy: {
+                  Component: () =>
+                    import('@/pages/NotificationSettingsPage').then(
+                      (m) => m.NotificationSettingsPage,
+                    ),
+                },
+              },
+              {
+                path: 'settings/withdraw', // SCR-13 탈퇴 (화면·목업 흐름 완료, 실제 API는 Task 082·084)
+                lazy: {
+                  Component: () => import('@/pages/WithdrawPage').then((m) => m.WithdrawPage),
+                },
+              },
+            ],
+          },
+
+          // 관리자 화면 (동작은 Task 057, 지금은 통과)
+          // 'admin'을 부모 경로로 두지 않고 자식마다 전체 경로를 적은 이유: 부모를 path: 'admin'으로 두면
+          // `/admin`만 입력했을 때 가드만 그려지고 본문이 빈 화면이 된다. 지금 구조에서는 `/admin`이 아래 '*'로 가 404가 보인다.
+          {
+            Component: RequireAdmin,
+            children: [
+              {
+                // `/admin`만 입력하면 수집 화면으로 보낸다(홈 1차안, 머리글 "관리" 링크의 목적지와 같다).
+                // 가드(RequireAdmin) 안에 둔 이유: 관리자가 아니면 보내기 전에 가드가 먼저 "권한 없음"을 보인다.
+                // replace: 뒤로 가기를 눌렀을 때 `/admin`으로 돌아와 다시 보내지는 반복을 막는다.
+                // (아래 옛 주석의 "`/admin`은 404" 설명은 이 라우트로 바뀌었다)
+                path: 'admin',
+                element: <Navigate to="/admin/collect" replace />,
+              },
+              {
+                // 경로 없는 레이아웃 라우트(Task 029): 관리자 화면 위에 관리자 메뉴(AdminNav)를 공통으로 둔다.
+                // 가드 안쪽에 둔 이유: 관리자가 아니면 메뉴도 그려지지 않아야 하고, 화면을 옮겨 다녀도 메뉴는 다시 만들어지지 않는다.
+                // 자식마다 전체 경로('admin/...')를 유지하므로 `/admin` 단독 주소는 여전히 아래 '*'(404)로 간다.
+                Component: AdminLayout,
+                children: [
+                  {
+                    path: 'admin/products', // SCR-14 OTT 구독상품·월 구독요금
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminProductsPage').then((m) => m.AdminProductsPage),
+                    },
+                  },
+                  {
+                    path: 'admin/providers', // SCR-15 제공처 매핑
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminProvidersPage').then((m) => m.AdminProvidersPage),
+                    },
+                  },
+                  {
+                    path: 'admin/collect', // SCR-16 수집
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminCollectPage').then((m) => m.AdminCollectPage),
+                    },
+                  },
+                  {
+                    path: 'admin/monitoring', // SCR-17 모니터링 (3단계, 준비 중)
+                    lazy: {
+                      Component: () =>
+                        import('@/pages/AdminMonitoringPage').then((m) => m.AdminMonitoringPage),
+                    },
+                  },
+                  {
+                    path: 'admin/llm', // SCR-18 LLM 검토 (3단계, 준비 중)
+                    lazy: {
+                      Component: () => import('@/pages/AdminLlmPage').then((m) => m.AdminLlmPage),
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+
+          // 개발 모드 전용 확인 화면(운영 빌드에서는 빈 배열이라 아무것도 더해지지 않는다)
+          ...DEV_ONLY_ROUTES,
+
+          // 위 어디에도 맞지 않는 주소는 404 화면(레이아웃 안)
+          {
+            path: '*',
+            lazy: { Component: () => import('@/pages/NotFoundPage').then((m) => m.NotFoundPage) },
+          },
+        ],
+      },
+    ],
+  },
+]
+
+/**
+ * 브라우저 주소(History API)를 쓰는 라우터를 만든다.
+ *
+ * 모듈을 불러올 때 바로 만들지 않고 함수로 둔 이유: createBrowserRouter는 만들어지는 즉시 현재 주소의 화면 준비를 시작한다.
+ * main.tsx가 MSW 목업 워커를 켠 뒤에 호출하게 해서, 이후 화면 준비 단계에서 API를 부르더라도 목업을 거치게 한다.
+ * 테스트는 이 함수 대신 같은 routes로 메모리 라우터를 만든다.
+ */
+export function createAppRouter() {
+  return createBrowserRouter(routes)
+}

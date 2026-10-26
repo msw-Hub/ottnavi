@@ -15,16 +15,25 @@ import com.ottnavi.global.common.CommonResponse;
 import com.ottnavi.global.security.ProblemDetailAccessDeniedHandler;
 import com.ottnavi.global.security.ProblemDetailAuthenticationEntryPoint;
 import com.ottnavi.global.security.SecurityConfig;
+import com.ottnavi.support.OAuth2LoginTestConfig;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -42,7 +51,8 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ErrorTestController.class)
 @Import({SecurityConfig.class, ProblemDetailAuthenticationEntryPoint.class, ProblemDetailAccessDeniedHandler.class,
-		GlobalExceptionHandlerTest.ErrorTestController.class})
+		OAuth2LoginTestConfig.class,
+		GlobalExceptionHandlerTest.ErrorTestController.class, GlobalExceptionHandlerTest.TestSecurityChain.class})
 class GlobalExceptionHandlerTest {
 
 	private static final String BASE = "/test/errors";
@@ -127,6 +137,99 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void 본문의_날짜_형식이_틀리면_VALIDATION_FAILED와_해당_필드를_준다() throws Exception {
+		// given
+		String content = "{\"targetDate\":\"2026-13-45\",\"tier\":\"ALL\"}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("targetDate"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("형식이 올바르지 않습니다."));
+	}
+
+	@Test
+	void 본문의_enum에_모르는_값이_오면_해당_필드_오류를_준다() throws Exception {
+		// given
+		String content = "{\"targetDate\":\"2026-10-01\",\"tier\":\"UNKNOWN\"}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("tier"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("형식이 올바르지 않습니다."));
+	}
+
+	@Test
+	void 깨진_JSON은_필드_오류_없이_INVALID_REQUEST다() throws Exception {
+		// given
+		String content = "{\"targetDate\":";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "INVALID_REQUEST")
+				.andExpect(jsonPath("$.fieldErrors").doesNotExist());
+	}
+
+	@Test
+	void 중첩_객체와_배열_경로는_점과_대괄호_표기로_필드명이_된다() throws Exception {
+		// given
+		String content = "{\"items\":[{\"targetDate\":\"2026-10-01\"},{\"targetDate\":\"2026-13-45\"}]}";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/nested-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("items[1].targetDate"));
+	}
+
+	@Test
+	void 본문_전체가_객체가_아니어서_경로가_비면_INVALID_REQUEST다() throws Exception {
+		// given
+		String content = "[1, 2]";
+
+		// when
+		ResultActions result = mockMvc.perform(post(BASE + "/date-body")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(content));
+
+		// then
+		expectProblem(result, 400, "INVALID_REQUEST")
+				.andExpect(jsonPath("$.fieldErrors").doesNotExist());
+	}
+
+	@Test
+	void FieldValidationException은_지정한_필드와_메시지로_400을_준다() throws Exception {
+		// when
+		ResultActions result = mockMvc.perform(get(BASE + "/field-validation"));
+
+		// then
+		expectProblem(result, 400, "VALIDATION_FAILED")
+				.andExpect(jsonPath("$.detail").value(ErrorCode.VALIDATION_FAILED.getMessage()))
+				.andExpect(jsonPath("$.fieldErrors", hasSize(1)))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("targetDate"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("미래 날짜는 쓸 수 없습니다."));
+	}
+
+	@Test
+	@WithMockUser // /api/**는 로그인이 필요해 인증된 사용자로 호출해야 404까지 간다
 	void 없는_경로는_RESOURCE_NOT_FOUND다() throws Exception {
 		expectProblem(mockMvc.perform(get("/api/does-not-exist")), 404, "RESOURCE_NOT_FOUND")
 				.andExpect(jsonPath("$.instance").value("/api/does-not-exist"));
@@ -154,6 +257,13 @@ class GlobalExceptionHandlerTest {
 				.andExpect(content().string(not(containsString("내부 비밀"))));
 	}
 
+	@Test
+	void 요청_제한_초과는_429_RATE_LIMIT_EXCEEDED와_Retry_After_헤더를_준다() throws Exception {
+		expectProblem(mockMvc.perform(get(BASE + "/rate-limit")), 429, "RATE_LIMIT_EXCEEDED")
+				.andExpect(header().string("Retry-After", "7"))
+				.andExpect(jsonPath("$.detail").value(ErrorCode.RATE_LIMIT_EXCEEDED.getMessage()));
+	}
+
 	/** 공통 ProblemDetail 형식(상태, problem+json, errorCode)을 검사한다 */
 	private ResultActions expectProblem(ResultActions result, int status, String errorCode) throws Exception {
 		return result
@@ -176,6 +286,33 @@ class GlobalExceptionHandlerTest {
 	}
 
 	record TestResponse(String name) {
+	}
+
+	enum SampleEnum {
+		ALL
+	}
+
+	record DateBody(LocalDate targetDate, SampleEnum tier) {
+	}
+
+	record NestedItem(LocalDate targetDate) {
+	}
+
+	record NestedBody(List<NestedItem> items) {
+	}
+
+	/** 예외 변환 시험 경로(/test/errors/**)는 인가 규칙이 아니라 핸들러를 보려는 것이라 운영 체인보다 먼저 전부 허용한다 */
+	@TestConfiguration
+	static class TestSecurityChain {
+
+		@Bean
+		@Order(0)
+		SecurityFilterChain testErrorsChain(HttpSecurity http) throws Exception {
+			http.securityMatcher(BASE + "/**")
+					.csrf(csrf -> csrf.disable())
+					.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+			return http.build();
+		}
 	}
 
 	static class TestTitleNotFoundException extends BusinessException {
@@ -204,6 +341,11 @@ class GlobalExceptionHandlerTest {
 			throw new TestTitleNotFoundException("작품을 찾을 수 없습니다: movie/999");
 		}
 
+		@GetMapping("/rate-limit")
+		CommonResponse<TestResponse> rateLimit() {
+			throw new RateLimitExceededException("요청 제한 초과", 7);
+		}
+
 		@PostMapping("/body")
 		CommonResponse<TestResponse> body(@Valid @RequestBody TestRequest request) {
 			return CommonResponse.success(new TestResponse(request.name()));
@@ -217,6 +359,21 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/items/{itemId}")
 		CommonResponse<Long> item(@PathVariable Long itemId) {
 			return CommonResponse.success(itemId);
+		}
+
+		@PostMapping("/date-body")
+		CommonResponse<TestResponse> dateBody(@RequestBody DateBody request) {
+			return CommonResponse.success(new TestResponse(String.valueOf(request.targetDate())));
+		}
+
+		@PostMapping("/nested-body")
+		CommonResponse<TestResponse> nestedBody(@RequestBody NestedBody request) {
+			return CommonResponse.success(new TestResponse("ok"));
+		}
+
+		@GetMapping("/field-validation")
+		CommonResponse<TestResponse> fieldValidation() {
+			throw new FieldValidationException("targetDate", "미래 날짜는 쓸 수 없습니다.");
 		}
 
 		@GetMapping("/runtime")

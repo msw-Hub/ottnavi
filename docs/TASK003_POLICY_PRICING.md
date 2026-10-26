@@ -176,7 +176,7 @@ R11-27은 안내 문구에만 영향을 준다. 결론: 확인된 서비스는 �
 
 - 초과분은 자동 과금되지 않지만, 지속 초과 시 공정 이용 정책에 따른 제한이 있다(사용자 제공).
 - **프로젝트 영향**
-  - Supabase를 일반 PostgreSQL로만 쓰므로 MAU·Storage·Edge Functions·Realtime·SSO는 해당 없다. Data API는 사용자 판단으로 켜 둔 상태다(백엔드는 JDBC 직접 접속).
+  - Supabase를 일반 PostgreSQL로만 쓰므로 MAU·Storage·Edge Functions·Realtime·SSO는 해당 없다. Data API는 꺼 둔 상태다(2026-10-13 사용자 확인, 백엔드는 JDBC 직접 접속).
   - 가장 중요한 한도는 **DB 500MB**다. PRD 후보 규모는 약 5만 5천 건이고 TECH는 `BATCH_*` 이력 누적을 우려한다. **수집 구현 후 실제 크기를 측정**한다(`SELECT pg_size_pretty(pg_database_size(current_database()))`).
   - 7일 비활성은 Hobby 전환 후 매일 수집 cron이 막고, 무료 기간에는 대시보드에서 Resume한다(TECH 3절).
   - Supabase의 PostgreSQL 버전은 17.11이고 로컬 compose는 17.6이다. 17.x 마이너 차이라 호환에 문제가 없다고 보고 지금은 맞추지 않는다(맞출지는 사용자 결정).
@@ -245,7 +245,6 @@ Task 003의 완료 기준(항목별 출처·날짜·결론 기록, R11-27 판단
 | `docs/PRD.md` 11절 27번 | R11-27 확정 |
 | `docs/ROADMAP.md` | Task 002·003 완료와 `기록:`, Phase 1 진행 수치, 10.2 표에서 R11-27 제거, Task 020(R-12 저장소 직접 빌드, Redis 생존 확인)·022(무료 리소스)·021·040·048·100(측정 항목), 4.6 메모리 예산과 측정 지점 |
 | `docs/TECH.md` | T-6과 3절의 하비 HTTP 타임아웃 5분 |
-| `docs/PHASE1_HUMAN_TASKS.md` | Task 002·003 완료 표시, Task 020 R-12 보정 |
 | `CLAUDE.md` | 문서 체계 표에 이 문서 추가 |
 
 - 호스팅·DB 한도와 요금은 자주 바뀔 수 있으므로 Task 092 최종 점검 때 다시 확인한다.

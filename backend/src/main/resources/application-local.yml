@@ -8,6 +8,23 @@ spring:
     redis:
       host: 127.0.0.1
       port: ${REDIS_PORT:6379}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # 로컬 기동이 실패하지 않게 더미 기본값을 둔다. 실제 구글 로그인은 .env의 GOOGLE_CLIENT_ID·SECRET이 있어야 한다
+            client-id: ${GOOGLE_CLIENT_ID:local-dummy}
+            client-secret: ${GOOGLE_CLIENT_SECRET:local-dummy}
+            # 로컬은 Vite 프록시(5173 → 8080)를 거치므로 콜백도 5173으로 받는다
+            redirect-uri: "${OAUTH2_REDIRECT_BASE_URL:http://localhost:5173}/api/login/oauth2/code/{registrationId}"
 app:
+  frontend-origin: ${APP_FRONTEND_ORIGIN:http://localhost:5173}   # Origin 검사·로그인 후 이동 주소의 기준
   origin-secret:
     enabled: false                # 로컬은 Vite proxy·직접 호출이라 오리진 비밀 헤더를 검사하지 않는다
+  admin-batch-token: ${ADMIN_BATCH_TOKEN:local-admin-batch-token}   # 수집 실행 API 배치 토큰. 로컬 전용 기본값
+  jwt:
+    # 로컬·테스트 전용 개발 키(Base64, 48바이트). 저장소에서 알 수 있는 값이라 운영에서 절대 쓰면 안 된다
+    secret: b3R0bmF2aS1sb2NhbC1kZXYtb25seS1qd3Qtc2VjcmV0LWtleS0wMTIzNDU2Nzg5
+  collect:
+    allow-target-date-override: true   # 로컬은 targetDate를 직접 지정해 같은 날 재수집을 재현할 수 있다(Task 045)

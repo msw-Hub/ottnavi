@@ -1,0 +1,155 @@
+{
+  "name" : "case-11-seven-products-regression",
+  "note" : "상품 7개 규모의 회귀 기준 케이스. 월 예산 30,000원이라 달마다 후보 조합이 많고(최대 128개 중 대부분), 긴 시즌(작품F 1,800분 = 1,000+800)과 서비스 여러 곳에 겹쳐 제공되는 작품이 섞여 있다. 손계산이 아니라 ExactSolver(SolverSelector)의 결과를 고정한 회귀 기준이다. 엔진을 바꿔 이 결과가 달라지면 의도한 변경인지 확인한다. 2026-10-10 조기 시청 규칙 반영으로 재생성했고, 전수 탐색(동치 제거 없는 무차별 대입) 결과와 세 유형 모두 같음을 확인했다.",
+  "expectationBasis" : "REGRESSION",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 30000,
+  "monthlyWatchMinutes" : 1000,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 4900,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 5500,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 6900,
+    "condition" : "NONE"
+  }, {
+    "id" : 4,
+    "name" : "서비스4",
+    "monthlyPrice" : 7900,
+    "condition" : "NONE"
+  }, {
+    "id" : 5,
+    "name" : "서비스5",
+    "monthlyPrice" : 8900,
+    "condition" : "NONE"
+  }, {
+    "id" : 6,
+    "name" : "서비스6",
+    "monthlyPrice" : 9900,
+    "condition" : "NONE"
+  }, {
+    "id" : 7,
+    "name" : "서비스7",
+    "monthlyPrice" : 10900,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 150,
+    "watchableProductIds" : [ 1, 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "MUST",
+    "requiredMinutes" : 300,
+    "watchableProductIds" : [ 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "MUST",
+    "requiredMinutes" : 200,
+    "watchableProductIds" : [ 5, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 2, 4 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 5,
+    "name" : "작품E",
+    "priority" : "WANT",
+    "requiredMinutes" : 400,
+    "watchableProductIds" : [ 4, 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 6,
+    "name" : "작품F",
+    "priority" : "WANT",
+    "requiredMinutes" : 1800,
+    "watchableProductIds" : [ 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 7,
+    "name" : "작품G",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 8,
+    "name" : "작품H",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 90,
+    "watchableProductIds" : [ 5 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 9,
+    "name" : "작품I",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 250,
+    "watchableProductIds" : [ 3, 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 10,
+    "name" : "작품J",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 130,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 11,
+    "name" : "작품K",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 500,
+    "watchableProductIds" : [ 1, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 12,
+    "name" : "작품L",
+    "priority" : "WANT",
+    "requiredMinutes" : 220,
+    "watchableProductIds" : [ 7 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 2, 3, 5 ], [ 7 ], [ 1 ] ],
+      "mustCompleted" : 3,
+      "score" : 12,
+      "totalCost" : 37100
+    },
+    "SAVER" : {
+      "months" : [ [ 3, 5 ], [ 1 ], [ 4 ] ],
+      "mustCompleted" : 3,
+      "score" : 9,
+      "totalCost" : 28600
+    },
+    "SIMPLE" : {
+      "months" : [ [ 3, 5 ], [ 1 ], [ 4 ] ],
+      "mustCompleted" : 3,
+      "score" : 9,
+      "totalCost" : 28600
+    }
+  },
+  "greedyExpected" : {
+    "months" : [ [ 1, 2, 3, 5 ], [ 2, 7 ], [ 1 ] ],
+    "mustCompleted" : 3,
+    "score" : 12,
+    "totalCost" : 47500
+  }
+}

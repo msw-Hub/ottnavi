@@ -1,0 +1,149 @@
+{
+  "name" : "case-13-realistic-kr-ott-b",
+  "note" : "현실 모양 케이스 B: 국내 OTT 7곳 규모, 월 요금 4,900~13,900원, 작품 12개(MUST 2·WANT 5·MAYBE 5 가운데 시청 가능 상품이 없는 작품 2개 포함), 구독 중인 서비스가 없고 월 예산 12,000원, 월 시청 10시간(600분)으로 빠듯하다. 서비스5(13,900원)는 혼자서도 예산을 넘어 후보에서 빠지고, 긴 시즌(작품C 1,000분 = 600+400)과 여러 서비스에 동시 제공되는 작품이 섞여 있다. 손계산이 아니라 ExactSolver(SolverSelector)의 결과를 고정한 회귀 기준이다. 2026-10-10 조기 시청 규칙 반영 후에도 결과가 같고, 전수 탐색(동치 제거 없는 무차별 대입) 결과와 세 유형 모두 같음을 확인했다.",
+  "expectationBasis" : "REGRESSION",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 12000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 5500,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 7900,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 9900,
+    "condition" : "NONE"
+  }, {
+    "id" : 4,
+    "name" : "서비스4",
+    "monthlyPrice" : 11900,
+    "condition" : "NONE"
+  }, {
+    "id" : 5,
+    "name" : "서비스5",
+    "monthlyPrice" : 13900,
+    "condition" : "NONE"
+  }, {
+    "id" : 6,
+    "name" : "서비스6",
+    "monthlyPrice" : 6500,
+    "condition" : "NONE"
+  }, {
+    "id" : 7,
+    "name" : "서비스7",
+    "monthlyPrice" : 4900,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 300,
+    "watchableProductIds" : [ 1, 3 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "MUST",
+    "requiredMinutes" : 110,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "WANT",
+    "requiredMinutes" : 1000,
+    "watchableProductIds" : [ 4 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "WANT",
+    "requiredMinutes" : 480,
+    "watchableProductIds" : [ 3, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 5,
+    "name" : "작품E",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 5 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 6,
+    "name" : "작품F",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1, 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 7,
+    "name" : "작품G",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 90,
+    "watchableProductIds" : [ 2, 6 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 8,
+    "name" : "작품H",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 540,
+    "watchableProductIds" : [ 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 9,
+    "name" : "작품I",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 130,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 10,
+    "name" : "작품J",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 200,
+    "watchableProductIds" : [ 3, 4, 7 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 11,
+    "name" : "작품K",
+    "priority" : "WANT",
+    "requiredMinutes" : 95,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : false
+  }, {
+    "id" : 12,
+    "name" : "작품L",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : true
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ 6 ] ],
+      "mustCompleted" : 2,
+      "score" : 6,
+      "totalCost" : 19900
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ 7 ] ],
+      "mustCompleted" : 2,
+      "score" : 5,
+      "totalCost" : 18300
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 2 ], [ 7 ] ],
+      "mustCompleted" : 2,
+      "score" : 5,
+      "totalCost" : 18300
+    }
+  }
+}

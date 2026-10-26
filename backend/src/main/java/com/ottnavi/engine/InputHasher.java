@@ -1,0 +1,94 @@
+package com.ottnavi.engine;
+
+import com.ottnavi.engine.model.OttProduct;
+import com.ottnavi.engine.model.PlanInput;
+import com.ottnavi.engine.model.WatchUnit;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * 계산 입력의 정규화 해시(input_hash)를 만든다. 같은 입력이면 순서가 달라도 같은 해시가 나와 계산 결과 캐시·비교 기록의 키로 쓴다(TECH 1절).
+ * 순수 Java이며 상태가 없다.
+ *
+ * <p>정규화 문자열 형식(구분자 고정, 앞에 버전 {@value #FORMAT_VERSION}):
+ * {@code v3|budget=…|minutes=…|asOf=…|products=id:price:condition:serviceIds;…|units=id:priority:minutes:watchableIds:unknown:titleId:seasonNumber;…}
+ * 시청 단위는 id 오름차순, 상품은 id 오름차순, 시청 가능 상품 ID는 오름차순으로 정렬해 잇는다.
+ * titleId·seasonNumber는 시즌 순서(PRD 5.4)가 배정 결과를 바꾸므로 v2에서 넣었다. 영화는 둘 다 '-'다.
+ * serviceIds(구성 서비스 ID, 오름차순, 쉼표)는 서비스 겹침 금지(PRD 11절 33번)가 선택지를 바꾸므로 v3에서 넣었다. 서비스 정보가 없는 상품은 '-'다.
+ * v3로 올리면서 v2로 만든 기존 저장 플랜의 해시와는 달라진다(같은 입력이어도 재계산 시 새 해시로 취급).
+ * 참고: 이 해시를 저장하는 곳(plan.input_hash 등)이 아직 없어 v1 해시와의 호환 문제는 없다. 저장을 도입한 뒤에는 형식을 바꾸면 기존 값이 무효가 된다.
+ * 형식을 바꾸면 기존 해시가 모두 달라지므로 {@code FORMAT_VERSION}을 올린다.
+ */
+public final class InputHasher {
+
+	private static final String FORMAT_VERSION = "v3"; // 정규화 형식 버전. 형식을 바꾸면 올린다
+
+	private InputHasher() {
+	}
+
+	/** 입력과 데이터 기준일로 SHA-256 소문자 hex(64자) 해시를 만든다. */
+	public static String hash(PlanInput input, LocalDate dataAsOf) {
+		if (input == null || dataAsOf == null) {
+			throw new IllegalArgumentException("입력과 데이터 기준일은 null일 수 없다");
+		}
+		return sha256Hex(canonicalize(input, dataAsOf));
+	}
+
+	/** 해시 직전의 정규화 문자열을 만든다(디버깅·테스트용으로 공개). */
+	public static String canonicalize(PlanInput input, LocalDate dataAsOf) {
+		if (input == null || dataAsOf == null) {
+			throw new IllegalArgumentException("입력과 데이터 기준일은 null일 수 없다");
+		}
+		// 1. 시청 단위를 id 순으로 정렬해 문자열로 잇는다
+		// PlanInput.units()는 배정 순서로 정렬돼 있어 해시용으로 id 순으로 다시 정렬한다
+		String units = input.units().stream()
+				.sorted(Comparator.comparingLong(WatchUnit::id))
+				.map(InputHasher::canonicalize)
+				.collect(Collectors.joining(";"));
+		// 2. 상품을 id 순으로 정렬해 문자열로 잇는다
+		String products = input.products().stream()
+				.sorted(Comparator.comparingLong(OttProduct::id))
+				.map(InputHasher::canonicalize)
+				.collect(Collectors.joining(";"));
+		// 3. 버전·예산·시청 시간·기준일·상품·단위를 구분자로 이어 붙인다
+		return FORMAT_VERSION
+				+ "|budget=" + input.monthlyBudget()
+				+ "|minutes=" + input.monthlyWatchMinutes()
+				+ "|asOf=" + dataAsOf // LocalDate.toString()은 ISO-8601(yyyy-MM-dd)
+				+ "|products=" + products
+				+ "|units=" + units;
+	}
+
+	/** 상품 하나를 id:가격:구독 상태:구성 서비스 ID(오름차순, 쉼표; 없으면 -) 로 바꾼다. */
+	private static String canonicalize(OttProduct product) {
+		String serviceIds = product.ottServiceIds().stream().map(String::valueOf).collect(Collectors.joining(","));
+		if (serviceIds.isEmpty()) {
+			serviceIds = "-";
+		}
+		return product.id() + ":" + product.monthlyPrice() + ":" + product.condition().name() + ":" + serviceIds;
+	}
+
+	/** 시청 단위 하나를 id:우선순위:필요 분:시청 가능 상품 ID(오름차순, 쉼표):모름 여부:titleId:시즌 번호(영화는 -) 로 바꾼다. */
+	private static String canonicalize(WatchUnit unit) {
+		List<Long> watchableIds = unit.watchableProductIds().stream().sorted().toList();
+		String ids = watchableIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+		return unit.id() + ":" + unit.priority().name() + ":" + unit.requiredMinutes() + ":" + ids + ":" + unit.isProviderUnknown()
+				+ ":" + (unit.titleId() == null ? "-" : unit.titleId()) + ":" + (unit.seasonNumber() == null ? "-" : unit.seasonNumber());
+	}
+
+	private static String sha256Hex(String text) {
+		try {
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
+			return HexFormat.of().formatHex(digest); // HexFormat 기본값이 소문자다
+		} catch (NoSuchAlgorithmException e) {
+			// SHA-256은 모든 Java 구현이 반드시 제공해야 해서 실제로는 일어나지 않는다
+			throw new IllegalStateException("SHA-256을 사용할 수 없다", e);
+		}
+	}
+}

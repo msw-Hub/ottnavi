@@ -79,7 +79,7 @@ Phase 자체와 순서는 고정이다. 추가하거나 생략하지 않는다. 
 **백엔드(`[B]`) — 빌드·테스트·API 호출 확인**
 - Windows 기준 `gradlew.bat test`(또는 해당 Task의 테스트 클래스 지정)를 통과해야 한다. 통합 테스트는 Testcontainers(PostgreSQL, Redis)를 쓴다(H2 금지).
 - API Task는 서버를 띄워 실제 엔드포인트를 호출(`Invoke-RestMethod` 등)하고 응답 형식(`CommonResponse` / `ProblemDetail`)과 상태 코드를 확인하는 절차를 적는다.
-- 계산 엔진 Task는 정답이 알려진 테스트 케이스 통과와 정확해·그리디 비교 기록을 완료 기준에 넣는다.
+- 계산 엔진 Task는 정답이 알려진 테스트 케이스 통과와 완전탐색·그리디 비교 기록을 완료 기준에 넣는다.
 
 **풀스택·배포**
 - 목업을 실제 API로 교체하는 Task는 `VITE_USE_MOCK=false`로 브라우저에서 실제 값이 반영되는지 확인한다.

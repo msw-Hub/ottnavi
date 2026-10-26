@@ -1,0 +1,73 @@
+{
+  "name" : "case-04-no-provider-and-unknown",
+  "note" : "시청 가능 상품이 없는 작품(NO_PROVIDER, UNKNOWN)이 섞인 소규모(상품 3개). 손계산: 작품A(MUST)·B(WANT)는 볼 수 있는 서비스가 없어 점수에 들어가지 않고 꼭 시청 완료 수는 0이다. 서비스3은 보는 작품이 없어 후보에서 빠진다. 작품C(2점)는 서비스1, 작품D(1점)는 서비스2에만 있어 점수 3, 비용 5,000+7,000=12,000원이다. 12,000원은 월 예산 10,000원을 넘으므로 두 서비스를 서로 다른 달에 구독하며, 점수가 큰 작품C(2점)를 먼저 볼 수 있게 서비스1을 첫 달에 두는 조기 시청으로 [[1],[2],[]]이고, 절약형·간편형도 같다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 5000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 7000,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 9000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ ],
+    "providerUnknown" : true
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "WANT",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 4,
+    "name" : "작품D",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 100,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 3,
+      "totalCost" : 12000
+    },
+    "SAVER" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 3,
+      "totalCost" : 12000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1 ], [ 2 ], [ ] ],
+      "mustCompleted" : 0,
+      "score" : 3,
+      "totalCost" : 12000
+    }
+  }
+}

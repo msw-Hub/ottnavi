@@ -1,0 +1,66 @@
+{
+  "name" : "case-02-budget-ample",
+  "note" : "예산이 넉넉한 소규모(상품 3개). 월 예산 50,000원이라 예산 제약이 없다. 손계산: 작품A(MUST)·B(WANT 2점)·C(MAYBE 1점)가 서로 다른 서비스에만 있어 셋 다 구독해야 점수 3, 비용 9,500+7,000+5,000=21,500원이다. 같은 점수·비용이면 첫 달부터 바로 보는 조기 시청으로 [[1,2,3],[],[]]이고 점수 하한(3)이 최대와 같아 절약형·간편형도 같은 결과다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 50000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 9500,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 7000,
+    "condition" : "NONE"
+  }, {
+    "id" : 3,
+    "name" : "서비스3",
+    "monthlyPrice" : 5000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품A",
+    "priority" : "MUST",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품B",
+    "priority" : "WANT",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 3,
+    "name" : "작품C",
+    "priority" : "MAYBE",
+    "requiredMinutes" : 120,
+    "watchableProductIds" : [ 3 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 1, 2, 3 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 21500
+    },
+    "SAVER" : {
+      "months" : [ [ 1, 2, 3 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 21500
+    },
+    "SIMPLE" : {
+      "months" : [ [ 1, 2, 3 ], [ ], [ ] ],
+      "mustCompleted" : 1,
+      "score" : 3,
+      "totalCost" : 21500
+    }
+  }
+}

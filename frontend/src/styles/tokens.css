@@ -1,0 +1,230 @@
+/*
+ * OTT내비 전용 디자인 토큰(Task 026, Task 037에서 확정).
+ *
+ * shadcn 기본 토큰(--background, --primary 등)은 index.css의 :root에 있고, 여기에는 shadcn에 없는
+ * 서비스 고유 의미(제공 상태 3가지, 데이터 부족, 추정, 토스트용 빨강)의 색만 둔다.
+ * 값은 사용자가 확정한 시안 "D2c 미드나잇 블루"(.playwright-mcp/directions-dark/direction-D2c.html)를 그대로 옮겼다.
+ *
+ * 왜 토큰으로 두나: 컴포넌트가 색 값을 직접 쓰면 디자인을 바꿀 때 파일마다 찾아 고쳐야 한다.
+ * 토큰 이름(의미)만 쓰게 하면 여기 값만 바꿔 앱 전체에 반영된다(frontend.md 디자인 값 규칙).
+ *
+ * 색만으로 정보를 전달하지 않는다: 제공 상태는 색 외에도 모양(꽉 채움 / 실선 / 점선 테두리)과
+ * 아이콘(체크 / X / 물음표), 글자(있음 / 없음 / 모름)로 구분한다. 색은 보조 수단이다.
+ */
+:root {
+  /* 제공 상태: 있음(AVAILABLE). 초록으로 꽉 채운 알약 + 짙은 남색 글자 */
+  --status-available: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --status-available-bg: oklch(0.8 0.12 160); /* 바탕(채움) */
+  --status-available-border: oklch(0.8 0.12 160); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+
+  /* 제공 상태: 없음(NOT_AVAILABLE). 바탕 없이 실선 테두리 */
+  --status-unavailable: oklch(0.9 0.012 258);
+  --status-unavailable-bg: transparent;
+  --status-unavailable-border: oklch(0.62 0.025 258);
+
+  /*
+   * 제공 상태: 모름(UNKNOWN). 차분한 중립(슬레이트) 톤 + 옅게 채운 바탕 + 점선 테두리
+   * (점선 모양은 컴포넌트의 border-dashed가 정한다).
+   * 바꾼 이유(Task 028 피드백): 이전 값은 채도 높은 노랑(글자 oklch 0.88 0.1 85)이라 어두운 바탕에서 번져 보이고,
+   * 2px 점선 노랑 테두리와 겹쳐 눈이 피로하고 글자가 잘 읽히지 않았다. 색조(노랑)를 빼고 foreground에 가까운 글자색으로 바꿨다.
+   * - 글자: 밝기 0.92 → 카드 바탕(0.175)과 칩 바탕(0.27) 위에서 대비 약 10:1 이상(본문 기준 4.5:1 이상)
+   * - 바탕: 옅게 채움(0.27). "없음"(바탕 없음 + 실선)과 모양이 달라지게 하는 보조 수단이다
+   * - 테두리: 없음과 같은 슬레이트(0.62). 카드 위 3:1 이상이라 점선 모양이 보이되 노랑처럼 튀지 않는다
+   * 색은 보조 수단이다. 모름은 물음표 아이콘 + "모름" 글자 + 점선 테두리 + 옅은 바탕으로도 구분된다.
+   * 이 토큰은 ProviderStatusBadge(작품 상세 등)와 찜 목록 칩(ServiceStatusChips)이 함께 쓴다.
+   */
+  --status-unknown: oklch(0.92 0.01 258);
+  --status-unknown-bg: oklch(0.27 0.03 262);
+  --status-unknown-border: oklch(0.62 0.025 258);
+
+  /*
+   * 데이터 부족(쿠팡플레이처럼 data_quality = INSUFFICIENT인 서비스) 표시.
+   * 모름 칩 안에 들어가므로 같은 중립 톤으로 맞췄다(이전: 노랑 글자 + 갈색 바탕이라 모름 칩 안에서 읽기 어려웠다).
+   * 바탕(0.34)이 모름 칩 바탕(0.27)보다 한 단계 밝아 칩 안에서도 구분되고, 글자(0.92)와의 대비는 약 8:1이다.
+   * 의미는 색이 아니라 데이터베이스 아이콘 + "데이터 부족" 글자가 전달한다.
+   */
+  --quality-insufficient: oklch(0.92 0.01 258); /* 글자·아이콘 */
+  --quality-insufficient-bg: oklch(0.36 0.03 262); /* 바탕 */
+
+  /* "추정" 태그(러닝타임 등 추정값) */
+  --estimated: oklch(0.85 0.07 290); /* 글자·점선 테두리 */
+  --estimated-bg: oklch(0.27 0.05 290); /* 바탕 */
+
+  /*
+   * 오류 토스트 바탕·테두리 빨강(#B32228). 위에 흰 글자(--destructive-foreground)를 올리면 대비 6.59:1이다
+   * (Task 037, 디자인 결정 "세트 1". 이전 값 oklch(0.577 0.245 27.325) = #E7000B은 4.76:1로 기준 4.5:1에 근접했다).
+   * 어두운 테마에서는 빨강을 둘로 나눈다.
+   * - --destructive(index.css): 어두운 바탕 위에 직접 쓰는 오류 글자·아이콘용 밝은 빨강
+   * - --destructive-solid(여기): 흰 글자를 올리는 면(토스트 바탕)용 짙은 빨강
+   * 하나로 쓰면 밝은 빨강 위 흰 글자는 대비가 모자라고, 짙은 빨강 글자는 어두운 바탕에서 읽기 어렵다.
+   */
+  --destructive-solid: oklch(0.5 0.18 25); /* #B32228 */
+  /* 이전 값(#E7000B): --destructive-solid: oklch(0.577 0.245 27.325); */
+
+  /*
+   * 안내(info) 띠·"이어 보기" 배지·"이미 시청 가능" 배지용 색(Task 028, Task 037에서 확정).
+   * 안내 문구가 오류(빨강)·경고(노랑)처럼 보이지 않게 강조색(--primary)과 같은 하늘색 계열로 맞췄다.
+   * 바탕(--info-bg, 밝기 0.27)과 글자(--info, 밝기 0.88)의 대비는 약 9:1로 본문 기준 4.5:1을 넉넉히 넘는다.
+   */
+  --info: oklch(0.88 0.07 230); /* 글자·아이콘·점선 테두리 */
+  --info-bg: oklch(0.27 0.05 235); /* 바탕 */
+
+  /*
+   * 플랜 유형 카드에서 "선택된 카드"의 테두리 색(Task 028, Task 037에서 확정).
+   * 기본은 강조색(--primary)을 그대로 쓴다. 선택 표시는 색만이 아니라 테두리 굵기(2px)와 "선택됨" 글자+체크 아이콘을 함께 쓰므로
+   * 이 색은 보조 수단이다. 디자인 방향이 바뀌면 이 한 줄만 바꾼다.
+   */
+  --plan-selected-border: var(--primary);
+
+  /*
+   * 서비스 이용 상태 선택 칸(SCR-07)의 "선택됨" 바탕색. 네 선택지가 서로 다른 색으로 보이게 한다(Task 028, Task 037에서 확정).
+   * 모두 밝은 바탕(밝기 0.8~0.86) 위에 짙은 남색 글자(--choice-fg, 밝기 0.15)를 올려 대비가 약 9:1 이상이다(본문 기준 4.5:1 이상).
+   * 색은 보조 수단이다. 선택됨은 체크 아이콘·굵은 글자·두꺼운 테두리로도 알리고, 상태 이름은 항상 글자로 적혀 있다.
+   * 구독 중=하늘, 무료 이용=초록(제공 "있음"과 같은 계열), 잘 모르겠음=노랑(미구독 회색과 구분하려고 따로 둔 값. 제공 "모름" 토큰(--status-unknown-*)은 중립 톤으로 바뀌어 더 이상 공유하지 않는다), 미구독=회색.
+   */
+  --choice-fg: oklch(0.15 0.035 264); /* 선택된 칸 글자·아이콘 */
+  --choice-subscribed-bg: oklch(0.8 0.1 235); /* 구독 중 */
+  --choice-free-bg: oklch(0.8 0.12 160); /* 무료 이용 */
+  --choice-unknown-bg: oklch(0.86 0.12 85); /* 잘 모르겠음 */
+  --choice-none-bg: oklch(0.82 0.02 258); /* 미구독 */
+
+  /*
+   * 주의(attention) 표시: 관리자 화면의 "미매핑" 제공처, "요금 확인일 오래됨" 태그, 미매핑 행의 왼쪽 막대(Task 029, Task 037에서 확정).
+   * 값은 "잘 모르겠음" 선택 칸(--choice-unknown-bg)·선택 글자(--choice-fg)와 같다. 같은 값을 그대로 참조하지 않고
+   * 이름을 따로 둔 이유: 뜻이 다르다. 한쪽 색을 바꿀 때 다른 쪽이 따라 바뀌지 않게 하려는 것이다.
+   * 노랑을 "글자"가 아니라 "바탕"으로만 쓴다. 어두운 바탕 위 노랑 글자는 번져 보인다는 Task 028 피드백 때문이다.
+   * 밝은 노랑 바탕(0.86) 위 짙은 남색 글자(0.15)의 대비는 약 9:1로 본문 기준 4.5:1 이상이다.
+   * 색은 보조 수단이다. 주의 표시는 항상 경고 아이콘 + 글자(예: "미매핑")와 함께 쓴다.
+   */
+  --attention-bg: oklch(0.86 0.12 85); /* 배지 바탕·행 왼쪽 막대 */
+  --attention-fg: oklch(0.15 0.035 264); /* 배지 글자·아이콘 */
+  --attention-border: var(--attention-bg); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+
+  /*
+   * 성공(success) 표시: 관리자 수집 이력의 "성공" 배지(Task 029, Task 037에서 확정).
+   * 값은 제공 상태 "있음"(--status-available-*)과 같다. "제공 있음"과 "실행 성공"은 뜻이 달라 이름을 나눴다.
+   * 초록 바탕(0.8) 위 짙은 남색 글자(0.15)의 대비는 "있음" 배지와 같아 4.5:1 이상이다. 체크 아이콘 + "성공" 글자와 함께 쓴다.
+   */
+  --success: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --success-bg: oklch(0.8 0.12 160); /* 바탕(채움) */
+
+  /*
+   * 찜 우선순위 3단계(꼭 볼 작품 MUST / 보고 싶음 WANT / 여유될 때 MAYBE) 표시 색(우선순위 차이 체감 개선, 2026-10-17).
+   * 플랜 계산은 "꼭 볼 작품"을 끝까지 보는 수를 가장 먼저 챙기고 그다음 점수(보고 싶음 2, 여유될 때 1)를 보므로(PRD 5.4·11절 35번),
+   * 화면에서도 단계의 무게가 위에서 아래로 줄어드는 것이 보이게 "꽉 채움 → 실선 테두리 → 점선 테두리" 순으로 힘을 뺀다.
+   * 색만으로 구분하지 않는다: 단계마다 아이콘(별 / 북마크 / 시계)과 글자가 항상 함께 있고, 모양(채움·실선·점선)도 다르다.
+   * - 꼭 볼 작품: 금빛 바탕(0.83) 위 짙은 남색 글자(0.15), 대비 약 10:1. 경고용 노랑(--attention-bg, 색조 85)과 섞이지 않게 주황 쪽(색조 70)으로 옮겼다
+   * - 보고 싶음: 강조색 계열 하늘색 글자(0.88)·테두리 + 옅은 남색 바탕(0.27), 대비 약 9:1
+   * - 여유될 때: 옅은 바탕(0.23) + 슬레이트 점선 테두리(0.62, 카드 위 3:1 이상) + 밝은 글자(0.9), 대비 약 11:1
+   */
+  --priority-must-fg: oklch(0.15 0.035 264); /* 글자·아이콘 */
+  --priority-must-bg: oklch(0.83 0.13 70); /* 바탕(채움) */
+  --priority-must-border: var(--priority-must-bg); /* 테두리(바탕과 같게 해 꽉 찬 모양) */
+  --priority-want-fg: oklch(0.88 0.07 230);
+  --priority-want-bg: oklch(0.27 0.05 235);
+  --priority-want-border: oklch(0.88 0.07 230); /* 실선 테두리 */
+  --priority-maybe-fg: oklch(0.9 0.012 258);
+  --priority-maybe-bg: oklch(
+    0.23 0.02 260
+  ); /* 카드 바탕(0.175)보다 한 단계 밝게 채워, 선택된 칸이 선택 안 된 칸(바탕 없음)과 구분되게 한다 */
+  --priority-maybe-border: oklch(
+    0.62 0.025 258
+  ); /* 점선 테두리(점선 모양은 컴포넌트의 border-dashed가 정한다) */
+}
+
+/*
+ * 머리글(app/RootLayout.tsx의 <header>)의 최소 높이. 토스트가 머리글을 덮지 않고 그 아래에서 시작하도록
+ * 머리글(min-height)과 토스트 위치(app/providers.tsx의 offset)가 이 값 하나를 함께 쓴다(Task 037 이월 정리 ①).
+ * 값 = 위아래 여백 py-3(24px) + 입력창·버튼 h-10(40px) + 아래 테두리 1px = 65px.
+ * (홈 1차안: 넓은 화면은 한 줄 [로고·메뉴·작은 검색창(h-10)·계정]이라 65px 그대로다.)
+ * 640px 미만(Tailwind sm 미만)은 머리글이 두 줄이다. 홈 1차안에서 줄 구성이 바뀌어 아래 @media 블록의 주석에 새 계산을 적었다.
+ * (이전 계산: 윗줄 로고·로그인 26px + 줄 간격 12px + 검색창 줄 40px + 여백 24px + 테두리 1px = 103px)
+ * 한계: 이 값은 "최소" 높이라 머리글 안의 내용이 더 커지면(글자 크게 보기 등) 머리글이 이 값보다 커져 토스트가 일부 덮을 수 있다.
+ */
+/*
+ * 토스트 바탕용 별칭(Task 037). sonner가 자기 토스트 묶음(.toaster) 안에서 --success-bg·--info-bg라는 같은 이름의 변수를
+ * 따로 정의해(어두운 테마용 짙은 초록·남색) 묶음 안에서는 우리 토큰 대신 sonner 값이 쓰인다(실제로 성공 토스트가 짙은 초록으로 나왔다).
+ * 이름이 겹치지 않는 별칭을 :root에서 풀어 두면(변수는 선언된 자리에서 값이 정해져 상속된다) 토스트 안에서도 우리 값이 쓰인다.
+ */
+:root {
+  --toast-success-bg: var(--success-bg);
+  --toast-info-bg: var(--info-bg);
+}
+
+:root {
+  --header-height: calc(var(--spacing) * 16 + 1px);
+}
+/*
+ * 640px 미만 머리글 높이(Tab 순서 수정 후 구조, Playwright 375px 실측으로 계산: 머리글 안쪽 98px + 테두리 1px = 99px).
+ * 두 줄: [로고 · 홈·랭킹·탐색] + gap-y-2 8px + [검색창 40px · 계정] + 여백 py-3 24px. 실측에서 검색창 아래 끝이 86px, 아래 여백 12px → 98px.
+ * 계정 영역은 검색창 옆 폭이 모자라면 셋째 줄로 내려간다(flex-wrap). 운영의 비로그인·회원은 두 줄,
+ * 관리자("관리" 링크까지)와 목업 모드의 개발용 로그인 전환이 있을 때는 세 줄(약 131px)이 되어 이 최소 높이보다 커진다.
+ * 최소 높이를 세 줄 기준으로 잡지 않은 이유: 두 줄인 사용자의 머리글 아래에 빈 공간이 생긴다.
+ * 이전 값(세 줄 [로고·계정]/[검색창]/[메뉴], CSS order 사용, 131px): --header-height: calc(var(--spacing) * 32.5 + 1px);
+ * 그 전 값(1차안 첫 판, 돋보기만 있던 두 줄 구조 83px): --header-height: calc(var(--spacing) * 20.5 + 1px);
+ * 처음 값(검색창이 아랫줄에 있던 구조, 103px): --header-height: calc(var(--spacing) * 25.5 + 1px);
+ */
+@media (width < 40rem) {
+  :root {
+    --header-height: calc(var(--spacing) * 24.5 + 1px);
+  }
+}
+
+/*
+ * 파비콘·홈 화면 아이콘·링크 미리보기 이미지(frontend/public/favicon.svg, favicon.ico, favicon-32/48.png,
+ * apple-touch-icon.png, og-image.png)에 쓴 브랜드 색 대응표(나비 C안).
+ * 이 파일들은 CSS 변수를 읽지 못하는 별도 이미지라 토큰 값을 hex로 옮겨 넣었다. 새 색 체계가 아니라 아래 토큰의 값이다.
+ * 토큰 값을 바꾸면 이 표와 public의 이미지도 함께 다시 만든다(자동으로 따라 바뀌지 않는다).
+ * - 바탕 타일:        --card               oklch(0.175 0.04 264)  → #081022
+ * - 타일 테두리(svg):  --border             oklch(0.28 0.045 264)  → #1d283f
+ * - 왼쪽 날개(이번 달): --primary            oklch(0.79 0.09 230)   → #7bc6e9
+ * - 오른쪽 날개(다음 달): --priority-must-bg oklch(0.83 0.13 70)    → #fdb862
+ * - 몸통·더듬이:      --foreground         oklch(0.96 0.006 258)  → #eff2f6
+ * - 미리보기 이미지 바탕: --background      oklch(0.125 0.035 264) → #020614
+ * - 미리보기 소개 문구: --info              oklch(0.88 0.07 230)   → #a8e1fd
+ * hex는 oklch → sRGB 변환식으로 계산한 값이다(소수 반올림 차이로 브라우저 표시와 1 정도 다를 수 있다).
+ */
+
+/*
+ * 위 토큰을 Tailwind 클래스로 쓸 수 있게 연결한다(예: bg-status-available-bg, text-status-unknown).
+ * inline을 붙이는 이유: 클래스가 var(--status-...)를 그대로 참조하게 해, :root 값을 바꾸면 클래스 결과도 바로 바뀐다
+ * (Tailwind v4 문서 "Referencing other variables", context7 /tailwindlabs/tailwindcss.com 확인).
+ */
+@theme inline {
+  --color-status-available: var(--status-available);
+  --color-status-available-bg: var(--status-available-bg);
+  --color-status-available-border: var(--status-available-border);
+  --color-status-unavailable: var(--status-unavailable);
+  --color-status-unavailable-bg: var(--status-unavailable-bg);
+  --color-status-unavailable-border: var(--status-unavailable-border);
+  --color-status-unknown: var(--status-unknown);
+  --color-status-unknown-bg: var(--status-unknown-bg);
+  --color-status-unknown-border: var(--status-unknown-border);
+  --color-quality-insufficient: var(--quality-insufficient);
+  --color-quality-insufficient-bg: var(--quality-insufficient-bg);
+  --color-estimated: var(--estimated);
+  --color-estimated-bg: var(--estimated-bg);
+  --color-destructive-solid: var(--destructive-solid);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-plan-selected-border: var(--plan-selected-border);
+  --color-choice-fg: var(--choice-fg);
+  --color-choice-subscribed-bg: var(--choice-subscribed-bg);
+  --color-choice-free-bg: var(--choice-free-bg);
+  --color-choice-unknown-bg: var(--choice-unknown-bg);
+  --color-choice-none-bg: var(--choice-none-bg);
+  --color-attention-bg: var(--attention-bg);
+  --color-attention-fg: var(--attention-fg);
+  --color-attention-border: var(--attention-border);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-priority-must-fg: var(--priority-must-fg);
+  --color-priority-must-bg: var(--priority-must-bg);
+  --color-priority-must-border: var(--priority-must-border);
+  --color-priority-want-fg: var(--priority-want-fg);
+  --color-priority-want-bg: var(--priority-want-bg);
+  --color-priority-want-border: var(--priority-want-border);
+  --color-priority-maybe-fg: var(--priority-maybe-fg);
+  --color-priority-maybe-bg: var(--priority-maybe-bg);
+  --color-priority-maybe-border: var(--priority-maybe-border);
+}

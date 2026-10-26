@@ -3,34 +3,45 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - 아직 구현하지 않은 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시한다(Task 031).
- * - 성공 응답은 `CommonResponse` 래퍼, 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+ * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
  * OpenAPI spec version: 0.1.0
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  BadRequestResponse,
   CommonResponseOttServiceList,
+  CommonResponseServicePrice,
+  CommonResponseServicePriceList,
   InternalErrorResponse,
-  TooManyRequestsResponse
+  NotFoundResponse,
+  SetMyServicePriceRequest,
+  TooManyRequestsResponse,
+  UnauthorizedResponse
 } from '../model';
 
 import { customInstance } from '../../http';
-import type { ErrorType } from '../../http';
+import type { ErrorType , BodyType } from '../../http';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -146,3 +157,239 @@ export function useListOttServices<TData = Awaited<ReturnType<typeof listOttServ
 
 
 
+/**
+ * 서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
+ * 판매 중인 상품만 주며, 항목마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다. 판매 중이어도 현재 적용 중인 요금이 없는 상품(첫 요금 이력이 미래 등)은 목록에서 빠지며, 그 상품의 수정·삭제는 404 `SERVICE_PRICE_NOT_FOUND`다.
+ * 기본 월 요금은 오늘 적용 중인 월 구독요금 이력이다. 계산은 달마다 사용자 결제일에 적용 중인 요금을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
+ * 내가 고친 금액은 상품 단위로 저장된다(ERD `user_price_override`). 관리자가 상품을 판매 종료하고 새 상품을 등록하면 고친 금액은 새 상품에 이어지지 않는다.
+ * 마지막 확인일이 90일을 넘으면 화면이 "요금이 달라졌을 수 있어요" 안내를 붙인다(PRD 11절 41번).
+ * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * @summary 내 서비스별 월 요금 조회
+ */
+export const listMyServicePrices = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseServicePriceList>(
+      {url: `/me/service-prices`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getListMyServicePricesQueryKey = () => {
+    return [
+    `/me/service-prices`
+    ] as const;
+    }
+
+
+export const getListMyServicePricesQueryOptions = <TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyServicePricesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyServicePrices>>> = ({ signal }) => listMyServicePrices(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListMyServicePricesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyServicePrices>>>
+export type ListMyServicePricesQueryError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+
+
+export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMyServicePrices>>,
+          TError,
+          Awaited<ReturnType<typeof listMyServicePrices>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listMyServicePrices>>,
+          TError,
+          Awaited<ReturnType<typeof listMyServicePrices>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 내 서비스별 월 요금 조회
+ */
+
+export function useListMyServicePrices<TData = Awaited<ReturnType<typeof listMyServicePrices>>, TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyServicePrices>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListMyServicePricesQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
+ * 상품 ID로 대상을 정하므로 한 서비스에 상품이 여러 개 생기는 2단계(광고형·번들)에도 이 주소는 바뀌지 않는다.
+ * 오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+ * @summary 내 월 요금 설정
+ */
+export const setMyServicePrice = (
+    productId: number,
+    setMyServicePriceRequest: BodyType<SetMyServicePriceRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseServicePrice>(
+      {url: `/me/service-prices/${productId}`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: setMyServicePriceRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getSetMyServicePriceMutationKey = () => ['setMyServicePrice'] as const;
+
+export const getSetMyServicePriceMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMyServicePrice>>, TError,SetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof setMyServicePrice>>, TError,SetMyServicePriceMutationVariables, TContext> => {
+
+const mutationKey = getSetMyServicePriceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setMyServicePrice>>, SetMyServicePriceMutationVariables> = (props) => {
+          const {productId,data} = props ?? {};
+
+          return  setMyServicePrice(productId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetMyServicePriceMutationResult = NonNullable<Awaited<ReturnType<typeof setMyServicePrice>>>
+    export type SetMyServicePriceMutationBody = BodyType<SetMyServicePriceRequest>
+    export type SetMyServicePriceMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>
+    export type SetMyServicePriceMutationVariables = {productId: number;data: BodyType<SetMyServicePriceRequest>}
+
+    /**
+ * @summary 내 월 요금 설정
+ */
+export const useSetMyServicePrice = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMyServicePrice>>, TError,SetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof setMyServicePrice>>,
+        TError,
+        SetMyServicePriceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetMyServicePriceMutationOptions(options), queryClient);
+    }
+    /**
+ * 내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
+ * 오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+ * @summary 내 월 요금 지우기(기본 요금으로 복귀)
+ */
+export const resetMyServicePrice = (
+    productId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/me/service-prices/${productId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getResetMyServicePriceMutationKey = () => ['resetMyServicePrice'] as const;
+
+export const getResetMyServicePriceMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetMyServicePrice>>, TError,ResetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetMyServicePrice>>, TError,ResetMyServicePriceMutationVariables, TContext> => {
+
+const mutationKey = getResetMyServicePriceMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetMyServicePrice>>, ResetMyServicePriceMutationVariables> = (props) => {
+          const {productId} = props ?? {};
+
+          return  resetMyServicePrice(productId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetMyServicePriceMutationResult = NonNullable<Awaited<ReturnType<typeof resetMyServicePrice>>>
+
+    export type ResetMyServicePriceMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>
+    export type ResetMyServicePriceMutationVariables = {productId: number}
+
+    /**
+ * @summary 내 월 요금 지우기(기본 요금으로 복귀)
+ */
+export const useResetMyServicePrice = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetMyServicePrice>>, TError,ResetMyServicePriceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof resetMyServicePrice>>,
+        TError,
+        ResetMyServicePriceMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResetMyServicePriceMutationOptions(options), queryClient);
+    }

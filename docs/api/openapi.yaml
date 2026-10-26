@@ -3,15 +3,16 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - 아직 구현하지 않은 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시한다(Task 031).
-    - 성공 응답은 `CommonResponse` 래퍼, 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+    - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
+    - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
 servers:
   - url: /api
     description: 상대 경로. 배포는 Vercel rewrite, 로컬은 Vite proxy가 백엔드로 전달한다
 tags:
   - name: catalog
-    description: 작품 검색·상세 (공개)
+    description: 작품 검색·상세, 홈·탐색 공통 목록 (공개)
   - name: user
     description: 내 설정·구독 상태 (`/api/me/**`)
   - name: wishlist
@@ -48,6 +49,1413 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalError'
+  /public/ott-services/{ottServiceId}/exclusive-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listServiceExclusiveTitles
+      security: []
+      summary: 서비스별 독점 목록 조회
+      description: |
+        "확인된 범위에서 7개 서비스 중 이 서비스에서만 구독으로 볼 수 있는 작품"을 인기도(TMDB 인기도) 높은 순으로 한 페이지 돌려준다(PRD FR-04). 비로그인 공개 API(요청 제한 적용).
+        수집이 끝날 때 미리 계산해 서버 캐시에 두며, 캐시가 비어 있으면 그 자리에서 계산한다. 독점은 시즌(시청 단위) 단위로 판정하므로 드라마는 독점 시즌 번호(`exclusiveSeasonNumbers`)를 함께 준다.
+        다른 서비스가 "없음"이거나 "모름"이면 독점으로 본다. "모름"인 서비스 수는 `unknownElsewhereCount`로 알려 화면이 "다른 곳에도 있을 수 있음"을 표시하게 한다.
+        쿠팡플레이 영화처럼 구조적으로 알 수 없는 서비스는 비교에서 빼므로(`comparedServiceCount`에 세지 않는다) 영화는 보통 5곳, 드라마는 6곳과 비교한다.
+        데이터 부족 서비스(`dataQuality`가 `INSUFFICIENT`, 쿠팡플레이)도 같은 규칙으로 판정한다. 쿠팡플레이 영화는 구조적으로 알 수 없어 판정하지 않으므로 목록에는 드라마(시즌)만 나오고, 화면은 서비스 목록의 `dataQuality`로 "영화는 판정하지 못했다"를 안내한다. 없는 서비스 ID만 404다.
+        오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `OTT_SERVICE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: ottServiceId
+          in: path
+          description: 서비스 ID(서비스 목록 API의 `ottServiceId`)
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 서비스의 독점 목록 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseExclusiveTitlePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== catalog (공개) =====
+  /public/titles:
+    get:
+      tags:
+        - catalog
+      operationId: searchTitles
+      security: []
+      summary: 작품 검색
+      description: |
+        제목(한국어·원제)에 검색어가 들어간 작품을 찾는다(대소문자 구분 없는 부분 일치). 비로그인 공개 API(요청 제한 적용).
+        **DB에 저장된 작품만 대상**이며 TMDB를 호출하지 않는다. 결과는 인기도 높은 순이다(같으면 먼저 저장된 작품 먼저).
+        서비스별 상태(`availabilities`)는 7개 서비스를 서비스 ID 순으로 모두 담는다. 드라마는 시즌 중 하나라도 제공되면 AVAILABLE이고, 판정이 없는 서비스는 UNKNOWN이다.
+        `dataAsOf`는 이 페이지 작품들의 판정 확인일(KST) 중 가장 오래된 날짜다(결과가 없으면 전체 판정의 최신 확인일).
+        `isExternalCollectFailed`는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입하기 전까지 항상 `false`다. 필드는 호환을 위해 유지한다.
+        페이지네이션 응답(`content`, `page`, `size`, `totalElements`, `totalPages`)이다.
+        오류: `VALIDATION_FAILED`(400, 검색어 없음·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: q
+          in: query
+          description: 검색어(제목). 앞뒤 공백을 뺀 뒤 1자 이상
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 검색 결과 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleSearchPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/titles/{mediaType}/{tmdbId}:
+    get:
+      tags:
+        - catalog
+      operationId: getTitleDetail
+      security: []
+      summary: 작품 상세 조회
+      description: |
+        TMDB 기준(`mediaType` + `tmdbId`)으로 작품 상세와 서비스별 제공 상태를 조회한다. 드라마는 시즌별 정보와 시즌별 제공 상태를 함께 준다. 비로그인 공개 API(요청 제한 적용).
+        **DB에 저장된 작품만 조회**하며, 없으면 TMDB를 호출하지 않고 `TITLE_NOT_FOUND`(404)로 응답한다. 응답은 서버에서 24시간 캐시되고 수집이 끝나면 갱신된다.
+        `mediaType`은 소문자(`movie`/`tv`)만 받는다. 출연진은 출연 순서 상위 10명, 시즌은 시즌 번호 순이다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `TITLE_NOT_FOUND`(404), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+        `EXTERNAL_API_ERROR`(502)는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입할 때 쓸 응답이며, 현재는 발생하지 않는다.
+      parameters:
+        - $ref: '#/components/parameters/MediaTypePath'
+        - $ref: '#/components/parameters/TmdbIdPath'
+      responses:
+        '200':
+          description: 작품 상세
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  # ===== catalog: 홈·탐색 공통 목록 (공개, Task 107. 개인화 없이 모두에게 같은 목록) =====
+  /public/popularity-rankings:
+    get:
+      tags:
+        - catalog
+      operationId: listPopularityRankings
+      security: []
+      summary: 서비스별 인기 순위 조회
+      description: |
+        서비스별 인기 순위를 `TODAY`(가장 최근 스냅샷 하루) 또는 `WEEK`(최근 7일 스냅샷의 TMDB 인기도 평균)로 돌려준다. 비로그인 공개 API(요청 제한 적용).
+        순위는 TMDB `discover`(한국, 서비스 제공처 필터, 인기순)를 하루 한 번 받아 쌓은 일별 스냅샷으로 만든다. **TMDB 인기도 기준이며 OTT 공식 순위가 아니다**(`notice`에 화면 표기용 문구를 담는다). 서비스마다 영화·드라마를 합쳐 인기도 높은 순 상위 `limit`개이고, `ottServiceId`를 생략하면 7개 서비스 전체에서 같은 작품을 한 번만 세어 순위를 매긴다.
+        `WEEK`는 가장 최근 스냅샷 날짜까지 7일 범위에서 스냅샷이 있는 날 수(`daysCounted`)로 나눈 평균이고, 그날 상위권에 없던 작품은 그날을 0으로 센다(한 번 반짝 오른 작품이 부풀려지지 않는다). 공개 직후 7일 미만이면 `daysCounted`가 7보다 작다. `ottServiceId`를 지정하면 최신 날짜와 `daysCounted` 모두 그 서비스의 기록만으로 구한다(다른 서비스만 기록된 날은 세지 않는다). 동률이면 가장 최근 날 인기도, TMDB ID 순이다. 스냅샷이 하나도 없으면 `items`는 빈 배열, `snapshotDate`는 null이다(화면은 줄을 숨긴다).
+        작품 정보(`title`)는 우리 DB에 수집된 작품이면 서비스별 제공 상태(`availabilities`)가 채워지고, 아직 수집되지 않은 작품은 `availabilities`가 빈 배열이다(그런 작품의 상세는 `TITLE_NOT_FOUND`(404)일 수 있다).
+        응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `VALIDATION_FAILED`(400, `period` 값·`limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: period
+          in: query
+          description: 순위 기간. 기본 `TODAY`
+          required: false
+          schema:
+            $ref: '#/components/schemas/PopularityPeriod'
+        - name: ottServiceId
+          in: query
+          description: 서비스 내부 ID. 생략하면 7개 서비스 전체 순위
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          description: 돌려줄 순위 개수(기본 20, 최대 20)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 20
+            default: 20
+      responses:
+        '200':
+          description: 인기 순위
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePopularityRanking'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/wishlisted-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listWishlistedTitles
+      security: []
+      summary: 찜 많은 작품 조회
+      description: |
+        찜한 사용자 수가 많은 작품을 많은 순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        사용자 수는 작품 단위로 센다(드라마는 시즌을 여러 개 찜해도 한 명). "다 봤음"으로 체크한 찜은 세지 않고, **숫자만 노출**하며 누가 찜했는지는 알 수 없다. 사용자가 `minUserCount`명보다 적은 작품은 목록에서 뺀다(개인 식별 방지, 설정값 `app.home.min-wishlist-users`, 기본 3). 조건을 채운 작품이 없으면 `items`는 빈 배열이고 화면은 줄을 숨긴다.
+        동률이면 먼저 저장된 작품이 앞에 온다. `dataAsOf`는 제공 상태의 데이터 기준일(KST)이다.
+        오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: limit
+          in: query
+          description: 돌려줄 작품 수(기본 10, 최대 20)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 20
+            default: 10
+      responses:
+        '200':
+          description: 찜 많은 작품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseWishlistedTitleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/newly-available-titles:
+    get:
+      tags:
+        - catalog
+      operationId: listNewlyAvailableTitles
+      security: []
+      summary: 새로 볼 수 있게 된 작품 조회
+      description: |
+        최근 서비스에서 새로 볼 수 있게 된 작품을 최신순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        두 경우를 묶는다. (1) `ARRIVAL`(입고): 최근 14일 안에 제공 상태가 없음·모름에서 있음(AVAILABLE)으로 바뀐 기록이 있는 작품. (2) `RELEASE`(공개): 우리가 처음 수집하며 바로 있음으로 적재된 작품이지만 공개일(영화 개봉일, 드라마는 시즌 공개일)이 최근 30일 이내인 작품. 첫 적재인데 공개일을 모르면 제외한다.
+        `availableSince`는 `ARRIVAL`이면 있음으로 바뀐 것을 확인한 날(KST), `RELEASE`면 공개일이다. 실제 서비스에 들어온 날이 아니라 **우리가 확인한 범위**의 날짜다. 같은 작품이 같은 서비스에 여러 번 해당하면(예: 시즌 여러 개) 가장 최근 하나만 담는다.
+        `ottServiceId`를 주면 그 서비스만 돌려준다. 결과가 없으면 `items`는 빈 배열이다.
+        오류: `VALIDATION_FAILED`(400, `limit` 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: ottServiceId
+          in: query
+          description: 서비스 내부 ID. 생략하면 7개 서비스 전체
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: limit
+          in: query
+          description: 돌려줄 작품 수(기본 20, 최대 50)
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: 새로 볼 수 있게 된 작품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNewlyAvailableTitleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/genres:
+    get:
+      tags:
+        - catalog
+      operationId: listGenres
+      security: []
+      summary: 장르 목록 조회
+      description: |
+        탐색 화면의 장르 선택에 쓸 장르 목록이다. 우리 DB에 작품이 하나 이상 연결된 장르만 이름 가나다순으로 돌려준다. 비로그인 공개 API(요청 제한 적용). 응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 장르 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseGenreList'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/genres/{genreId}/titles:
+    get:
+      tags:
+        - catalog
+      operationId: listGenreTitles
+      security: []
+      summary: 장르별 작품 조회
+      description: |
+        장르(`genreId`)에 속한 작품을 인기도 높은 순으로 한 페이지 돌려준다. **우리 DB에 수집된 작품만** 대상이라 "7개 서비스에서 확인된 범위"이며 TMDB를 호출하지 않는다. 비로그인 공개 API(요청 제한 적용).
+        없는 `genreId`는 404가 아니라 빈 결과다. 페이지 크기 기본 20. 응답은 브라우저가 약 1분 캐시할 수 있다.
+        오류: `VALIDATION_FAILED`(400, 경로·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: genreId
+          in: path
+          description: TMDB 장르 ID(장르 목록 API의 `genreId`)
+          required: true
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 장르별 작품 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleExplorePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /public/people/titles:
+    get:
+      tags:
+        - catalog
+      operationId: listPersonTitles
+      security: []
+      summary: 인물(출연자)별 작품 조회
+      description: |
+        이름이 `name`과 같은(대소문자 구분 없음) 출연자가 나온 작품을 인기도 높은 순으로 한 페이지 돌려준다. 우리 DB에 저장된 출연진(작품당 출연 순서 상위 10명)만 조회하며 TMDB 인물 검색은 쓰지 않는다. 비로그인 공개 API(요청 제한 적용).
+        그래서 결과는 "7개 서비스에서 확인된 범위"이고, 같은 이름의 다른 사람이 섞일 수 있으며 출연 순서 10번째 밖의 출연작은 빠진다(화면이 안내 문구로 알린다).
+        오류: `VALIDATION_FAILED`(400, 이름 없음·page/size 범위 오류), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: name
+          in: query
+          description: 출연자 이름. 앞뒤 공백을 뺀 뒤 1자 이상
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 인물별 작품 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseTitleExplorePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== wishlist =====
+  /me/wishlist-items:
+    get:
+      tags:
+        - wishlist
+      operationId: listWishlistItems
+      security:
+        - bearerAuth: []
+      summary: 내 찜 목록 조회
+      description: |
+        내 찜을 최근에 찜한 순으로 전부 돌려준다. 드라마는 시즌 단위로 한 항목씩이다(R11-19).
+        "다 봤음" 항목(`watchedAt`이 있음)도 목록에 포함하되 `activeItemCount`에는 세지 않는다(PRD 11절 36번).
+        페이지네이션은 두지 않는다. 계산 대상 찜은 20개로 막히고, "다 봤음" 항목은 상한이 없지만 사용자가 직접 체크해야 늘어나 증가가 느리다. 많아져 문제가 되면 "다 봤음"만 따로 나눠 조회하는 API를 추가한다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 찜 목록과 현재 개수·상한
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseWishlistItemList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - wishlist
+      operationId: addWishlistItem
+      security:
+        - bearerAuth: []
+      summary: 찜 추가
+      description: |
+        작품(드라마는 시즌)을 찜한다. 새로 만들면 201, 같은 작품(시즌)이 이미 찜돼 있으면 새로 만들지 않고 기존 항목 ID와 함께 200을 준다(PRD FR-09 "중복 추가는 무시"). 중복이면 기존 우선순위·"다 봤음" 상태를 바꾸지 않는다(우선순위 변경은 PATCH).
+        드라마(`tv`)는 `seasonNumber`가 필수이고 영화(`movie`)는 `null`이어야 한다. 작품은 검색·상세 조회로 이미 저장된 것이어야 한다(찜 추가는 TMDB를 호출하지 않는다).
+        "다 봤음"이 아닌 찜이 이미 20개면 새로 추가할 수 없다(PRD 11절 36번). 이미 20개여도 중복 추가는 409가 아니라 200이다(PRD FR-09).
+        오류: `VALIDATION_FAILED`(400, 필드 누락·영화/드라마와 seasonNumber 불일치), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `TITLE_NOT_FOUND`(404, 작품 또는 시즌 없음), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWishlistItemRequest'
+      responses:
+        '200':
+          description: 이미 찜한 작품(시즌). 기존 항목 ID를 돌려준다
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAddWishlistItemResult'
+        '201':
+          description: 새로 찜함
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAddWishlistItemResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/wishlist-items/{wishlistItemId}:
+    patch:
+      tags:
+        - wishlist
+      operationId: updateWishlistItem
+      security:
+        - bearerAuth: []
+      summary: 찜 우선순위·"다 봤음" 변경
+      description: |
+        보낸 필드만 바꾼다(하나 이상 필요). `isWatched: true`면 "다 봤음"으로 표시해 `watchedAt`을 기록하고 계산에서 뺀다. `false`면 되돌린다. 이미 같은 상태면 그대로 둔다(이미 "다 봤음"인 항목에 `true`를 보내도 `watchedAt`은 처음 값 유지).
+        되돌릴 때 "다 봤음"이 아닌 찜이 이미 20개면 되돌릴 수 없다(PRD 11절 36번).
+        오류: `VALIDATION_FAILED`(400, 빈 요청·잘못된 값·경로 ID 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `WISHLIST_ITEM_NOT_FOUND`(404, 없거나 본인 찜이 아님), `WISHLIST_LIMIT_EXCEEDED`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/WishlistItemIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWishlistItemRequest'
+      responses:
+        '200':
+          description: 바뀐 찜 항목의 상태
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseUpdatedWishlistItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - wishlist
+      operationId: removeWishlistItem
+      security:
+        - bearerAuth: []
+      summary: 찜 삭제
+      description: |
+        찜을 삭제한다. 이미 없는 항목(또는 본인 것이 아닌 항목)도 오류 없이 204다(여러 번 해도 결과가 같다).
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/WishlistItemIdPath'
+      responses:
+        '204':
+          description: 삭제됨(본문 없음)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== user =====
+  /me:
+    delete:
+      tags:
+        - user
+      operationId: withdrawMe
+      security:
+        - bearerAuth: []
+      summary: 회원 탈퇴
+      description: |
+        로그인한 본인의 계정을 즉시 영구 삭제한다. 대기 기간이나 복구는 없다(PRD FR-07).
+        찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
+        서버는 그 사용자의 Refresh Token 계열을 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
+        요청 본문은 없다. Access Token은 만료(30분) 전이라도 탈퇴한 계정으로는 쓸 수 없다: 같은 토큰으로 다시 탈퇴하거나 설정 저장·찜 추가 같은 쓰기를 하면 사용자를 찾을 수 없어 `UNAUTHORIZED`이고, 내 설정 조회는 온보딩 전 상태(200)로 보인다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '204':
+          description: 탈퇴됨(본문 없음)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/settings:
+    get:
+      tags:
+        - user
+      operationId: getMySettings
+      security:
+        - bearerAuth: []
+      summary: 내 설정 조회
+      description: |
+        서비스별 이용 상태, 월 예산, 월 시청 시간을 조회한다. 온보딩 전이면 `isOnboardingDone: false`이고 나머지 값은 비어 있다(`subscriptions` 빈 배열, 나머지 `null`).
+        온보딩 뒤에는 `subscriptions`에 서비스 7개가 모두 온다. 미구독은 저장 행이 없으므로(PRD FR-08) 서버가 `NOT_SUBSCRIBED`로 채운다.
+        요금 화면(SCR-09)의 예산·시청 시간 요약도 이 API로 가져온다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 내 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseUserSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - user
+      operationId: updateMySettings
+      security:
+        - bearerAuth: []
+      summary: 내 설정 저장
+      description: |
+        설정 전체를 저장한다. 처음 저장하면 온보딩이 끝난 것으로 본다(`isOnboardingDone: true`).
+        시청 시간은 분 단위 결과(`monthlyWatchMinutes`)와 고른 방식(`watchPreset`)만 저장한다. "주 N회 × 회당 M시간" 환산 입력값은 저장하지 않는다(R11-18 A안).
+        `subscriptions`에 없는 서비스는 미구독으로 본다. `SUBSCRIBED`인데 `billingDay`가 `null`이면 1일로 저장한다(PRD FR-08 결제일 기본값 1일).
+        오류: `VALIDATION_FAILED`(400, 예산 음수·시청 시간 범위 밖·구독 중인데 요금제 이름 없음·구독 중이 아닌데 요금제 이름이나 결제일을 보냄·없는 서비스·같은 서비스 중복 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMySettingsRequest'
+      responses:
+        '200':
+          description: 저장된 내 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseUserSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== product (내 요금) =====
+  /me/service-prices:
+    get:
+      tags:
+        - product
+      operationId: listMyServicePrices
+      security:
+        - bearerAuth: []
+      summary: 내 서비스별 월 요금 조회
+      description: |
+        서비스별 기본 월 요금(관리자 등록), 내가 고친 금액, 계산에 쓰는 적용 금액, 그리고 요금 적용 시작일·마지막 확인일을 서비스 ID 순으로 돌려준다.
+        판매 중인 상품만 주며, 항목마다 `productId`가 있어 요금 수정·삭제 API가 이 값으로 상품을 정한다. 판매 중인 상품이 없는 서비스는 목록에서 빠진다. 판매 중이어도 현재 적용 중인 요금이 없는 상품(첫 요금 이력이 미래 등)은 목록에서 빠지며, 그 상품의 수정·삭제는 404 `SERVICE_PRICE_NOT_FOUND`다.
+        기본 월 요금은 오늘 적용 중인 월 구독요금 이력이다. 계산은 달마다 사용자 결제일에 적용 중인 요금을 쓰므로(PRD 11절 40번) 예정된 인상이 있으면 이후 달의 계산 금액과 다를 수 있다.
+        내가 고친 금액은 상품 단위로 저장된다(ERD `user_price_override`). 관리자가 상품을 판매 종료하고 새 상품을 등록하면 고친 금액은 새 상품에 이어지지 않는다.
+        마지막 확인일이 90일을 넘으면 화면이 "요금이 달라졌을 수 있어요" 안내를 붙인다(PRD 11절 41번).
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 서비스별 요금
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseServicePriceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/service-prices/{productId}:
+    put:
+      tags:
+        - product
+      operationId: setMyServicePrice
+      security:
+        - bearerAuth: []
+      summary: 내 월 요금 설정
+      description: |
+        이 상품의 월 요금을 내가 아는 금액으로 고친다(FR-11). 이후 계산은 이 금액을 쓴다(`priceSource: USER_OVERRIDE`). 관리자 요금표는 바뀌지 않는다.
+        상품 ID로 대상을 정하므로 한 서비스에 상품이 여러 개 생기는 2단계(광고형·번들)에도 이 주소는 바뀌지 않는다.
+        오류: `VALIDATION_FAILED`(400, 0원 미만·100만 원 초과·정수 아님), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetMyServicePriceRequest'
+      responses:
+        '200':
+          description: 바뀐 서비스 항목
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseServicePrice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - product
+      operationId: resetMyServicePrice
+      security:
+        - bearerAuth: []
+      summary: 내 월 요금 지우기(기본 요금으로 복귀)
+      description: |
+        내가 고친 금액을 지우고 기본 요금으로 되돌린다. 고친 금액이 없어도 204다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `SERVICE_PRICE_NOT_FOUND`(404, 요금을 고칠 수 있는 상품이 아님: 없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+      responses:
+        '204':
+          description: 기본 요금으로 되돌림(본문 없음)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== plan =====
+  /me/plan-drafts:
+    post:
+      tags:
+        - plan
+      operationId: createPlanDrafts
+      security:
+        - bearerAuth: []
+      summary: 플랜 계산(초안 3종 생성)
+      description: |
+        내 찜·설정·요금으로 3개월 플랜을 계산해 플랜 유형(`RECOMMENDED`·`SAVER`·`SIMPLE`)마다 초안(DRAFT)을 하나씩, 항상 3개 만든다. 기존 초안은 덮어쓴다. 요청 본문은 없다.
+        세 유형의 선택이 같으면 합쳐 보여 주는 것은 화면 몫이라 응답은 항상 3개다. `allSubscribeCost`·`savedAmount`는 세 유형이 같은 정의다(PRD 5.4, 11절 38번).
+        계산 선행 조건(월 예산·월 시청 시간 입력, "다 봤음"이 아닌 찜 1개 이상)을 채우지 않으면 400이다(PRD FR-10).
+        동기 처리다. 엔진은 순수 계산(CPU)이고 후보 조합이 상한을 넘으면 그리디로 바뀌어 시간이 묶이므로(TECH 1절, T-4) 응답 안에서 끝낸다. 같은 사용자의 동시 계산은 서버가 직렬화한다(TECH 2절).
+        회원 API라 요청 제한(429)은 두지 않는다. 남용이 보이면 사용자별 제한을 추가하고 이 operation에 429를 단다.
+        오류: `VALIDATION_FAILED`(400, 선행 조건 미충족), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '201':
+          description: 새로 만든 초안 3개
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanDraftList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      tags:
+        - plan
+      operationId: listPlanDrafts
+      security:
+        - bearerAuth: []
+      summary: 플랜 초안 조회
+      description: |
+        지금 있는 내 초안을 조회한다. 계산 전이거나 저장한 뒤(나머지 DRAFT 삭제)에는 `drafts`가 빈 배열이다.
+        계산 직후의 `POST /me/plan-drafts` 응답과 같은 내용·같은 순서(플랜 유형 `RECOMMENDED`·`SAVER`·`SIMPLE` 순)다. 상품 이름은 조회 시점의 이름이다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 초안 목록(없으면 빈 배열)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanDraftList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/plans/current:
+    get:
+      tags:
+        - plan
+      operationId: getCurrentPlan
+      security:
+        - bearerAuth: []
+      summary: 현재 플랜 조회
+      description: |
+        저장한 현재 플랜(ACTIVE)을 조회한다. 초안(`PlanDraft`)의 필드를 모두 담고 저장 시각(`activatedAt`)이 더해진다.
+        저장한 플랜이 없으면 404가 아니라 200이고 `plan`이 `null`이다(아직 저장 전인 사용자의 정상 상태다).
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 현재 플랜(없으면 `plan`이 null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCurrentPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/plans:
+    post:
+      tags:
+        - plan
+      operationId: createPlan
+      security:
+        - bearerAuth: []
+      summary: 플랜 저장(초안을 현재 플랜으로)
+      description: |
+        고른 초안(`planId`)을 ACTIVE로 저장한다. 기존 ACTIVE는 ARCHIVED가 되고 나머지 DRAFT는 삭제된다(TECH 2절).
+        초안을 계산한 뒤 데이터 수집이 새로 끝났으면 409 `PLAN_DRAFT_STALE`이고, 프론트는 다시 계산을 요청한다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `PLAN_DRAFT_NOT_FOUND`(404, 없음·본인 초안이 아님·이미 저장돼 DRAFT가 아님·다시 계산해 지워짐), `PLAN_DRAFT_STALE`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlanRequest'
+      responses:
+        '201':
+          description: 저장된 플랜
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseSavedPlan'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/plan-changes:
+    get:
+      tags:
+        - plan
+      operationId: listPlanChanges
+      security:
+        - bearerAuth: []
+      summary: 플랜 변경 내역 조회
+      description: |
+        매월 재계산으로 현재 플랜이 바뀐 기록을 최신순으로 최대 6건 돌려준다(Task 068·069). 직접 저장한 플랜은 기록하지 않는다.
+        기록은 두 플랜이 함께 다루는 달에서 구독 상품·요금이 달라졌거나 작품 자리가 바뀌었고, 그 이유(가격 변경·작품이 서비스에서 빠짐·작품이 서비스에 새로 들어옴·시청 체크)가 있을 때만 남는다.
+        기록이 없으면 404가 아니라 200이고 `items`가 빈 배열이다. 페이지 파라미터는 없다. 요약·이유 문장은 서버가 만들고, 서비스 이름은 서비스 목록 API(`listOttServices`)로 상품의 `ottServiceIds`와 작품 자리의 `ottServiceId`를 풀어 쓴다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 변경 내역(없으면 `items`가 빈 배열)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanChangeHistoryList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: OTT 구독상품·월 구독요금 =====
+  /admin/products:
+    get:
+      tags:
+        - admin
+      operationId: listAdminProducts
+      security:
+        - bearerAuth: []
+      summary: OTT 구독상품·월 구독요금 이력 조회
+      description: |
+        판매 종료 상품을 포함한 OTT 구독상품 전체와 각 상품의 월 구독요금 이력(적용 시작일이 빠른 순)을 돌려준다.
+        적용 종료일은 저장하지 않는다. 화면이 "다음 요금 이력 시작일의 전날"로 계산하고 가장 최근 요금 이력은 "계속"이다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: OTT 구독상품 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProductList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - admin
+      operationId: createAdminProduct
+      security:
+        - bearerAuth: []
+      summary: OTT 구독상품 등록
+      description: |
+        OTT 구독상품을 첫 월 구독요금과 함께 등록한다. 단품(`SINGLE`)은 서비스 1개, 번들(`BUNDLE`)은 서로 다른 서비스 2개 이상이다.
+        번들 구성은 등록할 때만 정하며 편집 API는 없다(판매를 끝내고 새로 등록한다). 판매 중 번들은 최대 13개다.
+        첫 요금 이력의 마지막 확인일은 오늘이고, 적용 시작일은 오늘 이하여야 한다.
+        오류: `VALIDATION_FAILED`(400, 이름 비어 있음·서비스 개수가 종류와 안 맞음·서비스 중복·없는 서비스·판매 중 번들 13개 초과·금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminProductRequest'
+      responses:
+        '201':
+          description: 등록된 OTT 구독상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProduct'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/products/{productId}:
+    patch:
+      tags:
+        - admin
+      operationId: updateAdminProduct
+      security:
+        - bearerAuth: []
+      summary: OTT 구독상품 이름·판매 여부 수정
+      description: |
+        보낸 필드만 바꾼다(하나 이상 필요). `isActive: false`는 판매 종료, `true`는 판매 재개다. 상품은 삭제하지 않는다(ERD).
+        `isLowCost`로 저가형 분류를 바꾼다. 번들 구성은 바꿀 수 없다. 판매 중 번들이 13개일 때 번들의 판매 재개는 거절한다.
+        오류: `VALIDATION_FAILED`(400, 빈 요청·이름 비어 있음·판매 중 번들 13개 초과), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminProductRequest'
+      responses:
+        '200':
+          description: 바뀐 OTT 구독상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProduct'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/products/{productId}/prices:
+    post:
+      tags:
+        - admin
+      operationId: addAdminProductPrice
+      security:
+        - bearerAuth: []
+      summary: 월 구독요금 이력 추가
+      description: |
+        월 구독요금 이력을 맨 뒤에 추가한다. 적용 시작일은 가장 최근 요금 이력의 시작일보다 늦어야 한다(지난 날짜는 허용하고 화면이 안내만 한다). 새 요금 이력의 마지막 확인일은 오늘이다.
+        응답은 바뀐 OTT 구독상품 전체다(화면이 목록 캐시를 바로 고칠 수 있게).
+        오류: `VALIDATION_FAILED`(400, 금액 범위 밖·날짜 형식 오류), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품), `PRICE_START_DATE_DUPLICATE`(409, 같은 시작일의 요금 이력이 이미 있음), `PRICE_START_DATE_NOT_AFTER_LAST`(409, 가장 최근 요금 이력 시작일보다 이르다), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductPriceRequest'
+      responses:
+        '201':
+          description: 요금 이력이 추가된 OTT 구독상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProduct'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/products/{productId}/prices/{priceId}:
+    patch:
+      tags:
+        - admin
+      operationId: updateAdminProductPrice
+      security:
+        - bearerAuth: []
+      summary: 마지막 월 구독요금 이력 수정
+      description: |
+        가장 최근 요금 이력만 고칠 수 있다. 금액을 고친 것은 확인한 것으로 보아 마지막 확인일도 오늘로 바뀐다.
+        시작일 규칙은 추가와 같다(바로 앞 요금 이력보다 늦어야 함). 요금 이력이 하나뿐이면 첫 요금 이력 규칙(시작일 오늘 이하)을 따른다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_NOT_LATEST`(409, 가장 최근 요금 이력이 아님), `PRICE_START_DATE_DUPLICATE`(409), `PRICE_START_DATE_NOT_AFTER_LAST`(409), `PRICE_FIRST_START_DATE_IN_FUTURE`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+        - $ref: '#/components/parameters/PriceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductPriceRequest'
+      responses:
+        '200':
+          description: 요금 이력이 수정된 OTT 구독상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProduct'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - admin
+      operationId: deleteAdminProductPrice
+      security:
+        - bearerAuth: []
+      summary: 마지막 월 구독요금 이력 삭제
+      description: |
+        가장 최근 요금 이력만 지울 수 있고, 요금 이력이 하나뿐이면 지울 수 없다. 성공하면 본문 없이 204이며 화면은 목록을 다시 조회한다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_LAST_ROW_CANNOT_DELETE`(409), `PRICE_NOT_LATEST`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+        - $ref: '#/components/parameters/PriceIdPath'
+      responses:
+        '204':
+          description: 삭제됨(본문 없음)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/products/{productId}/prices/{priceId}/verify:
+    post:
+      tags:
+        - admin
+      operationId: verifyAdminProductPrice
+      security:
+        - bearerAuth: []
+      summary: 월 구독요금 확인함
+      description: |
+        [요금 확인함] 동작이다. 금액은 그대로 두고 마지막 확인일만 오늘로 바꾼다. 요청 본문은 없다. 현재 적용 중인 요금만 확인할 수 있다(지난 요금 이력·예정 요금 이력은 불가).
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 상품·요금 이력), `PRICE_NOT_CURRENT`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProductIdPath'
+        - $ref: '#/components/parameters/PriceIdPath'
+      responses:
+        '200':
+          description: 확인일이 바뀐 OTT 구독상품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProduct'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 제공처 매핑 =====
+  /admin/providers:
+    get:
+      tags:
+        - admin
+      operationId: listAdminProviders
+      security:
+        - bearerAuth: []
+      summary: TMDB 제공처 매핑 목록 조회
+      description: |
+        수집 중 발견한 TMDB 제공처 전체(미매핑·관련 없음 포함)를 돌려준다. 미매핑을 먼저, 그다음 제공처 번호 순으로 정렬해 내려준다. 매핑 변경은 다음 수집부터 반영된다.
+        관리자(ADMIN) Access Token으로만 호출할 수 있다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 제공처 목록
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProviderList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/providers/{providerId}:
+    patch:
+      tags:
+        - admin
+      operationId: updateAdminProvider
+      security:
+        - bearerAuth: []
+      summary: 제공처 매핑 변경
+      description: |
+        매핑 상태·연결 서비스·등급을 저장한다. 변경은 다음 수집부터 반영되며 이미 저장된 제공 상태는 바뀌지 않는다. `MAPPED`면 `ottServiceId`가 필수이고, `UNMAPPED`·`IGNORED`면 `ottServiceId`는 `null`이며 등급은 `STANDARD`로 저장된다.
+        오류: `VALIDATION_FAILED`(400, MAPPED인데 서비스 없음·없는 서비스·providerId가 1 미만 등), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 제공처), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ProviderIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminProviderRequest'
+      responses:
+        '200':
+          description: 바뀐 제공처
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminProvider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 수집 (배치 토큰 범위 /admin/collect/**, TECH 3절) =====
+  /admin/collect/executions:
+    get:
+      tags:
+        - admin
+      operationId: listCollectExecutions
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 수집 실행 이력 조회
+      description: |
+        수집 실행 이력을 대상 날짜 내림차순, 같으면 실행 ID 내림차순으로 돌려준다(Task 029 화면 정렬). 서버가 멈춰 기록만 "실행 중"으로 남은 실행은 서버가 `STOPPED`로 판정해 내려준다(저장하지 않고 조회할 때마다 판정한다).
+        페이지네이션 응답이다. 수집은 매일 1회 이상 돌고 Spring Batch 메타데이터는 지우지 않으므로 이력이 계속 늘어난다.
+        관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다(배치 토큰은 `/admin/collect/**`에서만 유효, TECH 4절).        오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401, 배치 토큰이 없거나 틀림), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 실행 이력 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCollectExecutionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - admin
+      operationId: createCollectExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 수집 실행 요청
+      description: |
+        수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 결과는 실행 이력에서 본다. 관리자 화면과 GitHub Actions cron(관리자 배치 토큰)이 함께 쓴다(TECH 3절).
+        `tier`는 `ALL`(전체 일괄), `DAILY`(찜한 작품만 매일 갱신), `WEEKLY`(후보 발견 + 나머지 작품 주 1회 갱신)를 받는다. 모든 tier는 시작할 때 찜 현황에 맞춰 작품의 갱신 주기(`refresh_tier`)를 먼저 다시 맞춘다. `DAILY`는 제공처 목록·후보 발견을 건너뛰고 `refresh_tier=DAILY` 작품의 상세·제공 상태 판정만, `WEEKLY`는 전체 흐름을 돌되 상세·판정 대상이 `refresh_tier=WEEKLY` 작품이다. `ALL`은 모든 작품이다. `DAILY`·`WEEKLY`·`ALL`은 서로 다른 실행(날짜가 같아도 따로 완료·중복 판정)이고 동시에 돌지 못한다. `targetDate`를 비우면 오늘(KST)이다. 날짜를 직접 지정하는 것은 설정 키 `app.collect.allow-target-date-override`가 true인 환경(로컬)에서만 허용하고(오늘 이하), 운영에서는 오늘(KST)만 받으며 다른 날짜를 보내면 400이다(TECH 3절 "무료 기간과 Hobby 전환 이후").
+        수집은 전체에서 동시에 하나만 돈다. 같은 날짜·범위가 실행 중이면 물론 다른 날짜가 실행 중이어도, 매월 재계산이나 데이터 정리가 실행 중일 때도 `BATCH_ALREADY_RUNNING`(409)이다(끝난 뒤 다시 요청). 같은 날짜·범위의 상태(실행 중·중단됨·완료)를 먼저 보고, 그 뒤에 다른 실행이 도는지 본다.
+        선택 값 `scope`(`AVAILABILITY_TV`)를 주면 후보·상세 Step을 건너뛰고 드라마 시즌 제공 상태 판정 Step만 실행한다(이미 모은 데이터에 새 판정 규칙을 다시 적용할 때). `targetDate`처럼 로컬에서만 받고 운영에서는 400(`fieldErrors.scope`)이다. 중복·재시작 판정은 날짜·범위·scope가 같은 실행끼리만 한다(같은 날짜에 전체 수집이 완료돼도 scope 실행은 새로 시작된다).
+        같은 날짜·범위의 마지막 실행이 실패(`FAILED`)면 새 실행으로 다시 시작해 202다(Spring Batch는 같은 식별 파라미터로 시작하면 실패한 인스턴스를 재시작한다, TECH 3절 "실패한 실행은 같은 파라미터로 restart").
+        오류: `VALIDATION_FAILED`(400, 본문 값 변환 실패(날짜 형식·모르는 `tier`·`scope` 값)와 미래 날짜·운영에서 오늘이 아닌 날짜는 `fieldErrors`로 필드를 알린다. 모르는 `tier`는 `fieldErrors.tier`, 운영에서 `scope`를 지정하면 `fieldErrors.scope`), `INVALID_REQUEST`(400, 깨진 JSON처럼 필드를 특정할 수 없는 경우만), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중이거나 매월 재계산·데이터 정리가 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409, 같은 날짜·범위의 중단된 실행을 먼저 복구해야 함), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCollectExecutionRequest'
+      responses:
+        '202':
+          description: 실행 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCollectExecutionAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/collect/executions/{executionId}/changes:
+    get:
+      tags:
+        - admin
+      operationId: listCollectExecutionChanges
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 실행별 제공 상태가 바뀐 작품 조회
+      description: |
+        이 실행에서 제공 상태가 바뀐 건(시청 단위 × 서비스, ERD `availability_change`)을 제목 순, 같으면 시즌 번호·서비스 ID 순으로 돌려준다. 끝나지 않은 실행은 빈 페이지일 수 있다.
+        페이지네이션 응답이다. 첫 전체 수집은 모든 작품이 "처음 확인됨"이라 한 실행에 수천~수만 건이 생길 수 있다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·page/size 범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ExecutionIdPath'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 바뀐 작품 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCollectExecutionChangePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/collect/executions/{executionId}/recover:
+    post:
+      tags:
+        - admin
+      operationId: recoverCollectExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 중단된 실행을 실패로 복구
+      description: |
+        `STOPPED`(중단됨) 실행을 `FAILED`로 바꾸고 바뀐 실행을 돌려준다(TECH 3절). 요청 본문은 없다. 언제 멈췄는지 알 수 없어 `endedAt`은 `null`로 두고 `failureReason`은 고정 문구다.
+        응답의 `canRestart`로 이어서 재시작할 수 있는지(`restartCollectExecution`) 바로 알 수 있다.
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_NOT_STOPPED`(409, 중단된 실행이 아님), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ExecutionIdPath'
+      responses:
+        '200':
+          description: 실패로 바뀐 실행
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCollectExecution'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /admin/collect/executions/{executionId}/restart:
+    post:
+      tags:
+        - admin
+      operationId: restartCollectExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 실패한 실행을 새 실행으로 재시작
+      description: |
+        `FAILED` 실행을 같은 대상 날짜·범위로 다시 실행한다. 요청 본문은 없다. 새 실행으로 접수해 202와 새 `executionId`를 돌려주고, 실패 기록은 이력에 남는다.
+        실패가 아닌 실행은 그 날짜·범위의 현재 상태에 맞는 코드로 거절한다: 실행 중이면 `BATCH_ALREADY_RUNNING`, 완료면 `BATCH_ALREADY_COMPLETED`, 중단됨이면 `BATCH_RECOVERY_REQUIRED`(먼저 복구). 그래서 "실패한 실행이 아님" 전용 코드는 두지 않는다. 같은 날짜·범위에 더 나중 실행이 있으면 그 실행의 상태로 판단한다.
+        운영 환경에서는 그 실행의 대상 날짜가 오늘(KST)이 아니면 거절한다. 다른 날짜·범위의 수집이 실행 중이어도 시작할 수 없다(전체 동시 실행 금지).
+        오류: `VALIDATION_FAILED`(400, 경로 값 형식 오류·운영에서 대상 날짜가 오늘이 아님), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 실행), `BATCH_ALREADY_RUNNING`(409, 같은 날짜·범위 또는 다른 날짜의 수집이 실행 중이거나 매월 재계산·데이터 정리가 실행 중), `BATCH_ALREADY_COMPLETED`(409), `BATCH_RECOVERY_REQUIRED`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/ExecutionIdPath'
+      responses:
+        '202':
+          description: 재시작 접수됨(새 실행)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseCollectExecutionAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 매월 재계산 (배치 토큰 범위 /admin/plans/monthly/**, TECH 4절) =====
+  /admin/plans/monthly/executions:
+    post:
+      tags:
+        - admin
+      operationId: createPlanRecalcExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 매월 재계산 수동 실행 요청
+      description: |
+        매월 재계산 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 재계산은 수집이 끝나면 자동으로 이어 돌고, 이 API는 자동 실행이 실패했을 때 관리자가 다시 돌리는 복구용이다. 요청 본문은 없다.
+        재계산·수집·데이터 정리 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다. 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+      responses:
+        '202':
+          description: 실행 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanRecalcExecutionAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 데이터 정리 (배치 토큰 범위 /admin/retention/**, TECH 4절) =====
+  /admin/retention/executions:
+    post:
+      tags:
+        - admin
+      operationId: createRetentionExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 데이터 정리 실행 요청
+      description: |
+        데이터 정리 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. GitHub Actions cron이 주 1회 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
+        하는 일은 세 가지다. (1) 마지막 수집이 5개월을 넘은 작품을 TMDB에 다시 물어 있으면 갱신하고, TMDB가 없다고 답한(404) 작품은 찜·플랜과 함께 삭제한다(한 번에 가장 오래된 순 최대 500건, 나머지는 다음 실행). 사라진 작품이 든 현재 플랜은 찜을 뺀 채 다시 계산하고, 저장 전 초안과 보관 플랜은 통째로 지운다. 찜이 그 작품뿐이라 다시 계산할 수 없는 현재 플랜도 지운다. (2) 180일이 지난 배치 실행 이력을 지운다. (3) 180일이 지난, 플랜과 연결이 끊긴 계산 기록(`calc_run`)을 지운다.
+        정리·재계산·수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 정리 실행 중에는 수집·재계산 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+      responses:
+        '202':
+          description: 실행 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseRetentionExecutionAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 인기 순위 수집 (배치 토큰 범위 /admin/popularity/**, Task 107) =====
+  /admin/popularity/executions:
+    post:
+      tags:
+        - admin
+      operationId: createPopularityExecution
+      security:
+        - bearerAuth: []
+        - adminBatchToken: []
+      summary: 인기 순위 수집 실행 요청
+      description: |
+        인기 순위 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 하루 1회 GitHub Actions cron이 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
+        하는 일: 서비스 7곳 × 영화·드라마별로 TMDB `discover`(한국, 서비스 제공처 필터, 인기순) 첫 쪽(상위 20개)을 받아 오늘(KST) 날짜의 인기 스냅샷으로 저장한다(약 14번 호출). 같은 날 다시 실행하면 그 날짜의 스냅샷을 덮어쓰고(중복 행이 쌓이지 않는다), 14일이 지난 스냅샷은 지운다. 한 서비스·매체의 호출이 실패하면 그 조각만 건너뛰고 나머지는 저장한다(건너뛴 조각의 이전 스냅샷은 그대로 남는다).
+        수집·재계산·정리·인기 수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 인기 수집 실행 중에는 수집·재계산·정리 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
+      responses:
+        '202':
+          description: 실행 접수됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePopularityExecutionAccepted'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/plan-benchmarks:
+    post:
+      tags:
+        - admin
+      operationId: createPlanBenchmark
+      security:
+        - bearerAuth: []
+      summary: 완전탐색·그리디 비교 측정 실행
+      description: |
+        정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.
+        요청 본문은 없다. 같은 입력으로 다시 호출하면 행이 더 쌓이고, 같은 `inputHash`에 EXACT·GREEDY 두 행이 함께 있다. 기록의 `plan_id`는 NULL, 플랜 유형은 추천형이다.
+        ADMIN만 호출할 수 있고 배치 토큰은 허용하지 않는다. 수 초 걸리는 CPU 작업이라 응답이 느리다.
+        완전탐색이 후보 조합 수 상한을 넘어 건너뛰어진 케이스는 저장하지 않고 `skippedCaseNames`에 이름을 담는다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500, 정답 세트를 못 읽음·반복 결과가 서로 다름).
+      responses:
+        '201':
+          description: 측정 결과(저장된 calc_run 행 포함)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanBenchmark'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== auth =====
+  /auth/refresh:
+    post:
+      tags:
+        - auth
+      operationId: refreshAccessToken
+      security: []
+      summary: Access Token 재발급
+      description: |
+        Refresh Token(HttpOnly 쿠키 `rt`)으로 새 Access Token과 사용자 권한(`role`)을 발급한다. 요청 본문은 없다. Refresh Token은 재발급 때 회전하며(새 쿠키, 수명은 그때부터 다시 14일), 응답 본문에는 담지 않는다(TECH 4절).
+        직전 Refresh Token이 10초 안에 다시 오면(동시 요청·응답 유실) 회전 없이 Access Token만 발급한다(새 쿠키를 내리지 않는다). 유예가 지난 직전 토큰을 재사용하면 해당 계열을 무효화하고 401이다. 실패한 401 응답은 쿠키를 지운다.
+        CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다(회전 전에 검사). 인증 경로도 공개 API와 같은 요청 제한을 받는다(`.claude/rules/backend.md`).
+        오류: `UNAUTHORIZED`(401, 쿠키 없음·만료·무효·재사용 감지), `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500, Redis 장애 포함).
+      responses:
+        '200':
+          description: 새 Access Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/logout:
+    post:
+      tags:
+        - auth
+      operationId: logout
+      security: []
+      summary: 로그아웃
+      description: |
+        Refresh Token(HttpOnly 쿠키 `rt`)의 계열을 서버에서 폐기하고(현재 기기만) 쿠키를 지운다. 요청 본문은 없다. 쿠키가 없거나 이미 무효여도 204다.
+        Access Token은 요구하지 않는다. 폐기 대상은 쿠키의 Refresh Token이고, Access Token이 만료된 뒤에도 재발급 없이 로그아웃할 수 있어야 하기 때문이다. Access Token은 서버에 저장하지 않으므로 수명(30분)이 끝날 때까지 유효하고, 프론트가 메모리에서 지운다(TECH 4절).
+        CSRF 방지를 위해 `Origin`이 프론트 주소와 같아야 한다. 인증 경로도 공개 API와 같은 요청 제한을 받는다.
+        오류: `FORBIDDEN`(403, Origin 불일치), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      responses:
+        '204':
+          description: 로그아웃됨(본문 없음)
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     bearerAuth:
@@ -55,6 +1463,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Access Token(JWT). Refresh Token은 HttpOnly 쿠키로 관리되며 계약에 노출하지 않는다.
+    adminBatchToken:
+      type: http
+      scheme: bearer
+      description: |
+        관리자 배치 토큰(`ADMIN_BATCH_TOKEN`, JWT 아님). GitHub Actions cron이 `Authorization: Bearer`로 보낸다. 별도 필터가 상수 시간 비교로 검사하고 `/admin/collect/**`, `/admin/plans/monthly/**`, `/admin/retention/**`, `/admin/popularity/**`에서만 유효하다(TECH 4절). 관리자 Access Token(JWT)과는 OR 관계다(둘 중 하나만 맞으면 통과한다).
+        cron은 Vercel을 거치지 않고 백엔드에 직접 호출하므로 오리진 비밀 헤더(`x-origin-secret`)도 함께 보낸다(TECH 3절). 이 헤더는 인프라 경계 검사라 operation 파라미터로 적지 않는다.
   parameters:
     PageParam:
       name: page
@@ -77,9 +1491,71 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    MediaTypePath:
+      name: mediaType
+      in: path
+      description: 작품 구분(`movie` 영화 / `tv` 드라마). TMDB는 둘의 ID 공간이 달라 `tmdbId`와 함께 써야 작품이 정해진다
+      required: true
+      schema:
+        $ref: '#/components/schemas/MediaType'
+    TmdbIdPath:
+      name: tmdbId
+      in: path
+      description: TMDB 작품 ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 2147483647
+    WishlistItemIdPath:
+      name: wishlistItemId
+      in: path
+      description: 찜 항목 ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    ProductIdPath:
+      name: productId
+      in: path
+      description: OTT 구독상품 ID(내 요금 목록·관리자 상품 목록의 `productId`)
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    PriceIdPath:
+      name: priceId
+      in: path
+      description: 월 구독요금 이력 ID
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    ProviderIdPath:
+      name: providerId
+      in: path
+      description: TMDB 제공처 ID(그대로 PK)
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+    ExecutionIdPath:
+      name: executionId
+      in: path
+      description: 수집 실행 ID(Spring Batch jobExecutionId)
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
   responses:
     BadRequest:
-      description: 요청 값 오류. `errorCode`는 `VALIDATION_FAILED`이며 `fieldErrors`에 필드별 오류가 담긴다
+      description: 요청 값 오류. 필드를 특정할 수 있으면 `VALIDATION_FAILED`(`fieldErrors`에 필드별 오류), 깨진 본문처럼 특정할 수 없으면 `INVALID_REQUEST`
       content:
         application/problem+json:
           schema:
@@ -96,8 +1572,20 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/ProblemDetail'
+    NotFound:
+      description: 요청한 데이터가 없음. `errorCode`는 operation 설명 참고(사용자 API는 도메인 코드 `TITLE_NOT_FOUND`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`(요금을 고칠 수 있는 상품이 아님. 없는 상품이거나 판매 종료)·`PLAN_DRAFT_NOT_FOUND`·`OTT_SERVICE_NOT_FOUND`(없는 서비스 ID), 관리자 API의 없는 데이터는 `RESOURCE_NOT_FOUND`)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Conflict:
+      description: 현재 상태와 충돌해 처리할 수 없음. `errorCode`는 operation 설명 참고
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
     TooManyRequests:
-      description: 요청 제한 초과(비로그인 공개 API). `errorCode`는 `RATE_LIMIT_EXCEEDED`
+      description: 요청 제한 초과(비로그인 공개 API). `errorCode`는 `RATE_LIMIT_EXCEEDED`. `Retry-After` 헤더에 다시 시도할 수 있을 때까지의 초가 담긴다
       content:
         application/problem+json:
           schema:
@@ -307,3 +1795,2957 @@ components:
             logoPath: /bP0TPAhxmSdIthEWbzdI1NQB4C2.png
             displayOrder: 7
             dataQuality: INSUFFICIENT
+
+    # ----- 공통 enum·작은 객체 (여러 응답이 함께 쓴다) -----
+    MediaType:
+      type: string
+      description: |
+        작품 구분. **enum UPPER_SNAKE_CASE 규칙의 예외**로 소문자다. 작품 경로 `/public/titles/{mediaType}/{tmdbId}`(api-contract.md가 정한 형태, 예 `/api/public/titles/movie/999`)와 본문 값을 같게 두어 프론트가 응답 값으로 바로 상세 경로를 만들게 하려는 것이다. TMDB 경로 표기와도 같다.
+        DB(`title.media_type`)는 MOVIE/TV 대문자로 저장하고 API 경계에서 바꾼다(백엔드 구현: Jackson 직렬화 값과 경로 변수 변환기 둘 다 소문자로 맞춘다).
+      enum:
+        - movie
+        - tv
+    WishlistPriority:
+      type: string
+      description: 찜 우선순위. MUST 꼭 볼 작품 / WANT 보고 싶음 / MAYBE 여유될 때 (PRD FR-09)
+      enum:
+        - MUST
+        - WANT
+        - MAYBE
+    AvailabilityStatus:
+      type: string
+      description: 서비스의 구독(정액제) 제공 상태. AVAILABLE 있음 / NOT_AVAILABLE 없음 / UNKNOWN 모름 (ERD availability.status)
+      enum:
+        - AVAILABLE
+        - NOT_AVAILABLE
+        - UNKNOWN
+    ServiceAvailability:
+      type: object
+      description: 서비스 하나의 제공 상태. 서비스 이름은 서비스 목록 API에서 `ottServiceId`로 찾는다
+      required:
+        - ottServiceId
+        - status
+      properties:
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 서비스 내부 ID
+        status:
+          $ref: '#/components/schemas/AvailabilityStatus'
+      example:
+        ottServiceId: 1
+        status: AVAILABLE
+    ServiceSubscriptionStatus:
+      type: string
+      description: |
+        서비스 이용 상태. SUBSCRIBED 구독 중 / FREE 가족 공유 등 무료 이용 / NOT_SUBSCRIBED 미구독 / UNKNOWN 잘 모르겠음.
+        UNKNOWN도 저장한다. 설정을 다시 열면 고른 값 그대로 보인다. 계산에서는 NOT_SUBSCRIBED와 같이 취급한다(볼 수 있는 서비스로 세지 않음). ERD `user_subscription` 상태 값에 `UNKNOWN`이 있다(ERD v0.4에 반영됨).
+      enum:
+        - SUBSCRIBED
+        - FREE
+        - NOT_SUBSCRIBED
+        - UNKNOWN
+    PriceSource:
+      type: string
+      description: 금액 출처. ADMIN 기본 요금(관리자 등록) / USER_OVERRIDE 사용자 수정 / ALREADY_PAID 이미 결제(이번 달 비용 제외) / FREE 무료 이용(비용 제외) (ERD plan_month_product.price_source)
+      enum:
+        - ADMIN
+        - USER_OVERRIDE
+        - ALREADY_PAID
+        - FREE
+    WatchPreset:
+      type: string
+      description: 월 시청 시간을 고른 방식. LIGHT 8시간 / NORMAL 15시간 / HEAVY 30시간 / CUSTOM 직접 입력(환산 포함) (PRD 5.4)
+      enum:
+        - LIGHT
+        - NORMAL
+        - HEAVY
+        - CUSTOM
+    OverviewLanguage:
+      type: string
+      description: 줄거리 언어. 한국어 줄거리가 없으면 영어로 대체한다(PRD FR-03). **enum 대문자 규칙의 예외**로 ISO 639-1 언어 코드 관례대로 소문자이며 DB(`title.overview_lang`) 값과 같다
+      enum:
+        - ko
+        - en
+    PlanType:
+      type: string
+      description: 플랜 유형. RECOMMENDED 추천형 / SAVER 절약형 / SIMPLE 간편형 (PRD 11절 35번)
+      enum:
+        - RECOMMENDED
+        - SAVER
+        - SIMPLE
+    PlanStatus:
+      type: string
+      description: 플랜 상태. DRAFT 계산 결과 / ACTIVE 저장한 현재 플랜 / ARCHIVED 지난 플랜 (ERD plan.status)
+      enum:
+        - DRAFT
+        - ACTIVE
+        - ARCHIVED
+    PlanAlgorithm:
+      type: string
+      description: 계산 방식. EXACT 완전탐색 / GREEDY 그리디 (ERD plan.algorithm)
+      enum:
+        - EXACT
+        - GREEDY
+    UnscheduledReason:
+      type: string
+      description: 3개월 안에 배정하지 못한 이유. BUDGET 예산 부족 / TIME 시청 시간 초과(시즌 순서 때문에 밀린 경우 포함) / UNKNOWN 제공처 정보 없음 / NO_PROVIDER 7개 서비스에 없음 (ERD plan_item.reason)
+      enum:
+        - BUDGET
+        - TIME
+        - UNKNOWN
+        - NO_PROVIDER
+    ProductType:
+      type: string
+      description: OTT 구독상품 종류. SINGLE 단품(서비스 1개) / BUNDLE 번들(서비스 2개 이상)
+      enum:
+        - SINGLE
+        - BUNDLE
+    ProviderTier:
+      type: string
+      description: 제공처 요금제 등급. STANDARD 일반 / AD 광고형 (ERD tmdb_provider.tier)
+      enum:
+        - STANDARD
+        - AD
+    ProviderMappingState:
+      type: string
+      description: 제공처 매핑 상태. UNMAPPED 미매핑 / MAPPED 서비스에 연결됨 / IGNORED 관련 없음
+      enum:
+        - UNMAPPED
+        - MAPPED
+        - IGNORED
+    CollectExecutionStatus:
+      type: string
+      description: |
+        수집 실행 상태. RUNNING 실행 중 / COMPLETED 완료 / FAILED 실패 / STOPPED 중단됨(서버가 멈춰 기록만 실행 중으로 남은 실행을 서버가 판정).
+        Spring Batch `BatchStatus`를 그대로 내보내지 않는다. 이 `STOPPED`는 Batch의 STOPPED(정상 정지)와 뜻이 다르며, 메타데이터는 실행 중인데 지금 서버에서 돌고 있지 않은 실행이다. Batch 상태와의 대응은 다음과 같다.
+        - RUNNING: Batch 상태가 STARTING·STARTED·STOPPING이고 이번 서버 기동 뒤에 만들어진 실행
+        - STOPPED: 같은 상태(STARTING·STARTED·STOPPING)인데 이번 서버 기동 전에 만들어진 실행. 저장하지 않고 조회할 때마다 서버 기동 시각과 비교해 판정한다
+        - FAILED: Batch의 FAILED(복구한 실행 포함)와 그 밖의 상태(Batch의 STOPPED·ABANDONED 등)
+        - COMPLETED: Batch의 COMPLETED
+      enum:
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - STOPPED
+    CollectTier:
+      type: string
+      description: 수집 범위(TECH 3절). ALL 전체 일괄(수동 전체 실행), DAILY 찜한 작품만(후보 발견 생략), WEEKLY 후보 발견 + 나머지 작품(Task 077)
+      enum:
+        - ALL
+        - DAILY
+        - WEEKLY
+    CollectScope:
+      type: string
+      description: 수집 Job의 일부 Step만 실행하는 범위. AVAILABILITY_TV는 후보·상세 Step을 건너뛰고 드라마 시즌 제공 상태 판정 Step만 실행한다(이미 모은 데이터에 새 판정 규칙을 다시 적용할 때). 로컬 프로필에서만 받는다
+      enum:
+        - AVAILABILITY_TV
+
+    # ----- catalog -----
+    TitleSearchItem:
+      type: object
+      description: 검색 결과의 작품 하나
+      required:
+        - mediaType
+        - tmdbId
+        - title
+        - releaseYear
+        - posterPath
+        - availabilities
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID. `mediaType`과 함께 작품을 정한다
+        title:
+          type: string
+          description: 한국어 제목
+        releaseYear:
+          type: integer
+          format: int32
+          nullable: true
+          description: 개봉(첫 방영) 연도. 모르면 null
+        posterPath:
+          type: string
+          nullable: true
+          description: TMDB 포스터 상대 경로. 없으면 null(화면은 "포스터 없음" 표시)
+        availabilities:
+          type: array
+          description: 서비스별 제공 상태(7개). 드라마는 시즌 중 하나라도 제공되면 AVAILABLE
+          items:
+            $ref: '#/components/schemas/ServiceAvailability'
+    TitleSearchPage:
+      description: 검색 결과 한 페이지(페이지네이션 고정 형태 + 수집 실패 여부·데이터 기준일)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - isExternalCollectFailed
+            - dataAsOf
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 작품들(없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/TitleSearchItem'
+            isExternalCollectFailed:
+              type: boolean
+              description: 외부(TMDB) 수집이 실패해 저장된 결과(DB)만 보여 주는지
+            dataAsOf:
+              type: string
+              format: date
+              description: 제공 상태의 데이터 기준일
+    CommonResponseTitleSearchPage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TitleSearchPage'
+      example:
+        success: true
+        data:
+          content:
+            - mediaType: movie
+              tmdbId: 496243
+              title: 기생충
+              releaseYear: 2019
+              posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+              availabilities:
+                - { ottServiceId: 1, status: NOT_AVAILABLE }
+                - { ottServiceId: 2, status: NOT_AVAILABLE }
+                - { ottServiceId: 3, status: UNKNOWN }
+                - { ottServiceId: 4, status: AVAILABLE }
+                - { ottServiceId: 5, status: AVAILABLE }
+                - { ottServiceId: 6, status: AVAILABLE }
+                - { ottServiceId: 7, status: UNKNOWN }
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          isExternalCollectFailed: false
+          dataAsOf: '2026-10-08'
+    CastMember:
+      type: object
+      description: 출연진 한 명
+      required:
+        - name
+        - character
+      properties:
+        name:
+          type: string
+          description: 배우 이름
+        character:
+          type: string
+          nullable: true
+          description: 배역 이름. 모르면 null
+    TitleSeason:
+      type: object
+      description: 드라마의 시즌 하나(찜의 단위)
+      required:
+        - seasonNumber
+        - name
+        - episodeCount
+        - airYear
+        - totalRuntimeMin
+        - isRuntimeEstimated
+        - availabilities
+      properties:
+        seasonNumber:
+          type: integer
+          format: int32
+          description: 시즌 번호
+        name:
+          type: string
+          description: 시즌 이름(예 "시즌 1")
+        episodeCount:
+          type: integer
+          format: int32
+          description: 회차 수
+        airYear:
+          type: integer
+          format: int32
+          nullable: true
+          description: 방영 연도. 모르면 null
+        totalRuntimeMin:
+          type: integer
+          format: int32
+          description: 시즌 총 시청 시간(분). 방영된 회차 러닝타임의 합
+        isRuntimeEstimated:
+          type: boolean
+          description: TMDB 러닝타임이 비어 기본값으로 추정했는지("추정" 표시)
+        availabilities:
+          type: array
+          description: 시즌별 서비스 제공 상태(7개)
+          items:
+            $ref: '#/components/schemas/ServiceAvailability'
+    TitleDetail:
+      type: object
+      description: 작품 상세
+      required:
+        - mediaType
+        - tmdbId
+        - title
+        - originalTitle
+        - posterPath
+        - overview
+        - overviewLang
+        - genres
+        - releaseDate
+        - runtimeMin
+        - isRuntimeEstimated
+        - cast
+        - availabilities
+        - seasons
+        - dataAsOf
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID
+        title:
+          type: string
+          description: 한국어 제목
+        originalTitle:
+          type: string
+          description: 원제
+        posterPath:
+          type: string
+          nullable: true
+          description: TMDB 포스터 상대 경로. 없으면 null
+        overview:
+          type: string
+          nullable: true
+          description: 줄거리. 없으면 null
+        overviewLang:
+          allOf:
+            - $ref: '#/components/schemas/OverviewLanguage'
+          nullable: true
+          description: overview의 언어. overview가 null이면 null
+        genres:
+          type: array
+          description: 장르 이름들
+          items:
+            type: string
+        releaseDate:
+          type: string
+          format: date
+          nullable: true
+          description: 개봉일(영화) 또는 첫 방영일(드라마). 모르면 null
+        runtimeMin:
+          type: integer
+          format: int32
+          nullable: true
+          description: 영화 러닝타임(분). 드라마는 null(시즌별 총 시간을 쓴다)
+        isRuntimeEstimated:
+          type: boolean
+          description: runtimeMin이 추정값인지("추정" 표시). 드라마는 false
+        cast:
+          type: array
+          description: 주요 출연진(상위 10명)
+          items:
+            $ref: '#/components/schemas/CastMember'
+        availabilities:
+          type: array
+          description: 작품 전체 서비스별 제공 상태(7개). 드라마는 시즌 중 하나라도 제공되면 AVAILABLE
+          items:
+            $ref: '#/components/schemas/ServiceAvailability'
+        seasons:
+          type: array
+          description: 드라마의 시즌들(시즌 번호 순). 영화는 빈 배열
+          items:
+            $ref: '#/components/schemas/TitleSeason'
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일
+    CommonResponseTitleDetail:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TitleDetail'
+      example:
+        success: true
+        data:
+          mediaType: tv
+          tmdbId: 93405
+          title: 오징어 게임
+          originalTitle: 오징어 게임
+          posterPath: /dDlEmu3EZ0Pgg93K2SVNLCjCSvE.jpg
+          overview: 거액의 상금이 걸린 의문의 서바이벌에 참가한 사람들이 목숨을 걸고 어린 시절의 놀이에 도전하는 이야기다.
+          overviewLang: ko
+          genres:
+            - 드라마
+            - 액션&어드벤처
+            - 미스터리
+          releaseDate: '2021-09-17'
+          runtimeMin: null
+          isRuntimeEstimated: false
+          cast:
+            - { name: 이정재, character: null }
+            - { name: 박해수, character: null }
+          availabilities:
+            - { ottServiceId: 1, status: AVAILABLE }
+            - { ottServiceId: 2, status: NOT_AVAILABLE }
+            - { ottServiceId: 3, status: NOT_AVAILABLE }
+            - { ottServiceId: 4, status: NOT_AVAILABLE }
+            - { ottServiceId: 5, status: NOT_AVAILABLE }
+            - { ottServiceId: 6, status: UNKNOWN }
+            - { ottServiceId: 7, status: UNKNOWN }
+          seasons:
+            - seasonNumber: 1
+              name: 시즌 1
+              episodeCount: 9
+              airYear: 2021
+              totalRuntimeMin: 500
+              isRuntimeEstimated: false
+              availabilities:
+                - { ottServiceId: 1, status: AVAILABLE }
+                - { ottServiceId: 2, status: NOT_AVAILABLE }
+                - { ottServiceId: 3, status: NOT_AVAILABLE }
+                - { ottServiceId: 4, status: NOT_AVAILABLE }
+                - { ottServiceId: 5, status: NOT_AVAILABLE }
+                - { ottServiceId: 6, status: UNKNOWN }
+                - { ottServiceId: 7, status: UNKNOWN }
+            - seasonNumber: 2
+              name: 시즌 2
+              episodeCount: 7
+              airYear: 2024
+              totalRuntimeMin: 425
+              isRuntimeEstimated: false
+              availabilities:
+                - { ottServiceId: 1, status: AVAILABLE }
+                - { ottServiceId: 2, status: NOT_AVAILABLE }
+                - { ottServiceId: 3, status: NOT_AVAILABLE }
+                - { ottServiceId: 4, status: NOT_AVAILABLE }
+                - { ottServiceId: 5, status: NOT_AVAILABLE }
+                - { ottServiceId: 6, status: UNKNOWN }
+                - { ottServiceId: 7, status: UNKNOWN }
+          dataAsOf: '2026-10-08'
+
+    # ----- wishlist -----
+    WishlistItem:
+      type: object
+      description: 찜 목록의 한 항목. 드라마는 시즌 단위다(R11-19)
+      required:
+        - wishlistItemId
+        - mediaType
+        - tmdbId
+        - title
+        - posterPath
+        - seasonNumber
+        - seasonName
+        - priority
+        - requiredMin
+        - isRuntimeEstimated
+        - availabilities
+        - isWatchableNow
+        - watchedAt
+      properties:
+        wishlistItemId:
+          type: integer
+          format: int64
+          description: 찜 항목 ID(변경·삭제 경로에 쓴다)
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID
+        title:
+          type: string
+          description: 한국어 제목
+        posterPath:
+          type: string
+          nullable: true
+          description: TMDB 포스터 상대 경로. 없으면 null
+        seasonNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: 드라마 시즌 번호. 영화는 null
+        seasonName:
+          type: string
+          nullable: true
+          description: 시즌 이름(예 "시즌 2"). 영화는 null
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+        requiredMin:
+          type: integer
+          format: int32
+          description: 다 보는 데 필요한 시간(분). 드라마는 그 시즌의 총 시간
+        isRuntimeEstimated:
+          type: boolean
+          description: requiredMin이 추정값인지("추정" 표시)
+        availabilities:
+          type: array
+          description: 서비스별 제공 상태(7개). 드라마는 그 시즌 기준
+          items:
+            $ref: '#/components/schemas/ServiceAvailability'
+        isWatchableNow:
+          type: boolean
+          description: 내가 구독 중(SUBSCRIBED)이거나 무료 이용(FREE) 중인 서비스에서 이미 볼 수 있는지
+        watchedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: '"다 봤음"으로 표시한 시각. 안 봤으면 null. 값이 있으면 계산과 개수 상한에서 빠진다'
+    WishlistItemList:
+      type: object
+      description: 내 찜 목록(최근에 찜한 순, 전부)
+      required:
+        - items
+        - activeItemCount
+        - maxActiveItemCount
+        - dataAsOf
+      properties:
+        items:
+          type: array
+          description: 찜 항목들. 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/WishlistItem'
+        activeItemCount:
+          type: integer
+          format: int32
+          description: 상한에 세는 현재 찜 개수("다 봤음" 제외)
+        maxActiveItemCount:
+          type: integer
+          format: int32
+          description: 찜 상한(20, PRD 11절 36번)
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일
+    CommonResponseWishlistItemList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/WishlistItemList'
+      example:
+        success: true
+        data:
+          items:
+            - wishlistItemId: 12
+              mediaType: tv
+              tmdbId: 93405
+              title: 오징어 게임
+              posterPath: /dDlEmu3EZ0Pgg93K2SVNLCjCSvE.jpg
+              seasonNumber: 1
+              seasonName: 시즌 1
+              priority: MUST
+              requiredMin: 500
+              isRuntimeEstimated: false
+              availabilities:
+                - { ottServiceId: 1, status: AVAILABLE }
+                - { ottServiceId: 2, status: NOT_AVAILABLE }
+                - { ottServiceId: 3, status: NOT_AVAILABLE }
+                - { ottServiceId: 4, status: NOT_AVAILABLE }
+                - { ottServiceId: 5, status: NOT_AVAILABLE }
+                - { ottServiceId: 6, status: UNKNOWN }
+                - { ottServiceId: 7, status: UNKNOWN }
+              isWatchableNow: true
+              watchedAt: null
+            - wishlistItemId: 11
+              mediaType: movie
+              tmdbId: 496243
+              title: 기생충
+              posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+              seasonNumber: null
+              seasonName: null
+              priority: WANT
+              requiredMin: 133
+              isRuntimeEstimated: false
+              availabilities:
+                - { ottServiceId: 1, status: NOT_AVAILABLE }
+                - { ottServiceId: 2, status: NOT_AVAILABLE }
+                - { ottServiceId: 3, status: UNKNOWN }
+                - { ottServiceId: 4, status: AVAILABLE }
+                - { ottServiceId: 5, status: AVAILABLE }
+                - { ottServiceId: 6, status: AVAILABLE }
+                - { ottServiceId: 7, status: UNKNOWN }
+              isWatchableNow: true
+              watchedAt: '2026-10-10T21:30:00+09:00'
+          activeItemCount: 1
+          maxActiveItemCount: 20
+          dataAsOf: '2026-10-08'
+    AddWishlistItemRequest:
+      type: object
+      description: 찜 추가 요청
+      required:
+        - mediaType
+        - tmdbId
+        - seasonNumber
+        - priority
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 2147483647
+          description: TMDB ID
+        seasonNumber:
+          type: integer
+          format: int32
+          minimum: 1
+          nullable: true
+          description: 드라마(tv)는 찜할 시즌 번호(필수, 1부터. 시즌 0 스페셜은 수집하지 않는다, ERD watch_unit), 영화는 null
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+      example:
+        mediaType: tv
+        tmdbId: 93405
+        seasonNumber: 1
+        priority: MUST
+    AddWishlistItemResult:
+      type: object
+      description: 찜 추가 결과. 이미 찜한 작품(시즌)이면 기존 항목 ID다
+      required:
+        - wishlistItemId
+      properties:
+        wishlistItemId:
+          type: integer
+          format: int64
+          description: 찜 항목 ID
+    CommonResponseAddWishlistItemResult:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AddWishlistItemResult'
+      example:
+        success: true
+        data:
+          wishlistItemId: 12
+    UpdateWishlistItemRequest:
+      type: object
+      description: 찜 항목 변경 요청. 보낸 필드만 바꾼다(하나 이상 필요)
+      minProperties: 1
+      properties:
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+        isWatched:
+          type: boolean
+          description: true면 "다 봤음"(watchedAt 기록), false면 되돌림
+      example:
+        isWatched: true
+    UpdatedWishlistItem:
+      type: object
+      description: 바뀐 찜 항목의 상태
+      required:
+        - wishlistItemId
+        - priority
+        - watchedAt
+      properties:
+        wishlistItemId:
+          type: integer
+          format: int64
+          description: 찜 항목 ID
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+        watchedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: '"다 봤음"으로 표시한 시각. 안 봤으면 null'
+    CommonResponseUpdatedWishlistItem:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/UpdatedWishlistItem'
+      example:
+        success: true
+        data:
+          wishlistItemId: 12
+          priority: MUST
+          watchedAt: '2026-10-12T20:15:00+09:00'
+
+    # ----- user -----
+    UserSubscription:
+      type: object
+      description: 서비스 하나의 이용 상태(ERD user_subscription)
+      required:
+        - ottServiceId
+        - status
+        - planName
+        - billingDay
+      properties:
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 서비스 내부 ID
+        status:
+          $ref: '#/components/schemas/ServiceSubscriptionStatus'
+        planName:
+          type: string
+          maxLength: 30
+          nullable: true
+          description: 요금제 이름(예 "스탠다드"). SUBSCRIBED일 때만 필수이고 그 밖에는 null. 계산에 쓰이지 않는 표시용 입력이다. ERD `user_subscription`에 `plan_name`(30자) 칸이 있다(ERD v0.4에 반영됨). 2단계에서 상품 선택으로 대체될 수 있다
+        billingDay:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: 결제일(1~31). SUBSCRIBED일 때만 값이 있고 그 밖에는 null. 저장 요청에서 SUBSCRIBED인데 null이면 1일로 저장한다(PRD FR-08 기본값)
+      example:
+        ottServiceId: 1
+        status: SUBSCRIBED
+        planName: 스탠다드
+        billingDay: 15
+    UserSettings:
+      type: object
+      description: 내 설정. 온보딩 전이면 subscriptions는 빈 배열, isLowestPriceMode는 false, 나머지 값은 null
+      required:
+        - isOnboardingDone
+        - subscriptions
+        - monthlyBudget
+        - monthlyWatchMinutes
+        - watchPreset
+        - isLowestPriceMode
+      properties:
+        isOnboardingDone:
+          type: boolean
+          description: 온보딩(첫 설정 저장)을 마쳤는지
+        subscriptions:
+          type: array
+          description: 서비스별 이용 상태
+          items:
+            $ref: '#/components/schemas/UserSubscription'
+        monthlyBudget:
+          type: integer
+          format: int32
+          nullable: true
+          description: 월 예산(원). 입력 전이면 null
+        monthlyWatchMinutes:
+          type: integer
+          format: int32
+          nullable: true
+          description: 월 시청 시간(분). 입력 전이면 null
+        watchPreset:
+          allOf:
+            - $ref: '#/components/schemas/WatchPreset'
+          nullable: true
+          description: 시청 시간을 고른 방식. 입력 전이면 null
+        isLowestPriceMode:
+          type: boolean
+          description: '"가장 저렴한 요금제로 계산할래요" 체크. 끄면 서비스마다 표준 요금제로, 켜면 가장 싼 요금제로 계산한다. 입력 전이면 false'
+    CommonResponseUserSettings:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/UserSettings'
+      example:
+        success: true
+        data:
+          isOnboardingDone: true
+          subscriptions:
+            - { ottServiceId: 1, status: SUBSCRIBED, planName: 스탠다드, billingDay: 15 }
+            - { ottServiceId: 2, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+            - { ottServiceId: 3, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+            - { ottServiceId: 4, status: FREE, planName: null, billingDay: null }
+            - { ottServiceId: 5, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+            - { ottServiceId: 6, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+            - { ottServiceId: 7, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+          monthlyBudget: 20000
+          monthlyWatchMinutes: 900
+          watchPreset: NORMAL
+          isLowestPriceMode: false
+    UpdateMySettingsRequest:
+      type: object
+      description: 내 설정 저장 요청(전체 교체). 환산 입력값("주 N회 × 회당 M시간")은 받지 않는다(R11-18 A안)
+      required:
+        - subscriptions
+        - monthlyBudget
+        - monthlyWatchMinutes
+        - watchPreset
+        - isLowestPriceMode
+      properties:
+        subscriptions:
+          type: array
+          minItems: 1
+          maxItems: 7
+          description: 서비스별 이용 상태. 서비스마다 한 번만 보낸다(중복이면 400). 빠진 서비스는 미구독
+          items:
+            $ref: '#/components/schemas/UserSubscription'
+        monthlyBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          description: 월 예산(원). 0이면 이미 쓰는 서비스만으로 계산한다
+        monthlyWatchMinutes:
+          type: integer
+          format: int32
+          minimum: 120
+          maximum: 44640
+          description: 월 시청 시간(분). 120분 이상(PRD FR-10), 최대 31일 × 24시간
+        watchPreset:
+          $ref: '#/components/schemas/WatchPreset'
+        isLowestPriceMode:
+          type: boolean
+          description: '"가장 저렴한 요금제로 계산할래요" 체크. 끄면 서비스마다 표준 요금제로, 켜면 가장 싼 요금제로 계산한다. 이미 저장된 플랜은 바뀌지 않고 다음 계산부터 반영된다'
+      example:
+        subscriptions:
+          - { ottServiceId: 1, status: SUBSCRIBED, planName: 스탠다드, billingDay: 15 }
+          - { ottServiceId: 2, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+          - { ottServiceId: 3, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+          - { ottServiceId: 4, status: FREE, planName: null, billingDay: null }
+          - { ottServiceId: 5, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+          - { ottServiceId: 6, status: UNKNOWN, planName: null, billingDay: null }
+          - { ottServiceId: 7, status: NOT_SUBSCRIBED, planName: null, billingDay: null }
+        monthlyBudget: 20000
+        monthlyWatchMinutes: 900
+        watchPreset: NORMAL
+        isLowestPriceMode: false
+
+    # ----- product (내 요금) -----
+    ServicePrice:
+      type: object
+      description: 상품 하나의 월 요금(SCR-09). 단품과 번들이 함께 오며, 단품(서비스 ID 순) 다음에 번들 순서다. `subscriptionStatus`는 단품이 속한 서비스의 이용 상태이고 번들은 구독 입력이 없어 항상 NOT_SUBSCRIBED다
+      required:
+        - ottServiceId
+        - productId
+        - productName
+        - productType
+        - ottServiceIds
+        - isLowCost
+        - isCalcCandidate
+        - adminPrice
+        - userPrice
+        - appliedPrice
+        - priceSource
+        - subscriptionStatus
+        - effectiveFrom
+        - lastVerifiedAt
+      properties:
+        ottServiceId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 단품이 속한 서비스 내부 ID. 서비스 이름을 찾는 데 쓴다. 번들이면 null(`ottServiceIds`를 쓴다)
+        productId:
+          type: integer
+          format: int64
+          description: OTT 구독상품 ID. 수정·되돌리기 경로에 쓴다(사용자 금액은 상품 단위로 저장된다)
+        productName:
+          type: string
+          description: 상품(요금제) 이름. 예 "넷플릭스 스탠다드"
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        ottServiceIds:
+          type: array
+          description: 상품이 포함하는 서비스 ID 목록(오름차순). 단품은 1개, 번들은 2개 이상
+          items:
+            type: integer
+            format: int64
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준. 가격 선택에만 쓰고 볼 수 있는 작품 범위와는 무관하다
+        isCalcCandidate:
+          type: boolean
+          description: 내 설정의 모드(`isLowestPriceMode`) 기준으로 이 상품이 플랜 계산 후보인지. 서비스마다 단품은 1개만 후보이고 번들은 모드에 따라 걸러진다
+        adminPrice:
+          type: integer
+          format: int32
+          description: 관리자가 등록한 기본 월 요금 중 현재 적용 중인 요금의 금액(원)
+        userPrice:
+          type: integer
+          format: int32
+          nullable: true
+          description: 내가 고친 월 요금(원). 고치지 않았으면 null
+        appliedPrice:
+          type: integer
+          format: int32
+          description: 계산에 쓰는 금액(userPrice가 있으면 그 값, 없으면 adminPrice)
+        priceSource:
+          allOf:
+            - $ref: '#/components/schemas/PriceSource'
+          description: 적용 금액의 출처. 이 응답에서는 ADMIN 또는 USER_OVERRIDE만 온다
+        subscriptionStatus:
+          $ref: '#/components/schemas/ServiceSubscriptionStatus'
+        effectiveFrom:
+          type: string
+          format: date
+          description: adminPrice의 적용 시작일(관리자 월 구독요금 이력)
+        lastVerifiedAt:
+          type: string
+          format: date-time
+          description: adminPrice 요금 이력을 관리자가 마지막으로 확인한 일시. 서버가 확인·수정·추가·상품 등록 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
+    ServicePriceList:
+      type: object
+      description: 판매 중인 상품의 요금(단품은 서비스 ID 순, 같은 서비스는 상품 ID 순이고 그다음에 번들이 상품 ID 순). 한 서비스에 판매 중 상품이 여러 개일 수 있다
+      required:
+        - services
+      properties:
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServicePrice'
+    CommonResponseServicePriceList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ServicePriceList'
+      example:
+        success: true
+        data:
+          services:
+            - ottServiceId: 1
+              productId: 101
+              productName: 넷플릭스 스탠다드
+              productType: SINGLE
+              ottServiceIds: [1]
+              isLowCost: false
+              isCalcCandidate: true
+              adminPrice: 13500
+              userPrice: null
+              appliedPrice: 13500
+              priceSource: ADMIN
+              subscriptionStatus: SUBSCRIBED
+              effectiveFrom: '2026-10-02'
+              lastVerifiedAt: '2026-10-07T09:00:00+09:00'
+            - ottServiceId: 3
+              productId: 103
+              productName: 애플 TV+
+              productType: SINGLE
+              ottServiceIds: [3]
+              isLowCost: false
+              isCalcCandidate: true
+              adminPrice: 6500
+              userPrice: null
+              appliedPrice: 6500
+              priceSource: ADMIN
+              subscriptionStatus: NOT_SUBSCRIBED
+              effectiveFrom: '2025-12-16'
+              lastVerifiedAt: '2026-06-14T09:00:00+09:00'
+            - ottServiceId: 5
+              productId: 105
+              productName: 웨이브 스탠다드
+              productType: SINGLE
+              ottServiceIds: [5]
+              isLowCost: false
+              isCalcCandidate: true
+              adminPrice: 10900
+              userPrice: 9900
+              appliedPrice: 9900
+              priceSource: USER_OVERRIDE
+              subscriptionStatus: NOT_SUBSCRIBED
+              effectiveFrom: '2026-04-15'
+              lastVerifiedAt: '2026-10-05T09:00:00+09:00'
+    SetMyServicePriceRequest:
+      type: object
+      description: 내 월 요금 설정 요청. 지우려면 DELETE를 쓴다
+      required:
+        - monthlyPrice
+      properties:
+        monthlyPrice:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000000
+          description: 월 요금(원, 0 이상 100만 이하 정수)
+      example:
+        monthlyPrice: 9900
+    CommonResponseServicePrice:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ServicePrice'
+      example:
+        success: true
+        data:
+          ottServiceId: 5
+          productId: 105
+          productName: 웨이브 스탠다드
+          productType: SINGLE
+          ottServiceIds: [5]
+          isLowCost: false
+          isCalcCandidate: true
+          adminPrice: 10900
+          userPrice: 9900
+          appliedPrice: 9900
+          priceSource: USER_OVERRIDE
+          subscriptionStatus: NOT_SUBSCRIBED
+          effectiveFrom: '2026-04-15'
+          lastVerifiedAt: '2026-10-05T09:00:00+09:00'
+
+    # ----- plan -----
+    PlanMonthProduct:
+      type: object
+      description: 그 달에 구독할(또는 이미 이용 중인) 상품 하나(ERD plan_month_product)
+      required:
+        - productId
+        - productName
+        - ottServiceIds
+        - appliedPrice
+        - priceSource
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: OTT 구독상품 ID
+        productName:
+          type: string
+          description: 상품(요금제) 이름
+        ottServiceIds:
+          type: array
+          description: 상품이 포함하는 서비스 ID들(단품은 1개)
+          items:
+            type: integer
+            format: int64
+        appliedPrice:
+          type: integer
+          format: int32
+          description: 적용 월 요금(원). priceSource가 ALREADY_PAID·FREE면 그 달 비용에 넣지 않는다
+        priceSource:
+          $ref: '#/components/schemas/PriceSource'
+    PlanAssignment:
+      type: object
+      description: 그 달에 볼 작품 배정 하나. 긴 시즌은 연속된 달에 걸쳐 조각으로 나뉜다(PRD 5.4)
+      required:
+        - planItemId
+        - mediaType
+        - tmdbId
+        - title
+        - seasonNumber
+        - priority
+        - ottServiceId
+        - watchMin
+        - segmentIndex
+        - segmentCount
+        - isContinuation
+      properties:
+        planItemId:
+          type: integer
+          format: int64
+          description: 플랜 항목 ID(같은 시즌의 조각들은 같은 값)
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID
+        title:
+          type: string
+          description: 한국어 제목
+        seasonNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: 드라마 시즌 번호. 영화는 null
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 이 달에 이 조각을 보는 서비스
+        watchMin:
+          type: integer
+          format: int32
+          description: 이 달에 배정된 시청 시간(분)
+        segmentIndex:
+          type: integer
+          format: int32
+          minimum: 1
+          description: 몇 번째 조각인지(1부터). 나뉘지 않으면 1
+        segmentCount:
+          type: integer
+          format: int32
+          minimum: 1
+          description: 전체 조각 수. 나뉘지 않으면 1
+        isContinuation:
+          type: boolean
+          description: 앞 달에서 이어 보는 조각인지(segmentIndex > 1)
+    PlanMonth:
+      type: object
+      description: 플랜의 한 달(ERD plan_month)
+      required:
+        - monthIndex
+        - month
+        - isConfirmed
+        - cost
+        - products
+        - assignments
+      properties:
+        monthIndex:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 2
+          description: 0 이번 달, 1·2 다음 두 달
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 해당 달(YYYY-MM)
+        isConfirmed:
+          type: boolean
+          description: 이번 달만 true. 나머지는 "예상"
+        cost:
+          type: integer
+          format: int32
+          description: 그 달 비용(원). 구독 상품이 없으면 0
+        products:
+          type: array
+          description: 그 달 상품들. 빈 배열이면 그 달은 구독하지 않는다
+          items:
+            $ref: '#/components/schemas/PlanMonthProduct'
+        assignments:
+          type: array
+          description: 그 달에 볼 작품들
+          items:
+            $ref: '#/components/schemas/PlanAssignment'
+    UnscheduledItem:
+      type: object
+      description: 3개월 안에 배정하지 못한 작품 하나("남은 작품과 이유")
+      required:
+        - planItemId
+        - mediaType
+        - tmdbId
+        - title
+        - seasonNumber
+        - priority
+        - reason
+      properties:
+        planItemId:
+          type: integer
+          format: int64
+          description: 플랜 항목 ID
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID
+        title:
+          type: string
+          description: 한국어 제목
+        seasonNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: 드라마 시즌 번호. 영화는 null
+        priority:
+          $ref: '#/components/schemas/WishlistPriority'
+        reason:
+          $ref: '#/components/schemas/UnscheduledReason'
+    PlanDraft:
+      type: object
+      description: 플랜 초안 하나(ERD plan, status = DRAFT)
+      required:
+        - planId
+        - planType
+        - startMonth
+        - algorithm
+        - monthlyBudget
+        - monthlyWatchMinutes
+        - mustTotal
+        - mustCompleted
+        - scheduledCount
+        - totalCount
+        - score
+        - totalCost
+        - allSubscribeCost
+        - savedAmount
+        - months
+        - unscheduled
+        - dataAsOf
+      properties:
+        planId:
+          type: integer
+          format: int64
+          description: 플랜 ID(저장 요청에 쓴다)
+        planType:
+          $ref: '#/components/schemas/PlanType'
+        startMonth:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 첫 달(YYYY-MM)
+        algorithm:
+          $ref: '#/components/schemas/PlanAlgorithm'
+        monthlyBudget:
+          type: integer
+          format: int32
+          description: 계산에 쓴 월 예산(스냅샷, 원)
+        monthlyWatchMinutes:
+          type: integer
+          format: int32
+          description: 계산에 쓴 월 시청 시간(스냅샷, 분)
+        mustTotal:
+          type: integer
+          format: int32
+          description: 꼭 볼 작품 수
+        mustCompleted:
+          type: integer
+          format: int32
+          description: 그중 3개월 안에 다 볼 수 있는 수
+        scheduledCount:
+          type: integer
+          format: int32
+          description: 배정된 작품(시즌) 수
+        totalCount:
+          type: integer
+          format: int32
+          description: 계산 대상 찜 수("다 봤음" 제외)
+        score:
+          type: integer
+          format: int32
+          description: 점수(보고 싶음 2, 여유될 때 1의 합. 꼭 볼 작품은 mustCompleted로만 센다)
+        totalCost:
+          type: integer
+          format: int32
+          description: 3개월 총비용(원)
+        allSubscribeCost:
+          type: integer
+          format: int32
+          description: 전체 구독 비용(원). 세 유형이 같은 정의라 같은 값이다(PRD 5.4, 11절 38번)
+        savedAmount:
+          type: integer
+          format: int32
+          description: 절감액 = allSubscribeCost − totalCost (PRD 11절 38번)
+        months:
+          type: array
+          description: 3개월(monthIndex 0, 1, 2 순)
+          minItems: 3
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/PlanMonth'
+        unscheduled:
+          type: array
+          description: 남은 작품과 이유. 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/UnscheduledItem'
+        dataAsOf:
+          type: string
+          format: date
+          description: 계산에 쓴 데이터 기준일
+    PlanDraftList:
+      type: object
+      description: 플랜 초안 목록. 계산하면 유형마다 1개씩 항상 3개, 계산 전·저장 후에는 빈 배열
+      required:
+        - drafts
+      properties:
+        drafts:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/PlanDraft'
+    CommonResponsePlanDraftList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanDraftList'
+      example:
+        success: true
+        data:
+          drafts:
+            - planId: 301
+              planType: RECOMMENDED
+              startMonth: '2026-10'
+              algorithm: EXACT
+              monthlyBudget: 20000
+              monthlyWatchMinutes: 900
+              mustTotal: 1
+              mustCompleted: 1
+              scheduledCount: 4
+              totalCount: 5
+              score: 5
+              totalCost: 13500
+              allSubscribeCost: 137400
+              savedAmount: 123900
+              months:
+                - monthIndex: 0
+                  month: '2026-10'
+                  isConfirmed: true
+                  cost: 0
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ALREADY_PAID }
+                    - { productId: 104, productName: 티빙 스탠다드, ottServiceIds: [4], appliedPrice: 13500, priceSource: FREE }
+                  assignments:
+                    - { planItemId: 401, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 1, priority: MUST, ottServiceId: 1, watchMin: 500, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 402, mediaType: movie, tmdbId: 496243, title: 기생충, seasonNumber: null, priority: WANT, ottServiceId: 4, watchMin: 133, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 403, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 267, segmentIndex: 1, segmentCount: 2, isContinuation: false }
+                - monthIndex: 1
+                  month: '2026-11'
+                  isConfirmed: false
+                  cost: 13500
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ADMIN }
+                  assignments:
+                    - { planItemId: 403, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 158, segmentIndex: 2, segmentCount: 2, isContinuation: true }
+                    - { planItemId: 404, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 3, priority: MAYBE, ottServiceId: 1, watchMin: 270, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                - monthIndex: 2
+                  month: '2026-12'
+                  isConfirmed: false
+                  cost: 0
+                  products: []
+                  assignments: []
+              unscheduled:
+                - { planItemId: 405, mediaType: tv, tmdbId: 118243, title: 안나, seasonNumber: 1, priority: MAYBE, reason: UNKNOWN }
+              dataAsOf: '2026-10-08'
+            - planId: 302
+              planType: SAVER
+              startMonth: '2026-10'
+              algorithm: EXACT
+              monthlyBudget: 20000
+              monthlyWatchMinutes: 900
+              mustTotal: 1
+              mustCompleted: 1
+              scheduledCount: 4
+              totalCount: 5
+              score: 5
+              totalCost: 13500
+              allSubscribeCost: 137400
+              savedAmount: 123900
+              months:
+                - monthIndex: 0
+                  month: '2026-10'
+                  isConfirmed: true
+                  cost: 0
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ALREADY_PAID }
+                    - { productId: 104, productName: 티빙 스탠다드, ottServiceIds: [4], appliedPrice: 13500, priceSource: FREE }
+                  assignments:
+                    - { planItemId: 411, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 1, priority: MUST, ottServiceId: 1, watchMin: 500, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 412, mediaType: movie, tmdbId: 496243, title: 기생충, seasonNumber: null, priority: WANT, ottServiceId: 4, watchMin: 133, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 413, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 267, segmentIndex: 1, segmentCount: 2, isContinuation: false }
+                - monthIndex: 1
+                  month: '2026-11'
+                  isConfirmed: false
+                  cost: 13500
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ADMIN }
+                  assignments:
+                    - { planItemId: 413, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 158, segmentIndex: 2, segmentCount: 2, isContinuation: true }
+                    - { planItemId: 414, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 3, priority: MAYBE, ottServiceId: 1, watchMin: 270, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                - monthIndex: 2
+                  month: '2026-12'
+                  isConfirmed: false
+                  cost: 0
+                  products: []
+                  assignments: []
+              unscheduled:
+                - { planItemId: 415, mediaType: tv, tmdbId: 118243, title: 안나, seasonNumber: 1, priority: MAYBE, reason: UNKNOWN }
+              dataAsOf: '2026-10-08'
+            - planId: 303
+              planType: SIMPLE
+              startMonth: '2026-10'
+              algorithm: EXACT
+              monthlyBudget: 20000
+              monthlyWatchMinutes: 900
+              mustTotal: 1
+              mustCompleted: 1
+              scheduledCount: 4
+              totalCount: 5
+              score: 5
+              totalCost: 13500
+              allSubscribeCost: 137400
+              savedAmount: 123900
+              months:
+                - monthIndex: 0
+                  month: '2026-10'
+                  isConfirmed: true
+                  cost: 0
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ALREADY_PAID }
+                    - { productId: 104, productName: 티빙 스탠다드, ottServiceIds: [4], appliedPrice: 13500, priceSource: FREE }
+                  assignments:
+                    - { planItemId: 421, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 1, priority: MUST, ottServiceId: 1, watchMin: 500, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 422, mediaType: movie, tmdbId: 496243, title: 기생충, seasonNumber: null, priority: WANT, ottServiceId: 4, watchMin: 133, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                    - { planItemId: 423, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 267, segmentIndex: 1, segmentCount: 2, isContinuation: false }
+                - monthIndex: 1
+                  month: '2026-11'
+                  isConfirmed: false
+                  cost: 13500
+                  products:
+                    - { productId: 101, productName: 넷플릭스 스탠다드, ottServiceIds: [1], appliedPrice: 13500, priceSource: ADMIN }
+                  assignments:
+                    - { planItemId: 423, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, priority: WANT, ottServiceId: 1, watchMin: 158, segmentIndex: 2, segmentCount: 2, isContinuation: true }
+                    - { planItemId: 424, mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 3, priority: MAYBE, ottServiceId: 1, watchMin: 270, segmentIndex: 1, segmentCount: 1, isContinuation: false }
+                - monthIndex: 2
+                  month: '2026-12'
+                  isConfirmed: false
+                  cost: 0
+                  products: []
+                  assignments: []
+              unscheduled:
+                - { planItemId: 425, mediaType: tv, tmdbId: 118243, title: 안나, seasonNumber: 1, priority: MAYBE, reason: UNKNOWN }
+              dataAsOf: '2026-10-08'
+    CreatePlanRequest:
+      type: object
+      description: 플랜 저장 요청. 저장할 초안의 planId(데이터가 갱신됐는지 서버가 판단하는 기준)
+      required:
+        - planId
+      properties:
+        planId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 저장할 초안의 플랜 ID
+      example:
+        planId: 301
+    SavedPlan:
+      type: object
+      description: 저장된 플랜(ERD plan, status = ACTIVE)
+      required:
+        - planId
+        - planType
+        - status
+        - activatedAt
+      properties:
+        planId:
+          type: integer
+          format: int64
+          description: 플랜 ID
+        planType:
+          $ref: '#/components/schemas/PlanType'
+        status:
+          allOf:
+            - $ref: '#/components/schemas/PlanStatus'
+          description: 이 응답에서는 항상 ACTIVE
+        activatedAt:
+          type: string
+          format: date-time
+          description: 저장(활성화) 시각
+    CommonResponseSavedPlan:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SavedPlan'
+      example:
+        success: true
+        data:
+          planId: 301
+          planType: RECOMMENDED
+          status: ACTIVE
+          activatedAt: '2026-10-12T21:05:00+09:00'
+    ActivePlan:
+      description: 현재 플랜(ERD plan, status = ACTIVE). 초안(PlanDraft)의 필드를 모두 담고 저장 시각이 더해진다
+      allOf:
+        - $ref: '#/components/schemas/PlanDraft'
+        - type: object
+          required:
+            - activatedAt
+          properties:
+            activatedAt:
+              type: string
+              format: date-time
+              description: 저장(활성화) 시각
+    CurrentPlan:
+      type: object
+      description: 현재 플랜 조회 결과. 저장한 플랜이 없으면 `plan`이 null이다
+      required:
+        - plan
+      properties:
+        plan:
+          allOf:
+            - $ref: '#/components/schemas/ActivePlan'
+          nullable: true
+          description: 현재 플랜. 없으면 null
+    CommonResponseCurrentPlan:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CurrentPlan'
+      example:
+        success: true
+        data:
+          plan: null
+    PlanChangeReasonType:
+      type: string
+      description: 플랜이 바뀐 이유의 종류. PRICE_CHANGED 구독 상품의 요금이 바뀜 / TITLE_LEFT_SERVICE 작품이 어느 서비스에서 빠짐 / TITLE_JOINED_SERVICE 작품이 어느 서비스에 새로 들어옴 / MARKED_WATCHED 사용자가 "다 봤음"으로 체크함(찜·예산 변경은 이유로 쓰지 않는다)
+      enum:
+        - PRICE_CHANGED
+        - TITLE_LEFT_SERVICE
+        - TITLE_JOINED_SERVICE
+        - MARKED_WATCHED
+    PlanTitleChangeType:
+      type: string
+      description: 작품 변화의 종류. ADDED 새로 플랜에 들어감 / REMOVED 플랜에서 빠짐 / MOVED_MONTH 같은 서비스에서 보는 달만 바뀜 / CHANGED_SERVICE 보는 서비스가 바뀜(달이 같이 바뀌어도 이 값)
+      enum:
+        - ADDED
+        - REMOVED
+        - MOVED_MONTH
+        - CHANGED_SERVICE
+    PlanChangeReason:
+      type: object
+      description: 플랜이 바뀐 이유 한 건
+      required:
+        - reasonType
+        - description
+      properties:
+        reasonType:
+          $ref: '#/components/schemas/PlanChangeReasonType'
+        description:
+          type: string
+          description: 서버가 만든 한 줄 설명
+    PlanChangeProduct:
+      type: object
+      description: 달별 구독 변화에 보이는 상품 한 개
+      required:
+        - productId
+        - ottServiceIds
+        - productName
+      properties:
+        productId:
+          type: integer
+          format: int64
+        ottServiceIds:
+          type: array
+          minItems: 1
+          description: 상품이 포함하는 서비스 ID들. 번들이면 구성 서비스 전부, 단품이면 1개
+          items:
+            type: integer
+            format: int64
+        productName:
+          type: string
+          description: 상품(요금제) 이름
+    PlanMonthChange:
+      type: object
+      description: 한 달의 구독 변화. 이전·새 플랜이 함께 다루는 달 중 구독 상품이나 요금이 달라진 달과, 새 플랜에만 있는 달(새로 생긴 달)이 온다
+      required:
+        - month
+        - isConfirmed
+        - previousProducts
+        - currentProducts
+        - previousCost
+        - currentCost
+      properties:
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 해당 달(YYYY-MM)
+        isConfirmed:
+          type: boolean
+          description: 재계산 당시 새 플랜의 첫 달(곧 결제하는 달)인지
+        previousProducts:
+          type: array
+          description: 이전 플랜의 이 달 구독 상품. 비어 있으면 구독 안 함이거나 이전 플랜에 없던 달
+          items:
+            $ref: '#/components/schemas/PlanChangeProduct'
+        currentProducts:
+          type: array
+          description: 새 플랜의 이 달 구독 상품. 비어 있으면 구독 안 함
+          items:
+            $ref: '#/components/schemas/PlanChangeProduct'
+        previousCost:
+          type: integer
+          format: int32
+          nullable: true
+          description: 이전 플랜의 이 달 비용(원). 이전 플랜에 없던 달이면 null(이때 `previousProducts`는 빈 배열). 0은 이전에도 이 달이 있었고 구독하지 않았다는 뜻
+        currentCost:
+          type: integer
+          format: int32
+          description: 새 플랜의 이 달 비용(원)
+    PlanTitlePlacement:
+      type: object
+      description: 작품을 어느 달·어느 서비스에서 보는지
+      required:
+        - month
+        - ottServiceId
+      properties:
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 시청을 끝내는 달(YYYY-MM)
+        ottServiceId:
+          type: integer
+          format: int64
+    PlanTitleChange:
+      type: object
+      description: 작품(시즌) 하나의 변화
+      required:
+        - changeType
+        - title
+        - seasonNumber
+        - previous
+        - current
+      properties:
+        changeType:
+          $ref: '#/components/schemas/PlanTitleChangeType'
+        title:
+          type: string
+          description: 작품 제목
+        seasonNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: 시즌 번호. 영화·시즌 없는 작품은 null
+        previous:
+          allOf:
+            - $ref: '#/components/schemas/PlanTitlePlacement'
+          nullable: true
+          description: 이전 플랜에서의 자리. `ADDED`면 null
+        current:
+          allOf:
+            - $ref: '#/components/schemas/PlanTitlePlacement'
+          nullable: true
+          description: 새 플랜에서의 자리. `REMOVED`면 null
+    PlanChangeHistoryEntry:
+      type: object
+      description: 변경 내역 한 건(매월 재계산으로 플랜이 바뀐 한 번). 절감액 변화는 두 플랜이 다루는 3개월이 달라 비교가 부정확해 넣지 않는다
+      required:
+        - changeId
+        - changedAt
+        - planType
+        - summary
+        - reasons
+        - monthChanges
+        - titleChanges
+        - dataAsOf
+      properties:
+        changeId:
+          type: integer
+          format: int64
+          description: 변경 내역 ID(새 플랜의 ID와 같다)
+        changedAt:
+          type: string
+          format: date-time
+          description: 재계산해 플랜이 바뀐 시각
+        planType:
+          $ref: '#/components/schemas/PlanType'
+        summary:
+          type: string
+          description: 서버가 만든 한 줄 요약
+        reasons:
+          type: array
+          description: 바뀐 이유(1건 이상)
+          items:
+            $ref: '#/components/schemas/PlanChangeReason'
+        monthChanges:
+          type: array
+          description: 달별 구독 변화(구독이 그대로이고 작품만 옮겨졌다면 새로 생긴 달만 있을 수 있다)
+          items:
+            $ref: '#/components/schemas/PlanMonthChange'
+        titleChanges:
+          type: array
+          description: 작품 변화. 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/PlanTitleChange'
+        dataAsOf:
+          type: string
+          format: date
+          description: 이 재계산에 쓴 데이터의 기준일(KST)
+    PlanChangeHistoryList:
+      type: object
+      description: 변경 내역 목록(최신순, 최대 6건)
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          description: 없으면 빈 배열
+          items:
+            $ref: '#/components/schemas/PlanChangeHistoryEntry'
+    CommonResponsePlanChangeHistoryList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanChangeHistoryList'
+      example:
+        success: true
+        data:
+          items:
+            - changeId: 312
+              changedAt: '2026-11-01T03:50:00+09:00'
+              planType: RECOMMENDED
+              summary: 11월 구독이 넷플릭스에서 디즈니+로 바뀌었어요
+              reasons:
+                - reasonType: TITLE_LEFT_SERVICE
+                  description: '''카지노 시즌 1''이 넷플릭스에서 빠진 것으로 확인됐어요'
+              monthChanges:
+                - month: '2026-11'
+                  isConfirmed: true
+                  previousProducts:
+                    - productId: 1
+                      ottServiceIds: [1]
+                      productName: 넷플릭스 스탠다드
+                  currentProducts:
+                    - productId: 6
+                      ottServiceIds: [5]
+                      productName: 디즈니+ 스탠다드
+                  previousCost: 13500
+                  currentCost: 9900
+                - month: '2027-01'
+                  isConfirmed: false
+                  previousProducts: []
+                  currentProducts: []
+                  previousCost: null
+                  currentCost: 0
+              titleChanges:
+                - changeType: CHANGED_SERVICE
+                  title: 카지노
+                  seasonNumber: 1
+                  previous:
+                    month: '2026-11'
+                    ottServiceId: 1
+                  current:
+                    month: '2026-11'
+                    ottServiceId: 5
+              dataAsOf: '2026-11-01'
+
+    # ----- admin: OTT 구독상품·월 구독요금 -----
+    AdminProductPrice:
+      type: object
+      description: 월 구독요금 이력 한 건. 적용 종료일은 저장하지 않는다(다음 요금 이력 시작일의 전날까지, 가장 최근 요금 이력은 계속)
+      required:
+        - priceId
+        - monthlyPrice
+        - effectiveFrom
+        - lastVerifiedAt
+      properties:
+        priceId:
+          type: integer
+          format: int64
+          description: 월 구독요금 이력 ID
+        monthlyPrice:
+          type: integer
+          format: int32
+          description: 월 구독요금(원)
+        effectiveFrom:
+          type: string
+          format: date
+          description: 적용 시작일. 같은 상품 안에서 겹치지 않는다
+        lastVerifiedAt:
+          type: string
+          format: date-time
+          description: 마지막 확인 일시. [요금 확인함]과 요금 이력 수정·추가·상품 등록이 현재 시각으로 바꾼다. 서버가 시각을 저장한다(ERD `last_verified_at`은 TIMESTAMPTZ이다, ERD v0.4에 반영됨). 화면은 한국 시간 기준 날짜만 표기한다. "요금 확인일 오래됨"(90일)도 한국 날짜 기준으로 판정한다
+    AdminProduct:
+      type: object
+      description: OTT 구독상품(단품 또는 번들) 하나와 월 구독요금 이력
+      required:
+        - productId
+        - name
+        - productType
+        - ottServiceIds
+        - isLowCost
+        - isActive
+        - prices
+      properties:
+        productId:
+          type: integer
+          format: int64
+          description: OTT 구독상품 ID
+        name:
+          type: string
+          maxLength: 100
+          description: 이름. 예 "넷플릭스 스탠다드"
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        ottServiceIds:
+          type: array
+          description: 이 상품이 포함하는 서비스 ID 목록(오름차순). 단품은 1개, 번들은 2개 이상
+          items:
+            type: integer
+            format: int64
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
+        isActive:
+          type: boolean
+          description: false면 판매 종료(삭제하지 않고 남긴다)
+        prices:
+          type: array
+          description: 월 구독요금 이력. 적용 시작일이 빠른 순(마지막 항목이 가장 최근 요금 이력)
+          items:
+            $ref: '#/components/schemas/AdminProductPrice'
+    AdminProductList:
+      type: object
+      required:
+        - products
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminProduct'
+    CommonResponseAdminProductList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminProductList'
+      example:
+        success: true
+        data:
+          products:
+            - productId: 101
+              name: 넷플릭스 스탠다드
+              productType: SINGLE
+              ottServiceIds: [1]
+              isLowCost: false
+              isActive: true
+              prices:
+                - { priceId: 1011, monthlyPrice: 12000, effectiveFrom: '2025-09-07', lastVerifiedAt: '2026-03-26T09:00:00+09:00' }
+                - { priceId: 1012, monthlyPrice: 13500, effectiveFrom: '2026-10-02', lastVerifiedAt: '2026-10-07T09:00:00+09:00' }
+                - { priceId: 1013, monthlyPrice: 14500, effectiveFrom: '2026-11-11', lastVerifiedAt: '2026-10-10T09:00:00+09:00' }
+            - productId: 106
+              name: 왓챠 베이직
+              productType: SINGLE
+              ottServiceIds: [6]
+              isLowCost: false
+              isActive: false
+              prices:
+                - { priceId: 1061, monthlyPrice: 7900, effectiveFrom: '2026-04-15', lastVerifiedAt: '2026-10-05T09:00:00+09:00' }
+    CommonResponseAdminProduct:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminProduct'
+      example:
+        success: true
+        data:
+          productId: 103
+          name: 애플 TV+
+          productType: SINGLE
+          ottServiceIds: [3]
+          isLowCost: false
+          isActive: true
+          prices:
+            - { priceId: 1031, monthlyPrice: 6500, effectiveFrom: '2025-12-16', lastVerifiedAt: '2026-10-12T09:00:00+09:00' }
+    PlanBenchmarkMeasurement:
+      type: object
+      description: 알고리즘 하나의 측정 결과(3회 중앙값)
+      required:
+        - calcRunId
+        - mustCompleted
+        - score
+        - totalCost
+        - elapsedMicros
+        - elapsedMs
+        - matchesExpected
+      properties:
+        calcRunId:
+          type: integer
+          format: int64
+          description: 저장된 `calc_run` 행의 ID
+        mustCompleted:
+          type: integer
+          format: int32
+          description: 시청을 끝내는 꼭 볼 작품 수
+        score:
+          type: integer
+          format: int32
+          description: 시청 완료 점수 합(보고 싶음 2점, 여유될 때 1점)
+        totalCost:
+          type: integer
+          format: int32
+          description: 3개월 총비용(원)
+        elapsedMicros:
+          type: integer
+          format: int64
+          description: 소요 시간 중앙값(마이크로초). 1ms 미만의 풀이를 구분하려고 따로 준다
+        elapsedMs:
+          type: integer
+          format: int64
+          description: 소요 시간 중앙값(ms, 내림). `calc_run.elapsed_ms`에 저장되는 값이다. ms 내림은 0일 수 있어 `elapsedMicros`를 함께 준다
+        matchesExpected:
+          type: boolean
+          description: 정답 세트의 기대 결과(꼭 시청 완료 수·점수·총비용)와 같은지
+    PlanBenchmarkCase:
+      type: object
+      description: 정답 세트 케이스 하나의 비교 결과. 차이 값은 모두 그리디 − 완전탐색이다
+      required:
+        - caseName
+        - inputHash
+        - candidateCount
+        - exact
+        - greedy
+        - mustDiff
+        - scoreDiff
+        - costDiff
+      properties:
+        caseName:
+          type: string
+          description: 케이스 이름
+        inputHash:
+          type: string
+          description: 입력 해시(SHA-256 16진수 64자). `calc_run`에서 이 케이스의 두 행을 찾는 키다
+        candidateCount:
+          type: integer
+          format: int32
+          description: 완전탐색 기준 후보 조합 수. 그리디 행에도 같은 값을 기록한다
+        exact:
+          $ref: '#/components/schemas/PlanBenchmarkMeasurement'
+        greedy:
+          $ref: '#/components/schemas/PlanBenchmarkMeasurement'
+        mustDiff:
+          type: integer
+          format: int32
+          description: 꼭 시청 완료 수 차이(그리디 − 완전탐색)
+        scoreDiff:
+          type: integer
+          format: int32
+          description: 점수 차이(그리디 − 완전탐색)
+        costDiff:
+          type: integer
+          format: int32
+          description: 총비용 차이(원, 그리디 − 완전탐색)
+    PlanBenchmark:
+      type: object
+      description: 완전탐색·그리디 비교 측정 결과
+      required:
+        - measuredRuns
+        - warmupRuns
+        - caseCount
+        - cases
+        - skippedCaseNames
+      properties:
+        measuredRuns:
+          type: integer
+          format: int32
+          description: 알고리즘마다 측정한 횟수
+        warmupRuns:
+          type: integer
+          format: int32
+          description: 알고리즘마다 버린 워밍업 횟수
+        caseCount:
+          type: integer
+          format: int32
+          description: 저장된 케이스 수
+        cases:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanBenchmarkCase'
+        skippedCaseNames:
+          type: array
+          items:
+            type: string
+          description: 완전탐색이 후보 수 상한을 넘어 건너뛰어진 케이스 이름(저장하지 않는다). 없으면 빈 배열
+      example:
+        measuredRuns: 3
+        warmupRuns: 1
+        caseCount: 1
+        cases:
+          - caseName: case-07-greedy-trap
+            inputHash: 9f2c000000000000000000000000000000000000000000000000000000000000
+            candidateCount: 27
+            exact: { calcRunId: 101, mustCompleted: 1, score: 4, totalCost: 28000, elapsedMicros: 21, elapsedMs: 0, matchesExpected: true }
+            greedy: { calcRunId: 102, mustCompleted: 1, score: 2, totalCost: 8000, elapsedMicros: 9, elapsedMs: 0, matchesExpected: true }
+            mustDiff: 0
+            scoreDiff: -2
+            costDiff: -20000
+        skippedCaseNames: []
+    CommonResponsePlanBenchmark:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanBenchmark'
+    CreateAdminProductRequest:
+      type: object
+      description: OTT 구독상품 등록 요청(첫 월 구독요금 포함)
+      required:
+        - name
+        - productType
+        - ottServiceIds
+        - isLowCost
+        - monthlyPrice
+        - effectiveFrom
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
+        productType:
+          $ref: '#/components/schemas/ProductType'
+        ottServiceIds:
+          type: array
+          minItems: 1
+          maxItems: 7
+          description: 속할 서비스 ID 목록. 단품은 정확히 1개, 번들은 서로 다른 2개 이상. 번들 구성은 등록할 때만 정한다
+          items:
+            type: integer
+            format: int64
+            minimum: 1
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
+        monthlyPrice:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000000
+          description: 첫 월 구독요금(원)
+        effectiveFrom:
+          type: string
+          format: date
+          description: 첫 요금 이력의 적용 시작일(오늘 이하)
+      example:
+        name: 디즈니+ 프리미엄
+        productType: SINGLE
+        ottServiceIds: [2]
+        isLowCost: false
+        monthlyPrice: 13900
+        effectiveFrom: '2026-10-01'
+    UpdateAdminProductRequest:
+      type: object
+      description: OTT 구독상품 수정 요청. 보낸 필드만 바꾼다(하나 이상 필요)
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: 이름. 서버가 앞뒤 공백을 제거한 뒤 1~100자인지 검증한다
+        isActive:
+          type: boolean
+          description: false 판매 종료 / true 판매 재개. 판매 중 번들이 13개이면 번들의 판매 재개는 거절한다
+        isLowCost:
+          type: boolean
+          description: 저가형(광고형·베이직 등) 요금 분류. false면 표준
+      example:
+        isActive: false
+    AdminProductPriceRequest:
+      type: object
+      description: 월 구독요금 이력 추가·수정 요청(같은 모양)
+      required:
+        - monthlyPrice
+        - effectiveFrom
+      properties:
+        monthlyPrice:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000000
+          description: 월 구독요금(원)
+        effectiveFrom:
+          type: string
+          format: date
+          description: 적용 시작일. 바로 앞 요금 이력의 시작일보다 늦어야 한다
+      example:
+        monthlyPrice: 14500
+        effectiveFrom: '2026-11-11'
+
+    # ----- admin: 제공처 매핑 -----
+    AdminProvider:
+      type: object
+      description: TMDB 제공처 한 곳
+      required:
+        - providerId
+        - tmdbName
+        - ottServiceId
+        - tier
+        - firstSeenAt
+        - mappingState
+      properties:
+        providerId:
+          type: integer
+          format: int64
+          description: TMDB 제공처 ID(그대로 PK)
+        tmdbName:
+          type: string
+          description: TMDB 원본 이름. 운영자 확인용이며 판정에는 쓰지 않는다
+        ottServiceId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 연결된 서비스 ID. 미매핑·관련 없음이면 null
+        tier:
+          $ref: '#/components/schemas/ProviderTier'
+        firstSeenAt:
+          type: string
+          format: date-time
+          description: 처음 발견된 시각
+        mappingState:
+          $ref: '#/components/schemas/ProviderMappingState'
+    AdminProviderList:
+      type: object
+      required:
+        - providers
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminProvider'
+    CommonResponseAdminProviderList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminProviderList'
+      example:
+        success: true
+        data:
+          providers:
+            - { providerId: 8, tmdbName: Netflix, ottServiceId: 1, tier: STANDARD, firstSeenAt: '2026-03-26T03:10:00+09:00', mappingState: MAPPED }
+            - { providerId: 1796, tmdbName: Netflix Standard with Ads, ottServiceId: 1, tier: AD, firstSeenAt: '2026-03-26T03:10:00+09:00', mappingState: MAPPED }
+            - { providerId: 119, tmdbName: Amazon Prime Video, ottServiceId: null, tier: STANDARD, firstSeenAt: '2026-03-26T03:10:00+09:00', mappingState: IGNORED }
+    CommonResponseAdminProvider:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminProvider'
+      example:
+        success: true
+        data:
+          providerId: 1881
+          tmdbName: Coupang Play
+          ottServiceId: 7
+          tier: STANDARD
+          firstSeenAt: '2026-03-26T03:10:00+09:00'
+          mappingState: MAPPED
+    UpdateAdminProviderRequest:
+      type: object
+      description: 제공처 매핑 저장 요청. MAPPED면 ottServiceId 필수, UNMAPPED·IGNORED면 null
+      required:
+        - mappingState
+        - ottServiceId
+        - tier
+      properties:
+        mappingState:
+          $ref: '#/components/schemas/ProviderMappingState'
+        ottServiceId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 연결할 서비스 ID
+        tier:
+          $ref: '#/components/schemas/ProviderTier'
+      example:
+        mappingState: MAPPED
+        ottServiceId: 7
+        tier: STANDARD
+
+    # ----- admin: 수집 -----
+    CollectExecution:
+      type: object
+      description: 수집 실행 한 건
+      required:
+        - executionId
+        - targetDate
+        - tier
+        - status
+        - startedAt
+        - endedAt
+        - processedCount
+        - changedCount
+        - failureReason
+        - canRecover
+        - canRestart
+        - recalcTargetCount
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 실행 ID(Spring Batch jobExecutionId)
+        targetDate:
+          type: string
+          format: date
+          description: 수집 기준 날짜
+        tier:
+          $ref: '#/components/schemas/CollectTier'
+        status:
+          $ref: '#/components/schemas/CollectExecutionStatus'
+        startedAt:
+          type: string
+          format: date-time
+          description: 시작 시각(KST 오프셋). 아직 시작 전이면 접수 시각
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 끝난 시각. 완료되었거나 스스로 실패한 실행만 값이 있다. 실행 중·중단됨이면 null, 복구로 실패가 된 실행도 null(복구를 누른 시각은 실제 종료가 아니다)
+        processedCount:
+          type: integer
+          format: int32
+          description: 영화·드라마 상세 단계에서 저장한 작품 수(실행 중이면 지금까지). TMDB가 404를 줘 건너뛴 작품은 세지 않는다. 재시작한 실행은 그 실행이 처리한 몫만 센다
+        changedCount:
+          type: integer
+          format: int32
+          description: 제공 상태가 바뀐 건수(시청 단위 × 서비스). `listCollectExecutionChanges`의 `totalElements`와 같다
+        failureReason:
+          type: string
+          nullable: true
+          description: >-
+            실패 사유. 실패가 아니면 null. 예외가 원인이면 예외 메시지의 첫 줄 "예외명: 메시지"를 300자까지 담고,
+            중단을 관리자가 복구한 실행은 "중단된 실행을 관리자가 실패로 복구함"이다
+        canRecover:
+          type: boolean
+          description: 복구 버튼을 켤 수 있는지. 중단됨(`STOPPED`)이면 true
+        canRestart:
+          type: boolean
+          description: 재시작 버튼을 켤 수 있는지. 실패(`FAILED`)이고 같은 날짜·범위의 가장 최근 실행이며, 운영에서는 대상 날짜가 오늘이고 다른 수집이 실행 중이 아닐 때 true. Batch가 포기(`ABANDONED`)한 실행은 화면 상태가 `FAILED`여도 false다(이 서비스는 그 상태를 만들지 않는다). 서버가 시작·재시작 거절 규칙과 같은 코드로 계산한다
+        recalcTargetCount:
+          type: integer
+          format: int32
+          nullable: true
+          description: 이 수집 뒤 이어 돈 재계산 중 가장 최근 실행의 대상 플랜 수. 재계산이 없거나 아직 끝나지 않았으면 null
+    CollectExecutionPage:
+      description: 수집 실행 이력 한 페이지(페이지네이션 고정 형태)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              type: array
+              description: 대상 날짜 내림차순, 같으면 실행 ID 내림차순. 없으면 빈 배열
+              items:
+                $ref: '#/components/schemas/CollectExecution'
+    CommonResponseCollectExecutionPage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CollectExecutionPage'
+      example:
+        success: true
+        data:
+          page: 0
+          size: 20
+          totalElements: 2
+          totalPages: 1
+          content:
+            - executionId: 5
+              targetDate: '2026-10-12'
+              tier: ALL
+              status: COMPLETED
+              startedAt: '2026-10-12T03:00:00+09:00'
+              endedAt: '2026-10-12T03:42:00+09:00'
+              processedCount: 1840
+              changedCount: 2
+              failureReason: null
+              canRecover: false
+              canRestart: false
+              recalcTargetCount: 12
+            - executionId: 4
+              targetDate: '2026-10-11'
+              tier: ALL
+              status: FAILED
+              startedAt: '2026-10-11T03:00:00+09:00'
+              endedAt: '2026-10-11T03:05:00+09:00'
+              processedCount: 120
+              changedCount: 0
+              failureReason: TMDB 호출 제한 초과로 중단됨
+              canRecover: false
+              canRestart: false
+              recalcTargetCount: null
+    CommonResponseCollectExecution:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CollectExecution'
+      example:
+        success: true
+        data:
+          executionId: 3
+          targetDate: '2026-10-10'
+          tier: ALL
+          status: FAILED
+          startedAt: '2026-10-10T03:00:00+09:00'
+          endedAt: null
+          processedCount: 640
+          changedCount: 0
+          failureReason: 중단된 실행을 관리자가 실패로 복구함
+          canRecover: false
+          canRestart: true
+          recalcTargetCount: null
+    CollectExecutionChange:
+      type: object
+      description: 실행에서 제공 상태가 바뀐 작품 한 건(서비스 단위)
+      required:
+        - mediaType
+        - tmdbId
+        - title
+        - seasonNumber
+        - ottServiceId
+        - previousStatus
+        - currentStatus
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID
+        title:
+          type: string
+          description: 한국어 제목
+        seasonNumber:
+          type: integer
+          format: int32
+          nullable: true
+          description: 드라마 시즌 번호. 영화는 null. 제공 상태는 시즌 단위로 기록되므로(ERD availability_change) 같은 드라마의 시즌이 여러 건 올 수 있다
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 상태가 바뀐 서비스
+        previousStatus:
+          allOf:
+            - $ref: '#/components/schemas/AvailabilityStatus'
+          nullable: true
+          description: 이전 상태. null이면 이번에 처음 확인된 작품
+        currentStatus:
+          $ref: '#/components/schemas/AvailabilityStatus'
+    CollectExecutionChangePage:
+      description: 실행별 변경 건 한 페이지(페이지네이션 고정 형태)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              type: array
+              description: 제목 순, 같으면 시즌 번호·서비스 ID 순. 없으면 빈 배열
+              items:
+                $ref: '#/components/schemas/CollectExecutionChange'
+    CommonResponseCollectExecutionChangePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CollectExecutionChangePage'
+      example:
+        success: true
+        data:
+          page: 0
+          size: 20
+          totalElements: 3
+          totalPages: 1
+          content:
+            - { mediaType: movie, tmdbId: 496243, title: 기생충, seasonNumber: null, ottServiceId: 6, previousStatus: AVAILABLE, currentStatus: UNKNOWN }
+            - { mediaType: tv, tmdbId: 93405, title: 오징어 게임, seasonNumber: 2, ottServiceId: 1, previousStatus: null, currentStatus: AVAILABLE }
+            - { mediaType: movie, tmdbId: 838209, title: 파묘, seasonNumber: null, ottServiceId: 2, previousStatus: null, currentStatus: AVAILABLE }
+    CreateCollectExecutionRequest:
+      type: object
+      description: 수집 실행 요청
+      required:
+        - tier
+      properties:
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+          description: 수집 기준 날짜. 비우거나 null이면 오늘(KST). 오늘이 아닌 날짜는 로컬 프로필에서만 받는다(오늘 이하, TECH 3절)
+        tier:
+          $ref: '#/components/schemas/CollectTier'
+        scope:
+          allOf:
+            - $ref: '#/components/schemas/CollectScope'
+          nullable: true
+          description: 일부 Step만 실행하는 범위. 비우거나 null이면 전체 수집(기존 동작). 값을 주면 같은 날짜의 전체 수집과 별개의 실행으로 취급하고, 운영 프로필에서는 400(`VALIDATION_FAILED`, 필드 `scope`)으로 거절한다
+      example:
+        targetDate: '2026-10-12'
+        tier: ALL
+    CollectExecutionAccepted:
+      type: object
+      description: 실행 접수 결과(202). 결과는 실행 이력에서 본다
+      required:
+        - executionId
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 새 실행 ID
+    CommonResponseCollectExecutionAccepted:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/CollectExecutionAccepted'
+      example:
+        success: true
+        data:
+          executionId: 6
+    PlanRecalcExecutionAccepted:
+      type: object
+      description: 재계산 실행 접수 결과(202)
+      required:
+        - executionId
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 새 재계산 실행 ID(Spring Batch jobExecutionId)
+    CommonResponsePlanRecalcExecutionAccepted:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanRecalcExecutionAccepted'
+      example:
+        success: true
+        data:
+          executionId: 14
+    RetentionExecutionAccepted:
+      type: object
+      description: 데이터 정리 실행 접수 결과(202)
+      required:
+        - executionId
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 새 정리 실행 ID(Spring Batch jobExecutionId)
+    CommonResponseRetentionExecutionAccepted:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/RetentionExecutionAccepted'
+      example:
+        success: true
+        data:
+          executionId: 21
+    PopularityExecutionAccepted:
+      type: object
+      description: 인기 순위 수집 실행 접수 결과(202)
+      required:
+        - executionId
+      properties:
+        executionId:
+          type: integer
+          format: int64
+          description: 새 수집 실행 ID(Spring Batch jobExecutionId)
+    CommonResponsePopularityExecutionAccepted:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PopularityExecutionAccepted'
+      example:
+        success: true
+        data:
+          executionId: 31
+
+    # ----- catalog: 홈·탐색 공통 목록 (Task 107) -----
+    PopularityPeriod:
+      type: string
+      description: 인기 순위 기간. TODAY 가장 최근 스냅샷 하루 / WEEK 최근 7일 스냅샷의 인기도 평균
+      enum:
+        - TODAY
+        - WEEK
+    PopularityRankingItem:
+      type: object
+      description: 인기 순위의 한 줄
+      required:
+        - rank
+        - title
+      properties:
+        rank:
+          type: integer
+          format: int32
+          description: 순위(1부터)
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+    PopularityRanking:
+      type: object
+      description: 서비스(또는 전체)의 인기 순위
+      required:
+        - period
+        - ottServiceId
+        - snapshotDate
+        - daysCounted
+        - notice
+        - items
+      properties:
+        period:
+          $ref: '#/components/schemas/PopularityPeriod'
+        ottServiceId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 요청한 서비스 ID. 전체 순위면 null
+        snapshotDate:
+          type: string
+          format: date
+          nullable: true
+          description: 사용한 가장 최근 스냅샷 날짜(KST, 데이터 기준일). 스냅샷이 없으면 null
+        daysCounted:
+          type: integer
+          format: int32
+          description: 평균에 쓴 스냅샷 날 수. 스냅샷이 없으면 0, 있으면 TODAY는 1, WEEK는 1~7
+        notice:
+          type: string
+          description: 화면에 함께 적을 기준 안내 문구. 예 "TMDB 인기도 기준, OTT 공식 순위 아님"
+        items:
+          type: array
+          description: 인기도 높은 순위(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/PopularityRankingItem'
+    CommonResponsePopularityRanking:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PopularityRanking'
+      example:
+        success: true
+        data:
+          period: TODAY
+          ottServiceId: 1
+          snapshotDate: '2026-10-18'
+          daysCounted: 1
+          notice: TMDB 인기도 기준, OTT 공식 순위 아님
+          items:
+            - rank: 1
+              title:
+                mediaType: tv
+                tmdbId: 93405
+                title: 오징어 게임
+                releaseYear: 2021
+                posterPath: /dDlEmu3EZ0Pgg93K2SVNLCjCSvE.jpg
+                availabilities:
+                  - ottServiceId: 1
+                    status: AVAILABLE
+    WishlistedTitle:
+      type: object
+      description: 찜이 많은 작품 한 줄
+      required:
+        - title
+        - wishlistUserCount
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+        wishlistUserCount:
+          type: integer
+          format: int32
+          description: 이 작품을 찜한 사용자 수("다 봤음" 제외, 작품 단위). 최소 인원 미만 작품은 목록에 없다
+    WishlistedTitleList:
+      type: object
+      required:
+        - minUserCount
+        - dataAsOf
+        - items
+      properties:
+        minUserCount:
+          type: integer
+          format: int32
+          description: 목록에 넣는 최소 찜 사용자 수(이보다 적은 작품은 뺀다)
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일(KST)
+        items:
+          type: array
+          description: 찜 사용자 수 많은 순(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/WishlistedTitle'
+    CommonResponseWishlistedTitleList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/WishlistedTitleList'
+      example:
+        success: true
+        data:
+          minUserCount: 3
+          dataAsOf: '2026-10-18'
+          items:
+            - title:
+                mediaType: movie
+                tmdbId: 496243
+                title: 기생충
+                releaseYear: 2019
+                posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+                availabilities:
+                  - ottServiceId: 1
+                    status: AVAILABLE
+              wishlistUserCount: 12
+    ArrivalType:
+      type: string
+      description: 새로 볼 수 있게 된 이유. ARRIVAL 입고(없음·모름에서 있음으로 바뀜을 확인) / RELEASE 공개(첫 수집부터 있음이지만 공개일이 최근)
+      enum:
+        - ARRIVAL
+        - RELEASE
+    NewlyAvailableTitle:
+      type: object
+      description: 새로 볼 수 있게 된 작품 한 줄
+      required:
+        - title
+        - ottServiceId
+        - arrivalType
+        - availableSince
+      properties:
+        title:
+          $ref: '#/components/schemas/TitleSearchItem'
+        ottServiceId:
+          type: integer
+          format: int64
+          description: 새로 볼 수 있게 된 서비스
+        arrivalType:
+          $ref: '#/components/schemas/ArrivalType'
+        availableSince:
+          type: string
+          format: date
+          description: 기준 날짜(KST). ARRIVAL이면 있음으로 바뀐 것을 확인한 날, RELEASE면 공개일(실제 서비스 입고일이 아니라 우리가 확인한 범위의 날짜)
+    NewlyAvailableTitleList:
+      type: object
+      required:
+        - dataAsOf
+        - items
+      properties:
+        dataAsOf:
+          type: string
+          format: date
+          description: 제공 상태의 데이터 기준일(KST)
+        items:
+          type: array
+          description: 기준 날짜가 최근인 순(없으면 빈 배열)
+          items:
+            $ref: '#/components/schemas/NewlyAvailableTitle'
+    CommonResponseNewlyAvailableTitleList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NewlyAvailableTitleList'
+      example:
+        success: true
+        data:
+          dataAsOf: '2026-10-18'
+          items:
+            - title:
+                mediaType: movie
+                tmdbId: 496243
+                title: 기생충
+                releaseYear: 2019
+                posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+                availabilities:
+                  - ottServiceId: 4
+                    status: AVAILABLE
+              ottServiceId: 4
+              arrivalType: ARRIVAL
+              availableSince: '2026-10-15'
+    Genre:
+      type: object
+      description: 탐색용 장르 하나(TMDB 장르)
+      required:
+        - genreId
+        - name
+      properties:
+        genreId:
+          type: integer
+          format: int32
+          description: TMDB 장르 ID
+        name:
+          type: string
+          description: 한국어 장르 이름
+    CommonResponseGenreList:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Genre'
+      example:
+        success: true
+        data:
+          - genreId: 16
+            name: 애니메이션
+          - genreId: 80
+            name: 범죄
+    TitleExplorePage:
+      description: 탐색 결과 한 페이지(페이지네이션 고정 형태 + 데이터 기준일)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - dataAsOf
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/TitleSearchItem'
+            dataAsOf:
+              type: string
+              format: date
+              description: 제공 상태의 데이터 기준일(KST)
+    CommonResponseTitleExplorePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TitleExplorePage'
+      example:
+        success: true
+        data:
+          content:
+            - mediaType: movie
+              tmdbId: 496243
+              title: 기생충
+              releaseYear: 2019
+              posterPath: /mSi0gskYpmf1FbXngM37s2HppXh.jpg
+              availabilities:
+                - ottServiceId: 1
+                  status: AVAILABLE
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          dataAsOf: '2026-10-18'
+    ExclusiveTitle:
+      type: object
+      description: 독점 목록의 작품 하나. "확인된 범위에서 7개 서비스 중 이 서비스에서만 구독으로 볼 수 있는 작품"이다(PRD FR-04)
+      required:
+        - mediaType
+        - tmdbId
+        - title
+        - releaseYear
+        - posterPath
+        - exclusiveSeasonNumbers
+        - comparedServiceCount
+        - unknownElsewhereCount
+      properties:
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        tmdbId:
+          type: integer
+          format: int64
+          description: TMDB ID. 작품 상세 주소(`/public/titles/{mediaType}/{tmdbId}`)에 쓴다
+        title:
+          type: string
+          description: 한국어 제목
+        releaseYear:
+          type: integer
+          format: int32
+          nullable: true
+          description: 개봉(첫 방영) 연도. 모르면 null
+        posterPath:
+          type: string
+          nullable: true
+          description: TMDB 포스터 상대 경로. 없으면 null
+        exclusiveSeasonNumbers:
+          type: array
+          nullable: true
+          description: 드라마에서 이 서비스 독점으로 확인된 시즌 번호(오름차순). 같은 드라마라도 일부 시즌만 독점일 수 있다. 영화는 null
+          items:
+            type: integer
+            format: int32
+        comparedServiceCount:
+          type: integer
+          format: int32
+          description: 비교한 다른 서비스 수. 구조적 공백(쿠팡플레이 영화)은 세지 않아 영화는 보통 5, 드라마는 6이다
+        unknownElsewhereCount:
+          type: integer
+          format: int32
+          description: 비교한 다른 서비스 중 제공 여부가 "모름"인 곳의 수. 0보다 크면 다른 곳에도 있을 수 있다. 드라마는 독점 시즌 중 가장 큰 값
+    ExclusiveTitlePage:
+      description: 서비스별 독점 목록 한 페이지(페이지네이션 고정 형태 + 서비스 ID·판정 여부·데이터 기준일)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - ottServiceId
+            - isJudged
+            - dataAsOf
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/ExclusiveTitle'
+            ottServiceId:
+              type: integer
+              format: int64
+              description: 요청한 서비스 ID
+            isJudged:
+              type: boolean
+              description: 독점 목록을 판정했는지. 현재는 모든 서비스가 true다(계약 호환을 위해 필드를 남겼다). 데이터 충분도가 낮은 서비스(`dataQuality`가 `INSUFFICIENT`)는 일부 구간(쿠팡플레이 영화)을 판정에서 빼고, 그 서비스의 `dataQuality`로 화면이 안내한다
+            dataAsOf:
+              type: string
+              format: date
+              description: 독점을 계산한 제공 상태의 데이터 기준일(KST)
+    CommonResponseExclusiveTitlePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ExclusiveTitlePage'
+      example:
+        success: true
+        data:
+          content:
+            - mediaType: tv
+              tmdbId: 1396
+              title: 브레이킹 배드
+              releaseYear: 2008
+              posterPath: /ggFHVNu6YYI5L9pCfOacjizRGt.jpg
+              exclusiveSeasonNumbers: [1, 2]
+              comparedServiceCount: 6
+              unknownElsewhereCount: 1
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          ottServiceId: 1
+          isJudged: true
+          dataAsOf: '2026-10-18'
+
+    # ----- auth -----
+    AccessToken:
+      type: object
+      description: 새 Access Token. Refresh Token은 HttpOnly 쿠키로만 오가며 본문에 담지 않는다
+      required:
+        - accessToken
+        - role
+      properties:
+        accessToken:
+          type: string
+          description: Access Token(JWT, 수명 30분). 프론트는 메모리에만 둔다
+        role:
+          type: string
+          enum:
+            - USER
+            - ADMIN
+          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다
+    CommonResponseAccessToken:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AccessToken'
+      example:
+        success: true
+        data:
+          accessToken: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.example-signature
+          role: USER

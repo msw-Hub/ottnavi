@@ -1,0 +1,21 @@
+package com.ottnavi.admin.dto.request;
+
+import com.ottnavi.collect.job.CollectScope;
+import com.ottnavi.collect.job.CollectTier;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
+
+/**
+ * 수집 실행 요청(계약 CreateCollectExecutionRequest).
+ *
+ * @param targetDate 수집 기준 날짜. 비우면 오늘(KST). 오늘이 아닌 날짜는 로컬 프로필에서만 받는다
+ * @param tier       수집 범위. ALL 전체, DAILY 찜한 작품만, WEEKLY 후보 발견 + 나머지 작품(Task 077)
+ * @param scope      일부 Step만 실행하는 범위. 비우면 전체. 값이 있으면 로컬 프로필에서만 받는다
+ */
+public record CreateCollectExecutionRequest(
+		@Schema(nullable = true, example = "2026-10-12") LocalDate targetDate,
+		@NotNull(message = "수집 범위는 필수입니다.")
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "ALL") CollectTier tier,
+		@Schema(nullable = true, example = "AVAILABILITY_TV") CollectScope scope) {
+}

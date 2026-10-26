@@ -1,0 +1,60 @@
+{
+  "name" : "case-07-greedy-worse-than-exact",
+  "note" : "그리디가 완전탐색보다 나쁜 소규모(상품 2개, 안내서 5절 3번 예시). 월 시청 600분, 월 예산 10,000원. 작품X(WANT 1,000분)는 서비스1에만 있어 600+400분으로 두 달 연속 구독해야 끝난다. 손계산: 완전탐색(추천형)은 서비스1 두 달(20,000원)+서비스2 한 달(8,000원)로 점수 4, 28,000원, [[2],[1],[1]]다(점수·비용이 같은 [[1],[1],[2]]보다 작품Y를 0번째 달에 시청 완료해 0번째 달까지 점수 2를 얻는 조기 시청이 앞서므로 [[2],[1],[1]]이다). 그리디는 첫 달에 당장 끝나는 작품Y(2점)를 위해 서비스2만 고르고 이어 보기가 필요한 작품X를 놓쳐 점수 2, 8,000원, [[2],[],[]]이다.",
+  "expectationBasis" : "ORACLE",
+  "dataAsOf" : "2026-10-01",
+  "monthlyBudget" : 10000,
+  "monthlyWatchMinutes" : 600,
+  "products" : [ {
+    "id" : 1,
+    "name" : "서비스1",
+    "monthlyPrice" : 10000,
+    "condition" : "NONE"
+  }, {
+    "id" : 2,
+    "name" : "서비스2",
+    "monthlyPrice" : 8000,
+    "condition" : "NONE"
+  } ],
+  "units" : [ {
+    "id" : 1,
+    "name" : "작품X",
+    "priority" : "WANT",
+    "requiredMinutes" : 1000,
+    "watchableProductIds" : [ 1 ],
+    "providerUnknown" : false
+  }, {
+    "id" : 2,
+    "name" : "작품Y",
+    "priority" : "WANT",
+    "requiredMinutes" : 300,
+    "watchableProductIds" : [ 2 ],
+    "providerUnknown" : false
+  } ],
+  "expected" : {
+    "RECOMMENDED" : {
+      "months" : [ [ 2 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 0,
+      "score" : 4,
+      "totalCost" : 28000
+    },
+    "SAVER" : {
+      "months" : [ [ 2 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 0,
+      "score" : 4,
+      "totalCost" : 28000
+    },
+    "SIMPLE" : {
+      "months" : [ [ 2 ], [ 1 ], [ 1 ] ],
+      "mustCompleted" : 0,
+      "score" : 4,
+      "totalCost" : 28000
+    }
+  },
+  "greedyExpected" : {
+    "months" : [ [ 2 ], [ ], [ ] ],
+    "mustCompleted" : 0,
+    "score" : 2,
+    "totalCost" : 8000
+  }
+}
