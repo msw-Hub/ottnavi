@@ -12,6 +12,9 @@ spring:
       thread-name-prefix: async-
       pool:
         core-size: 2              # 메일 한 통을 보내는 동안 다른 요청이 막히지 않을 만큼만. 큐는 기본(무제한)
+      shutdown:
+        await-termination: true         # 재배포(종료) 때 큐에 남은 가입 안내 알림 생성 작업이 버려지지 않게 끝날 때까지 기다린다
+        await-termination-period: 30s   # 무한정 기다리지 않도록 상한을 둔다
   jackson:
     deserialization:
       accept-float-as-int: false  # 정수 필드에 소수(9900.5)가 오면 버림으로 통과시키지 않고 400으로 거절한다
