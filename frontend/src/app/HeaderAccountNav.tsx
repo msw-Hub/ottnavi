@@ -1,27 +1,27 @@
 import { HeartIcon } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { useListWishlistItems } from '@/api/generated/wishlist/wishlist'
+import { HeaderAccountMenu } from '@/app/HeaderAccountMenu'
 import { MockRoleSwitcher } from '@/app/MockRoleSwitcher'
-import { useLogout } from '@/hooks/useLogout'
+// import { useLogout } from '@/hooks/useLogout' // 이전: 머리글 로그아웃 버튼용
 import { useSession } from '@/hooks/useSession'
 import { getMockRequestParams } from '@/lib/mockScenario'
 import { cn } from '@/lib/utils'
 
 /**
- * 머리글 오른쪽의 계정 영역이다. 비로그인이면 "로그인" 링크, 로그인했으면 찜 하트(개수 배지)·관리(ADMIN만)·"로그아웃"을 보인다.
- * 이전: 로그인했으면 사용자 표시("회원"/"관리자")와 "로그아웃"을 보였다(역할 표시는 HANDOFF 5-1 #3으로 없앴다).
+ * 머리글 오른쪽의 계정 영역이다. 비로그인이면 "로그인" 링크, 로그인했으면 찜 하트(개수 배지)와 "내 메뉴" 드롭다운(HeaderAccountMenu)을 보인다.
+ * 이전: 하트 옆에 관리 링크(ADMIN만)와 "로그아웃" 버튼이 따로 있었다. 둘 다 "내 메뉴" 안으로 옮겼다.
  *
  * 로그인 상태는 hooks/useSession이 준다(실제 환경은 authStore, 목업 모드는 개발용 전환 토글의 역할).
  * 재발급을 확인하는 중(checking)에는 계정 영역을 비워 둔다(로그인한 사용자에게 "로그인" 링크가 잠깐 보였다 사라지는 깜빡임을 피한다).
- * 로그아웃은 POST /api/auth/logout을 부른다(hooks/useLogout).
- * 머리글에는 찜 목록(하트)만 둔다. 설정·요금·플랜 화면으로 가는 상시 메뉴를 머리글에 둘지는 정해지지 않았다(HANDOFF 5-1의 UI 의견 참고).
+ * 로그아웃은 메뉴 안에서 POST /api/auth/logout을 부른다(hooks/useLogout).
  *
  * 머리글 높이를 키우지 않으려고 모두 text-sm 한 줄이고 개발용 전환은 h-6이다(토스트 시작 위치가 머리글 높이에 맞춰져 있다).
  */
 export function HeaderAccountNav() {
   const session = useSession()
   const location = useLocation()
-  const logout = useLogout()
+  // const logout = useLogout() // 이전: 머리글 로그아웃 버튼용. HeaderAccountMenu로 옮겼다
   // 비로그인으로 그릴 상태: guest, 그리고 재발급 오류(error: 로그인 여부를 몰라 로그인 링크를 남겨 둔다)
   const isGuest = session.status === 'guest' || session.status === 'error'
 
@@ -41,10 +41,10 @@ export function HeaderAccountNav() {
   const mockParams = new URLSearchParams(getMockRequestParams()).toString()
   const wishlistSearch = mockParams ? `?${mockParams}` : ''
 
-  // 로그아웃: 서버에 폐기를 요청하고, 메모리의 토큰·쿼리 캐시를 비운 뒤 첫 화면으로 보낸다(hooks/useLogout)
-  function handleLogout() {
-    void logout()
-  }
+  // 이전: 로그아웃 버튼이 여기 있었다. 지금은 HeaderAccountMenu가 useLogout을 직접 쓴다
+  // function handleLogout() {
+  //   void logout()
+  // }
 
   // 링크·버튼은 min-h-10(40px)·좌우 px-1로 누르는 영역을 넓혔다(Task 037 ⑫). -my-2(위아래 -8px)는 넓힌 높이가 레이아웃 높이에는 안 잡히게 하는 장치다:
   // 그냥 40px로 두면 모바일 머리글 윗줄(로고 26px)이 40px로 커져 머리글이 103px → 117px이 되고 토스트 위치(--header-height)와 어긋난다.
@@ -73,7 +73,7 @@ export function HeaderAccountNav() {
           {/*
             하트 아이콘 + 개수 배지(HANDOFF 5-1 #2). 글자 "찜 목록"을 아이콘으로 바꿔 375px 윗줄의 폭을 아꼈다.
             - 누르는 영역: 40x40px(size-10) 정사각형. -my-2는 다른 링크와 같은 이유로 머리글 높이를 키우지 않게 하는 장치다.
-            - mr-2: 하트와 "로그아웃"이 너무 붙어 보인다는 사용자 의견으로 오른쪽 간격 8px을 더했다(관리 링크가 없을 때 특히 가깝다).
+            - mr-2: 하트와 오른쪽 이웃("로그아웃" 글자였고 지금은 "내 메뉴" 버튼)이 너무 붙어 보인다는 사용자 의견으로 오른쪽 간격 8px을 더했다.
             - 배지: 계산 대상 개수(activeItemCount)가 1 이상일 때만 하트 오른쪽 위에 겹쳐 숫자로 보인다(최대 20이라 두 자리까지).
               0개·불러오는 중·실패일 때는 배지 없이 하트만 둔다(0을 굳이 보이면 "아무 일 없음"을 강조하는 꼴이 된다).
               색만으로 알리지 않고 숫자 자체를 보이며, 배지 바탕(primary)과 글자(primary-foreground)는 shadcn 기본 짝이라 대비를 맞춰 둔 값이다.
@@ -120,31 +120,28 @@ export function HeaderAccountNav() {
             )}
           </Link>
           {/*
-            관리자(ADMIN)에게만 보이는 관리 화면 진입점(홈 1차안). 역할은 useSession 값을 읽어 표시만 바꾸는 것이고,
-            실제 권한 검사는 백엔드와 라우트 가드(RequireAdmin)가 한다. 링크를 숨긴다고 관리자 화면이 막히는 것은 아니다.
+            "내 메뉴" 드롭다운(시안 A). 관리 화면 진입점(ADMIN만)과 로그아웃이 이 안으로 옮겨졌다.
+            역할은 useSession 값을 읽어 표시만 바꾸는 것이고, 실제 권한 검사는 백엔드와 라우트 가드(RequireAdmin)가 한다.
+            찜 개수는 위 하트와 같은 값을 내려 보내 요청이 한 번만 나가게 한다.
           */}
-          {session.role === 'ADMIN' && (
-            <Link
-              to="/admin/collect"
-              className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
-            >
-              관리
-            </Link>
-          )}
+          <HeaderAccountMenu
+            isAdmin={session.role === 'ADMIN'}
+            wishlistCount={wishlistCount}
+            search={wishlistSearch}
+          />
           {/*
-            역할 표시("회원"/"관리자")는 없앴다(HANDOFF 5-1 #3): 사용자에게 필요 없는 정보이고, 관리자는 "관리" 링크로 이미 구분된다.
-            이전:
+            이전: 관리 링크와 로그아웃 버튼이 머리글에 따로 있었다.
+            {session.role === 'ADMIN' && (
+              <Link to="/admin/collect"
+                className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline">관리</Link>
+            )}
+            역할 표시("회원"/"관리자")는 HANDOFF 5-1 #3으로 없앴다:
             <span className="text-sm text-muted-foreground max-sm:sr-only">
               {session.role === 'ADMIN' ? '관리자' : '회원'}
             </span>
+            <button type="button" onClick={handleLogout}
+              className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline">로그아웃</button>
           */}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="-my-2 inline-flex min-h-10 items-center px-1 text-sm underline-offset-4 hover:underline"
-          >
-            로그아웃
-          </button>
         </>
       )}
     </nav>

@@ -1,11 +1,11 @@
 import { useRef } from 'react'
-import { Link, Outlet, useLocation } from 'react-router'
+import { Link, Outlet } from 'react-router'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
 import { HeaderPrimaryNav } from '@/app/HeaderPrimaryNav'
 import { TitleSearchForm } from '@/components/common/TitleSearchForm'
 import { WishlistAddedDialog } from '@/components/common/WishlistAddedDialog'
-import { isMockMode } from '@/lib/mockScenario'
+// import { isMockMode } from '@/lib/mockScenario' // 이전: 개발용 이동 링크(주석 처리됨)용
 
 // 이전(홈 1차안 첫 판): 본문에 큰 검색창이 있는 화면에서 머리글 검색창을 숨기던 목록. 검색창을 머리글로 통일하며 쓰지 않는다
 // const PAGES_WITH_OWN_SEARCH = ['/', '/search']
@@ -18,8 +18,8 @@ import { isMockMode } from '@/lib/mockScenario'
  * 색은 디자인 토큰(bg-background, text-muted-foreground 등)만 쓴다.
  */
 export function RootLayout() {
-  // 개발용 이동 링크가 목업 확인용 주소 파라미터(?mockScenario=… 등)를 이어 붙이도록 현재 주소의 쿼리를 읽는다
-  const { search } = useLocation()
+  // 이전: 개발용 이동 링크가 목업 확인용 주소 파라미터를 이어 붙이도록 현재 주소의 쿼리를 읽었다(링크를 주석 처리해 쓰지 않는다)
+  // const { search } = useLocation()
   // 머리글의 실제 높이를 재서 토스트 위치 변수에 반영한다(줄 수가 바뀌어도 토스트가 머리글을 덮지 않게, Task 090)
   const headerRef = useRef<HTMLElement>(null)
   useMeasuredHeaderHeight(headerRef)
@@ -95,39 +95,18 @@ export function RootLayout() {
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>
           {/*
-            목업 확인용 이동 링크(Task 028). 로그인 후 화면(SCR-07~10)으로 가는 상시 메뉴가 없어서(머리글에는 찜 목록만 있다),
-            주소를 직접 입력하면 새로고침으로 목업 로그인·찜 상태가 사라져 화면 사이를 옮겨 다니며 확인할 수 없어 둔다.
-            목업 모드에서만 보이고 운영에서는 그려지지 않는다. 상시 "내 메뉴"가 생기면 이 줄은 지운다.
-          */}
+            이전: 목업 확인용 "개발용 이동" 링크(Task 028). 로그인 후 화면으로 가는 상시 메뉴가 없어 목업 모드에만 두었다.
+            머리글 "내 메뉴"(HeaderAccountMenu)가 생겨 지운다(주석 처리). 목업 파라미터는 메뉴 링크가 이어 붙인다.
           {isMockMode() && (
             <nav aria-label="개발용 이동" className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>개발용 이동</span>
-              <Link
-                to={{ pathname: '/settings', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                내 설정
-              </Link>
-              <Link
-                to={{ pathname: '/wishlist', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                찜 목록
-              </Link>
-              <Link
-                to={{ pathname: '/pricing', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                요금 확인
-              </Link>
-              <Link
-                to={{ pathname: '/plan', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                플랜 결과
-              </Link>
+              <Link to={{ pathname: '/settings', search }} className="inline-flex min-h-10 items-center underline-offset-4 hover:underline">내 설정</Link>
+              <Link to={{ pathname: '/wishlist', search }} className="...">찜 목록</Link>
+              <Link to={{ pathname: '/pricing', search }} className="...">요금 확인</Link>
+              <Link to={{ pathname: '/plan', search }} className="...">플랜 결과</Link>
             </nav>
           )}
+          */}
         </div>
       </footer>
 
