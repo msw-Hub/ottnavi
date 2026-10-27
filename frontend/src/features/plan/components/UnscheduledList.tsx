@@ -1,5 +1,6 @@
 import { CircleCheckIcon } from 'lucide-react'
 import { WISHLIST_PRIORITY_LABELS } from '@/components/common/displayTypes'
+import { PageSection } from '@/components/common/PageSection'
 import {
   comparePriority,
   formatAssignmentTitle,
@@ -22,10 +23,10 @@ export function UnscheduledList({ items }: UnscheduledListProps) {
   const sorted = [...items].sort(comparePriority)
 
   return (
-    <section aria-labelledby="plan-unscheduled-heading" className="grid gap-3">
-      <h2 id="plan-unscheduled-heading" className="text-lg font-semibold">
-        남은 작품과 이유
-      </h2>
+    // 구간 제목·간격은 공통 PageSection이 맡는다(제목 h2 text-xl bold, 제목과 내용 사이 16px. styles/tokens.css R3·R4).
+    // 이전: <section aria-labelledby="plan-unscheduled-heading" className="grid gap-3">
+    //         <h2 id="plan-unscheduled-heading" className="text-lg font-semibold">남은 작품과 이유</h2>
+    <PageSection headingId="plan-unscheduled-heading" title="남은 작품과 이유">
       {sorted.length === 0 ? (
         <p className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm">
           <CircleCheckIcon aria-hidden="true" className="size-4 shrink-0" />
@@ -59,6 +60,6 @@ export function UnscheduledList({ items }: UnscheduledListProps) {
           })}
         </ul>
       )}
-    </section>
+    </PageSection>
   )
 }

@@ -66,9 +66,12 @@ export function SeasonSection({
   const isAnyRuntimeEstimated = seasons.some((season) => season.isRuntimeEstimated)
 
   return (
-    <section className="grid gap-3">
+    // 구간 제목 h2 text-xl bold, 제목 줄과 내용 사이 16px(gap-section-inner)로 맞췄다(styles/tokens.css R3·R4).
+    // 제목 옆 합계 줄과 "모든 시즌의 제공처가 같습니다" 안내, 시즌 카드가 모두 이 section의 직접 자식이라 이 값 하나로 띄운다.
+    // 이전: <section className="grid gap-3"> … <h2 className="text-lg font-semibold">
+    <section className="grid gap-section-inner">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-lg font-semibold">시즌별 제공처와 시청 시간</h2>
+        <h2 className="text-xl font-bold">시즌별 제공처와 시청 시간</h2>
         {seasons.length > 0 && (
           <p className="text-sm text-muted-foreground tabular-nums">
             시즌 {seasons.length}개 · 총 {formatMinutes(totalRuntimeMin)}
