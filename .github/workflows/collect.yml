@@ -4,8 +4,10 @@ name: collect
 # 재계산(Task 069)과 월초 알림 생성(Task 073)은 백엔드가 수집 Job 완료 뒤 이어서 실행하므로 단계를 추가하지 않는다(R-21).
 #
 # 계층별 갱신(Task 077): 같은 워크플로를 cron 두 개가 나눠 쓴다. 어떤 cron이 깨웠는지(github.event.schedule)로 tier를 고른다.
-#   - DAILY : 월~토 03:17 KST. 찜한 작품만 상세·제공 상태를 다시 받는다(후보 발견 생략, 호출량이 작다)
-#   - WEEKLY: 일 03:17 KST. 후보 발견 + 찜하지 않은 나머지 작품을 다시 받는다(전체 수집과 비슷한 분량)
+#   - DAILY : 수요일을 뺀 매일(월·화·목·금·토·일) 03:17 KST. 찜한 작품만 상세·제공 상태를 다시 받는다(후보 발견 생략, 호출량이 작다)
+#   - WEEKLY: 수 03:17 KST. 후보 발견 + 찜하지 않은 나머지 작품을 다시 받는다(전체 수집과 비슷한 분량, 8시간쯤 걸린다)
+#     WEEKLY를 일요일에서 수요일로 옮긴 이유(2026-10-27 사용자 결정): 오래 걸리는 큰 작업은 실패했을 때 바로 확인하고 복구할 수 있는 평일에 둔다.
+#     WEEKLY가 도는 날은 DAILY가 돌지 않는다(두 cron의 요일이 겹치지 않는다).
 #   - 수동 실행(workflow_dispatch)은 입력 tier를 쓴다(기본 ALL = 전체)
 #
 # schedule은 켜 둔 상태다(Task 093). 다만 기본 브랜치(main)의 파일만 실행되므로 develop에서는 돌지 않고, develop → main 병합(Task 095) 때 켜진다.
@@ -31,8 +33,10 @@ on:
         default: ALL
   schedule:
     # UTC 기준. 18:17 UTC = KST 03:17(정각을 피한 분, 정각에는 지연될 수 있다). 요일은 UTC 기준이라 KST보다 하루 앞선다
-    - cron: '17 18 * * 0-5'   # DAILY : UTC 일~금 = KST 월~토 03:17
-    - cron: '17 18 * * 6'     # WEEKLY: UTC 토 = KST 일 03:17
+    # - cron: '17 18 * * 0-5'   # (이전) DAILY : UTC 일~금 = KST 월~토 03:17
+    # - cron: '17 18 * * 6'     # (이전) WEEKLY: UTC 토 = KST 일 03:17
+    - cron: '17 18 * * 0,1,3,4,5,6'   # DAILY : UTC 일·월·수·목·금·토 = KST 월·화·목·금·토·일 03:17
+    - cron: '17 18 * * 2'             # WEEKLY: UTC 화 = KST 수 03:17
 
 permissions:
   contents: read
@@ -51,7 +55,7 @@ jobs:
           ORIGIN_SECRET: ${{ secrets.ORIGIN_SECRET }}
           ADMIN_BATCH_TOKEN: ${{ secrets.ADMIN_BATCH_TOKEN }}
           # 수동 실행은 입력값, 예약 실행은 WEEKLY cron이면 WEEKLY, 그 밖(DAILY cron)은 DAILY
-          TIER: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || (github.event.schedule == '17 18 * * 6' && 'WEEKLY' || 'DAILY') }}
+          TIER: ${{ github.event_name == 'workflow_dispatch' && inputs.tier || (github.event.schedule == '17 18 * * 2' && 'WEEKLY' || 'DAILY') }}
         run: |
           set -u
           # 오리진 비밀 헤더와 배치 토큰이 평문으로 나가지 않도록 https 주소가 아니면 중단한다

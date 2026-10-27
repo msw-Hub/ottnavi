@@ -16,7 +16,7 @@ interface ScrollRailProps {
  * - 키보드: Tab으로 카드 제목 링크를 차례로 옮기면 브라우저가 그 카드가 보이게 알아서 옆으로 넘긴다. 따로 키를 배울 필요가 없다.
  * - 마우스(640px 이상): 줄 양 끝의 화살표 버튼으로 한 화면(보이는 폭의 80%)씩 넘긴다. 끝에 닿으면 그쪽 버튼은 비활성(disabled)이 되고 화면에서도 사라진다(카드를 가리지 않게).
  *   모바일에서는 손가락으로 미는 것이 자연스러워 버튼을 숨긴다.
- * - 움직임 줄이기(prefers-reduced-motion)를 켠 사용자에게는 부드러운 스크롤 대신 바로 넘긴다.
+ * - 움직임 줄이기(prefers-reduced-motion)를 켠 사용자에게는 부드러운 스크롤 대신 바로 넘기고, 줄의 밝기를 잠깐 되살려 넘어간 것을 알린다(scrollByPage).
  *
  * 모양: 모바일에서는 줄이 화면 끝까지 닿게(-mx-4 px-4) 해서 "옆에 더 있다"는 것이 잘린 카드로 보이게 한다.
  * 위아래 py-2는 카드 포커스 링(2px + 간격 2px)이 가로 스크롤 영역에 잘리지 않게 하는 여백이다(py-1이면 서비스 탭처럼 아래쪽이 잘릴 수 있다)(가로 스크롤 영역은 세로로도 내용을 자른다).
@@ -53,11 +53,20 @@ export function ScrollRail({ label, isOrdered = false, children }: ScrollRailPro
   function scrollByPage(direction: -1 | 1) {
     const list = listRef.current
     if (!list) return
+    // 1. 동작 줄이기 설정인지 본다(Windows "애니메이션 효과" 끔도 브라우저에서는 이 설정으로 잡힌다)
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    // 2. 평소에는 부드럽게 미끄러지고(smooth), 동작 줄이기면 옆으로 미끄러지는 움직임 없이 바로 넘긴다(auto)
     list.scrollBy({
       left: direction * list.clientWidth * 0.8,
       behavior: prefersReducedMotion ? 'auto' : 'smooth',
     })
+    // 3. 동작 줄이기에서 바로 넘기면 카드가 "뚝" 바뀌어 넘어간 것을 알아채기 어렵다(운영 피드백 "효과 없이 바로 넘어간다").
+    //    위치는 움직이지 않고 줄 전체의 밝기만 35% → 100%로 0.28초 동안 되살려 "바뀌었다"는 것만 알린다(진행 창의 animate-breathe와 같은 원칙).
+    //    한 번 누를 때 한 번뿐이라 깜빡임 기준(초당 3회)과도 멀다. Web Animations API(element.animate)는 끝나면 스스로 사라져 정리할 것이 없다.
+    //    animate가 없는 환경(테스트용 jsdom)에서는 건너뛴다
+    if (prefersReducedMotion && typeof list.animate === 'function') {
+      list.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' })
+    }
   }
 
   const ListTag = isOrdered ? 'ol' : 'ul'

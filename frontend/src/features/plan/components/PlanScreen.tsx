@@ -315,7 +315,8 @@ function PlanResult({
         )} */}
         {isSaving && (
           <p className="flex items-center gap-2 text-sm font-semibold">
-            <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
+            {/* loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin */}
+            <LoaderCircleIcon aria-hidden="true" className="size-4 loading-spin" />
             플랜을 저장하고 있어요. 데이터가 바뀌었다면 다시 계산해요
           </p>
         )}
@@ -389,7 +390,8 @@ function PlanResult({
           className="h-12 w-full text-base md:w-auto md:px-6"
         >
           {isSaving ? (
-            <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
+            // loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin
+            <LoaderCircleIcon aria-hidden="true" className="loading-spin" />
           ) : (
             <SaveIcon aria-hidden="true" />
           )}

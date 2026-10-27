@@ -2,7 +2,8 @@ import { useEffect, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
-import { Link, useLocation, useNavigate } from 'react-router'
+// import { Link, ... } — 이전: 아래 회원 탈퇴 링크용. 링크를 푸터로 옮겨 Link를 쓰지 않는다
+import { useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
@@ -313,9 +314,8 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
           </Alert>
         )}
         <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={save.isPending}>
-          {save.isPending && (
-            <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
-          )}
+          {/* loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin */}
+          {save.isPending && <LoaderCircleIcon aria-hidden="true" className="loading-spin" />}
           {save.isPending ? '저장하는 중' : '저장하기'}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
@@ -323,17 +323,19 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
         </p>
       </section>
 
-      {/* 회원 탈퇴 링크(SCR-13, Task 081). 눈에 덜 띄도록 폼 맨 아래 오른쪽 구석에 작은 빨간 글자로만 둔다(사용자 확정).
-          첫 방문(온보딩)에는 아직 가입을 마치기 전이라 보이지 않는다. 빨간색만으로 뜻을 전하지 않고 "회원 탈퇴" 글자가 있다.
-          높이 44px(min-h-11)는 글자는 작아도 누르는 영역은 터치 크기를 맞추려는 것이다 */}
-      {settings.isOnboardingDone && (
-        <Link
-          to="/settings/withdraw"
-          className="inline-flex min-h-11 items-center justify-self-end rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          회원 탈퇴
-        </Link>
-      )}
+      {/*
+        이전: 회원 탈퇴 링크(SCR-13, Task 081)가 여기(폼 맨 아래 오른쪽 구석, 작은 빨간 글자)에 있었다.
+        옮긴 이유: 저장 버튼 바로 아래 빨간 글자가 내 설정과 상관없어 보여 뜬금없다는 운영 피드백이 있었고,
+        사용자 확정으로 푸터(app/RootLayout.tsx, 로그인한 사용자에게만, 회색 글자)로 옮겼다. 이동 경로(/settings/withdraw)는 같다.
+        {settings.isOnboardingDone && (
+          <Link
+            to="/settings/withdraw"
+            className="inline-flex min-h-11 items-center justify-self-end rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            회원 탈퇴
+          </Link>
+        )}
+      */}
     </form>
   )
 }
