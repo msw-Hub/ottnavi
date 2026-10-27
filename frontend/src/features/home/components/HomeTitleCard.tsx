@@ -27,6 +27,9 @@ interface HomeTitleCardProps {
   leadServiceId?: number // 로고에서 맨 앞에 둘 서비스 ID(예: 새로 볼 수 있게 된 줄의 그 서비스). 로고가 3개까지만 보여 뒤로 밀려 숨지 않게 한다
   isServiceInfoHidden?: boolean // true면 정보 줄의 제공 상태 글자("제공 정보 수집 전" 등)를 붙이지 않는다. 로고는 그대로 보인다(이전: 배지·칩 줄 전체를 숨겼다)
   isFeatured?: boolean // true면 큰 카드(홈 첫 줄 "서비스별 인기 순위"). 순위 숫자·포스터 해상도·제목 글자를 키운다. 폭은 ScrollRailItem의 isFeatured가 정한다
+  // true면 포스터 오른쪽 위의 "볼 수 있는 곳" OTT 로고를 그리지 않는다. 홈 "서비스 독점 작품" 줄 전용: 위 서비스 탭이 이미 어느 서비스인지 말하고
+  // 모든 카드가 그 서비스 하나라 로고가 반복될 뿐이다(운영 피드백). 로고 자리는 포스터 위에 떠 있는(absolute) 요소라 빼도 카드 크기·정렬은 그대로다
+  isLogoHidden?: boolean
 }
 
 /**
@@ -56,6 +59,7 @@ export function HomeTitleCard({
   leadServiceId,
   isServiceInfoHidden = false,
   isFeatured = false,
+  isLogoHidden = false,
 }: HomeTitleCardProps) {
   const detailPath = `/titles/${title.mediaType}/${title.tmdbId}`
   const hasRank = rank !== undefined
@@ -132,12 +136,22 @@ export function HomeTitleCard({
                 detailPath={detailPath}
               />
             </div> */}
-        <AvailableServiceLogos
-          title={title}
-          services={services}
-          leadServiceId={leadServiceId ?? focusServiceId}
-          isFeatured={isFeatured}
-        />
+        {/* 독점 줄(isLogoHidden)은 로고를 그리지 않는다. 낭독기의 "볼 수 있는 곳" 목록도 함께 빠지지만 서비스 이름은 바로 위 탭이 알려 준다.
+            이전: 조건 없이 항상 그렸다
+            <AvailableServiceLogos
+              title={title}
+              services={services}
+              leadServiceId={leadServiceId ?? focusServiceId}
+              isFeatured={isFeatured}
+            /> */}
+        {!isLogoHidden && (
+          <AvailableServiceLogos
+            title={title}
+            services={services}
+            leadServiceId={leadServiceId ?? focusServiceId}
+            isFeatured={isFeatured}
+          />
+        )}
       </div>
 
       <div className={cn('grid min-w-0 content-start gap-1', hasRankColumn && 'col-start-2')}>

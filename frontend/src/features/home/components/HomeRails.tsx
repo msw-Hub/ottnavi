@@ -387,12 +387,16 @@ export function ExclusivesRail({ servicesQuery }: ExclusivesRailProps) {
               <ScrollRailItem key={`${title.mediaType}-${title.tmdbId}`}>
                 {/* 제공 상태 줄("넷플릭스 [있음]")을 숨긴다(운영 사용 피드백). 어느 서비스의 독점인지는 바로 위 탭이 이미 말하고,
                     독점 목록이라 모든 카드가 같은 "있음"이어서 반복될 뿐이다(독점 화면의 ExclusiveTitleCard도 같은 이유로 배지가 없다).
-                    이전: focusServiceId={service.ottServiceId}만 주고 isServiceInfoHidden은 없었다 */}
+                    이전: focusServiceId={service.ottServiceId}만 주고 isServiceInfoHidden은 없었다
+                    포스터 오른쪽 위 OTT 로고도 같은 이유로 뺀다(isLogoHidden, 운영 피드백). 모든 카드에 같은 로고 하나가 반복될 뿐이다.
+                    정보 줄은 isServiceInfoHidden이라 "볼 수 있는 곳" 글자도 없고 "영화/드라마 · 연도"만 남는다.
+                    이전: isLogoHidden 없음(로고가 보였다) */}
                 <HomeTitleCard
                   title={toHomeCardTitle(title, service.ottServiceId)}
                   services={services}
                   focusServiceId={service.ottServiceId}
                   isServiceInfoHidden
+                  isLogoHidden
                 />
               </ScrollRailItem>
             ))}
