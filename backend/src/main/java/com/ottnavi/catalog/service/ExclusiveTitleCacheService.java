@@ -11,7 +11,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 /**
- * 서비스별 독점 목록을 Redis `exclusiveTitles` 캐시에 두고 꺼내 쓴다(Task 078). 테이블은 따로 없다.
+ * 서비스별 독점 목록을 Redis `exclusiveTitlesV2` 캐시에 두고 꺼내 쓴다(Task 078). 테이블은 따로 없다.
  * 수집 Job이 성공으로 끝나면 {@link #refreshAll()}로 미리 계산해 채우고, 실패·정리로 데이터가 바뀌면 {@link #evictAll()}로 비운다.
  * 캐시가 비어 있으면(서버 재시작·TTL 만료·비운 뒤) {@link #get(long)}이 그 자리에서 계산해 채운다(캐시 미스 폴백).
  * 어노테이션 캐시가 아니라 Cache를 직접 쓰므로 CacheErrorHandler가 적용되지 않는다. 그래서 조회 경로({@link #get(long)})는

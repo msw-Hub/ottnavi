@@ -71,12 +71,16 @@ export function ScrollRail({ label, isOrdered = false, children }: ScrollRailPro
         isDisabled={edge.isAtStart}
         onClick={() => scrollByPage(-1)}
       />
+      {/* 가로 스크롤바를 숨긴다(독점 줄 ExclusiveTitleRail과 같은 방식). [scrollbar-width:none]은 Firefox·최신 Chromium,
+          [&::-webkit-scrollbar]:hidden은 Safari·예전 Chromium용이다. 숨겨도 넘길 수단은 그대로 남는다:
+          손가락·트랙패드 밀기, Tab 이동 시 자동 스크롤, 640px 이상의 양 끝 화살표 버튼, Shift+휠.
+          이전: [scrollbar-width:thin](얇은 스크롤바가 카드 아래에 보였다) */}
       <ListTag
         id={listId}
         ref={listRef}
         aria-label={label}
         onScroll={updateEdge}
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 py-2 [scrollbar-width:thin] sm:gap-4"
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overscroll-x-contain px-4 py-2 [scrollbar-width:none] sm:gap-4 [&::-webkit-scrollbar]:hidden"
       >
         {children}
       </ListTag>

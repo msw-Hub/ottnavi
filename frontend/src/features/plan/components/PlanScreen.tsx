@@ -2,12 +2,13 @@ import { useState, type ReactNode } from 'react'
 import {
   CalculatorIcon,
   CircleCheckIcon,
+  HeartIcon,
   HistoryIcon,
   InfoIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
   SaveIcon,
-  TriangleAlertIcon,
+  // TriangleAlertIcon, // 이전: "다시 계산하기" 실패 안내의 경고 아이콘
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
@@ -20,7 +21,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { PlanDetail } from '@/features/plan/components/PlanDetail'
 import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
-import { useCalculatePlan, useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
+// 이전: useCalculatePlan도 불러왔다("다시 계산하기" 버튼용)
+import { useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
 import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
@@ -44,7 +46,9 @@ export function PlanScreen() {
   const drafts = usePlanDrafts()
   const currentPlan = useCurrentPlan()
   const services = useOttServices()
-  const calculate = useCalculatePlan()
+  // 이전: 결과 화면 오른쪽 위 "다시 계산하기" 버튼용 계산 훅. 버튼을 "찜 목록 고치러 가기" 링크로 바꿔 더는 쓰지 않는다(운영 사용 피드백).
+  // 저장 중 409로 다시 계산하는 일은 useSavePlan 훅 안에서 하므로 이 훅이 없어도 그대로 동작한다
+  // const calculate = useCalculatePlan()
   const save = useSavePlan()
   const location = useLocation()
 
@@ -70,19 +74,21 @@ export function PlanScreen() {
         drafts={drafts.data}
         services={services.data}
         hasCurrentPlan={currentPlan.data != null}
-        isCalculating={calculate.isPending}
+        search={location.search}
         isSaving={save.isPending}
-        calculateError={calculate.isError ? calculate.error : null}
         saveError={save.isError && !hasNotFoundNotice ? save.error : null}
         hasRecalculatedNotice={hasRecalculatedNotice}
-        onRecalculate={() =>
-          calculate.mutate(undefined, {
-            onSuccess: () => {
-              setHasRecalculatedNotice(false)
-              setHasNotFoundNotice(false)
-            },
-          })
-        }
+        // 이전: "다시 계산하기" 버튼과 이어진 값들(버튼을 찜 목록 링크로 바꿔 쓰지 않는다)
+        // isCalculating={calculate.isPending}
+        // calculateError={calculate.isError ? calculate.error : null}
+        // onRecalculate={() =>
+        //   calculate.mutate(undefined, {
+        //     onSuccess: () => {
+        //       setHasRecalculatedNotice(false)
+        //       setHasNotFoundNotice(false)
+        //     },
+        //   })
+        // }
         onSave={(planId) => {
           setHasNotFoundNotice(false)
           save.mutate(
@@ -144,8 +150,9 @@ export function PlanScreen() {
         <Alert variant="destructive" role="alert">
           <AlertTitle>저장하려던 플랜을 찾지 못했어요</AlertTitle>
           <AlertDescription className="text-destructive/90">
+            {/* 이전 끝 문장: "…저장하거나, 다시 계산해 주세요." 결과 화면에 "다시 계산하기" 버튼이 없어져 갈 곳을 밝혔다 */}
             다시 계산했거나 이미 저장된 플랜일 수 있어요. 목록을 새로 불러왔으니 플랜을 다시 골라
-            저장하거나, 다시 계산해 주세요.
+            저장하거나, 요금 확인이나 찜 목록 화면에서 다시 계산해 주세요.
           </AlertDescription>
         </Alert>
       )}
@@ -227,12 +234,14 @@ interface PlanResultProps {
   drafts: PlanDraft[] // 플랜 유형 3종 초안(선택이 같은 것도 3개 그대로 온다)
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름 표시용)
   hasCurrentPlan: boolean // 이미 저장한 현재 플랜이 있는지(있으면 새로 저장할 때 바뀐다는 안내를 보인다)
-  isCalculating: boolean // 다시 계산 중인지
+  search: string // 목업 확인용 주소 파라미터(?mock…)를 "찜 목록 고치러 가기" 링크에 이어 붙이기 위한 값
   isSaving: boolean // 저장 중인지(저장 도중 자동 재계산도 포함)
-  calculateError: unknown // 다시 계산 실패 원인. 없으면 null
   saveError: unknown // 저장 실패 원인. 없으면 null
   hasRecalculatedNotice: boolean // 저장 중 자동 재계산이 있었는지
-  onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
+  // 이전: "다시 계산하기" 버튼용 값들(버튼을 찜 목록 링크로 바꿔 쓰지 않는다)
+  // isCalculating: boolean // 다시 계산 중인지
+  // calculateError: unknown // 다시 계산 실패 원인. 없으면 null
+  // onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
   onSave: (planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 그중 첫 초안의 planId를 넘긴다(유형은 서버가 planId로 안다)
 }
 
@@ -241,12 +250,10 @@ function PlanResult({
   drafts,
   services,
   hasCurrentPlan,
-  isCalculating,
+  search,
   isSaving,
-  calculateError,
   saveError,
   hasRecalculatedNotice,
-  onRecalculate,
   onSave,
 }: PlanResultProps) {
   const groups = mergeIdenticalDrafts(drafts)
@@ -257,7 +264,8 @@ function PlanResult({
   const typeNames = selectedGroup.planTypes
     .map((planType) => PLAN_TYPE_LABELS[planType])
     .join(' · ')
-  const isBusy = isCalculating || isSaving
+  // 이전: const isBusy = isCalculating || isSaving (다시 계산 버튼이 없어져 저장 중일 때만 바쁘다)
+  const isBusy = isSaving
 
   const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
 
@@ -269,30 +277,42 @@ function PlanResult({
           {/* 바뀐다는 안내는 저장 버튼 바로 위 안내 띠로 옮겼다(누르기 직전에 읽히게, 067 검수 제안 1) */}
           {/* {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'} */}
         </p>
+        {/* 결과가 마음에 들지 않을 때 할 일은 같은 조건으로 다시 계산하는 것이 아니라 찜(조건)을 고치는 것이라,
+            같은 자리를 "찜 목록 고치러 가기" 링크로 바꿨다(운영 사용 피드백). 찜을 고친 뒤 계산은 찜 목록·요금 확인 화면에서 한다.
+            저장 중에는 화면을 떠나지 않게 막는다(링크는 disabled가 없어 aria-disabled + 누름 무시로 막는다) */}
         <Button
-          type="button"
+          asChild
           variant="outline"
-          disabled={isBusy}
-          onClick={onRecalculate}
-          className="h-11"
+          className="h-11 aria-disabled:pointer-events-none aria-disabled:opacity-50"
         >
+          <Link
+            to={`/wishlist${search}`}
+            aria-disabled={isBusy || undefined}
+            tabIndex={isBusy ? -1 : undefined}
+          >
+            <HeartIcon aria-hidden="true" />찜 목록 고치러 가기
+          </Link>
+        </Button>
+        {/* 이전 "다시 계산하기" 버튼(같은 조건으로 다시 계산):
+        <Button type="button" variant="outline" disabled={isBusy} onClick={onRecalculate} className="h-11">
           {isCalculating ? (
             <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
           ) : (
             <RefreshCwIcon aria-hidden="true" />
           )}
           {isCalculating ? '계산하는 중' : '다시 계산하기'}
-        </Button>
+        </Button> */}
       </div>
 
       {/* 진행 안내: 영역은 항상 두고 안의 글자만 바꿔야 낭독기(aria-live)가 읽어 준다 */}
       <div role="status" aria-live="polite" className={isBusy ? 'block' : 'sr-only'}>
+        {/* 이전: 다시 계산 중 안내(버튼이 없어져 쓰지 않는다)
         {isCalculating && (
           <p className="flex items-center gap-2 text-sm font-semibold">
             <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
             3가지 플랜을 다시 계산하고 있어요
           </p>
-        )}
+        )} */}
         {isSaving && (
           <p className="flex items-center gap-2 text-sm font-semibold">
             <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
@@ -315,8 +335,8 @@ function PlanResult({
         )}
       </div>
 
+      {/* 이전: "다시 계산하기" 실패 안내(버튼이 없어져 쓰지 않는다)
       {calculateError != null && (
-        // 경고 아이콘을 넣어 공통 오류 화면(ErrorState)과 같은 모양으로 맞춘다. 색만으로 오류임을 알리지 않는다(067 검수 제안 5)
         <Alert variant="destructive">
           <TriangleAlertIcon aria-hidden="true" />
           <AlertTitle>플랜을 다시 계산하지 못했어요</AlertTitle>
@@ -324,7 +344,7 @@ function PlanResult({
             {getFailureMessage(calculateError)}
           </AlertDescription>
         </Alert>
-      )}
+      )} */}
 
       <PlanTypeSelector
         groups={groups}

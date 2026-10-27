@@ -87,7 +87,12 @@ describe('홈 화면', () => {
       ),
     ).toBeInTheDocument()
     // 서버가 준 기준 안내가 그대로 보인다
-    expect(screen.getByText(/TMDB 인기도 기준, OTT 공식 순위 아님 · 오늘/)).toBeInTheDocument()
+    // 순위 기준(최근 2년 안 한국 작품 중 인기도 순, 공식 순위 아님)과 기간이 함께 보인다
+    expect(
+      screen.getByText(
+        /최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순\(OTT 공식 순위 아님\) · 오늘/,
+      ),
+    ).toBeInTheDocument()
     // 출처·기준일: 목록 3줄마다 한 줄씩
     await waitFor(() =>
       expect(screen.getAllByText(/제공처 정보 출처/).length).toBeGreaterThanOrEqual(4),
@@ -102,6 +107,8 @@ describe('홈 화면', () => {
     // 넷플릭스 독점은 30편이지만 줄에는 첫 쪽 10편만 온다. 카드는 포스터 이미지 주소가 TMDB 상대 경로에서 만들어진다
     const list = await screen.findByRole('list', { name: '넷플릭스 독점 작품' })
     expect(within(list).getAllByRole('article')).toHaveLength(10)
+    // 탭이 이미 서비스를 말해 카드마다 "넷플릭스 [있음]" 줄을 반복하지 않는다
+    expect(within(list).queryByText('있음')).not.toBeInTheDocument()
     // 더보기는 같은 서비스 탭이 열린 독점 목록 화면으로 간다
     const section = list.closest('section') as HTMLElement
     expect(within(section).getByRole('link', { name: /더보기/ })).toHaveAttribute(
@@ -230,6 +237,11 @@ describe('홈 화면', () => {
     ).closest('section') as HTMLElement
     expect((await within(section).findAllByText(/월 \d+일 확인/)).length).toBeGreaterThan(0)
     expect(within(section).getAllByText(/월 \d+일 공개/).length).toBeGreaterThan(0)
+    // 카드 아래는 상태 배지("있음") 대신 볼 수 있는 서비스 이름 칩 목록이다
+    expect(within(section).queryByText('있음')).not.toBeInTheDocument()
+    expect(within(section).getAllByRole('list', { name: '볼 수 있는 곳' }).length).toBeGreaterThan(
+      0,
+    )
   })
 
   it('비로그인이면 카드의 찜 버튼이 로그인 화면으로 가는 링크다', async () => {

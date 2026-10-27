@@ -185,7 +185,12 @@ function CriteriaNote() {
           {/* 이전: "쿠팡플레이는 제공 정보가 부족해 쿠팡플레이의 독점 여부는 판단하지 않아요(드라마 비교에는 포함해요)."
               서버가 쿠팡플레이도 드라마 독점은 판정하게 바뀌어 문구를 맞췄다 */}
           <li>쿠팡플레이는 영화 제공 정보를 받지 못해, 쿠팡플레이 독점은 드라마만 확인해요.</li>
-          <li>매일 수집이 끝난 뒤 다시 계산해요. 순서는 TMDB 인기도 순이에요.</li>
+          {/* 정렬 규칙 변경(독점: 공개일이 최근 6개월 안인 작품이 먼저, 같은 묶음 안에서는 인기도순)에 맞춘 문구.
+              이전: "매일 수집이 끝난 뒤 다시 계산해요. 순서는 TMDB 인기도 순이에요." */}
+          <li>
+            매일 수집이 끝난 뒤 다시 계산해요. 순서는 최근 6개월 안에 공개된 작품이 먼저이고, 같은
+            묶음 안에서는 TMDB 인기도가 높은 순이에요.
+          </li>
         </ol>
       </details>
     </aside>
@@ -274,7 +279,8 @@ function ServicePanelBody({ service, exclusives }: ServicePanelProps) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm text-muted-foreground tabular-nums">
           <strong className="font-semibold text-foreground">{service.name}</strong> 독점으로 확인된
-          작품 {totalElements}편 · 인기순
+          작품 {totalElements}편 · 최근 공개작 먼저
+          {/* 이전: "· 인기순". 최근 6개월 안 공개작이 앞에 오도록 정렬이 바뀌어 순서의 뜻을 맞췄다 */}
         </p>
         {/* {isMultiPage && (
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -295,8 +301,9 @@ function ServicePanelBody({ service, exclusives }: ServicePanelProps) {
         isLoadMoreError={exclusives.isFetchNextPageError}
         onLoadMore={() => void exclusives.fetchNextPage()}
       >
-        {/* 순위 = 지금까지 불러온 목록에서의 위치(1부터). 서버가 인기도 내림차순(동률은 작품 ID)으로 주므로
-            다음 쪽이 뒤에 붙어도 25, 26…으로 이어진다. 요약 줄의 "인기순"이 이 숫자의 뜻을 이미 말한다 */}
+        {/* 순위 = 지금까지 불러온 목록에서의 위치(1부터). 서버가 정한 순서(최근 6개월 안 공개작 먼저 → 같은 묶음 안 인기도순)대로 주므로
+            다음 쪽이 뒤에 붙어도 25, 26…으로 이어진다. 요약 줄의 "최근 공개작 먼저"가 이 숫자의 뜻을 말한다.
+            이전 설명: 서버가 인기도 내림차순(동률은 작품 ID)으로 주고, 요약 줄의 "인기순"이 숫자의 뜻을 말했다 */}
         {titles.map((title, index) => (
           <ExclusiveTitleRailItem key={`${title.mediaType}-${title.tmdbId}`}>
             <ExclusiveTitleCard title={title} rank={index + 1} />
