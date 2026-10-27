@@ -149,7 +149,8 @@ interface MovieWatchSectionProps {
  *
  * 왜 이렇게 했나: 드라마는 찜 단위가 시즌이라 찜 버튼이 시즌 카드 오른쪽 위에 있다. 영화만 제목 아래에 두면 작품 종류마다
  * 버튼 위치가 달라 찾기 어렵다(운영 피드백). 영화는 시즌이 하나뿐인 드라마처럼 보고, 카드 하나에 이름·찜 버튼·러닝타임을 둔다.
- * 카드 클래스·제목 줄 배치(이름 왼쪽, 버튼 오른쪽 위, pt-2.5로 버튼 높이 44px의 글자선에 맞춤)는 SeasonItem과 같다.
+ * 카드 클래스·제목 줄 배치(이름 왼쪽, 버튼 오른쪽 위, leading-6 + py-2.5로 첫 줄 가운데를 버튼 높이 44px의 가운데에 맞춤)는 SeasonItem과 같다.
+ * (이전: pt-2.5로 버튼 높이 44px의 글자선에 맞춤 — 줄 높이를 물려받아 약 1px 어긋났다)
  * 찜 동작은 WishlistControl을 그대로 쓴다(이전과 같은 targetName이라 버튼 이름 "기생충 찜하기"도 같다).
  */
 function MovieWatchSection({ detail, posterUrl }: MovieWatchSectionProps) {
@@ -161,8 +162,12 @@ function MovieWatchSection({ detail, posterUrl }: MovieWatchSectionProps) {
         시청 시간과 찜
       </h2>
       <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">
+        {/* 제목 줄 정렬은 SeasonItem과 같다: 줄 높이 24px(leading-6) + 위아래 10px(py-2.5)로 첫 줄 가운데를 버튼(44px) 가운데 22px에 맞춘다.
+            본문 줄 높이(1.6)를 물려받던 이전 값은 글자가 버튼보다 약 1px 낮고 바닥선이 1.5px 내려가 보였다(운영 피드백).
+            긴 영화 제목이 두 줄로 꺾여도 items-start라 버튼은 첫 줄 옆에 머문다.
+            이전: <h3 className="min-w-0 pt-2.5 font-semibold"> */}
         <div className="grid grid-cols-[1fr_auto] items-start gap-x-2">
-          <h3 className="min-w-0 pt-2.5 font-semibold">{detail.title}</h3>
+          <h3 className="min-w-0 py-2.5 text-base leading-6 font-semibold">{detail.title}</h3>
           <WishlistControl
             mediaType={detail.mediaType}
             tmdbId={detail.tmdbId}
