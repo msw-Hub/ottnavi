@@ -159,6 +159,17 @@ describe('서비스별 독점 목록', () => {
     expect(within(list).getAllByRole('link')[24]).toHaveAccessibleName(/^25번째 /)
   })
 
+  // H-3(홈 카드와 같은 규칙): 제목은 한 줄 말줄임이고, 링크 title과 낭독 이름에는 전체 제목이 남는다
+  it('카드 제목은 한 줄 말줄임이고, 링크 title과 낭독 이름에 전체 제목이 남는다', async () => {
+    const { list } = await renderFirstPage()
+    const heading = within(list).getAllByRole('heading', { level: 3 })[0]
+    const link = within(heading).getByRole('link')
+    const fullTitle = link.getAttribute('title') ?? ''
+    expect(heading).toHaveClass('truncate')
+    expect(fullTitle).not.toBe('')
+    expect(link).toHaveAccessibleName(`1번째 ${fullTitle}`)
+  })
+
   it('다음 쪽 요청이 실패하면 받아 둔 목록은 두고 줄 끝의 다시 시도로 이어 받는다', async () => {
     const user = userEvent.setup()
     renderScreen()

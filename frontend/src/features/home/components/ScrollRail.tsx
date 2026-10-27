@@ -5,8 +5,19 @@ import { cn } from '@/lib/utils'
 interface ScrollRailProps {
   label: string // 목록 이름(낭독기가 "○○, 목록, 항목 10개"처럼 읽는다)
   isOrdered?: boolean // 순위 목록이면 true(<ol>로 그려 순서가 있다는 것을 낭독기에 알린다)
+  isFeatured?: boolean // 항목이 큰 카드(ScrollRailItem isFeatured)면 true. 화살표 버튼의 세로 위치·길이를 큰 포스터에 맞춘다
   children: ReactNode // <li> 항목들(ScrollRailItem)
 }
+
+// 화살표 버튼의 세로 위치와 길이(640px 이상에서만 보인다). 포스터(2:3) 높이의 가운데에 오게 미리 계산한 값이다.
+// 가운데 = 줄 위 여백 py-2(8px) + 포스터 높이 ÷ 2. 포스터 높이 = ScrollRailItem 폭 × 1.5 이므로 항목 폭을 바꾸면 여기도 같이 고친다.
+// - 보통 카드: 폭 144px(640px~)·160px(1024px~) → 포스터 216·240px → 가운데 116px(top-29)·128px(top-32), 길이 112·120px(포스터의 약 절반)
+// - 큰 카드:   폭 224px(640px~)·240px(1024px~) → 포스터 336·360px → 가운데 176px(top-44)·188px(top-47), 길이 160·176px(포스터의 약 절반)
+// 카드 전체(제목·칩 포함)의 1/3 지점(이전: top-1/3)이 아니라 포스터 기준이라 제목 줄 길이가 달라도 화살표가 포스터 가운데에 있다
+const ARROW_SIZE_CLASS = {
+  default: 'top-29 h-28 lg:top-32 lg:h-30',
+  featured: 'top-44 h-40 lg:top-47 lg:h-44',
+} as const
 
 /**
  * 작품 카드를 가로로 한 줄 늘어놓고 옆으로 넘겨 보는 목록이다(넷플릭스·TVING의 작품 줄을 우리 토큰으로 옮긴 것).
@@ -21,7 +32,13 @@ interface ScrollRailProps {
  * 모양: 모바일에서는 줄이 화면 끝까지 닿게(-mx-4 px-4) 해서 "옆에 더 있다"는 것이 잘린 카드로 보이게 한다.
  * 위아래 py-2는 카드 포커스 링(2px + 간격 2px)이 가로 스크롤 영역에 잘리지 않게 하는 여백이다(py-1이면 서비스 탭처럼 아래쪽이 잘릴 수 있다)(가로 스크롤 영역은 세로로도 내용을 자른다).
  */
-export function ScrollRail({ label, isOrdered = false, children }: ScrollRailProps) {
+export function ScrollRail({
+  label,
+  isOrdered = false,
+  isFeatured = false,
+  children,
+}: ScrollRailProps) {
+  const arrowSizeClass = ARROW_SIZE_CLASS[isFeatured ? 'featured' : 'default']
   const listId = useId()
   const listRef = useRef<HTMLOListElement & HTMLUListElement>(null)
   const [edge, setEdge] = useState({ isAtStart: true, isAtEnd: false }) // 화살표 버튼 비활성 판단용(화면 표시 전용 상태)
@@ -79,6 +96,7 @@ export function ScrollRail({ label, isOrdered = false, children }: ScrollRailPro
         controls={listId}
         isDisabled={edge.isAtStart}
         onClick={() => scrollByPage(-1)}
+        sizeClass={arrowSizeClass}
       />
       {/* 가로 스크롤바를 숨긴다(독점 줄 ExclusiveTitleRail과 같은 방식). [scrollbar-width:none]은 Firefox·최신 Chromium,
           [&::-webkit-scrollbar]:hidden은 Safari·예전 Chromium용이다. 숨겨도 넘길 수단은 그대로 남는다:
@@ -99,6 +117,7 @@ export function ScrollRail({ label, isOrdered = false, children }: ScrollRailPro
         controls={listId}
         isDisabled={edge.isAtEnd}
         onClick={() => scrollByPage(1)}
+        sizeClass={arrowSizeClass}
       />
     </div>
   )
@@ -106,17 +125,33 @@ export function ScrollRail({ label, isOrdered = false, children }: ScrollRailPro
 
 interface ScrollRailItemProps {
   isWide?: boolean // 순위 카드처럼 큰 숫자가 붙어 폭이 더 필요한 항목이면 true
+  isFeatured?: boolean // 홈 첫 줄(서비스별 인기 순위)처럼 시선을 먼저 끌어야 하는 큰 카드면 true. isWide보다 우선한다
   children: ReactNode
 }
 
 // 가로 줄의 항목 하나. 폭을 고정(shrink-0)해 카드 크기가 화면마다 흔들리지 않게 하고, 카드 왼쪽 끝에서 멈추게 한다(snap-start)
-export function ScrollRailItem({ isWide = false, children }: ScrollRailItemProps) {
+export function ScrollRailItem({
+  isWide = false,
+  isFeatured = false,
+  children,
+}: ScrollRailItemProps) {
   return (
     <li
       className={cn(
         'shrink-0 snap-start',
         // 모바일 128px(375px 화면에 카드 2장 반이 보여 옆에 더 있다는 것이 드러난다) → 넓은 화면 160px
-        isWide ? 'w-40 sm:w-44 lg:w-48' : 'w-32 sm:w-36 lg:w-40',
+        // 큰 카드(isFeatured): 순위 숫자 칸을 빼고 포스터 폭이 모바일 136px · 640px 이상 164px · 1024px 이상 212px이 된다.
+        // 375px 화면에 카드 1장 반 남짓(약 1.7장)이 보여 첫 카드가 크게 눈에 들어오면서도 옆에 더 있다는 것이 드러난다.
+        // 1280px 화면에는 3장 남짓이 보인다(다른 줄은 6장 남짓이라 이 줄이 홈에서 가장 크게 보인다)
+        // B안: 큰 카드는 순위 숫자를 포스터 위에 겹쳐 항목 폭이 곧 포스터 폭이다.
+        // 모바일은 줄 안쪽 폭(375px 화면에서 343px)의 82%(약 281px)라 포스터 한 장이 화면 폭 가까이 크게 보이고 옆 카드가 약 50px 보인다.
+        // 640px 이상 224px · 1024px 이상 240px(포스터 높이 360px): 1280×800 첫 화면에 포스터 전체와 제목이 들어오는 크기이고 3장 반 남짓이 보인다.
+        // 이전(B안 전): 'w-48 sm:w-60 lg:w-72' (숫자 칸 포함 폭, 포스터는 136/164/212px)
+        isFeatured
+          ? 'w-[82%] sm:w-56 lg:w-60'
+          : isWide
+            ? 'w-40 sm:w-44 lg:w-48'
+            : 'w-32 sm:w-36 lg:w-40',
       )}
     >
       {children}
@@ -130,15 +165,17 @@ interface RailArrowButtonProps {
   controls: string // 이 버튼이 움직이는 목록의 id(aria-controls)
   isDisabled: boolean // 그쪽 끝에 닿아 더 넘길 수 없으면 true
   onClick: () => void
+  sizeClass: string // 세로 위치(top)와 길이(h). 포스터 높이 가운데에 맞춘 값(ARROW_SIZE_CLASS)
 }
 
-// 줄 양 끝의 원형 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데쯤(top-1/3)에 떠 있다
+// 줄 양 끝의 세로로 긴 사각 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데에 떠 있다(H-1-1 사용자 요청 "사각으로 길게, 포스터 가운데")
 function RailArrowButton({
   direction,
   label,
   controls,
   isDisabled,
   onClick,
+  sizeClass,
 }: RailArrowButtonProps) {
   const Icon = direction === 'prev' ? ChevronLeftIcon : ChevronRightIcon
   return (
@@ -149,9 +186,13 @@ function RailArrowButton({
       disabled={isDisabled}
       onClick={onClick}
       className={cn(
-        // size-10(40px) 원형. 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다
-        'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex',
-        direction === 'prev' ? '-left-3' : '-right-3',
+        // w-9(36px) × 포스터 높이의 약 절반, 모서리 rounded-md. 폭 36px은 마우스로 누르기 충분하면서(24px 최소 기준을 넘는다) 포스터를 적게 가린다.
+        // 줄의 스크롤 영역 끝(-left-4/-right-4, 줄의 -mx-4와 같은 거리)에 붙여, 첫 카드나 잘린 끝 카드의 가장자리 약 20px만 덮는다.
+        // 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다. 포커스 링·끝에서 숨기기(disabled:opacity-0)는 그대로다
+        // 이전: 'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full ...', direction === 'prev' ? '-left-3' : '-right-3'
+        'absolute z-20 hidden w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex',
+        sizeClass,
+        direction === 'prev' ? '-left-4' : '-right-4',
       )}
     >
       <Icon aria-hidden="true" className="size-5" />

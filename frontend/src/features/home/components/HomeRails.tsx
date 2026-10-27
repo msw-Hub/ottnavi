@@ -24,6 +24,7 @@ import {
   toPeriodParam,
 } from '@/features/home/homeDisplay'
 import {
+  POPULAR_RANKING_LIMIT,
   useNewlyAvailableTitles,
   usePopularityRanking,
   useServiceExclusiveTitles,
@@ -31,8 +32,8 @@ import {
 } from '@/features/home/hooks/useHomeLists'
 import { withJosa } from '@/lib/josa'
 
-// 인기 순위 줄에 보일 개수(TOP 10)
-const POPULAR_RANKING_LIMIT = 10
+// 이전: 인기 순위 줄에 보일 개수(TOP 10)를 여기서 정의했다. 홈 맨 위 배너(HomeScreen)도 같은 요청을 써야 해서 useHomeLists.ts로 옮겼다
+// const POPULAR_RANKING_LIMIT = 10
 // 찜이 많은 작품 줄에 보일 개수
 const WISHLISTED_LIMIT = 10
 // 새로 볼 수 있게 된 작품 줄에 보일 개수
@@ -103,13 +104,15 @@ export function PopularRail({ servicesQuery }: PopularRailProps) {
       error={servicesQuery.error}
       onRetry={() => void servicesQuery.refetch()}
     >
-      {/* 기간 전환은 서비스 탭보다 먼저 둔다: "언제 기준" → "어느 서비스" 순으로 좁혀 가는 순서다 */}
-      <PeriodToggle value={period} onChange={setPeriod} />
+      {/* 기간 전환은 서비스 탭보다 먼저 둔다: "언제 기준" → "어느 서비스" 순으로 좁혀 가는 순서다.
+          B안: 기간 전환을 서비스 탭과 같은 줄 맨 앞(leading)에 둬 줄 하나(약 56px)를 아낀다. 첫 화면에 포스터가 더 들어온다.
+          이전: <PeriodToggle value={period} onChange={setPeriod} /> 를 ServiceTabs 위 별도 줄에 두었다 */}
       <ServiceTabs
         label="인기 순위 서비스 선택"
         value={tab}
         onValueChange={setTab}
         options={buildServiceTabOptions(services, true)}
+        leading={<PeriodToggle value={period} onChange={setPeriod} />}
       >
         {service?.dataQuality === 'INSUFFICIENT' && (
           <InsufficientServiceNote
@@ -118,7 +121,7 @@ export function PopularRail({ servicesQuery }: PopularRailProps) {
           />
         )}
         {ranking.isPending ? (
-          <RailSkeleton heading="서비스별 인기 순위" />
+          <RailSkeleton heading="서비스별 인기 순위" isFeatured />
         ) : ranking.isError ? (
           <ErrorState
             title="서비스별 인기 순위를 불러오지 못했습니다"
@@ -145,15 +148,26 @@ export function PopularRail({ servicesQuery }: PopularRailProps) {
             key={`${tab}-${period}`}
             label={`${service?.name ?? '전체'} 인기 순위`}
             isOrdered
+            isFeatured // 큰 카드 줄이라 화살표를 큰 포스터 가운데에 맞춘다
           >
             {ranking.data.items.map((item) => (
-              <ScrollRailItem key={`${item.title.mediaType}-${item.title.tmdbId}`} isWide>
+              // 홈에 들어오자마자 시선을 끄는 첫 줄이라 큰 카드(isFeatured)로 그린다(사용자 요청). 다른 줄의 카드 크기는 그대로다
+              // 이전: <ScrollRailItem ... isWide> + HomeTitleCard 기본 크기(포스터 데스크톱 136px)
+              <ScrollRailItem key={`${item.title.mediaType}-${item.title.tmdbId}`} isFeatured>
                 <HomeTitleCard
                   title={item.title}
                   services={services}
                   focusServiceId={service?.ottServiceId}
                   rank={item.rank}
                   rankLabel="인기"
+                  isFeatured
+                  // H-1-3(사용자 요청): 서비스 탭을 고르면 카드마다 나오던 "넷플릭스 [있음]" 줄을 뺀다. 고른 탭이 이미 서비스를 말하고,
+                  // 이 목록은 그 서비스에서 볼 수 있다고 확인된 작품만이라 모든 카드가 같은 "있음"이다(독점 줄과 같은 이유).
+                  // "전체" 탭(service 없음)의 "볼 수 있는 곳" 칩 줄은 그대로 보인다. 랭킹 화면 카드는 이 값을 넘기지 않아 그대로다.
+                  // H-2 뒤: 배지·칩 줄이 없어지고 포스터 위 로고가 대신한다. 이 값은 이제 정보 줄의 "제공 정보 수집 전" 같은 상태 글자만 숨긴다
+                  // (서비스 탭 목록은 모두 그 서비스에서 "있음"이라 상태 글자가 나올 일이 없다).
+                  // 이전: isServiceInfoHidden 없음(서비스 탭에서 focusServiceId 배지 줄이 보였다)
+                  isServiceInfoHidden={service !== null}
                 />
               </ScrollRailItem>
             ))}
@@ -270,7 +284,9 @@ export function NewArrivalsRail({ servicesQuery }: NewArrivalsRailProps) {
                     이 줄은 "볼 수 있게 된" 작품이라 상태 글자(있음)는 늘 같아 정보가 없고, 다른 서비스에서도 볼 수 있는지가 더 쓸모 있다.
                     칩은 "있음"인 서비스만 이름 글자로 보이므로 색만으로 상태를 전하지 않는다. 좁은 카드(375px)에서는 2개까지 보이고 나머지는 "+N"으로 줄인다.
                     새로 들어온 그 서비스(leadServiceId)를 맨 앞에 둬 "+N" 뒤로 숨지 않게 한다. 볼 수 있는 곳이 하나도 없으면 "확인된 제공처가 없습니다"가 보인다.
-                    이전: focusServiceId={arrival.ottServiceId} (그 서비스의 있음 배지) */}
+                    이전: focusServiceId={arrival.ottServiceId} (그 서비스의 있음 배지)
+                    H-2: 위 칩 줄은 포스터 오른쪽 위 OTT 로고(최대 3개 + "+N")로 바뀌었다. leadServiceId는 그대로 로고 맨 앞을 정하고,
+                    "10월 15일 확인"은 제목 아래 한 줄의 맨 앞에 붙는다 */}
                 <HomeTitleCard
                   title={arrival.title}
                   services={services}

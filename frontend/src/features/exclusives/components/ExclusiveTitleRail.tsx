@@ -409,7 +409,8 @@ interface RailArrowButtonProps {
   onClick: () => void
 }
 
-// 줄 양 끝의 원형 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데쯤(top-1/3)에 떠 있다(홈 줄과 같은 모양)
+// 줄 양 끝의 세로로 긴 사각 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데에 떠 있다(홈 줄 ScrollRail과 같은 모양, H-2 사용자 확정).
+// 이전: 원형 버튼(size-10 rounded-full)이 카드 전체의 1/3 지점(top-1/3)에 있었다
 function RailArrowButton({
   direction,
   label,
@@ -426,9 +427,13 @@ function RailArrowButton({
       disabled={isDisabled}
       onClick={onClick}
       className={cn(
-        // size-10(40px) 원형. 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다
-        'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex',
-        direction === 'prev' ? '-left-3' : '-right-3',
+        // w-9(36px) × 포스터 높이의 약 절반, 모서리 rounded-md. 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다.
+        // 세로 위치 = 줄 위 여백 py-2(8px) + 포스터 높이 ÷ 2. 카드 폭(RAIL_ITEM_WIDTH) 144px(640px~)·160px(1024px~)의 2:3 포스터 216·240px 기준이라
+        // 가운데 116px(top-29)·128px(top-32), 길이 112·120px이다(홈 보통 카드 줄과 같은 값). 카드 폭을 바꾸면 이 값도 같이 고친다.
+        // 줄의 스크롤 영역 끝(-left-4/-right-4, 줄의 -mx-4와 같은 거리)에 붙여 카드 가장자리를 약 20px만 덮는다
+        // 이전: 'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full ...', direction === 'prev' ? '-left-3' : '-right-3'
+        'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex lg:top-32 lg:h-30',
+        direction === 'prev' ? '-left-4' : '-right-4',
       )}
     >
       <Icon aria-hidden="true" className="size-5" />

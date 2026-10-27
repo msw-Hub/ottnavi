@@ -44,7 +44,8 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
             )}
           </header>
 
-          {/* 영화는 작품 상단에 찜 버튼 하나를 둔다(드라마는 시즌마다 시즌 요약 줄에 있다) */}
+          {/* 이전: 영화는 제목 바로 아래(작품 상단)에 찜 버튼을 두었다. 드라마는 아래 시즌 카드 오른쪽 위에 있어
+              작품 종류에 따라 찜 버튼 위치가 달라 헷갈린다는 운영 피드백이 있어, 영화도 같은 자리(서비스별 제공 상태 아래 카드 오른쪽 위)로 옮겼다(MovieWatchSection).
           {!isTv && (
             <WishlistControl
               mediaType={detail.mediaType}
@@ -53,14 +54,15 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
               targetName={detail.title}
               posterUrl={posterUrl}
             />
-          )}
+          )} */}
 
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
             <dt className="text-muted-foreground">구분</dt>
             <dd>{MEDIA_TYPE_LABELS[detail.mediaType]}</dd>
             <dt className="text-muted-foreground">{isTv ? '첫 방영일' : '개봉일'}</dt>
             <dd>{releaseDateText ?? '정보 없음'}</dd>
-            {/* 드라마의 시간은 시즌별 총 시청 시간으로 아래에서 보여 주므로 영화일 때만 러닝타임 줄을 둔다 */}
+            {/* 이전: 영화일 때 여기에 러닝타임 줄을 두었다. 드라마가 시즌 카드에 총 시간을 보이듯 영화도 아래 찜 카드에 러닝타임을 보이므로
+                같은 값이 두 번 나오지 않게 뺐다.
             {!isTv && (
               <>
                 <dt className="text-muted-foreground">러닝타임</dt>
@@ -74,7 +76,7 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
                   )}
                 </dd>
               </>
-            )}
+            )} */}
             <dt className="text-muted-foreground">장르</dt>
             <dd>{detail.genres.length > 0 ? detail.genres.join(' · ') : '정보 없음'}</dd>
           </dl>
@@ -111,6 +113,9 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
         />
       )}
 
+      {/* 영화의 찜 자리: 드라마의 시즌 구역과 같은 위치·같은 카드 모양(이름 + 오른쪽 위 찜 버튼 + 시간 줄) */}
+      {!isTv && <MovieWatchSection detail={detail} posterUrl={posterUrl} />}
+
       <CastList cast={detail.cast} />
 
       {/* 제공처 정보가 보이는 화면이라 JustWatch 출처와 데이터 기준일을 둔다. 포스터·작품 정보의 출처(TMDB)도 함께 밝힌다 */}
@@ -123,6 +128,54 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
         </p>
       </div>
     </article>
+  )
+}
+
+interface MovieWatchSectionProps {
+  detail: TitleDetail // 영화 상세(제목·러닝타임·추정 여부)
+  posterUrl: string | null // 찜 추가 팝업 썸네일
+}
+
+/**
+ * 영화의 "시청 시간과 찜" 구역이다. 드라마의 시즌 구역(SeasonSection)과 같은 자리·같은 카드 모양으로 둔다.
+ *
+ * 왜 이렇게 했나: 드라마는 찜 단위가 시즌이라 찜 버튼이 시즌 카드 오른쪽 위에 있다. 영화만 제목 아래에 두면 작품 종류마다
+ * 버튼 위치가 달라 찾기 어렵다(운영 피드백). 영화는 시즌이 하나뿐인 드라마처럼 보고, 카드 하나에 이름·찜 버튼·러닝타임을 둔다.
+ * 카드 클래스·제목 줄 배치(이름 왼쪽, 버튼 오른쪽 위, pt-2.5로 버튼 높이 44px의 글자선에 맞춤)는 SeasonItem과 같다.
+ * 찜 동작은 WishlistControl을 그대로 쓴다(이전과 같은 targetName이라 버튼 이름 "기생충 찜하기"도 같다).
+ */
+function MovieWatchSection({ detail, posterUrl }: MovieWatchSectionProps) {
+  return (
+    <section aria-labelledby="movie-watch-heading" className="grid gap-3">
+      <h2 id="movie-watch-heading" className="text-lg font-semibold">
+        시청 시간과 찜
+      </h2>
+      <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">
+        <div className="grid grid-cols-[1fr_auto] items-start gap-x-2">
+          <h3 className="min-w-0 pt-2.5 font-semibold">{detail.title}</h3>
+          <WishlistControl
+            mediaType={detail.mediaType}
+            tmdbId={detail.tmdbId}
+            seasonNumber={null}
+            targetName={detail.title}
+            posterUrl={posterUrl}
+            panelAlign="end"
+          />
+        </div>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          {/* 값만 따로 감싸 "러닝타임"(이름표)과 "2시간 13분"(값)이 서로 다른 글자 덩어리로 읽히게 한다 */}
+          러닝타임{' '}
+          <span>{detail.runtimeMin === null ? '정보 없음' : formatMinutes(detail.runtimeMin)}</span>
+          {/* 추정 러닝타임은 정확한 값으로 오해하지 않도록 "추정"을 붙인다 */}
+          {detail.isRuntimeEstimated && (
+            <>
+              {' '}
+              <EstimatedTag />
+            </>
+          )}
+        </p>
+      </div>
+    </section>
   )
 }
 

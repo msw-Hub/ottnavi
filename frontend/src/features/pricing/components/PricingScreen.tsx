@@ -37,7 +37,7 @@ interface PricingCalculation {
  * pages/PricingPage가 대신 불러 props로 넘겼다. 훅을 src/hooks로 올려 공유하게 되면서 pages를 다시 얇게 두고 화면이 계산 시작·이동까지 맡는다.
  * 계산이 성공하면 플랜 결과(SCR-10)로 이동하고, 목업 확인용 주소 파라미터(?mock…)는 이어 붙여 같은 시나리오로 결과를 본다.
  *
- * 위에서 아래로: 예산·시청 시간 요약 띠 → 요금 기준일 → 서비스별 상품 표(좁은 화면은 카드) → 플랜 계산 버튼.
+ * 위에서 아래로: 예산·시청 시간 요약 띠 → 서비스별 요금(제목 바로 아래 요금 기준일 → 상품 카드) → 플랜 계산 버튼.
  * 요금이 곧 계산의 입력이라 "무엇을 근거로 계산하는지"를 요약 띠와 출처 라벨로 먼저 보여 준다.
  */
 export function PricingScreen() {
@@ -151,27 +151,36 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
         </Alert>
       )}
 
+      {/* 이전: 요금 기준일 줄을 요약 띠와 "서비스별 요금" 제목 사이에 따로 두었다. 위아래 간격이 같아(20px) 어느 구역의 설명인지 모호했다(운영 피드백).
+          기준일은 아래 요금 목록의 기준이고 "아래에서 내 금액으로 고쳐 주세요"도 목록을 가리키므로, "서비스별 요금" 제목 바로 아래 설명으로 옮겼다.
       <div className="grid gap-1">
-        {/* 요금 기준일: 관리자가 요금을 마지막으로 확인한 날. 요금은 바뀔 수 있어 어느 날짜 기준인지 보여 준다 */}
         <p className="flex items-start gap-1.75 text-sm text-muted-foreground tabular-nums">
           <CalendarIcon aria-hidden="true" className="mt-0.75 size-4 shrink-0" />
-          {priceDate ? (
-            <span>
-              요금 기준일 <strong className="font-semibold text-foreground">{priceDate}</strong> ·
-              실제 요금과 다를 수 있어요. 다르면 아래에서 내 금액으로 고쳐 주세요.
-            </span>
-          ) : (
-            <span>요금 기준일 정보 없음</span>
-          )}
+          ...(아래 제목 묶음 안의 문단과 같은 내용)
         </p>
-      </div>
+      </div> */}
 
       {/* 서비스별 요금(Task 076 시안 A 확정): 계산 방식 안내 띠 + 서비스당 카드 한 장.
           계산 방식은 모드에 따라 아이콘·글자가 함께 바뀌어 색에 기대지 않는다. 번들은 마지막 "번들" 카드로 묶인다(계산은 번들을 상품 하나로 본다, PRD FR-19) */}
       <section aria-labelledby="pricing-list-heading" className="grid gap-3">
-        <h2 id="pricing-list-heading" className="text-lg font-semibold">
-          서비스별 요금
-        </h2>
+        {/* 제목과 요금 기준일을 한 묶음(간격 4px, gap-1)으로 둔다. 구역 안의 다른 요소 간격(12px)보다 좁혀 "이 제목의 설명"으로 읽히게 한다(근접성) */}
+        <div className="grid gap-1">
+          <h2 id="pricing-list-heading" className="text-lg font-semibold">
+            서비스별 요금
+          </h2>
+          {/* 요금 기준일: 관리자가 요금을 마지막으로 확인한 날. 요금은 바뀔 수 있어 어느 날짜 기준인지 보여 준다 */}
+          <p className="flex items-start gap-1.75 text-sm text-muted-foreground tabular-nums">
+            <CalendarIcon aria-hidden="true" className="mt-0.75 size-4 shrink-0" />
+            {priceDate ? (
+              <span>
+                요금 기준일 <strong className="font-semibold text-foreground">{priceDate}</strong> ·
+                실제 요금과 다를 수 있어요. 다르면 아래에서 내 금액으로 고쳐 주세요.
+              </span>
+            ) : (
+              <span>요금 기준일 정보 없음</span>
+            )}
+          </p>
+        </div>
         {/* 계산 방식 안내 띠: "지금 어떻게 계산하는지(굵게) → 그게 무슨 뜻인지 → 반대로 하려면 어디서 바꾸는지(링크)" 순서로 읽힌다.
             이전에는 "표준 요금제로 계산해요"와 "설정에서 바꾸기"만 있어 무엇을 무엇으로 바꾸는지 알 수 없었다(운영 사용 피드백).
             링크 이름에 바뀐 뒤의 상태를 넣어(예: "설정에서 저렴한 요금제로 바꾸기") 링크만 따로 읽어도 뜻이 통하게 했다(낭독기의 링크 목록).
