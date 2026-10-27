@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Link, Outlet } from 'react-router'
+import { Link, Outlet, ScrollRestoration } from 'react-router'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
 import { useSession } from '@/hooks/useSession'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
@@ -89,6 +89,13 @@ export function RootLayout() {
       >
         <Outlet />
       </main>
+      {/*
+        화면을 옮길 때 스크롤 위치를 다룬다(앱에 하나만 둔다. React Router 공식 문서).
+        - 이전: 이 컴포넌트가 없어서 설정 화면에서 아래로 내려간 채 홈으로 가면 홈이 맨 위가 아닌 같은 높이에서 시작했다(운영 피드백).
+        - 새로 이동(링크 클릭)하면 맨 위에서 시작하고, 뒤로 가기·앞으로 가기에서는 그 화면을 떠날 때의 위치로 돌아온다
+          (기본 키가 location.key라서 같은 주소라도 이동할 때마다 새 위치로 본다).
+      */}
+      <ScrollRestoration />
 
       {/* 푸터 링크는 inline-flex min-h-10으로 누르는 영역을 세로 40px로 넓혔다(Task 037 ⑫) */}
       <footer className="border-t">
@@ -99,6 +106,9 @@ export function RootLayout() {
           {/* 개인정보처리방침: 로그인 여부와 상관없이 모두에게 보인다(Google 로그인 동의 화면 게시에 필요한 공개 주소) */}
           <Link to="/privacy" className={FOOTER_LINK_CLASS}>
             개인정보처리방침
+          </Link>
+          <Link to="/terms" className={FOOTER_LINK_CLASS}>
+            이용약관
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>

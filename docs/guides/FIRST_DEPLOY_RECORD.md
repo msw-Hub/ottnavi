@@ -128,12 +128,12 @@
 - [ ] `/api/.env` 같은 비밀 파일 탐색 요청이 들어왔다(2026-10-27 11:36, 401로 막힘). 인터넷에 열린 서버라면 흔한 자동 탐색이고 `.env`는 저장소·서버에 노출되지 않는다는 점만 확인
 - [x] 스모크(2026-10-27): 로그인 유지, 검색, 찜, 플랜 계산·저장, 요금 확인, 관리자 화면에서 큰 문제 없음. 나온 피드백은 PR #104로 반영(5절). 배포 뒤 다시 확인
 - [x] `BACKEND_BASE_URL` 시크릿 등록(Cloudtype 기본 공개 주소, https, 경로 없이). 값 확인은 `popularity` 워크플로 수동 실행으로 대신한다
-- [ ] `CRON_ENABLED` 켜기(PR #104 배포·확인 뒤), 일요일 WEEKLY를 켤지 결정(지금은 켜지 않음)
+- [ ] `CRON_ENABLED` 켜기: 수요일 03:17(KST) 이후에 사용자가 켜기로 했다(첫 WEEKLY 2026-11-04). 일요일 WEEKLY는 수요일로 이동 확정(PR #106). 2026-10-27에 임시로 만들었다 지웠고 지금 변수는 없다(저장소·Preview·Production 모두 확인)
 - [x] CPU 증설 결정: 증설하지 않음(5절)
-- [ ] PR #104 병합 → `develop`→`main` 병합 → Cloudtype `배포하기`(기동 5~6분). 배포 뒤 `popularity_snapshot` 삭제 → `popularity` 워크플로 수동 실행 → 결과가 한국 작품인지 확인(`with_origin_country=KR` 값 형식 확인)
+- [x] PR #104 병합 → `develop`→`main` 병합 → Cloudtype `배포하기`(기동 5~6분). 배포 뒤 `popularity_snapshot` 삭제 → `popularity` 워크플로 수동 실행 → 결과가 한국 작품인지 확인(`with_origin_country=KR` 값 형식 확인)
 - [ ] 배포 뒤 확인: 독점 목록이 새 순서로 나오는지(캐시 이름 `exclusiveTitlesV2`), 계산 중 진행 창 모양과 Esc 동작, 진행 창이 열릴 때 낭독이 두 번 읽히지 않는지(검수 지적 6)
-- [ ] 문서: 캐시 이름 `exclusiveTitles` → `exclusiveTitlesV2`를 `CLAUDE.md`, `ROADMAP.md`(641·1459·1467행), `TECH.md`, `PACKAGE_MAP.md`에 반영. 인기 순위 의미 변경을 ROADMAP Task 107과 HANDOFF에 반영. 092~095 진행 기록과 `CLAUDE.md` 현황 문구 갱신
-- [ ] 개인정보처리방침 화면(`/privacy`)과 Google 동의 화면 Branding 입력·프로덕션 게시
+- [x] 문서(홈 개편 PR에서 반영함): 캐시 이름 `exclusiveTitles` → `exclusiveTitlesV2`를 `CLAUDE.md`, `ROADMAP.md`(641·1459·1467행), `TECH.md`, `PACKAGE_MAP.md`에 반영. 인기 순위 의미 변경을 ROADMAP Task 107과 HANDOFF에 반영. 092~095 진행 기록과 `CLAUDE.md` 현황 문구 갱신
+- [x] 개인정보처리방침 화면(`/privacy`, PR #106)과 Google 동의 화면 Branding 입력·프로덕션 게시(2026-10-27 완료, 동의 화면에 방침 링크 표시 확인). 이용약관 `/terms`는 PR #108(열림)
 - [ ] 검색 엔진 등록(공개 시점), `main`에 `v0.1.0` 태그
 - [ ] 로그 정리: `spring.data.redis.repositories.enabled`, `HV000271` 경고
 - [ ] 상품 가격 재확인(조사일 2026-10-05, 쿠팡플레이는 비공식 자료)

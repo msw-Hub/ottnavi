@@ -18,7 +18,9 @@ interface ExclusiveTitleCardProps {
 }
 
 /**
- * 독점 목록의 작품 카드다(세로 구조: 포스터(왼쪽 위에 인기 순위) → 제목 → "영화/드라마 · 연도 · 시즌").
+ * 독점 목록의 작품 카드다(세로 구조: 포스터(왼쪽 위에 인기 순위) → 제목 한 줄(길면 말줄임) → "독점 시즌 · 영화/드라마 · 연도" 한 줄).
+ * H-3: 제목·정보 줄 규칙을 홈 카드와 맞췄다. OTT 로고는 넣지 않는다(사용자 결정: 한 서비스의 목록이라 표시가 필요 없다).
+ * 이전 구조: 포스터 → 제목(최대 두 줄) → "영화/드라마 · 연도 · 시즌"
  *
  * 홈 카드(features/home의 HomeTitleCard)와 뼈대가 같지만 찜 버튼이 없고, 대신 포스터 왼쪽 위에 인기 순위 숫자가 있다.
  * 1. 이 서비스의 "있음" 배지는 넣지 않았다. 탭과 목록 요약 줄이 서비스를 이미 말해, 모든 카드에 같은 배지가 반복될 뿐이다.
@@ -41,7 +43,10 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
       <RankNotch rank={rank} />
 
       <div className="grid min-w-0 content-start gap-1">
-        <h3 className="line-clamp-2 text-sm leading-snug font-semibold">
+        {/* H-3(사용자 확정 B안, 홈 카드와 같은 규칙): 제목은 항상 한 줄이고 길면 끝을 말줄임(…)으로 줄인다(truncate).
+            말줄임은 보이는 모양만 자른다. DOM 글자는 전체 제목이라 낭독기는 "N번째 + 전체 제목"을 읽고, 마우스 사용자는 링크 title로 전체를 본다.
+            이전: <h3 className="line-clamp-2 text-sm leading-snug font-semibold"> (제목 줄 수에 따라 카드마다 정보 줄 높이가 달랐다) */}
+        <h3 className="truncate text-sm leading-snug font-semibold">
           <Link
             to={detailPath}
             data-card-link=""
@@ -55,13 +60,19 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
             <span className="sr-only">{rank}번째</span> {title.title}
           </Link>
         </h3>
+        {/* H-3: 제목 아래 정보를 홈 카드와 같은 한 줄 순서([부가정보] · 영화/드라마 · 연도)로 맞춘다.
+            독점 카드의 부가정보는 "독점으로 확인된 시즌"이다(드라마만, 일부 시즌만 독점일 수 있다). 이 카드를 보는 이유가 되는 정보라
+            맨 앞에 굵게 둬 좁은 카드에서 말줄임이 생겨도 남게 한다(홈 카드가 "찜 214명"을 맨 앞에 두는 것과 같은 이유).
+            시즌은 "시즌 1·2"처럼 가운뎃점으로 잇는다. 쉼표보다 좁은 카드에서 덜 끊긴다.
+            길면 truncate로 한 줄 말줄임하고, 전체 문장은 title(마우스)과 DOM 글자(낭독기)로 전한다.
+            이전: 영화/드라마 · 연도 · 시즌 1·2 순서로 쓰고 줄바꿈을 허용했다
         <p className="text-xs text-muted-foreground tabular-nums">
           {MEDIA_TYPE_TEXT[title.mediaType]} · {title.releaseYear ?? '연도 미상'}
-          {/* 시즌은 "시즌 1·2"처럼 가운뎃점으로 잇는다. 쉼표보다 좁은 카드에서 덜 끊긴다 */}
           {title.exclusiveSeasonNumbers && title.exclusiveSeasonNumbers.length > 0 && (
             <> · 시즌 {title.exclusiveSeasonNumbers.join('·')}</>
           )}
-        </p>
+        </p> */}
+        <ExclusiveInfoLine title={title} />
 
         {/* 이전: 카드마다 "{서비스} [✓ 있음]" 배지를 보였다. 탭과 목록 요약 줄이 이미 서비스를 말하고 모든 카드가 같은 글자라
             정보 없이 줄만 늘어 뺐다(1차안 판단). 다시 넣으려면 아래 주석을 푼다
@@ -86,6 +97,32 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
         </p> */}
       </div>
     </article>
+  )
+}
+
+// 제목 아래 한 줄: [독점 시즌] · [영화/드라마 · 연도]. 넘치면 한 줄 말줄임(truncate). 영화나 시즌 정보가 없으면 "영화 · 2024"만 보인다
+function ExclusiveInfoLine({ title }: { title: ExclusiveTitle }) {
+  // 1. 독점으로 확인된 시즌 글자(드라마에서 시즌 번호가 있을 때만)
+  const seasonText =
+    title.exclusiveSeasonNumbers && title.exclusiveSeasonNumbers.length > 0
+      ? `시즌 ${title.exclusiveSeasonNumbers.join('·')}`
+      : null
+  // 2. 작품 구분과 연도
+  const typeYearText = `${MEDIA_TYPE_TEXT[title.mediaType]} · ${title.releaseYear ?? '연도 미상'}`
+  // 3. 마우스를 올리면 잘린 부분까지 보이게 전체 문장을 title로 준다
+  const fullText = [seasonText, typeYearText].filter(Boolean).join(' · ')
+
+  return (
+    <p title={fullText} className="truncate text-xs text-muted-foreground tabular-nums">
+      {seasonText && (
+        <>
+          {/* 홈 카드의 부가정보와 같은 강조(굵은 foreground 글자). 색이 아니라 글자 자체가 정보다 */}
+          <span className="font-semibold text-foreground">{seasonText}</span>
+          {' · '}
+        </>
+      )}
+      <span>{typeYearText}</span>
+    </p>
   )
 }
 

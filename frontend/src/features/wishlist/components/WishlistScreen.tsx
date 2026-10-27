@@ -8,6 +8,7 @@ import { DataAsOf } from '@/components/common/DataAsOf'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
+import { PageSection } from '@/components/common/PageSection'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import {
   WISHLIST_PRIORITY_DESCRIPTIONS,
@@ -222,49 +223,58 @@ function WishlistContent({ list, services }: WishlistContentProps) {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* 개수 줄 "찜 N/20"(확정, PRD SCR-08). N은 서버가 센 현재 개수(다 봤음 제외), 20은 서버가 준 상한이다 */}
-        <p className="text-muted-foreground tabular-nums">
-          찜 {list.activeItemCount}/{list.maxActiveItemCount}
-          {watchedItems.length > 0 && <> · 다 봤음 {watchedItems.length}개</>}
-        </p>
-        {/* 데스크톱의 계산하기 버튼: 목록 위 오른쪽. 모바일에서는 아래 고정 막대가 대신한다 */}
-        {activeItems.length > 0 && (
-          <Button asChild size="lg" className="hidden h-11 px-5 text-base md:inline-flex">
-            <Link to={pricingPath}>
-              <CalculatorIcon aria-hidden="true" />
-              계산하기
-            </Link>
-          </Button>
+    // 구간(머리 안내 → 계산에 쓸 작품 → 다 봤음 → 출처) 사이를 gap-section(40/48px) 하나로 띄운다(styles/tokens.css R1·R2).
+    // 이전: <div className="flex flex-col gap-5"> (구간 사이 20px가 묶음 사이 12px와 비슷해 구간 경계가 약했다)
+    <div className="flex flex-col gap-section">
+      {/* 머리 안내 묶음: 개수 줄 + 상한 안내 + 시즌 순서 안내. 서로 같은 이야기라 16px로 붙인다.
+          이전에는 셋이 바깥 묶음의 직접 자식이었다(구간 사이 간격을 크게 하면 서로 멀어져서 감쌌다) */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* 개수 줄 "찜 N/20"(확정, PRD SCR-08). N은 서버가 센 현재 개수(다 봤음 제외), 20은 서버가 준 상한이다 */}
+          <p className="text-muted-foreground tabular-nums">
+            찜 {list.activeItemCount}/{list.maxActiveItemCount}
+            {watchedItems.length > 0 && <> · 다 봤음 {watchedItems.length}개</>}
+          </p>
+          {/* 데스크톱의 계산하기 버튼: 목록 위 오른쪽. 모바일에서는 아래 고정 막대가 대신한다 */}
+          {activeItems.length > 0 && (
+            <Button asChild size="lg" className="hidden h-11 px-5 text-base md:inline-flex">
+              <Link to={pricingPath}>
+                <CalculatorIcon aria-hidden="true" />
+                계산하기
+              </Link>
+            </Button>
+          )}
+        </div>
+
+        {/* 20개에 닿으면 상단 안내 띠(확정 문구, PRD SCR-08). 상한 숫자는 서버가 준 값이다.
+          role="status": shadcn Alert의 기본 role="alert"는 낭독기가 하던 말을 끊고 즉시 읽는다. 상한 안내는 오류가 아닌 참고 정보라 한 단계 낮춘다(058 검수 제안 6) */}
+        {isFull && (
+          <Alert role="status" className="border-info bg-info-bg text-info">
+            <InfoIcon aria-hidden="true" />
+            <AlertDescription className="text-info">
+              찜은 {list.maxActiveItemCount}개까지 담을 수 있어요. 다 본 작품을 &apos;다
+              봤음&apos;으로 옮기면 자리가 생겨요.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* 같은 드라마의 시즌이 둘 이상이면 계산 순서를 한 줄로 알린다(확정 문구, PRD SCR-08·11절 37번) */}
+        {hasSeveralSeasonsOfOneSeries && (
+          <p className="text-sm text-muted-foreground">
+            같은 드라마는 앞 시즌부터 보는 순서로 계산해요.
+          </p>
         )}
       </div>
 
-      {/* 20개에 닿으면 상단 안내 띠(확정 문구, PRD SCR-08). 상한 숫자는 서버가 준 값이다.
-          role="status": shadcn Alert의 기본 role="alert"는 낭독기가 하던 말을 끊고 즉시 읽는다. 상한 안내는 오류가 아닌 참고 정보라 한 단계 낮춘다(058 검수 제안 6) */}
-      {isFull && (
-        <Alert role="status" className="border-info bg-info-bg text-info">
-          <InfoIcon aria-hidden="true" />
-          <AlertDescription className="text-info">
-            찜은 {list.maxActiveItemCount}개까지 담을 수 있어요. 다 본 작품을 &apos;다
-            봤음&apos;으로 옮기면 자리가 생겨요.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* 같은 드라마의 시즌이 둘 이상이면 계산 순서를 한 줄로 알린다(확정 문구, PRD SCR-08·11절 37번) */}
-      {hasSeveralSeasonsOfOneSeries && (
-        <p className="text-sm text-muted-foreground">
-          같은 드라마는 앞 시즌부터 보는 순서로 계산해요.
-        </p>
-      )}
-
-      <section aria-labelledby="wishlist-active-heading" className="grid gap-3">
-        <h2 id="wishlist-active-heading" className="text-lg font-semibold">
-          계산에 쓸 작품
-        </h2>
+      {/* 구간 제목·간격은 공통 PageSection이 맡는다(제목 h2 text-xl bold, 제목과 내용 사이 16px. styles/tokens.css R3·R4).
+          이전: <section aria-labelledby="wishlist-active-heading" className="grid gap-3">
+                  <h2 id="wishlist-active-heading" className="text-lg font-semibold">계산에 쓸 작품</h2> */}
+      <PageSection headingId="wishlist-active-heading" title="계산에 쓸 작품">
         {activeItems.length > 0 ? (
-          <>
+          // 분포 요약과 우선순위 묶음(꼭 볼 작품 / 보고 싶음 / 여유될 때) 사이를 32px로 띄운다.
+          // 묶음 안(소제목과 카드 12px, 카드 사이 12px)보다 2.5배 이상 넓어 묶음 경계가 간격으로 읽힌다(R1과 같은 비율).
+          // 이전: 조각(<>)이라 바깥 section의 gap-3(12px)이 묶음 사이에도 그대로 쓰였다
+          <div className="grid gap-8">
             {/* 우선순위 분포 요약: 세 단계에 몇 개씩 들어 있는지 배지로 보이고, 계산이 단계를 어떤 순서로 챙기는지 한 줄로 알린다.
                 앞 문장은 늘 보이는 고정 안내, "우선순위를 나누면…" 권유는 모두 같은 단계일 때만 보인다 */}
             <div className="grid gap-2 rounded-xl border border-border bg-card p-3">
@@ -290,7 +300,8 @@ function WishlistContent({ list, services }: WishlistContentProps) {
                   key={group.priority}
                   role="group"
                   aria-labelledby={headingId}
-                  className="grid gap-2"
+                  // 이전: className="grid gap-2" (소제목과 카드 사이 8px)
+                  className="grid gap-3"
                 >
                   <div className="grid gap-0.5">
                     <h3
@@ -323,7 +334,7 @@ function WishlistContent({ list, services }: WishlistContentProps) {
                 </div>
               )
             })}
-          </>
+          </div>
         ) : (
           <EmptyState
             title="계산할 작품이 없어요"
@@ -338,16 +349,21 @@ function WishlistContent({ list, services }: WishlistContentProps) {
             }
           />
         )}
-      </section>
+      </PageSection>
 
       {watchedItems.length > 0 && (
-        <section aria-labelledby="wishlist-watched-heading" className="grid gap-3">
-          <h2 id="wishlist-watched-heading" className="text-lg font-semibold text-muted-foreground">
-            다 봤음
-          </h2>
-          <p className="-mt-1 text-sm text-muted-foreground">
-            다 본 작품은 계산에서 빠져요. '다 봤음 취소'로 되돌릴 수 있어요.
-          </p>
+        // 다 봤음 구간은 계산에서 빠진 작품이라 제목을 흐린 색(text-muted-foreground)으로 둔다. 그래서 PageSection 대신 같은 규칙을 직접 적었다
+        // (제목 h2 text-xl bold, 제목·설명 4px, 제목 묶음과 내용 16px. styles/tokens.css R3·R4).
+        // 이전: <section … className="grid gap-3"><h2 className="text-lg font-semibold text-muted-foreground">…</h2><p className="-mt-1 …">
+        <section aria-labelledby="wishlist-watched-heading" className="grid gap-section-inner">
+          <div className="grid gap-1">
+            <h2 id="wishlist-watched-heading" className="text-xl font-bold text-muted-foreground">
+              다 봤음
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              다 본 작품은 계산에서 빠져요. '다 봤음 취소'로 되돌릴 수 있어요.
+            </p>
+          </div>
           <CardList
             items={watchedItems}
             getCardProps={getCardProps}

@@ -76,8 +76,11 @@ function SectionCard({ stepNumber, title, description, children, notice, id }: S
               {title}
             </h2>
           </CardTitle>
-          <CardDescription>{description}</CardDescription>
-          {notice}
+          {/* 설명·보충 설명을 제목 글자와 같은 왼쪽 시작선에 맞춘다. 제목 앞에 번호 원(24px, size-6)과 간격(8px, gap-2)이 있어
+              제목 글자가 32px 안쪽에서 시작하므로, 설명도 같은 32px(pl-8)만큼 들여 쓴다(운영 피드백: 설명만 왼쪽으로 튀어나와 보였다).
+              바꿀 때는 위 번호 원 크기·간격과 함께 바꾼다. 이전: <CardDescription>{description}</CardDescription> {notice} (들여쓰기 없음) */}
+          <CardDescription className="pl-8">{description}</CardDescription>
+          {notice && <div className="pl-8">{notice}</div>}
         </CardHeader>
         <CardContent className="grid gap-0 divide-y divide-border">{children}</CardContent>
       </Card>

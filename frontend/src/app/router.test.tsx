@@ -22,6 +22,7 @@ const ROUTE_TABLE = [
   { pattern: '/exclusives', url: '/exclusives', heading: '독점 작품 목록' }, // SCR-03
   { pattern: '/about', url: '/about', heading: 'OTT내비 소개' }, // SCR-04
   { pattern: '/privacy', url: '/privacy', heading: '개인정보처리방침' }, // 개인정보처리방침(화면 번호 없음)
+  { pattern: '/terms', url: '/terms', heading: '이용약관' }, // 이용약관(화면 번호 없음)
   { pattern: '/accuracy', url: '/accuracy', heading: '데이터 정확도 안내' }, // SCR-05
   { pattern: '/login', url: '/login', heading: '로그인' }, // SCR-06
   { pattern: '/auth/callback', url: '/auth/callback', heading: '로그인 처리 중' }, // SCR-06 콜백

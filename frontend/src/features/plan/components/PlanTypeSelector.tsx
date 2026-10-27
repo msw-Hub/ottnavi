@@ -1,4 +1,5 @@
 import { CircleCheckIcon, CircleIcon, EqualIcon } from 'lucide-react'
+import { PageSection } from '@/components/common/PageSection'
 import { PLAN_TYPE_DESCRIPTIONS, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import type { MergedPlanGroup } from '@/features/plan/mergeDrafts'
 import type { PlanType } from '@/api/generated/model'
@@ -34,10 +35,10 @@ export function PlanTypeSelector({
   isBusy,
 }: PlanTypeSelectorProps) {
   return (
-    <section aria-labelledby="plan-type-heading" className="grid gap-3">
-      <h2 id="plan-type-heading" className="text-lg font-semibold">
-        플랜 유형 고르기
-      </h2>
+    // 구간 간격 규칙(제목 h2 text-xl bold, 제목과 내용 사이 16px)은 공통 PageSection이 맡는다(styles/tokens.css R3·R4).
+    // 이전: <section aria-labelledby="plan-type-heading" className="grid gap-3">
+    //         <h2 id="plan-type-heading" className="text-lg font-semibold">플랜 유형 고르기</h2>
+    <PageSection headingId="plan-type-heading" title="플랜 유형 고르기">
       <div
         role="radiogroup"
         aria-labelledby="plan-type-heading"
@@ -135,6 +136,6 @@ export function PlanTypeSelector({
           )
         })}
       </div>
-    </section>
+    </PageSection>
   )
 }
