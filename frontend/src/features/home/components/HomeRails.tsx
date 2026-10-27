@@ -72,7 +72,7 @@ interface PopularRailProps {
 /**
  * "서비스별 인기 순위" 줄. 서비스 탭을 고르면 그 서비스에서 볼 수 있는 작품을 인기도 순으로 큰 순위 숫자와 함께 보인다.
  *
- * 기준을 제목 아래에 밝힌다: OTT가 발표하는 시청 순위가 아니라 TMDB 인기도(popularity)로 정렬한 것이다(서버가 notice로 문구를 준다).
+ * 기준을 제목 아래에 밝힌다: OTT가 발표하는 시청 순위가 아니라, 최근 2년 안에 공개된 한국 작품을 TMDB 인기도(popularity)로 정렬한 것이다(서버가 notice로 문구를 준다).
  * 이걸 숨기면 "넷플릭스 TOP 10"처럼 오해할 수 있다. 쿠팡플레이는 영화 정보가 없어(구조적 공백) 드라마만 남는다는 것을 탭 안에 알린다.
  *
  * 상태를 두 겹으로 나눈 이유: 서비스 목록이 없으면 탭 자체를 못 그리므로 줄 전체(RailSection)가 로딩·오류를 맡고,
@@ -266,10 +266,15 @@ export function NewArrivalsRail({ servicesQuery }: NewArrivalsRailProps) {
               <ScrollRailItem
                 key={`${arrival.title.mediaType}-${arrival.title.tmdbId}-${arrival.ottServiceId}`}
               >
+                {/* 카드 아래에는 "넷플릭스 [있음]" 배지 대신 지금 볼 수 있는 서비스 이름만 칩으로 나열한다(운영 사용 피드백).
+                    이 줄은 "볼 수 있게 된" 작품이라 상태 글자(있음)는 늘 같아 정보가 없고, 다른 서비스에서도 볼 수 있는지가 더 쓸모 있다.
+                    칩은 "있음"인 서비스만 이름 글자로 보이므로 색만으로 상태를 전하지 않는다. 좁은 카드(375px)에서는 2개까지 보이고 나머지는 "+N"으로 줄인다.
+                    새로 들어온 그 서비스(leadServiceId)를 맨 앞에 둬 "+N" 뒤로 숨지 않게 한다. 볼 수 있는 곳이 하나도 없으면 "확인된 제공처가 없습니다"가 보인다.
+                    이전: focusServiceId={arrival.ottServiceId} (그 서비스의 있음 배지) */}
                 <HomeTitleCard
                   title={arrival.title}
                   services={services}
-                  focusServiceId={arrival.ottServiceId}
+                  leadServiceId={arrival.ottServiceId}
                   meta={`${formatMonthDay(arrival.availableSince)} ${
                     arrival.arrivalType === 'ARRIVAL' ? '확인' : '공개'
                   }`}
@@ -364,10 +369,14 @@ export function ExclusivesRail({ servicesQuery }: ExclusivesRailProps) {
           <ScrollRail key={tab} label={`${service.name} 독점 작품`}>
             {exclusives.data.content.map((title) => (
               <ScrollRailItem key={`${title.mediaType}-${title.tmdbId}`}>
+                {/* 제공 상태 줄("넷플릭스 [있음]")을 숨긴다(운영 사용 피드백). 어느 서비스의 독점인지는 바로 위 탭이 이미 말하고,
+                    독점 목록이라 모든 카드가 같은 "있음"이어서 반복될 뿐이다(독점 화면의 ExclusiveTitleCard도 같은 이유로 배지가 없다).
+                    이전: focusServiceId={service.ottServiceId}만 주고 isServiceInfoHidden은 없었다 */}
                 <HomeTitleCard
                   title={toHomeCardTitle(title, service.ottServiceId)}
                   services={services}
                   focusServiceId={service.ottServiceId}
+                  isServiceInfoHidden
                 />
               </ScrollRailItem>
             ))}

@@ -21,6 +21,8 @@ interface HomeTitleCardProps {
   rank?: number // 순위 목록이면 순위(1부터). 주면 포스터 왼쪽에 큰 숫자로 보인다
   rankLabel?: string // 순위 앞에 낭독기가 읽을 말(예: "인기", "찜"). 화면에는 숫자만 보인다
   meta?: ReactNode // 카드 맨 아래 보조 한 줄(예: "찜 214명", "10월 15일 확인")
+  leadServiceId?: number // "볼 수 있는 곳" 칩에서 맨 앞에 둘 서비스 ID(예: 새로 볼 수 있게 된 줄의 그 서비스). 칩이 2개까지만 보여 뒤로 밀려 숨지 않게 한다
+  isServiceInfoHidden?: boolean // true면 제공 상태 줄(배지·칩)을 그리지 않는다. 독점 줄처럼 탭·제목이 서비스를 이미 말해 모든 카드에 같은 표시가 반복되는 곳에서 쓴다
 }
 
 /**
@@ -44,6 +46,8 @@ export function HomeTitleCard({
   rank,
   rankLabel = '',
   meta,
+  leadServiceId,
+  isServiceInfoHidden = false,
 }: HomeTitleCardProps) {
   const detailPath = `/titles/${title.mediaType}/${title.tmdbId}`
   const hasRank = rank !== undefined
@@ -102,13 +106,13 @@ export function HomeTitleCard({
         <p className="text-xs text-muted-foreground tabular-nums">
           {MEDIA_TYPE_TEXT[title.mediaType]} · {title.releaseYear ?? '연도 미상'}
         </p>
-        {title.availabilities.length === 0 ? (
+        {isServiceInfoHidden ? null : title.availabilities.length === 0 ? (
           // 우리 DB에 아직 없는 작품(인기 순위는 TMDB 결과를 그대로 담아 이런 작품이 나올 수 있다): 있음/없음/모름 어느 쪽으로도 단정하지 않는다
           <p className="text-xs text-muted-foreground">제공 정보 수집 전</p>
         ) : focusServiceId !== undefined ? (
           <FocusServiceStatus title={title} services={services} serviceId={focusServiceId} />
         ) : (
-          <AvailableServiceChips title={title} services={services} />
+          <AvailableServiceChips title={title} services={services} leadServiceId={leadServiceId} />
         )}
         {meta && <p className="text-xs font-semibold text-foreground tabular-nums">{meta}</p>}
       </div>
@@ -143,14 +147,25 @@ function FocusServiceStatus({
 }
 
 // 여러 서비스 목록: "있음"인 서비스 이름만 칩으로(최대 2개 + "+N"). 하나도 없으면 글자로 알린다(검색 카드와 같은 규칙)
-function AvailableServiceChips({ title, services }: CardStatusProps) {
-  const availableNames = services
-    .filter((service) =>
-      title.availabilities.some(
-        (entry) => entry.ottServiceId === service.ottServiceId && entry.status === 'AVAILABLE',
-      ),
+// leadServiceId가 있으면 그 서비스를 맨 앞에 둔다(나머지는 서비스 표시 순서 그대로)
+function AvailableServiceChips({
+  title,
+  services,
+  leadServiceId,
+}: CardStatusProps & { leadServiceId?: number }) {
+  // 1. "있음"으로 확인된 서비스만 고른다
+  const availableServices = services.filter((service) =>
+    title.availabilities.some(
+      (entry) => entry.ottServiceId === service.ottServiceId && entry.status === 'AVAILABLE',
+    ),
+  )
+  // 2. 맨 앞에 둘 서비스가 있으면 앞으로 옮긴다(안정 정렬이라 나머지 순서는 바뀌지 않는다)
+  if (leadServiceId !== undefined) {
+    availableServices.sort(
+      (a, b) => Number(b.ottServiceId === leadServiceId) - Number(a.ottServiceId === leadServiceId),
     )
-    .map((service) => service.name)
+  }
+  const availableNames = availableServices.map((service) => service.name)
 
   if (availableNames.length === 0) {
     return <p className="text-xs text-muted-foreground">확인된 제공처가 없습니다</p>

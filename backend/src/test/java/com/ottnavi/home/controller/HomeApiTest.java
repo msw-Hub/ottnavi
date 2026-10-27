@@ -149,7 +149,7 @@ class HomeApiTest extends IntegrationTestSupport {
 				.andExpect(jsonPath("$.data.period").value("TODAY"))
 				.andExpect(jsonPath("$.data.snapshotDate").value(org.hamcrest.Matchers.nullValue()))
 				.andExpect(jsonPath("$.data.daysCounted").value(0))
-				.andExpect(jsonPath("$.data.notice").value("TMDB 인기도 기준, OTT 공식 순위 아님"))
+				.andExpect(jsonPath("$.data.notice").value("최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)"))
 				.andExpect(jsonPath("$.data.items.length()").value(0));
 	}
 

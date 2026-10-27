@@ -3,6 +3,7 @@ package com.ottnavi.home.job;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +116,37 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		String title = jdbcTemplate.queryForObject("SELECT title FROM popularity_snapshot WHERE tmdb_id = 900001 "
 				+ "AND media_type = 'MOVIE' LIMIT 1", String.class);
 		assertThat(title).isEqualTo("테스트 영화 1");
+	}
+
+	@Test
+	void 인기_수집은_한국_제작과_최근_2년_공개일_조건을_TMDB에_보낸다() throws Exception {
+		// when
+		awaitFinished(popularityLauncher.start());
+
+		// then: 영화는 primary_release_date.gte, 드라마는 first_air_date.gte에 오늘(KST)에서 2년 전 날짜가 실린다
+		String from = LocalDate.now(KST).minusYears(2).toString();
+		wireMock.verify(7, getRequestedFor(urlPathEqualTo("/3/discover/movie"))
+				.withQueryParam("with_origin_country", equalTo("KR"))
+				.withQueryParam("primary_release_date.gte", equalTo(from)));
+		wireMock.verify(7, getRequestedFor(urlPathEqualTo("/3/discover/tv"))
+				.withQueryParam("with_origin_country", equalTo("KR"))
+				.withQueryParam("first_air_date.gte", equalTo(from)));
+	}
+
+	@Test
+	void 조건에_맞는_작품이_0건인_자리는_저장하지_않고_Job은_정상_완료한다() throws Exception {
+		// given: 디즈니+(제공처 337)의 드라마가 필터 때문에 0건
+		wireMock.stubFor(get(urlPathEqualTo("/3/discover/tv")).withQueryParam("with_watch_providers", equalTo("337"))
+				.willReturn(aResponse().withHeader("Content-Type", "application/json")
+						.withBody("{\"page\":1,\"results\":[],\"total_pages\":0,\"total_results\":0}")));
+
+		// when
+		long executionId = popularityLauncher.start();
+		awaitFinished(executionId);
+
+		// then: 실패가 아니라 정상 흐름이다. 28행에서 디즈니+ 드라마 2행만 빠진다
+		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(countRows()).isEqualTo(26);
 	}
 
 	@Test

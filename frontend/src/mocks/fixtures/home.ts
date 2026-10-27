@@ -18,8 +18,10 @@ import { MOCK_DATA_AS_OF, TITLE_FIXTURES } from '@/mocks/fixtures/titles'
 // 인기 순위 집계일(스냅샷 날짜). 목업은 상세 데이터 기준일의 다음 날로 둔다
 export const MOCK_POPULARITY_SNAPSHOT_DATE = '2026-10-17'
 
-// 인기 순위 기준 안내(서버가 notice로 주는 문구와 같은 말)
-export const MOCK_POPULARITY_NOTICE = 'TMDB 인기도 기준, OTT 공식 순위 아님'
+// 인기 순위 기준 안내(서버가 notice로 주는 문구와 같은 말). 순위 기준이 "최근 2년 안 한국 작품 중 인기도 순"으로 바뀌어 맞췄다.
+// 이전: 'TMDB 인기도 기준, OTT 공식 순위 아님'
+export const MOCK_POPULARITY_NOTICE =
+  '최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)'
 
 // 홈 목록 응답의 데이터 기준일(제공 상태 확인일)
 export const MOCK_HOME_DATA_AS_OF = MOCK_DATA_AS_OF

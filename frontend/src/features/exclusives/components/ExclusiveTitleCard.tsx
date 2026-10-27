@@ -13,7 +13,7 @@ const MAX_RANK_DISPLAY = 999
 
 interface ExclusiveTitleCardProps {
   title: ExclusiveTitle // 보여 줄 독점 작품
-  rank: number // 인기순 순위(1부터). 지금까지 불러온 목록에서의 위치라 다음 쪽이 붙어도 25, 26…으로 이어진다
+  rank: number // 목록 안 순서(1부터, 최근 공개작 먼저 → 인기도순). 지금까지 불러온 목록에서의 위치라 다음 쪽이 붙어도 25, 26…으로 이어진다
   // serviceName: string // 지금 고른 서비스 이름. 카드의 "있음" 배지 줄을 다시 넣을 때 함께 되살린다
 }
 
@@ -48,9 +48,11 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
             title={title.title}
             className="text-inherit no-underline after:absolute after:inset-0 after:content-[''] group-hover:underline focus-visible:outline-none"
           >
-            {/* 낭독기용 순위. 화면의 큰 숫자는 aria-hidden이라, 링크 이름이 "인기 1위 오징어 게임"처럼 읽히게 여기서 글자로 준다 */}
-            {/* 띄어쓰기를 span 밖에 둔 이유: span 안 끝 공백은 이름 계산에서 잘려 "인기 1위심야 정비소"처럼 붙어 읽힌다 */}
-            <span className="sr-only">인기 {rank}위</span> {title.title}
+            {/* 낭독기용 순위. 화면의 큰 숫자는 aria-hidden이라, 링크 이름이 "1번째 오징어 게임"처럼 읽히게 여기서 글자로 준다 */}
+            {/* 띄어쓰기를 span 밖에 둔 이유: span 안 끝 공백은 이름 계산에서 잘려 "1번째심야 정비소"처럼 붙어 읽힌다 */}
+            {/* 정렬이 "최근 6개월 안 공개작 먼저 → 같은 묶음 안 인기도순"으로 바뀌어 숫자가 인기 순위가 아니라 목록 안 위치가 됐다.
+                그래서 "N번째"로 읽힌다. 이전: <span className="sr-only">인기 {rank}위</span> */}
+            <span className="sr-only">{rank}번째</span> {title.title}
           </Link>
         </h3>
         <p className="text-xs text-muted-foreground tabular-nums">
@@ -97,7 +99,7 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
  *   칸이 바탕과 같은 색이라 "포스터 위 배지"보다 "포스터가 한 모서리 잘린 모양"으로 보여, 순위가 포스터 정보가 아니라 목록 정보라는 것이 드러난다.
  * - 가리는 넓이: 한두 자리 숫자 기준 모바일 약 32×30px(포스터 128×192px의 4% 안팎). 포스터 제목 글자는 대개 아래쪽이라 식별을 해치지 않는다.
  * 자릿수: 1~99는 큰 글자, 100~999는 한 단계 작은 글자로 같은 칸 높이를 지킨다. 1000 이상은 "999+"로 줄인다.
- * 낭독기: 숫자는 장식(aria-hidden)이고, 같은 뜻을 제목 링크 안 sr-only "인기 N위"가 읽힌다.
+ * 낭독기: 숫자는 장식(aria-hidden)이고, 같은 뜻을 제목 링크 안 sr-only "N번째"가 읽힌다.
  * pointer-events-none: 숫자 칸을 눌러도 카드 전체 링크(제목 링크의 ::after)가 눌리게 한다.
  */
 function RankNotch({ rank }: { rank: number }) {
