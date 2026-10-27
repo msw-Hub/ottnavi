@@ -1,5 +1,5 @@
 import { http as mswHttp, HttpResponse } from 'msw'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -38,14 +38,15 @@ afterEach(() => {
 afterAll(() => server.close())
 
 // 설정 화면을 열고, 돌아갈 곳을 확인할 수 있게 도착 화면 자리표시를 둔다. state가 있으면 로그인 전에 보던 화면(from)을 흉내 낸다
-function renderSettings(state?: unknown) {
+// hash가 있으면 다른 화면에서 특정 구역으로 바로 이동해 온 경우를 흉내 낸다(예: 요금 확인 화면의 "#price-mode")
+function renderSettings(state?: unknown, hash = '') {
   const router = createMemoryRouter(
     [
       { path: '/settings', element: <SettingsScreen /> },
       { path: '/', element: <h1>첫 화면</h1> },
       { path: '/wishlist', element: <h1>찜 목록 화면</h1> },
     ],
-    { initialEntries: [{ pathname: '/settings', state }] },
+    { initialEntries: [{ pathname: '/settings', state, hash }] },
   )
   render(
     <Providers>
@@ -91,6 +92,33 @@ describe('내 설정 저장 후 이동', () => {
     await fillBudgetAndSave(user)
 
     expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+  })
+})
+
+describe('계산할 요금제 구역으로 바로 이동', () => {
+  it('주소가 #price-mode면 설정을 불러온 뒤 "계산할 요금제" 구역으로 스크롤하고 체크박스에 포커스를 준다', async () => {
+    // jsdom에는 scrollIntoView가 없어 빈 함수로 대신하고, 불렸는지만 본다
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    setMockOnboardingDone(true)
+    renderSettings(undefined, '#price-mode')
+
+    const checkbox = await screen.findByRole('checkbox', {
+      name: /가장 저렴한 요금제로 계산할래요/,
+    })
+    await waitFor(() => expect(checkbox).toHaveFocus())
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(scrollIntoView.mock.contexts[0]).toHaveAttribute('id', 'price-mode')
+  })
+
+  it('hash가 없으면 포커스를 옮기지 않는다', async () => {
+    setMockOnboardingDone(true)
+    renderSettings()
+
+    const checkbox = await screen.findByRole('checkbox', {
+      name: /가장 저렴한 요금제로 계산할래요/,
+    })
+    expect(checkbox).not.toHaveFocus()
   })
 })
 

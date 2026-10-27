@@ -22,7 +22,7 @@ public record PopularityRankingResponse(
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "1") Long ottServiceId,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "2026-10-18") LocalDate snapshotDate,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "1") int daysCounted,
-		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "TMDB 인기도 기준, OTT 공식 순위 아님") String notice,
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)") String notice,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<PopularityRankingItemResponse> items) {
 
 	/** 순위 조회 결과를 응답으로 바꾼다 */

@@ -254,6 +254,46 @@ describe('요금 확인 화면', () => {
     expect(within(card).getAllByText('구독 중')).toHaveLength(1)
   })
 
+  it('계산 방식 안내는 지금 방식과 바꾸는 방법을 함께 보이고, 링크는 설정의 "계산할 요금제" 구역(#price-mode)으로 간다', async () => {
+    renderPricing('/pricing?mock=1')
+
+    // 목업 기본은 모드 끔(표준 요금제)
+    expect(await screen.findByText('지금은 표준 요금제로 계산해요')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: '설정에서 저렴한 요금제로 바꾸기' })
+    // 목업 확인용 주소 파라미터(?mock…)를 유지하고 hash로 이동할 구역을 알린다
+    expect(link).toHaveAttribute('href', '/settings?mock=1#price-mode')
+  })
+
+  it('계산하는 동안 화면 가운데에 닫을 수 없는 진행 창이 뜨고, 끝나면 사라진다(실패하면 오류 안내가 남는다)', async () => {
+    const user = userEvent.setup()
+    // 계산 응답을 붙잡아 두었다가 풀어 준다. 진행 창이 떠 있는 순간을 확인하려는 것
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    server.use(
+      http.post('/api/me/plan-drafts', async () => {
+        await gate
+        return HttpResponse.json(
+          { title: '계산 실패', status: 500, errorCode: 'INTERNAL_ERROR' },
+          { status: 500 },
+        )
+      }),
+    )
+    renderPricing()
+
+    await user.click(await screen.findByRole('button', { name: '3개월 플랜 계산하기' }))
+    const dialog = await screen.findByRole('alertdialog', { name: '플랜을 계산하고 있어요' })
+    expect(dialog).toBeInTheDocument()
+    // Esc를 눌러도 닫히지 않는다
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+    release()
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(await screen.findByText('플랜을 계산하지 못했어요')).toBeInTheDocument()
+  })
+
   it('찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다', async () => {
     const user = userEvent.setup()
     const router = renderPricing()

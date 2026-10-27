@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -35,6 +35,10 @@ const FIELD_LABELS: Record<string, string> = {
   isLowestPriceMode: '계산할 요금제',
 }
 
+// 4번 "계산할 요금제" 구역의 id. 요금 확인 화면(pricing/PricingScreen)의 링크가 주소 #뒤에 같은 값을 붙인다.
+// 기능 폴더끼리 import하지 않는 규칙이라 상수를 공유하지 않고 양쪽에 같은 글자를 쓴다(바꾸면 둘 다 바꾼다)
+const PRICE_MODE_SECTION_ID = 'price-mode'
+
 // 이름표 표에서 찾는다. hasOwn으로 확인하는 이유: 서버가 "constructor" 같은 이름을 보내도 객체 기본 속성이 딸려 나오지 않게 하기 위함이다
 function getFieldLabel(field: string): string {
   return Object.hasOwn(FIELD_LABELS, field) ? FIELD_LABELS[field] : field
@@ -46,12 +50,18 @@ interface SectionCardProps {
   description: string // 구역 안내(왜 묻는지)
   children: ReactNode // 구역의 입력 칸들
   notice?: ReactNode // 구역 안내 아래, 입력 칸 위에 놓는 보충 설명(선택지의 뜻 등)
+  id?: string // 다른 화면에서 이 구역으로 바로 이동할 때 쓰는 이름(주소의 #뒤 값). 예: 요금 확인 화면의 "#price-mode"
 }
 
 // 입력 구역 하나를 카드로 묶는다. 번호는 장식이 아니라 순서 안내라 글자로 "1." 대신 원 안 숫자로 보인다
-function SectionCard({ stepNumber, title, description, children, notice }: SectionCardProps) {
+function SectionCard({ stepNumber, title, description, children, notice, id }: SectionCardProps) {
   return (
-    <section aria-labelledby={`settings-section-${stepNumber}`} className="grid gap-3">
+    // scroll-mt-4: 이 구역으로 스크롤해 올 때 카드 윗선이 화면 맨 위에 딱 붙지 않게 16px 띄운다
+    <section
+      id={id}
+      aria-labelledby={`settings-section-${stepNumber}`}
+      className="grid scroll-mt-4 gap-3"
+    >
       <Card className="bg-card ring-1 ring-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -102,6 +112,25 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
     shouldFocusError: false, // 기본 포커스는 쓰지 않고 아래 focusFirstInvalidField가 화면 순서로 직접 옮긴다
   })
   const monthlyBudget = useWatch({ control, name: 'monthlyBudget' })
+
+  // 주소가 #price-mode로 끝나면(요금 확인 화면의 "설정에서 … 요금제로 바꾸기" 링크) 4번 "계산할 요금제" 구역으로 내려가 체크박스에 포커스를 준다.
+  // 왜 여기(폼)에서 하나: 설정 화면은 내 설정·서비스 목록을 다 불러온 뒤에야 이 폼을 그린다(SettingsScreen). 그 전에는 구역이 화면에 없어
+  // 찾을 수 없으므로, 폼이 처음 그려진 뒤(useEffect)가 곧 "불러오기가 끝난 뒤"다. 브라우저 기본 #이동은 그 시점에 구역이 없어 동작하지 않는다.
+  // 같은 화면에서 hash만 바뀌어도 다시 이동하도록 location.hash를 의존성으로 둔다
+  useEffect(() => {
+    if (location.hash !== `#${PRICE_MODE_SECTION_ID}`) return
+    // 1. 이동할 구역과 포커스를 줄 체크박스를 찾는다
+    const section = document.getElementById(PRICE_MODE_SECTION_ID)
+    const checkbox = document.getElementById('isLowestPriceMode')
+    if (!section || !checkbox) return
+    // 2. 포커스를 먼저 옮기되 브라우저의 즉시 스크롤은 막는다(preventScroll). 아래 부드러운 스크롤과 겹쳐 화면이 튀지 않게 하려는 것.
+    //    focusVisible: 링크를 마우스로 눌러 왔어도 포커스 테두리(줄의 has-[:focus-visible] 링)를 보여 "여기가 바꿀 곳"임을 드러낸다
+    //    (MDN HTMLElement.focus 옵션. 모르는 브라우저는 무시하고 포커스만 옮긴다)
+    checkbox.focus({ preventScroll: true, focusVisible: true })
+    // 3. 구역 윗선이 보이게 스크롤한다. 동작 줄이기 설정이면 부드럽게 움직이지 않고 바로 옮긴다
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    section.scrollIntoView?.({ block: 'start', behavior: prefersReducedMotion ? 'auto' : 'smooth' })
+  }, [location.hash])
 
   // 저장 성공 뒤 이동할 곳: 로그인 전에 보던 화면(from)이 이 사이트 안의 경로면 거기로, 없으면 첫 화면(/)으로 간다.
   // from은 주소로 올 수 있는 값이라 getSafeRedirectPath로 검사한다(오픈 리다이렉트 방지). 없을 때는 목업 확인용 주소 파라미터(?mock…)를 이어 준다
@@ -227,6 +256,7 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
           체크박스는 브라우저 기본 <input type="checkbox">를 쓴다(shadcn checkbox가 설치돼 있지 않다. 관리자 번들 구성 칸과 같은 방식).
           줄 전체를 <label>로 감싸 글자를 눌러도 켜지고, 높이 44px(min-h-11)로 손가락 터치 크기를 맞췄다 */}
       <SectionCard
+        id={PRICE_MODE_SECTION_ID}
         stepNumber={4}
         title="계산할 요금제"
         description="한 서비스에 요금제가 여럿이면 어떤 요금제로 계산할지 정해요."

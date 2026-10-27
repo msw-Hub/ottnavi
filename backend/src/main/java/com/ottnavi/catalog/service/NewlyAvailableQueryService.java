@@ -40,7 +40,7 @@ public class NewlyAvailableQueryService {
     private final Clock clock;
 
     /**
-     * 새로 볼 수 있게 된 작품을 최신순으로 최대 limit건 돌려준다.
+     * 새로 볼 수 있게 된 작품을 최대 limit건 돌려준다. 작품 개봉일이 최근 6개월 안인 작품이 먼저이고 각 그룹 안은 날짜 최신순이다.
      *
      * @param ottServiceId 이 서비스만 보려면 서비스 ID, 전체면 null
      * @param arrivalDays  입고로 보는 최근 일수(오늘 포함 앞쪽으로 이 일수 전 0시부터)
@@ -67,7 +67,7 @@ public class NewlyAvailableQueryService {
             Title title = change.getWatchUnit().getTitle();
             titlesById.put(title.getId(), title);
             candidates.add(new NewArrivalCandidate(title.getId(), change.getOttService().getId(), ArrivalType.ARRIVAL,
-                    change.getChangedAt().atZone(zone).toLocalDate()));
+                    change.getChangedAt().atZone(zone).toLocalDate(), title.getReleaseDate()));
         }
         for (AvailabilityChange change : releases) {
             if (!matchesService(change, ottServiceId)) {
@@ -76,11 +76,11 @@ public class NewlyAvailableQueryService {
             Title title = change.getWatchUnit().getTitle();
             titlesById.put(title.getId(), title);
             candidates.add(new NewArrivalCandidate(title.getId(), change.getOttService().getId(), ArrivalType.RELEASE,
-                    releaseDateOf(change)));
+                    releaseDateOf(change), title.getReleaseDate()));
         }
 
-        // 4. 같은 작품·서비스는 대표 한 건만 남기고 최신순으로 자른다
-        List<NewArrivalCandidate> picked = NewArrivalPicker.pick(candidates, limit);
+        // 4. 같은 작품·서비스는 대표 한 건만 남기고 작품 개봉일 그룹·날짜 최신순으로 정렬해 자른다
+        List<NewArrivalCandidate> picked = NewArrivalPicker.pick(candidates, limit, today);
 
         // 5. 고른 작품들(중복 없이 등장 순서대로)을 카드로 만든다
         Map<Long, Title> orderedTitles = new LinkedHashMap<>();

@@ -10,6 +10,7 @@ import {
 import { Link, useLocation, useNavigate } from 'react-router'
 import type { OttService, ServicePrice, UserSettings } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
+import { BlockingProgressDialog } from '@/components/common/BlockingProgressDialog'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -171,22 +172,45 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
         <h2 id="pricing-list-heading" className="text-lg font-semibold">
           서비스별 요금
         </h2>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 rounded-xl border border-border bg-muted px-4 py-1">
-          <p className="flex items-center gap-2 py-2 text-sm font-semibold break-keep">
+        {/* 계산 방식 안내 띠: "지금 어떻게 계산하는지(굵게) → 그게 무슨 뜻인지 → 반대로 하려면 어디서 바꾸는지(링크)" 순서로 읽힌다.
+            이전에는 "표준 요금제로 계산해요"와 "설정에서 바꾸기"만 있어 무엇을 무엇으로 바꾸는지 알 수 없었다(운영 사용 피드백).
+            링크 이름에 바뀐 뒤의 상태를 넣어(예: "설정에서 저렴한 요금제로 바꾸기") 링크만 따로 읽어도 뜻이 통하게 했다(낭독기의 링크 목록).
+            링크는 설정 화면의 4번 "계산할 요금제" 구역(id="price-mode", onboarding/SettingsForm)으로 바로 내려가 체크박스에 포커스를 준다.
+            주소에 search(?mock… 목업 확인용 파라미터)를 그대로 붙이고 hash(#price-mode)로 이동 대상을 알린다 */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-border bg-muted px-4 py-2">
+          <div className="flex items-start gap-2 py-1">
             {isLowestPriceMode ? (
-              <BadgePercentIcon aria-hidden="true" className="size-5 shrink-0" />
+              <BadgePercentIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
             ) : (
-              <ListChecksIcon aria-hidden="true" className="size-5 shrink-0" />
+              <ListChecksIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
             )}
+            <div className="grid gap-0.5">
+              <p className="text-sm font-semibold break-keep">
+                {isLowestPriceMode
+                  ? '지금은 가장 저렴한 요금제로 계산해요'
+                  : '지금은 표준 요금제로 계산해요'}
+              </p>
+              <p className="text-sm break-keep text-muted-foreground">
+                {isLowestPriceMode
+                  ? '광고형·베이직 같은 저가형까지 포함해 서비스마다 가장 싼 요금제를 써요.'
+                  : '광고형·베이직 같은 저가형 요금제는 빼고 계산해요.'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to={{ pathname: '/settings', search: location.search, hash: '#price-mode' }}
+            state={{ from: `/pricing${location.search}` }}
+            className="inline-flex min-h-11 items-center rounded-md text-sm font-semibold underline underline-offset-3 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none max-sm:pl-7"
+          >
+            {isLowestPriceMode
+              ? '설정에서 표준 요금제로 바꾸기'
+              : '설정에서 저렴한 요금제로 바꾸기'}
+          </Link>
+          {/* 이전 문구·링크(무엇을 바꾸는지 드러나지 않았다):
+          <p className="flex items-center gap-2 py-2 text-sm font-semibold break-keep">
             {isLowestPriceMode ? '가장 저렴한 요금제로 계산해요' : '표준 요금제로 계산해요'}
           </p>
-          <Link
-            to={`/settings${location.search}`}
-            state={{ from: `/pricing${location.search}` }}
-            className="inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-3"
-          >
-            설정에서 바꾸기
-          </Link>
+          <Link to={`/settings${location.search}`} state={{ from: `/pricing${location.search}` }}>설정에서 바꾸기</Link> */}
         </div>
         <PricingList prices={prices} services={services} isLocked={calculation.isPending} />
       </section>
@@ -212,7 +236,15 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
           {calculation.isPending ? '계산하는 중' : '3개월 플랜 계산하기'}
         </Button>
 
-        {/* 진행 안내: 영역은 항상 있고 안의 글자만 바뀐다. 이미 있던 영역의 글자가 바뀌어야 낭독기(aria-live)가 읽어 준다 */}
+        {/* 계산 중 진행 창: 화면 가운데에 닫을 수 없는 창을 띄우고 뒤 화면을 흐리게 덮는다(운영 사용 피드백).
+            이전에는 버튼 아래 작은 막대라 화면 아래쪽(모바일 고정 막대)에서만 보여 계산 중인지 놓치기 쉬웠고, 그동안 요금을 고칠 수도 있었다.
+            계산이 끝나면 isPending이 false가 되어 창이 저절로 사라진다(성공이면 결과 화면으로 이동, 실패면 아래 오류 안내가 보인다) */}
+        <BlockingProgressDialog
+          open={calculation.isPending}
+          title="플랜을 계산하고 있어요"
+          description="찜한 작품과 예산, 시청 시간에 맞춰 3가지 플랜을 찾는 중이에요. 몇 초 걸릴 수 있어요."
+        />
+        {/* 이전 진행 안내(버튼 아래 막대):
         <div role="status" aria-live="polite">
           {calculation.isPending && (
             <div className="grid gap-1.5">
@@ -220,13 +252,12 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
               <p className="text-sm text-muted-foreground">
                 찜한 작품과 예산, 시청 시간에 맞춰 조합을 찾는 중이에요. 몇 초 걸릴 수 있어요.
               </p>
-              {/* 진행 막대: 끝이 정해지지 않은 작업이라 움직이는 띠로만 보인다. 동작 줄이기 설정이면 멈춘 띠가 된다 */}
               <div aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className="h-full w-1/3 rounded-full bg-primary motion-safe:animate-pulse" />
               </div>
             </div>
           )}
-        </div>
+        </div> */}
 
         {calculation.error != null && !calculation.isPending && (
           <Alert variant="destructive">

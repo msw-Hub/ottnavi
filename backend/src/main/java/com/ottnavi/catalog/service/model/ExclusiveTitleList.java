@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 한 서비스의 독점 목록 전체(인기도 높은 순). 서비스마다 하나씩 Redis `exclusiveTitles` 캐시에 저장한다.
+ * 한 서비스의 독점 목록 전체(인기도 높은 순). 서비스마다 하나씩 Redis `exclusiveTitlesV2` 캐시에 저장한다.
  * 데이터 부족 서비스(쿠팡플레이)도 판정하므로 judged는 현재 항상 true다. 쿠팡플레이는 영화가 구조적 공백이라 드라마(시즌)만 목록에 나온다.
  */
 public record ExclusiveTitleList(

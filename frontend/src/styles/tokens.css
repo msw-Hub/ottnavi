@@ -228,3 +228,23 @@
   --color-priority-maybe-bg: var(--priority-maybe-bg);
   --color-priority-maybe-border: var(--priority-maybe-border);
 }
+
+/*
+ * 끝이 정해지지 않은 작업(플랜 계산 등)의 진행 막대 움직임(animate-indeterminate).
+ * 막대 안의 짧은 띠가 왼쪽 바깥에서 오른쪽 바깥으로 계속 지나간다. 남은 시간을 모르는 작업이라 "몇 %"를 보이지 않고 움직임만 보인다.
+ * 1.6초: 너무 빠르면 재촉하는 느낌, 너무 느리면 멈춘 것처럼 보여 그 사이 값으로 정했다.
+ * 동작 줄이기(prefers-reduced-motion) 설정은 쓰는 쪽에서 motion-safe:animate-indeterminate로 걸러 움직이지 않는 띠로 보인다.
+ * (Tailwind v4 문서 "Defining animation keyframes"대로 @theme 안에 --animate-*와 @keyframes를 함께 둔다. context7 /tailwindlabs/tailwindcss.com 확인)
+ */
+@theme {
+  --animate-indeterminate: indeterminate 1.6s ease-in-out infinite;
+
+  @keyframes indeterminate {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+}
