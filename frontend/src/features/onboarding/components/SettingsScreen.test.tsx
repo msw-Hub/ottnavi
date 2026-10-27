@@ -123,14 +123,15 @@ describe('계산할 요금제 구역으로 바로 이동', () => {
 })
 
 describe('회원 탈퇴 링크(Task 081)', () => {
-  it('가입을 마친 회원의 내 설정 화면 맨 아래에 탈퇴 화면으로 가는 링크가 있다', async () => {
+  // 이전: '가입을 마친 회원의 내 설정 화면 맨 아래에 탈퇴 화면으로 가는 링크가 있다'(링크를 찾아 href가 /settings/withdraw인지 확인).
+  // 탈퇴 링크를 푸터(app/RootLayout)로 옮겨(사용자 확정) 내 설정에서는 사라진 것을 확인하도록 바꿨다. 푸터 쪽은 app/RootLayout.test.tsx가 본다
+  it('가입을 마친 회원의 내 설정 화면에도 탈퇴 링크가 없다(푸터로 옮김)', async () => {
     setMockOnboardingDone(true) // 목업 서버가 기본 설정(isOnboardingDone=true)을 돌려준다
     renderSettings()
-    // 제목은 불러오는 중에도 "내 설정"이라, 폼(맨 아래 링크 포함)이 그려질 때까지 링크를 기다린다
-    expect(await screen.findByRole('link', { name: '회원 탈퇴' })).toHaveAttribute(
-      'href',
-      '/settings/withdraw',
-    )
+    // 제목은 불러오는 중에도 "내 설정"이라, 폼이 다 그려진 표시인 저장 버튼을 기다린 뒤 링크가 없는지 본다
+    await screen.findByRole('button', { name: '저장하기' })
+
+    expect(screen.queryByRole('link', { name: '회원 탈퇴' })).not.toBeInTheDocument()
   })
 
   it('첫 방문(온보딩) 화면에는 탈퇴 링크가 없다', async () => {

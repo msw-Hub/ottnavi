@@ -249,7 +249,9 @@ export function HeaderAccountMenu({ isAdmin, wishlistCount, search }: HeaderAcco
 
         <DropdownMenuSeparator />
 
-        {/* 빨강으로 칠하지 않는다: 데이터가 지워지는 동작이 아니다(회원 탈퇴는 이 메뉴에 두지 않고 내 설정 안에서만 한다) */}
+        {/* 빨강으로 칠하지 않는다: 데이터가 지워지는 동작이 아니다.
+            회원 탈퇴는 이 메뉴에 두지 않고 푸터(app/RootLayout.tsx, 로그인한 사용자에게만)에 둔다. 빨강은 탈퇴 확인 화면에서만 쓴다.
+            이전: (회원 탈퇴는 이 메뉴에 두지 않고 내 설정 안에서만 한다) — 내 설정 맨 아래 링크를 푸터로 옮기며 고쳤다 */}
         <DropdownMenuItem className={ITEM_CLASS} onSelect={() => void logout()}>
           <LogOutIcon aria-hidden="true" className="size-4 text-muted-foreground" />
           로그아웃

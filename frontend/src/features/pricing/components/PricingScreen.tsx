@@ -229,7 +229,8 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
           className="h-12 w-full text-base md:w-auto md:justify-self-end md:px-6"
         >
           {calculation.isPending ? (
-            <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
+            // loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin
+            <LoaderCircleIcon aria-hidden="true" className="loading-spin" />
           ) : (
             <CalculatorIcon aria-hidden="true" />
           )}
@@ -243,6 +244,7 @@ function PricingContent({ prices, settings, services, calculation }: PricingCont
           open={calculation.isPending}
           title="플랜을 계산하고 있어요"
           description="찜한 작품과 예산, 시청 시간에 맞춰 3가지 플랜을 찾는 중이에요. 몇 초 걸릴 수 있어요."
+          activityLabel="계산하는 중이에요" // 창 아래 "7초째 계산하는 중이에요"
         />
         {/* 이전 진행 안내(버튼 아래 막대):
         <div role="status" aria-live="polite">

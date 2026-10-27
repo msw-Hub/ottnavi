@@ -133,10 +133,19 @@ export function ExclusiveTitleRail({
   function scrollByPage(direction: -1 | 1) {
     const list = listRef.current
     if (!list) return
+    // 1. 동작 줄이기 설정인지 본다(Windows "애니메이션 효과" 끔도 브라우저에서는 이 설정으로 잡힌다)
+    const isReduced = prefersReducedMotion()
+    // 2. 평소에는 부드럽게 미끄러지고(smooth), 동작 줄이기면 미끄러지는 움직임 없이 바로 넘긴다(auto)
     list.scrollBy({
       left: direction * list.clientWidth * 0.8,
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      behavior: isReduced ? 'auto' : 'smooth',
     })
+    // 3. 동작 줄이기에서 바로 넘기면 카드가 "뚝" 바뀌어 넘어간 것을 알아채기 어렵다. 홈 줄(home/components/ScrollRail)과 같은 규칙으로
+    //    위치는 그대로 두고 줄 전체의 밝기만 35% → 100%로 0.28초 동안 되살린다. 기능 폴더끼리 import 금지라 코드를 나눠 쓰지 않고 같은 값을 둔다.
+    //    animate가 없는 환경(테스트용 jsdom)에서는 건너뛴다
+    if (isReduced && typeof list.animate === 'function') {
+      list.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' })
+    }
   }
 
   // 마우스 드래그 상태. 렌더에 쓰이지 않는 값이라 state가 아닌 ref에 둔다(움직일 때마다 다시 그리지 않으려는 것).
