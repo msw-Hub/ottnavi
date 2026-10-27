@@ -190,12 +190,21 @@ function RailArrowButton({
         // 줄의 스크롤 영역 끝(-left-4/-right-4, 줄의 -mx-4와 같은 거리)에 붙여, 첫 카드나 잘린 끝 카드의 가장자리 약 20px만 덮는다.
         // 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다. 포커스 링·끝에서 숨기기(disabled:opacity-0)는 그대로다
         // 이전: 'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full ...', direction === 'prev' ? '-left-3' : '-right-3'
-        'absolute z-20 hidden w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex',
+        // 이전(불투명 버튼): 'absolute z-20 hidden w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex'
+        // 반투명 버튼(사용자 요청 "더 투명하게, 마우스를 올리면 진하게"):
+        // - 평소: 바탕 card 60%(bg-card/60) + 뒤 포스터 흐림(backdrop-blur-sm), 테두리 input 40%로 포스터가 비쳐 보인다.
+        //   바탕 투명도 하한이 60%인 이유: 가장 밝은 흰 포스터 위에서도 바탕이 충분히 어두워 화살표(foreground)와의 대비가 약 4:1로 3:1 기준을 넘는다(50%면 약 3:1로 아슬아슬하다).
+        //   화살표 아이콘에도 어두운 그림자(drop-shadow-background)를 둘러 밝은 포스터 위 윤곽을 한 번 더 지킨다.
+        // - 마우스를 올리거나(hover) 키보드 포커스가 오면(focus-visible): 바탕 accent 95%·테두리 input 100%·그림자 md로 거의 불투명해진다.
+        //   hover 효과는 "진해지는" 꾸밈일 뿐 정보를 숨기지 않는다(평소에도 화살표가 보인다). 터치 기기 폭(640px 미만)에서는 버튼 자체가 숨겨진다.
+        // - 전환은 0.2초로 부드럽게 하되 움직임 줄이기 설정에서는 끈다(motion-safe 접두사).
+        'absolute z-20 hidden w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input/40 bg-card/60 text-foreground shadow-sm backdrop-blur-sm hover:border-input hover:bg-accent/95 hover:shadow-md focus-visible:border-input focus-visible:bg-accent/95 focus-visible:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-200 sm:inline-flex',
         sizeClass,
         direction === 'prev' ? '-left-4' : '-right-4',
       )}
     >
-      <Icon aria-hidden="true" className="size-5" />
+      {/* 이전: className="size-5" */}
+      <Icon aria-hidden="true" className="size-5 drop-shadow-sm drop-shadow-background" />
     </button>
   )
 }

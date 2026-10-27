@@ -31,7 +31,9 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
   const posterUrl = getTmdbImageUrl(detail.posterPath, 'w500')
 
   return (
-    <article className="flex flex-col gap-8">
+    // 구간(머리 → 제공 상태 → 시즌·찜 → 출연진 → 출처) 사이를 gap-section(40/48px) 하나로 띄운다(styles/tokens.css R1·R2).
+    // 이전: <article className="flex flex-col gap-8"> (32px)
+    <article className="flex flex-col gap-section">
       <div className="grid gap-6 sm:grid-cols-[14rem_1fr]">
         {/* 상세에서는 제목을 옆에 크게 보이므로 제목이 없는 PosterImage를 쓴다(PosterCard를 쓰면 제목이 두 번 나온다) */}
         <PosterImage title={detail.title} posterUrl={posterUrl} className="w-40 sm:w-full" />
@@ -85,14 +87,20 @@ export function TitleDetailContent({ detail, services }: TitleDetailContentProps
         </div>
       </div>
 
-      <section className="grid gap-3">
-        <h2 className="text-lg font-semibold">서비스별 제공 상태</h2>
-        {isTv && (
-          <p className="text-sm text-muted-foreground">
-            드라마는 시즌 중 하나라도 제공되면 &ldquo;있음&rdquo;으로 보입니다. 시즌별 제공처는
-            아래에서 확인하세요.
-          </p>
-        )}
+      {/* 구간 제목 h2 text-xl bold, 제목 묶음과 내용 사이 16px(gap-section-inner)로 맞췄다(R3·R4).
+          이 화면의 구간은 aria-labelledby가 없는 이름 없는 section이라(낭독기 영역 목록에 새로 나타나지 않게) PageSection 대신 클래스만 바꿨다.
+          이전: <section className="grid gap-3"><h2 className="text-lg font-semibold"> */}
+      <section className="grid gap-section-inner">
+        {/* 제목과 설명은 4px로 붙여 "이 제목의 설명"으로 읽히게 한다(R3). 이전에는 h2와 p가 section의 직접 자식이라 12px 떨어져 있었다 */}
+        <div className="grid gap-1">
+          <h2 className="text-xl font-bold">서비스별 제공 상태</h2>
+          {isTv && (
+            <p className="text-sm text-muted-foreground">
+              드라마는 시즌 중 하나라도 제공되면 &ldquo;있음&rdquo;으로 보입니다. 시즌별 제공처는
+              아래에서 확인하세요.
+            </p>
+          )}
+        </div>
         {/* 먼저 "어디서 볼 수 있나"를 칩으로 요약하고, 있음/없음/모름 7줄은 필요할 때만 펼쳐 본다(기본 닫힘) */}
         <AvailableServiceBadges entries={statusEntries} />
         <details>
@@ -146,8 +154,10 @@ interface MovieWatchSectionProps {
  */
 function MovieWatchSection({ detail, posterUrl }: MovieWatchSectionProps) {
   return (
-    <section aria-labelledby="movie-watch-heading" className="grid gap-3">
-      <h2 id="movie-watch-heading" className="text-lg font-semibold">
+    // 구간 제목·간격은 공통 PageSection과 같은 규칙이다(h2 text-xl bold, 제목과 내용 사이 16px. styles/tokens.css R3·R4)
+    // 이전: <section aria-labelledby="movie-watch-heading" className="grid gap-3"><h2 … className="text-lg font-semibold">
+    <section aria-labelledby="movie-watch-heading" className="grid gap-section-inner">
+      <h2 id="movie-watch-heading" className="text-xl font-bold">
         시청 시간과 찜
       </h2>
       <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">

@@ -107,72 +107,78 @@ function SearchResultList({
     .map((service) => service.name)
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* 외부 수집 실패: 오류로 막지 않고 저장된 결과만 보여 주면서 한계를 알린다(PRD SCR-01). 급한 알림은 아니라 role="status" */}
-      {result.isExternalCollectFailed && (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm"
-        >
-          <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>
-            외부 데이터 수집에 실패해 저장된 결과만 보여 드립니다. 최근에 추가된 작품이나 바뀐 제공
-            정보는 반영되지 않았을 수 있습니다.
-          </span>
-        </p>
-      )}
-
-      {result.items.length === 0 ? (
-        <EmptyState
-          title="검색 결과가 없습니다"
-          description={`"${query}"에 해당하는 작품을 찾지 못했습니다. 제목을 다르게 입력하거나 원제로 검색해 보세요. 아직 수집되지 않은 작품은 검색되지 않을 수 있습니다.`}
-        />
-      ) : (
-        <>
-          <h2 className="text-lg font-semibold">
-            &ldquo;{query}&rdquo; 검색 결과 {result.totalElements}건
-          </h2>
-          {/* 쿠팡플레이처럼 데이터가 부족한 서비스의 안내는 카드마다 반복하지 않고 결과 위에 한 번만 둔다 */}
-          {insufficientNames.length > 0 && (
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
-              <DataInsufficientTag />
-              <span>
-                {insufficientNames.join(', ')}는 데이터가 부족해 제공 여부를 확인하지 못할 수
-                있습니다.
-              </span>
-            </p>
-          )}
-          <ul
-            className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
-            aria-label="검색 결과"
+    // 결과 구간과 출처 묶음 사이를 gap-section(40/48px)으로 띄운다(styles/tokens.css R1·R2).
+    // 이전: <div className="flex flex-col gap-4"> (결과와 출처를 포함한 모든 요소가 16px 간격이었다)
+    <div className="flex flex-col gap-section">
+      {/* 결과 구간: 수집 실패 안내 + 제목 + 데이터 부족 안내 + 결과 그리드 + 더보기. 이전과 같은 16px로 붙여 둔다 */}
+      <div className="flex flex-col gap-4">
+        {/* 외부 수집 실패: 오류로 막지 않고 저장된 결과만 보여 주면서 한계를 알린다(PRD SCR-01). 급한 알림은 아니라 role="status" */}
+        {result.isExternalCollectFailed && (
+          <p
+            role="status"
+            className="flex items-start gap-2 rounded-lg border border-border bg-muted px-4 py-3 text-sm"
           >
-            {result.items.map((item) => (
-              // 같은 제목의 영화·드라마가 있어 제목이 아니라 mediaType + tmdbId가 작품의 고유 식별자다
-              <li key={`${item.mediaType}-${item.tmdbId}`}>
-                <SearchResultCard item={item} services={services} />
-              </li>
-            ))}
-          </ul>
-          {/* 더보기: 다음 페이지를 아래에 이어 붙인다. 마지막 페이지까지 불러오면 버튼을 숨긴다. 실패하면 오류 안내와 다시 시도로 바꾼다 */}
-          {loadMoreError ? (
-            <ErrorState error={loadMoreError} onRetry={onLoadMore} />
-          ) : (
-            hasNextPage && (
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-11 w-full"
-                disabled={isFetchingNextPage}
-                aria-label={isFetchingNextPage ? '검색 결과 불러오는 중' : '검색 결과 더보기'}
-                onClick={onLoadMore}
-              >
-                {isFetchingNextPage ? '불러오는 중' : '더보기'}
-              </Button>
-            )
-          )}
-        </>
-      )}
+            <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+            <span>
+              외부 데이터 수집에 실패해 저장된 결과만 보여 드립니다. 최근에 추가된 작품이나 바뀐
+              제공 정보는 반영되지 않았을 수 있습니다.
+            </span>
+          </p>
+        )}
+
+        {result.items.length === 0 ? (
+          <EmptyState
+            title="검색 결과가 없습니다"
+            description={`"${query}"에 해당하는 작품을 찾지 못했습니다. 제목을 다르게 입력하거나 원제로 검색해 보세요. 아직 수집되지 않은 작품은 검색되지 않을 수 있습니다.`}
+          />
+        ) : (
+          <>
+            {/* 구간 제목 크기 규칙(h2 text-xl bold, R4). 이전: className="text-lg font-semibold" */}
+            <h2 className="text-xl font-bold">
+              &ldquo;{query}&rdquo; 검색 결과 {result.totalElements}건
+            </h2>
+            {/* 쿠팡플레이처럼 데이터가 부족한 서비스의 안내는 카드마다 반복하지 않고 결과 위에 한 번만 둔다 */}
+            {insufficientNames.length > 0 && (
+              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                <DataInsufficientTag />
+                <span>
+                  {insufficientNames.join(', ')}는 데이터가 부족해 제공 여부를 확인하지 못할 수
+                  있습니다.
+                </span>
+              </p>
+            )}
+            <ul
+              className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
+              aria-label="검색 결과"
+            >
+              {result.items.map((item) => (
+                // 같은 제목의 영화·드라마가 있어 제목이 아니라 mediaType + tmdbId가 작품의 고유 식별자다
+                <li key={`${item.mediaType}-${item.tmdbId}`}>
+                  <SearchResultCard item={item} services={services} />
+                </li>
+              ))}
+            </ul>
+            {/* 더보기: 다음 페이지를 아래에 이어 붙인다. 마지막 페이지까지 불러오면 버튼을 숨긴다. 실패하면 오류 안내와 다시 시도로 바꾼다 */}
+            {loadMoreError ? (
+              <ErrorState error={loadMoreError} onRetry={onLoadMore} />
+            ) : (
+              hasNextPage && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="h-11 w-full"
+                  disabled={isFetchingNextPage}
+                  aria-label={isFetchingNextPage ? '검색 결과 불러오는 중' : '검색 결과 더보기'}
+                  onClick={onLoadMore}
+                >
+                  {isFetchingNextPage ? '불러오는 중' : '더보기'}
+                </Button>
+              )
+            )}
+          </>
+        )}
+      </div>
 
       {/* 제공처 정보가 보이는 화면이라 출처와 기준일을 둔다(빈 결과에는 제공처가 없어 생략) */}
       {result.items.length > 0 && (

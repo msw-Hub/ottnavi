@@ -39,7 +39,9 @@ export function HomeScreen() {
   const heroPosterPaths = (bannerRanking.data?.items ?? []).map((item) => item.title.posterPath)
 
   return (
-    <div className="flex flex-col gap-10 sm:gap-12">
+    // 줄(구간) 사이 40px(640px 미만) / 48px(이상). 값은 그대로 두고 공통 구간 간격 토큰 이름으로 바꿨다(styles/tokens.css R1)
+    // 이전: <div className="flex flex-col gap-10 sm:gap-12">
+    <div className="flex flex-col gap-section">
       {/* 로그인한 사용자는 내 플랜을 제목 바로 아래에 둔다(HomeIntro의 memberSlot) */}
       {/* B안: 소개와 인기 순위 사이만 간격을 좁혀(gap-6 · 640px 이상 gap-8) 첫 화면에 포스터가 더 들어오게 한다. 다른 줄 사이 간격은 그대로다 */}
       {/* 소개가 둥근 배너 패널(시안 A)이 된 뒤로는 패널의 테두리와 둥근 모서리가 경계를 맡아, 패널과 인기 순위 줄 사이를 24px(gap-6)로 둔다.

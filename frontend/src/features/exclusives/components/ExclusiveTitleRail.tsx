@@ -432,11 +432,16 @@ function RailArrowButton({
         // 가운데 116px(top-29)·128px(top-32), 길이 112·120px이다(홈 보통 카드 줄과 같은 값). 카드 폭을 바꾸면 이 값도 같이 고친다.
         // 줄의 스크롤 영역 끝(-left-4/-right-4, 줄의 -mx-4와 같은 거리)에 붙여 카드 가장자리를 약 20px만 덮는다
         // 이전: 'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full ...', direction === 'prev' ? '-left-3' : '-right-3'
-        'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex lg:top-32 lg:h-30',
+        // 이전(불투명 버튼): 'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex lg:top-32 lg:h-30'
+        // 반투명 버튼(홈 줄 ScrollRail과 같은 값): 평소 card 60%·테두리 input 40%·뒤 흐림으로 포스터가 비쳐 보이고,
+        // 마우스를 올리거나 키보드 포커스가 오면 accent 95%·테두리 input 100%로 거의 불투명해진다.
+        // 바탕 하한 60%는 흰 포스터 위에서도 화살표(foreground) 대비 약 4:1(3:1 이상)을 지키는 값이다. 전환은 motion-safe에서만 0.2초
+        'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input/40 bg-card/60 text-foreground shadow-sm backdrop-blur-sm hover:border-input hover:bg-accent/95 hover:shadow-md focus-visible:border-input focus-visible:bg-accent/95 focus-visible:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-200 sm:inline-flex lg:top-32 lg:h-30',
         direction === 'prev' ? '-left-4' : '-right-4',
       )}
     >
-      <Icon aria-hidden="true" className="size-5" />
+      {/* 이전: className="size-5" (밝은 포스터 위 윤곽을 지키려 어두운 그림자를 더했다) */}
+      <Icon aria-hidden="true" className="size-5 drop-shadow-sm drop-shadow-background" />
     </button>
   )
 }
