@@ -115,6 +115,8 @@ describe('홈 화면', () => {
     expect(within(list).getAllByRole('article')).toHaveLength(10)
     // 탭이 이미 서비스를 말해 카드마다 "넷플릭스 [있음]" 줄을 반복하지 않는다
     expect(within(list).queryByText('있음')).not.toBeInTheDocument()
+    // 같은 이유로 포스터 위 "볼 수 있는 곳" OTT 로고도 없다(다른 줄의 로고는 아래 H-2·새로 볼 수 있게 된 작품 테스트가 확인한다)
+    expect(within(list).queryByRole('list', { name: '볼 수 있는 곳' })).not.toBeInTheDocument()
     // 더보기는 같은 서비스 탭이 열린 독점 목록 화면으로 간다
     const section = list.closest('section') as HTMLElement
     expect(within(section).getByRole('link', { name: /더보기/ })).toHaveAttribute(

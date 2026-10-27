@@ -1,5 +1,6 @@
 import { SourceAttribution } from '@/components/common/SourceAttribution'
-import { HomeIntro, StartSteps } from '@/features/home/components/HomeIntro'
+import { HomeIntro } from '@/features/home/components/HomeIntro'
+// 이전: import { HomeIntro, StartSteps } from '@/features/home/components/HomeIntro' (3단계 안내 상자를 없애 StartSteps는 쓰지 않는다)
 import {
   ExclusivesRail,
   NewArrivalsRail,
@@ -15,8 +16,8 @@ import { useOttServices } from '@/hooks/useOttServices'
  * 홈(`/`) 화면 본문이다. pages/HomePage는 이 컴포넌트를 연결만 한다(pages는 얇게, frontend.md).
  *
  * 순서와 이유(정보 위계):
- * 1. 처음 온 사람: 한 줄 가치 제안·시작 버튼 → 인기 순위(큰 포스터) → 3단계 안내 → 나머지 목록. 첫 화면에서 서비스 소개 한 문장과 큰 포스터가 함께 보인다(B안).
- *    이전: 한 줄 가치 제안 → 3단계 안내·시작 버튼 → 목록. 3단계 상자가 첫 화면을 차지해 모바일에서 인기 순위가 안 보였다.
+ * 1. 처음 온 사람: 포스터 배너(한 줄 가치 제안·시작 버튼) → 인기 순위(큰 포스터) → 나머지 목록. 첫 화면에서 서비스 소개 한 문장과 큰 포스터가 함께 보인다.
+ *    이전(2026-10-28 전): 인기 순위 줄 바로 아래에 "이렇게 써요" 3단계 안내 상자가 있었다. 그 전에는 3단계 상자가 첫 화면을 차지해 모바일에서 인기 순위가 안 보였다.
  * 2. 로그인한 사람: 작은 제목 → 내 플랜 → 목록 3줄. 반복 사용자가 가장 자주 하는 일(내 플랜 확인)이 맨 위에 있다.
  * 3. 목록은 "무엇을 볼지 고르는" 순서다: 인기 순위(가장 넓은 관심) → 찜 많은 작품(이 서비스 사용자의 관심) → 새로 볼 수 있게 된 작품(변화) → 서비스 독점 작품.
  * 4. 맨 아래에 출처 묶음(공통 SourceAttribution)을 한 번만 둔다. 데이터 기준일은 목록마다 제목 아래에 있다(RailSection).
@@ -59,8 +60,9 @@ export function HomeScreen() {
       {/* 이전:
       <HomeIntro isMember={isMember} memberSlot={<MyPlanBanner />} />
       <PopularRail servicesQuery={servicesQuery} /> */}
-      {/* B안: 3단계 안내 상자는 인기 순위 줄 바로 아래에 둔다(비로그인에게만). 첫 화면은 포스터가 차지하고, 둘러본 다음 "어떻게 쓰는지"를 읽는다 */}
-      {!isMember && <StartSteps />}
+      {/* 2026-10-28 사용자 결정: 비로그인 홈의 "이렇게 써요" 3단계 안내 상자를 없앤다(배너와 시작 버튼이 이미 서비스 설명과 첫 행동을 맡아 중복이다).
+          이 상자 안에 있던 "로그인하지 않아도 검색창에서 작품을 찾을 수 있어요" 안내도 함께 사라진다(StartSteps 컴포넌트는 HomeIntro.tsx에 남겨 둠).
+      이전(B안: 인기 순위 줄 바로 아래, 비로그인에게만): {!isMember && <StartSteps />} */}
       <WishlistedRail servicesQuery={servicesQuery} />
       <NewArrivalsRail servicesQuery={servicesQuery} />
       <ExclusivesRail servicesQuery={servicesQuery} />
