@@ -233,11 +233,19 @@
  * 끝이 정해지지 않은 작업(플랜 계산 등)의 진행 막대 움직임(animate-indeterminate).
  * 막대 안의 짧은 띠가 왼쪽 바깥에서 오른쪽 바깥으로 계속 지나간다. 남은 시간을 모르는 작업이라 "몇 %"를 보이지 않고 움직임만 보인다.
  * 1.6초: 너무 빠르면 재촉하는 느낌, 너무 느리면 멈춘 것처럼 보여 그 사이 값으로 정했다.
- * 동작 줄이기(prefers-reduced-motion) 설정은 쓰는 쪽에서 motion-safe:animate-indeterminate로 걸러 움직이지 않는 띠로 보인다.
+ * 동작 줄이기(prefers-reduced-motion) 설정은 쓰는 쪽에서 motion-safe:animate-indeterminate로 걸러, 대신 아래 animate-breathe(밝기만 바뀜)를 쓴다.
+ * 이전: 동작 줄이기면 움직이지 않는 띠로 멈춰 보였다. Windows "애니메이션 효과"를 끈 사용자에게 진행 창이 멈춘 것처럼 보여 바꿨다(운영 피드백).
  * (Tailwind v4 문서 "Defining animation keyframes"대로 @theme 안에 --animate-*와 @keyframes를 함께 둔다. context7 /tailwindlabs/tailwindcss.com 확인)
+ *
+ * animate-breathe: 위치·크기는 그대로 두고 밝기(투명도)만 천천히 오르내린다. 동작 줄이기 설정에서 "아직 일하는 중"을 알리는 대체 움직임이다.
+ * - 동작 줄이기가 막으려는 것은 위치 이동·회전·확대처럼 어지럼을 부르는 움직임이고, 제자리 밝기 변화는 해당하지 않는다
+ *   (WCAG 2.3.3의 "motion animation" 정의는 움직이는 느낌을 주는 이동·크기 변화이고 색·투명도 변화는 빼 둔다. context7 /w3c/wcag에서 정의 논의만 확인했고 정의 원문은 직접 보지 못했다).
+ * - 1.6초 주기: 초당 0.6회라 WCAG 2.3.1(초당 3회 넘게 번쩍이면 안 된다)과 거리가 멀고, 진행 막대(1.6초)와 박자를 맞췄다.
+ * - 가장 어두울 때 35%: 더 내리면 깜빡임으로 보여 신경 쓰이고, 더 올리면(60% 이상) 바뀌는 것을 알아채기 어렵다.
  */
 @theme {
   --animate-indeterminate: indeterminate 1.6s ease-in-out infinite;
+  --animate-breathe: breathe 1.6s ease-in-out infinite;
 
   @keyframes indeterminate {
     0% {
@@ -246,5 +254,32 @@
     100% {
       transform: translateX(300%);
     }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+/*
+ * 로딩 스피너(회전 아이콘) 공통 움직임. 스피너 7곳(LoadingState, 저장·계산 버튼 등)이 이 클래스 하나를 같이 쓴다.
+ * - 평소: Tailwind 기본 회전(animate-spin과 같은 --animate-spin, 1초에 한 바퀴).
+ * - 동작 줄이기: 회전 대신 제자리에서 밝기만 오르내린다(animate-breathe). 멈춘 동그라미는 "멈췄다/고장 났다"로 읽혀서 바꿨다.
+ * 이전: 각 자리에 className="motion-safe:animate-spin"을 따로 적었다(동작 줄이기면 멈춘 아이콘).
+ * @utility로 둔 이유: 두 조건(평소/동작 줄이기)을 클래스 하나로 묶어 7곳이 같은 규칙을 쓰게 한다.
+ * 이름을 animate-*로 짓지 않은 이유: Tailwind의 animate-{테마 키} 유틸리티와 헷갈리지 않게 한다.
+ * (Tailwind v4 문서 "Defining complex utilities with CSS nesting in @utility", context7 /tailwindlabs/tailwindcss.com 확인)
+ */
+@utility loading-spin {
+  animation: var(--animate-spin);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: var(--animate-breathe);
   }
 }
