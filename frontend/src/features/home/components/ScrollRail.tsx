@@ -19,13 +19,19 @@ const ARROW_SIZE_CLASS = {
   featured: 'top-44 h-40 lg:top-47 lg:h-44',
 } as const
 
+// 카드 왼쪽 끝이 스크롤 내용 안에서 시작하는 위치(px). offsetLeft를 쓰지 않는 이유: 줄(<ol>)이 위치 기준(relative) 요소가 아니라서
+// offsetLeft가 줄이 아닌 바깥 래퍼(div.relative) 기준으로 나오고, 줄이 -mx-4로 16px 넓어서 값이 16px 틀어진다. 화면 좌표 차이로 직접 잰다
+function getItemStart(list: HTMLElement, item: HTMLElement) {
+  return item.getBoundingClientRect().left - list.getBoundingClientRect().left + list.scrollLeft
+}
+
 /**
  * 작품 카드를 가로로 한 줄 늘어놓고 옆으로 넘겨 보는 목록이다(넷플릭스·TVING의 작품 줄을 우리 토큰으로 옮긴 것).
  *
  * 조작 방법:
  * - 손가락·트랙패드: 옆으로 밀면 카드 단위로 멈춘다(snap-x snap-mandatory, 카드 왼쪽 끝 기준).
  * - 키보드: Tab으로 카드 제목 링크를 차례로 옮기면 브라우저가 그 카드가 보이게 알아서 옆으로 넘긴다. 따로 키를 배울 필요가 없다.
- * - 마우스(640px 이상): 줄 양 끝의 화살표 버튼으로 한 화면(보이는 폭의 80%)씩 넘긴다. 끝에 닿으면 그쪽 버튼은 비활성(disabled)이 되고 화면에서도 사라진다(카드를 가리지 않게).
+ * - 마우스(640px 이상): 줄 양 끝의 화살표 버튼으로 한 화면(보이는 카드 수 - 1장, 카드 시작점에 맞춰)씩 넘긴다. 이전: 보이는 폭의 80%. 끝에 닿으면 그쪽 버튼은 비활성(disabled)이 되고 화면에서도 사라진다(카드를 가리지 않게).
  *   모바일에서는 손가락으로 미는 것이 자연스러워 버튼을 숨긴다.
  * - 움직임 줄이기(prefers-reduced-motion)를 켠 사용자에게는 부드러운 스크롤 대신 바로 넘기고, 줄의 밝기를 잠깐 되살려 넘어간 것을 알린다(scrollByPage).
  *
@@ -44,12 +50,19 @@ export function ScrollRail({
   const [edge, setEdge] = useState({ isAtStart: true, isAtEnd: false }) // 화살표 버튼 비활성 판단용(화면 표시 전용 상태)
 
   // 지금 스크롤 위치가 처음·끝인지 다시 잰다. 1px 여유는 소수점 픽셀 반올림 때문에 끝에 닿아도 1px 모자라게 나오는 경우를 막는다
+  // 끝 판단: 맨 끝까지 스크롤했거나, 마지막 카드가 줄 안에 온전히 보이면 끝으로 본다. 카드 단위로 넘기면(scrollByPage) 마지막 페이지가
+  // 맨 끝보다 16px(줄 오른쪽 여백) 앞에서 멈춰 "맨 끝까지"만 보면 다음 버튼이 계속 켜져 있게 되기 때문이다.
   function updateEdge() {
     const list = listRef.current
     if (!list) return
+    const lastItem = list.lastElementChild as HTMLElement | null
+    const isLastItemVisible = lastItem
+      ? getItemStart(list, lastItem) + lastItem.offsetWidth - list.scrollLeft <=
+        list.clientWidth + 1
+      : true
     setEdge({
       isAtStart: list.scrollLeft <= 1,
-      isAtEnd: list.scrollLeft + list.clientWidth >= list.scrollWidth - 1,
+      isAtEnd: isLastItemVisible || list.scrollLeft + list.clientWidth >= list.scrollWidth - 1,
     })
   }
 
@@ -66,18 +79,64 @@ export function ScrollRail({
     return () => observer.disconnect()
   }, [])
 
-  // 화살표 버튼: 보이는 폭의 80%만큼 넘긴다(다음 화면 첫 카드가 이전 화면 끝 카드와 조금 겹쳐 이어 보기 쉽다)
+  // 화살표 버튼: 한 번에 "보이는 카드 수 - 1"장을 넘긴다(다음 화면 첫 카드가 이전 화면 끝 카드와 1장 겹쳐 이어 보기 쉽다).
+  // 이전: 보이는 폭의 80%만큼 scrollBy 한 뒤 브라우저의 스냅(snap-mandatory)에 맡겼다. 그러면 마지막 페이지만 스냅이 카드 시작점이 아닌
+  // 맨 끝(16px 뒤)에 멈춰 카드 줄이 1~4위·4~7위와 16px 어긋났다(운영 피드백 "화살표는 고정인데 좌우 정렬이 안 맞아 보인다").
+  // 그래서 이동 위치를 "카드 시작점"으로 직접 계산해 모든 페이지가 같은 왼쪽 정렬을 갖게 한다.
   function scrollByPage(direction: -1 | 1) {
     const list = listRef.current
     if (!list) return
     // 1. 동작 줄이기 설정인지 본다(Windows "애니메이션 효과" 끔도 브라우저에서는 이 설정으로 잡힌다)
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    // 2. 평소에는 부드럽게 미끄러지고(smooth), 동작 줄이기면 옆으로 미끄러지는 움직임 없이 바로 넘긴다(auto)
-    list.scrollBy({
-      left: direction * list.clientWidth * 0.8,
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
-    })
-    // 3. 동작 줄이기에서 바로 넘기면 카드가 "뚝" 바뀌어 넘어간 것을 알아채기 어렵다(운영 피드백 "효과 없이 바로 넘어간다").
+    const behavior = prefersReducedMotion ? 'auto' : 'smooth'
+    const items = Array.from(list.children) as HTMLElement[]
+    const firstWidth = items[0]?.offsetWidth ?? 0
+    // 2. 카드 크기를 잴 수 없는 환경(테스트용 jsdom)에서는 이전처럼 보이는 폭의 80%만큼 넘긴다
+    if (items.length === 0 || firstWidth === 0 || typeof list.scrollTo !== 'function') {
+      list.scrollBy({ left: direction * list.clientWidth * 0.8, behavior })
+    } else {
+      // 3. 스냅 위치: 카드 왼쪽 끝이 줄 왼쪽에서 scroll-padding(16px)만큼 안쪽에 오는 scrollLeft. 첫 카드는 0이다
+      const snapPadding = parseFloat(getComputedStyle(list).scrollPaddingLeft) || 0
+      const snapOf = (item: HTMLElement) => getItemStart(list, item) - snapPadding
+      // 4. 지금 맨 왼쪽에 있는 카드: 스냅 위치가 현재 스크롤 위치에 가장 가까운 카드
+      let currentIndex = 0
+      items.forEach((item, index) => {
+        if (
+          Math.abs(snapOf(item) - list.scrollLeft) <
+          Math.abs(snapOf(items[currentIndex]) - list.scrollLeft)
+        ) {
+          currentIndex = index
+        }
+      })
+      // 5. 한 번에 보이는 카드 수(첫 카드 폭 + 카드 사이 간격 기준). 줄의 오른쪽 여백까지 카드가 차지하는 것이 이 줄의 디자인이다
+      const gap =
+        items.length > 1
+          ? getItemStart(list, items[1]) - getItemStart(list, items[0]) - firstWidth
+          : 0
+      const visibleCount = Math.max(
+        1,
+        Math.floor((list.clientWidth - snapPadding + gap) / (firstWidth + gap)),
+      )
+      // 6. 넘기는 장수는 1장 겹치게 (보이는 수 - 1), 최소 1장. 마지막 페이지는 "마지막 카드가 오른쪽 끝에 맞는" 시작 카드까지만 간다
+      const step = Math.max(1, visibleCount - 1)
+      const lastStartIndex = Math.max(0, items.length - visibleCount)
+      const targetIndex =
+        direction === 1
+          ? Math.min(currentIndex + step, Math.max(lastStartIndex, currentIndex))
+          : Math.max(currentIndex - step, 0)
+      // 7. 카드 시작점으로 이동한다(맨 끝을 넘지 않게 자른다). 스냅 위치와 같아서 브라우저 스냅이 다시 움직이지 않는다
+      const maxScroll = list.scrollWidth - list.clientWidth
+      list.scrollTo({
+        left: Math.min(Math.max(snapOf(items[targetIndex]), 0), maxScroll),
+        behavior,
+      })
+    }
+    // 이전(80% 방식):
+    // list.scrollBy({
+    //   left: direction * list.clientWidth * 0.8,
+    //   behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    // })
+    // 8. 동작 줄이기에서 바로 넘기면 카드가 "뚝" 바뀌어 넘어간 것을 알아채기 어렵다(운영 피드백 "효과 없이 바로 넘어간다").
     //    위치는 움직이지 않고 줄 전체의 밝기만 35% → 100%로 0.28초 동안 되살려 "바뀌었다"는 것만 알린다(진행 창의 animate-breathe와 같은 원칙).
     //    한 번 누를 때 한 번뿐이라 깜빡임 기준(초당 3회)과도 멀다. Web Animations API(element.animate)는 끝나면 스스로 사라져 정리할 것이 없다.
     //    animate가 없는 환경(테스트용 jsdom)에서는 건너뛴다
