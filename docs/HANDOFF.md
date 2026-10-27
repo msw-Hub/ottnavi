@@ -151,6 +151,7 @@
 5. **인물 탐색 한계**: 이름 완전 일치(대소문자 무시)이고 작품당 출연 상위 10명만 저장돼 있다. 동명이인이 섞이고 10번째 밖 출연작은 빠진다(화면 안내 문구는 108).
 6. **조정 위치(사용자가 나중에 바꿀 수 있다)**: `app.home.min-wishlist-users`(3)·`arrival-days`(14)·`release-days`(30), `app.popularity.top-n`(20)·`retention-days`(14), 7일 평균 규칙은 `PopularityRankingRules`, 7일 범위는 `PopularityRankingService.WEEK_DAYS`, 새 작품 대표 선택은 `NewArrivalPicker`, 안내 문구는 `PopularityRankingService.NOTICE`.
 7. **홈·탐색 응답 캐시**: 공개 조회 5개(출연자별 작품 제외)는 Redis에 캐시되므로 TTL(인기 60분·새 작품 30분·찜 10분·장르 24시간·장르별 작품 30분)이 지나기 전에는 이전 값이 나간다. 수집·정리 Job 종료 때 모두, 인기 수집 종료 때 인기 순위를 바로 비운다. 값은 `app.home.cache.*`, 브라우저 캐시는 `browser-seconds`(60)다. Vercel 엣지 캐시는 확인하지 않았다.
+8. **인기 순위의 의미가 바뀌었다(2026-10-27, PR #104)**: 수집이 **한국 제작(`with_origin_country=KR`) + 첫 공개일 최근 2년**(`app.popularity.recent-years: 2`)만 받는다. 이전에는 서비스에서 볼 수 있는 모든 인기 작품이었다. 화면 설명(서버 notice)도 "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순"으로 바꿨다. 영어권 작품이 순위에 안 나오는 것은 버그가 아니라 이 정책이다. 운영에서 `popularity_snapshot`을 비운 뒤 `popularity` 워크플로를 수동 실행해 한국 드라마·영화가 나오는 것을 확인했다.
 
 **Task 108 이월(2026-10-18, PR #86 병합)**
 
@@ -226,6 +227,20 @@
 | 9 | 2026-10-27 | 메인 페이지 줄에서 **옆 화살표를 눌러 작품을 넘길 때 효과 없이 바로 넘어가** UI가 별로다. 부드럽게 이동하게 한다 | `features/home/components/ScrollRail.tsx`(화살표 버튼의 이동 방식), 독점 화면 줄 `features/exclusives/components/ExclusiveTitleRail.tsx`도 같은 동작인지 확인 | 이동 방식(즉시 이동인지 `scrollBy`의 `behavior`인지)은 **아직 코드로 확인하지 못했다**. 동작 줄이기 설정이면 즉시 이동을 유지한다. 끝 카드에서 화살표가 사라지는 동작, 키보드(Tab) 이동과 겹치지 않는지 확인. 반영 전 `ui-designer` 1차안 | 대기 |
 | 10 | 2026-10-27 | 플랜 계산 중 진행 창의 로딩 막대가 **멈춘 것처럼 보인다** | `components/common/BlockingProgressDialog.tsx`, `styles/tokens.css`(`--animate-indeterminate`) | 원인 추정: Windows의 "애니메이션 효과" 끔이 브라우저의 동작 줄이기 설정으로 전달돼 `motion-safe`가 걸러내면 움직이지 않는 띠만 남는다. **추정이며 사용자 PC 설정으로 확인하지 못했다**. 그렇다면 동작 줄이기에서도 멈춰 보이지 않게 투명도 깜빡임 같은 약한 변화를 둔다. 검수 지적 6(띠가 왼쪽 끝에서 시작할 수 있음)도 같이 본다 | 대기 |
 | 11 | 2026-10-27 | 내 설정 맨 아래의 **빨간 "회원 탈퇴" 글자가 뜬금없는 곳**에 있다. 위치를 옮긴다(푸터도 후보) | `features/onboarding/components/SettingsForm.tsx`(약 296~304행), 탈퇴 화면은 `features/auth/components/WithdrawScreen.tsx`. 전에는 "내 메뉴에는 두지 않고 내 설정 안에서만 한다"로 정했다(`HeaderAccountMenu.tsx` 주석) | 푸터(`app/RootLayout.tsx` 87행)에 두면 로그인한 때만 보이게 해야 한다. 빨간색은 확인 화면(`/settings/withdraw`)에서만 쓴다. 이 결정은 위 주석의 이전 결정을 바꾼다 | 대기(결정 필요) |
+| 12 | 2026-10-27 | 홈의 **서비스별 인기 순위 포스터가 작다**. 첫 화면에서 바로 시선을 끌 만큼 키운다 | `features/home/components/HomeRails.tsx`, `ServiceTabs.tsx`, `HomeTitleCard.tsx` | 이 줄에만 적용한다(다른 줄 카드 크기는 그대로). 모바일 375px에서 노출 장수도 함께 본다 | 완료(`feature/f-home-redesign`). 데스크톱 포스터 136→240px, 모바일 104→약 269px(카드 폭 82%). 실제 TMDB 포스터에서의 모습은 배포 뒤 확인 |
+| 13 | 2026-10-27 | 홈을 **큰 이미지 배너로 시작**해 한눈에 눈에 띄게 한다(다른 사이트 참고) | `features/home/components/HomeIntro.tsx`(`HeroBanner`), `HomeScreen.tsx` | 시안 3개(콜라주/1위 크게/얇은 띠) 중 A 콜라주를 골랐고 모바일은 낮췄다. 배경 이미지(backdrop) 필드가 계약에 없어 세로 포스터만 쓴다(백엔드 변경 없음). 인기 순위 줄과 같은 요청을 공유한다. 확인 전: 실제 TMDB 포스터 위 글자 대비, 실제 휴대폰, 모바일 버튼 두 칸 줄바꿈 | 완료(확인 대기) |
+| 14 | 2026-10-27 | 소개 띠가 **머리글과 같은 색이라 X로 닫는 배너처럼** 보인다 | `HomeIntro.tsx` | 전체 폭 단색 띠를 없애고 테두리 있는 둥근 포스터 패널로 바꿨다(13번과 같은 변경) | 완료 |
+| 15 | 2026-10-27 | 옆으로 넘기는 **화살표를 사각으로 길게, 포스터 가운데에** | `ScrollRail.tsx`, `features/exclusives/components/ExclusiveTitleRail.tsx` | 폭 36px 세로 사각, 포스터 높이의 가운데에 맞춤(홈 4줄과 독점 화면). 카드 폭을 바꾸면 화살표 높이 값도 같이 고쳐야 한다(파일 주석) | 완료 |
+| 16 | 2026-10-27 | 줄마다 붙은 **출처 문구를 맨 아래 한 곳으로** | `RailSection.tsx`, `HomeScreen.tsx` | JustWatch 출처는 맨 아래에 유지, 기준일은 줄마다 달라서 각 줄 설명 끝에 "· 2026년 10월 17일 기준"으로 붙임 | 완료 |
+| 17 | 2026-10-27 | "새로 볼 수 있게 된 작품" 카드의 **글이 많아 보이고 제목 2줄/1줄 디자인이 통일되지 않는다** | `HomeTitleCard.tsx`(홈·랭킹·탐색 공통), `ExclusiveTitleCard.tsx` | 제목은 항상 1줄 말줄임(마우스를 올리면 전체, 낭독기는 전체), 정보는 "부가정보 · 영화/드라마 · 연도" 한 줄. 독점 화면 카드도 같은 규칙(OTT 로고 없음) | 완료 |
+| 18 | 2026-10-27 | **내 설정**에서 구역 제목과 설명 문장의 왼쪽 시작선이 달라 설명이 혼자 튀어나와 보인다 | `features/onboarding/components/SettingsForm.tsx`(`SectionCard`) | 어긋남 32px(번호 원 앞 간격)를 설명에 같은 들여쓰기로 맞춤. 4번 체크박스 줄 글자는 컨트롤이 앞에 있어 제목보다 11px 오른쪽에서 시작한다(그대로). 구역 안 입력 칸은 번호 원 왼쪽 끝에서 시작(이번 범위 밖) | 완료(체크박스 줄은 결정 대기) |
+| 19 | 2026-10-27 | 개인 설정을 한 뒤 **홈으로 가도 맨 위에서 시작하지 않는다** | `app/RootLayout.tsx`(`ScrollRestoration`), `test/setup.ts` | 앱에 화면 이동 시 스크롤을 다루는 코드가 없었다. 새 이동은 맨 위, 뒤로 가기는 이전 위치 복원. PR #108에 포함 | 코드 완료(배포 뒤 확인) |
+| 20 | 2026-10-27 | 홈 카드의 **찜 버튼을 누르면 바로 찜되지 않고 상세로 넘어간다 / 하트와 하트+가 섞여 통일이 안 된다** | `CardWishlistAction.tsx`(사용처 없어짐), `HomeTitleCard.tsx` | 원인은 설계였다(드라마는 시즌 단위 찜이라 상세로 보냄, 아이콘도 하트+). 사용자 결정으로 홈 카드에서 하트를 빼고 그 자리에 제공 OTT 로고(최대 3개+N)를 넣었다. 영화 빠른 찜은 홈에서 사라졌고 상세에서 찜한다 | 완료 |
+| 21 | 2026-10-27 | 서비스별 인기 순위에서 특정 OTT를 고르면 나오는 **"넷플릭스(있음)" 줄을 뺀다** | `HomeRails.tsx`, `HomeTitleCard.tsx` | 서비스 탭 선택 시 카드의 상태 글자를 숨김. 상세·검색의 있음/없음/모름 3상태 표시는 그대로 | 완료 |
+| 22 | 2026-10-27 | 작품 상세에서 **영화와 드라마의 찜하기 버튼 위치가 달라 당황스럽다**(다른 사용자 의견) | `features/title-detail/components/TitleDetailContent.tsx`, `WishlistControl.tsx` | 영화에도 드라마 시즌 카드와 같은 "시청 시간과 찜" 카드를 두고 찜하기를 카드 오른쪽 위로 옮김(러닝타임도 카드로 이동) | 완료 |
+| 23 | 2026-10-27 | **요금 화면의 금액("~원") 정렬**이 맞지 않는다 | `features/pricing/components/PricingRow.tsx` | 금액 오른쪽 정렬 + 입력 열 고정 폭(되돌리기 버튼 유무로 52px 밀리던 것 해소) | 완료 |
+| 24 | 2026-10-27 | **요금 기준일 문구**가 위아래 여백이 같아 어느 구역의 설명인지 모호하다 | `PricingScreen.tsx` | "서비스별 요금" 제목 바로 아래 설명으로 이동(제목과 4px) | 완료 |
+| 25 | 2026-10-27 | **구간 사이 간격이 구간 안 간격과 비슷해** 구분이 잘 안 된다(플랜 화면과 다른 화면 전체) | `styles/tokens.css`(`--spacing-section` 40/48px), `components/common/PageSection.tsx`, 플랜·찜·요금·상세·변경 내역·검색·랭킹·탐색·독점·홈 | 구간 사이 24→48px(모바일 40), 구간 안 16px, 구간 제목 h2 20px 굵게, 달 카드 h3는 18px로 내림. 방침·About·설정·로그인 계열은 이미 카드·선으로 구분돼 그대로. 검색·랭킹·탐색·독점·홈은 데스크톱만 캡처로 확인 | 완료(모바일 일부 확인 대기) |
 
 ## 6. 문서 목록(설명용, 근거 아님)
 
