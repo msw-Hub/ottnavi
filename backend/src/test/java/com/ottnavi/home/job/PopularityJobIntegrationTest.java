@@ -150,6 +150,27 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 같은_날_다시_실행해_한_자리가_0건이면_그_자리만_지워지고_다른_자리는_남는다() throws Exception {
+		// given: 첫 수집으로 28행(디즈니+ 드라마 2행 포함)이 저장된다
+		awaitFinished(popularityLauncher.start());
+		String disneyTvRows = "SELECT COUNT(*) FROM popularity_snapshot s JOIN ott_service o ON o.id = s.ott_service_id "
+				+ "WHERE o.code = 'DISNEY_PLUS' AND s.media_type = 'TV'";
+		assertThat(jdbcTemplate.queryForObject(disneyTvRows, Integer.class)).isEqualTo(2);
+
+		// when: 같은 날 디즈니+(제공처 337)의 드라마만 0건 응답으로 다시 수집한다
+		wireMock.stubFor(get(urlPathEqualTo("/3/discover/tv")).withQueryParam("with_watch_providers", equalTo("337"))
+				.willReturn(aResponse().withHeader("Content-Type", "application/json")
+						.withBody("{\"page\":1,\"results\":[],\"total_pages\":0,\"total_results\":0}")));
+		long secondExecutionId = popularityLauncher.start();
+		awaitFinished(secondExecutionId);
+
+		// then: 그 자리의 같은 날 행만 지워지고 나머지 26행은 그대로다
+		assertThat(stepStatuses(secondExecutionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(jdbcTemplate.queryForObject(disneyTvRows, Integer.class)).isZero();
+		assertThat(countRows()).isEqualTo(26);
+	}
+
+	@Test
 	void 같은_날_다시_실행해도_행이_중복되지_않는다() throws Exception {
 		// given
 		awaitFinished(popularityLauncher.start());
