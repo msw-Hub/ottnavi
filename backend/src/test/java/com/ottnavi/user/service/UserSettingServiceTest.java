@@ -21,6 +21,7 @@ import com.ottnavi.user.domain.enums.WatchPreset;
 import com.ottnavi.user.domain.repository.UserRepository;
 import com.ottnavi.user.domain.repository.UserSettingRepository;
 import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
+import com.ottnavi.user.exception.OnboardingRequiredException;
 import com.ottnavi.user.service.model.SubscriptionState;
 import com.ottnavi.user.service.model.UserSettingsState;
 import java.util.ArrayList;
@@ -104,6 +105,28 @@ class UserSettingServiceTest {
 		assertThat(result.subscriptions().get(0).ottServiceId()).isEqualTo(1L);
 		assertThat(result.subscriptions().get(0).status()).isEqualTo(ServiceSubscriptionStatus.NOT_SUBSCRIBED);
 		assertThat(result.subscriptions().get(2).status()).isEqualTo(ServiceSubscriptionStatus.FREE);
+	}
+
+	@Test
+	void 설정_행이_없으면_알림_설정_저장은_ONBOARDING_REQUIRED다() {
+		// given: setUp에서 설정 행이 없는 상태다
+
+		// when & then
+		assertThatThrownBy(() -> service.updateNotificationEnabled(USER_ID, true))
+				.isInstanceOf(OnboardingRequiredException.class);
+	}
+
+	@Test
+	void 설정_행이_있으면_알림_수신_여부가_바뀐다() {
+		// given
+		UserSetting setting = UserSetting.create(USER_ID, 20000, 900, WatchPreset.NORMAL, false);
+		when(userSettingRepository.findById(USER_ID)).thenReturn(Optional.of(setting));
+
+		// when
+		service.updateNotificationEnabled(USER_ID, true);
+
+		// then
+		assertThat(setting.isNotificationEnabled()).isTrue();
 	}
 
 	@Test

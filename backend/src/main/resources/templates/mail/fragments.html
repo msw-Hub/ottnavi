@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!--/* 알림 메일 본문 공용 조각(Task 073, 디자인 반영). 모두 th:text만 써서 HTML 이스케이프를 유지한다. 값이 없으면(옛 payload 등) 아무것도 그리지 않는다.
+     메일 클라이언트 호환을 위해 표 레이아웃과 인라인 style만 쓴다 */-->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!--/* 소제목. color는 템플릿에 적힌 고정 색 */-->
+<p th:fragment="heading(text, color)" th:style="'margin:0 0 8px;font-size:13px;font-weight:bold;color:' + ${color} + ';'" th:text="${text}">소제목</p>
+
+<!--/* 상품 목록: 상품 이름 · 포함 서비스 · 월 요금 */-->
+<table th:fragment="productList(items)" th:if="${!#lists.isEmpty(items)}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:20px;">
+    <tr th:each="item : ${items}">
+        <td style="padding:14px 16px;font-size:14px;border-bottom:1px solid #f0f1f3;"><b th:text="${item['productName']}">상품</b><br><span style="font-size:12px;color:#6b7280;">포함 서비스: <span th:text="${#strings.listJoin(item['serviceNames'], ', ')}">서비스</span></span></td>
+        <td align="right" style="padding:14px 16px;font-size:14px;white-space:nowrap;border-bottom:1px solid #f0f1f3;"><b>월 <span th:text="${#numbers.formatInteger(item['appliedPrice'], 0, 'COMMA')}">0</span>원</b></td>
+    </tr>
+</table>
+
+<!--/* 작품 목록: 제목(시즌) · 서비스. suffix는 서비스 이름 뒤에 붙는 고정 글(예: 에서 제공 종료), 없으면 빈 문자열 */-->
+<table th:fragment="titleList(items, suffix)" th:if="${!#lists.isEmpty(items)}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;font-size:14px;">
+    <tr th:each="item : ${items}">
+        <td style="padding:8px 0;border-bottom:1px solid #f0f1f3;"><span th:text="${item['title']}">작품</span><span th:if="${item['seasonNumber'] != null}" th:text="' 시즌 ' + ${item['seasonNumber']}"> 시즌 1</span></td>
+        <td align="right" style="padding:8px 0;border-bottom:1px solid #f0f1f3;color:#6b7280;"><span th:text="${item['serviceName']}">서비스</span><span th:if="${suffix != ''}" th:text="${suffix}"></span></td>
+    </tr>
+</table>
+
+<!--/* 문장 목록: 바뀐 이유 등. 왼쪽 선으로 인용처럼 보이게 한다 */-->
+<table th:fragment="textList(items)" th:if="${!#lists.isEmpty(items)}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+    <tr th:each="item : ${items}">
+        <td style="padding:2px 0 2px 12px;border-left:3px solid #cbd5e1;font-size:14px;line-height:1.7;" th:text="${item}">문장</td>
+    </tr>
+</table>
+
+<!--/* 해지 예약 안내: 색만으로 구분하지 않도록 "[해지 예약 권장]" 글자를 함께 둔다 */-->
+<table th:fragment="cancelReserveBox(items)" th:if="${!#lists.isEmpty(items)}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #fde68a;background:#fffbeb;border-radius:8px;margin-bottom:24px;">
+    <tr><td style="padding:14px 16px;font-size:13px;line-height:1.7;">
+        <b>[해지 예약 권장]</b> 아래 상품은 다음 달에는 쓰지 않아요<br>
+        <th:block th:each="item : ${items}"><span th:text="${item['productName']}">상품</span> · 월 <span th:text="${#numbers.formatInteger(item['appliedPrice'], 0, 'COMMA')}">0</span>원<br></th:block>
+    </td></tr>
+</table>
+
+<!--/* 큰 버튼. url은 렌더러가 만든 우리 사이트 고정 주소 */-->
+<table th:fragment="button(label, url)" role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+    <tr><td align="center" style="background:#0284c7;border-radius:8px;">
+        <a th:href="${url}" href="#" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;" th:text="${label}">버튼</a>
+    </td></tr>
+</table>
+
+</body>
+</html>

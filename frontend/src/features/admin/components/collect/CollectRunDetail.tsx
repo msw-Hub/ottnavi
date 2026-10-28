@@ -3,7 +3,7 @@ import { ProviderStatusBadge } from '@/components/common/ProviderStatusBadge'
 import type { AvailabilityStatus } from '@/components/common/displayTypes'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
+// import { NotificationSummary } from '@/features/admin/components/collect/NotificationSummary' // 수집 화면 상단으로 옮겼다
 import { useCollectChanges } from '@/features/admin/hooks/useAdminCollect'
 import type { CollectExecution } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
@@ -42,7 +42,8 @@ function StatusChange({
 }
 
 /**
- * 수집 실행 한 건의 펼침 영역이다(SCR-16): 이 실행에서 제공 상태가 바뀐 작품 목록과, 재계산 대상 플랜 수와 2단계부터 제공할 항목 자리.
+ * 수집 실행 한 건의 펼침 영역이다(SCR-16): 이 실행에서 제공 상태가 바뀐 작품 목록과 재계산 대상 플랜 수.
+ * (알림 발송 상태 요약은 실행 한 건이 아니라 최근 7일 전체 기준이라 수집 화면 상단으로 옮겼다)
  *
  * 실행 중인 행은 목록을 불러오지 않고 "끝나면 보인다"고만 알린다(요청도 보내지 않는다).
  * 성공한 행은 열릴 때 처음 불러온다(이 컴포넌트는 펼쳤을 때만 그려져서, 펼치기 전에는 요청이 없다).
@@ -114,10 +115,12 @@ export function CollectRunDetail({ id, execution, serviceNames }: CollectRunDeta
             <span className="tabular-nums">{execution.recalcTargetCount}개</span>
           )}
         </dd>
+        {/* 알림 발송 상태 요약은 수집 화면(CollectScreen) 상단으로 옮겼다. 요약은 이 실행이 아니라 최근 7일 전체 알림 기준이라
+            펼친 실행의 결과처럼 보이지 않게 하려는 것이다. 이전(Task 071 전): <PhaseLaterTag label="2단계부터 제공" />
         <dt className="text-muted-foreground">알림 발송 상태</dt>
         <dd>
-          <PhaseLaterTag label="2단계부터 제공" />
-        </dd>
+          <NotificationSummary />
+        </dd> */}
       </dl>
     </div>
   )

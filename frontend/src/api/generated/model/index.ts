@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -15,6 +15,7 @@ export * from './accessTokenRole';
 export * from './activePlan';
 export * from './addWishlistItemRequest';
 export * from './addWishlistItemResult';
+export * from './adminNotificationSummary';
 export * from './adminProduct';
 export * from './adminProductList';
 export * from './adminProductPrice';
@@ -36,6 +37,7 @@ export * from './collectScope';
 export * from './collectTier';
 export * from './commonResponseAccessToken';
 export * from './commonResponseAddWishlistItemResult';
+export * from './commonResponseAdminNotificationSummary';
 export * from './commonResponseAdminProduct';
 export * from './commonResponseAdminProductList';
 export * from './commonResponseAdminProvider';
@@ -48,6 +50,8 @@ export * from './commonResponseCurrentPlan';
 export * from './commonResponseExclusiveTitlePage';
 export * from './commonResponseGenreList';
 export * from './commonResponseNewlyAvailableTitleList';
+export * from './commonResponseNotificationHistoryPage';
+export * from './commonResponseNotificationSetting';
 export * from './commonResponseOttServiceList';
 export * from './commonResponsePlanBenchmark';
 export * from './commonResponsePlanChangeHistoryList';
@@ -80,6 +84,7 @@ export * from './internalErrorResponse';
 export * from './listCollectExecutionChangesParams';
 export * from './listCollectExecutionsParams';
 export * from './listGenreTitlesParams';
+export * from './listMyNotificationsParams';
 export * from './listNewlyAvailableTitlesParams';
 export * from './listPersonTitlesParams';
 export * from './listPopularityRankingsParams';
@@ -89,6 +94,11 @@ export * from './mediaType';
 export * from './newlyAvailableTitle';
 export * from './newlyAvailableTitleList';
 export * from './notFoundResponse';
+export * from './notificationHistoryItem';
+export * from './notificationHistoryItemStatus';
+export * from './notificationHistoryItemType';
+export * from './notificationHistoryPage';
+export * from './notificationSetting';
 export * from './ottService';
 export * from './ottServiceCode';
 export * from './ottServiceDataQuality';
@@ -146,6 +156,7 @@ export * from './unscheduledReason';
 export * from './updateAdminProductRequest';
 export * from './updateAdminProviderRequest';
 export * from './updatedWishlistItem';
+export * from './updateMyNotificationSettingRequest';
 export * from './updateMySettingsRequest';
 export * from './updateWishlistItemRequest';
 export * from './userSettings';

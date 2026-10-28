@@ -12,7 +12,8 @@ import org.springframework.validation.annotation.Validated;
  * 알림 발송기 설정(app.notification.*). 값은 application.yml에 있고, 값끼리의 관계는 거기에 적혀 있다.
  *
  * @param schedulerEnabled 발송 스케줄러 사용 여부. 테스트는 끈다
- * @param pollIntervalMs   스케줄러 실행 간격(ms)
+ * @param immediateSendEnabled 플랜 저장 직후 가입 안내를 바로 발송 시도할지. false면 알림 행만 만들고 스케줄러가 보낸다
+ * @param pollIntervalMs  스케줄러 실행 간격(ms)
  * @param batchSize        한 번에 점유하는 행 수
  * @param lease            점유한 행을 다시 집지 않는 시간
  * @param maxAttempts      점유 횟수 상한. 이 횟수째 실패하면 FAILED
@@ -22,6 +23,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.notification")
 public record NotificationProperties(
 		boolean schedulerEnabled,
+		boolean immediateSendEnabled,
 		long pollIntervalMs,
 		@Min(value = 1, message = "batch-size는 1 이상이어야 한다") int batchSize,
 		@NotNull Duration lease,

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import {
   CalculatorIcon,
   CircleCheckIcon,
+  BellIcon,
   HeartIcon,
   HistoryIcon,
   InfoIcon,
@@ -203,13 +204,23 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
           )}
         </div>
         {/* 이전: 변경 내역 API가 없어 링크를 목업 모드(isMockMode())에서만 보였다. Task 070에서 API를 연결해 조건을 없앴다 */}
-        <Link
-          to={`/plan/history${search}`}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          <HistoryIcon aria-hidden="true" className="size-4" />
-          변경 내역 보기
-        </Link>
+        {/* 알림 설정(SCR-12) 진입점도 같은 줄에 둔다(Task 071): 변경 내역과 "매월 재계산 결과를 메일로 받기"는 같은 맥락이라 함께 찾게 한다 */}
+        <div className="flex flex-wrap gap-x-4">
+          <Link
+            to={`/plan/history${search}`}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <HistoryIcon aria-hidden="true" className="size-4" />
+            변경 내역 보기
+          </Link>
+          <Link
+            to="/settings/notifications"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <BellIcon aria-hidden="true" className="size-4" />
+            알림 설정
+          </Link>
+        </div>
       </div>
 
       {/* 이전: <div className="grid gap-6"> (구간 사이 24px가 구간 안 카드 사이 16px와 비슷해 구간 경계가 약했다) */}

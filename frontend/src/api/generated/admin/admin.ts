@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -31,6 +31,7 @@ import type {
 import type {
   AdminProductPriceRequest,
   BadRequestResponse,
+  CommonResponseAdminNotificationSummary,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
@@ -1376,6 +1377,100 @@ export const useCreatePopularityExecution = <TError = ErrorType<UnauthorizedResp
       return useMutation(getCreatePopularityExecutionMutationOptions(options), queryClient);
     }
     /**
+ * 관리자 수집 화면(SCR-16)의 알림 발송 상태 요약이다. 최근 7일 동안 만들어진 알림의 상태별 건수와 마지막 발송 시각을 돌려준다. 사용자 이메일이나 본문은 담지 않는다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 알림 발송 상태 요약 조회
+ */
+export const getAdminNotificationSummary = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseAdminNotificationSummary>(
+      {url: `/admin/notifications/summary`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminNotificationSummaryQueryKey = () => {
+    return [
+    `/admin/notifications/summary`
+    ] as const;
+    }
+
+
+export const getGetAdminNotificationSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminNotificationSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminNotificationSummary>>> = ({ signal }) => getAdminNotificationSummary(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminNotificationSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminNotificationSummary>>>
+export type GetAdminNotificationSummaryQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminNotificationSummary>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 알림 발송 상태 요약 조회
+ */
+
+export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminNotificationSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminNotificationSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.
  * 요청 본문은 없다. 같은 입력으로 다시 호출하면 행이 더 쌓이고, 같은 `inputHash`에 EXACT·GREEDY 두 행이 함께 있다. 기록의 `plan_id`는 NULL, 플랜 유형은 추천형이다.
  * ADMIN만 호출할 수 있고 배치 토큰은 허용하지 않는다. 수 초 걸리는 CPU 작업이라 응답이 느리다.

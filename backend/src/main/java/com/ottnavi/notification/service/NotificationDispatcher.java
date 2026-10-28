@@ -47,6 +47,22 @@ public class NotificationDispatcher {
 		return claimed.size();
 	}
 
+	/**
+	 * 방금 만든 알림 한 건을 스케줄러를 기다리지 않고 바로 보낸다(가입 안내). 점유에 실패하면(스케줄러가 먼저 잡았거나 때가 아님) 아무것도 하지 않는다.
+	 * 점유한 뒤에는 스케줄러와 같은 발송·기록 단계를 탄다. 발송이 실패해도 PENDING이 남아 스케줄러가 재시도한다.
+	 */
+	public void dispatchNow(Long outboxId) {
+		// 1. 그 행 하나를 점유한다. 못 잡았으면 스케줄러가 맡는다
+		Optional<ClaimedNotification> claimed = claimService.claimOne(outboxId, Instant.now(clock));
+		if (claimed.isEmpty()) {
+			log.info("즉시 발송을 건너뛴다(이미 점유됐거나 때가 아님): outboxId={}", outboxId);
+			return;
+		}
+
+		// 2. 점유한 행을 발송하고 결과를 기록한다
+		dispatchOne(claimed.get());
+	}
+
 	/** 이미 점유한 알림들을 발송·기록 단계로 처리한다. 점유 직후 상태를 시험이 끼어들 수 있게 따로 뺐다 */
 	void dispatchAll(List<ClaimedNotification> claimed) {
 		if (claimed.isEmpty()) {

@@ -8,6 +8,7 @@ import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 알림 처리의 기록 단계: 발송 결과를 짧은 트랜잭션으로 기록한다. 메일을 보내는 동안 행이 지워졌을 수 있어(탈퇴) 행이 없거나 다른 발송기가 다시 점유했으면 기록하지 않고 로그만 남긴다 */
@@ -24,7 +25,7 @@ public class NotificationResultRecorder {
 	 * 발송 성공을 기록한다. 기록하면 true, 기록하지 않으면 false를 돌려준다.
 	 * 행이 없거나(탈퇴로 삭제) 그 사이 다른 발송기가 다시 점유했으면(시도 횟수가 다름) 아무것도 쓰지 않는다.
 	 */
-	@Transactional
+	@Transactional(propagation = Propagation.REQUIRES_NEW) // 즉시 발송이 다른 트랜잭션 안에서 불려도 기록이 따로 커밋되게 한다
 	public boolean recordSent(Long outboxId, int claimedAttemptCount, Instant now) {
 		// 1. 행이 있고 아직 내 점유인지 확인한다
 		Optional<NotificationOutbox> found = findOwned(outboxId, claimedAttemptCount);
@@ -40,7 +41,7 @@ public class NotificationResultRecorder {
 	 * 발송 실패를 기록하고 그 결과의 상태를 돌려준다. PENDING이면 재시도 예정, FAILED면 포기다.
 	 * 기록하지 않은 경우(행이 없거나 다른 발송기가 다시 점유함)는 빈 값이다.
 	 */
-	@Transactional
+	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public Optional<NotificationStatus> recordFailure(Long outboxId, int claimedAttemptCount, String error, Instant now) {
 		// 1. 행이 있고 아직 내 점유인지 확인한다
 		Optional<NotificationOutbox> found = findOwned(outboxId, claimedAttemptCount);

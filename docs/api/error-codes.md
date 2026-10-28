@@ -52,6 +52,7 @@
 |---|---|---|---|---|
 | `PLAN_DRAFT_STALE` | 409 | 저장하려는 DRAFT의 데이터 기준일이 최신 수집 완료 시각보다 이름. 프론트가 받으면 자동으로 재계산을 요청한다 | 데이터가 갱신되어 플랜을 다시 계산하고 있습니다. | TECH 2절, PRD 5.4 |
 | `PLAN_DRAFT_NOT_FOUND` | 404 | 저장하려는 DRAFT가 없거나 본인 것이 아님. 이미 저장돼 DRAFT가 아니게 됐거나 다시 계산해 지워진 경우 포함 | 계산된 플랜을 찾을 수 없습니다. 요금 확인이나 찜 목록 화면에서 다시 계산해 주세요. | TECH 2절 |
+| `ONBOARDING_REQUIRED` | 409 | 내 설정(온보딩)을 한 번도 저장하지 않아 알림 설정을 저장할 설정 행이 없음(`updateMyNotificationSetting`, Task 071·073) | 내 설정을 먼저 저장해 주세요. | PRD FR-16, Task 071·073 |
 | `BATCH_ALREADY_RUNNING` | 409 | 같은 날짜 또는 다른 날짜의 수집이 실행 중(전체 동시 실행 금지, 관리자 API). 매월 재계산 수동 실행(`POST /api/admin/plans/monthly/executions`, Task 069)과 데이터 정리 실행(`POST /api/admin/retention/executions`, Task 083)도 재계산·수집·정리 중 하나가 이미 실행 중이면 같은 코드를 쓰고, 반대로 수집 시작·재시작 요청도 매월 재계산이나 데이터 정리가 실행 중이면 이 코드(상세 메시지: 재계산이 실행 중이라 수집을 시작할 수 없습니다. / 데이터 정리가 실행 중이라 수집을 시작할 수 없습니다.)다. 인기 순위 수집 실행(`POST /api/admin/popularity/executions`, Task 107)도 수집·재계산·정리·인기 수집 중 하나가 실행 중이면 이 코드를 쓰고, 반대로 수집·재계산·정리 시작도 인기 수집이 실행 중이면 이 코드다 | 수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요. | TECH 3절 (도출) |
 | `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`(+`scope`)의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
 | `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`(+`scope`)에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |

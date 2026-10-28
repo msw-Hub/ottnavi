@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -21,14 +21,31 @@ import tools.jackson.databind.json.JsonMapper;
  * 본문 맨 아래에는 어느 유형이든 "확인된 범위" 고지, 출처(TMDB·JustWatch), 데이터 기준일, 알림 끄는 방법이 붙는다(PRD 화면 표시 규칙).
  */
 @Component
-@RequiredArgsConstructor
 public class NotificationMailRenderer {
 
 	private static final String DEFAULT_USER_NAME = "회원";
 
 	private final SpringTemplateEngine templateEngine;
 	private final Clock clock;
+	private final String planUrl; // 큰 버튼 도착지(프론트 /plan)
+	private final String settingsUrl; // 꼬리말 "알림 설정" 도착지(프론트 /settings/notifications)
 	private final ObjectMapper objectMapper = JsonMapper.builder().build();
+
+	/**
+	 * 링크 기준 주소는 기존 설정 app.frontend-origin(APP_FRONTEND_ORIGIN)을 쓴다. 끝의 /는 떼어 중복을 막는다.
+	 * 예: "https://ottnavi.vercel.app/" → planUrl "https://ottnavi.vercel.app/plan"
+	 */
+	public NotificationMailRenderer(SpringTemplateEngine templateEngine, Clock clock,
+			@Value("${app.frontend-origin}") String frontendOrigin) {
+		this.templateEngine = templateEngine;
+		this.clock = clock;
+		String base = frontendOrigin.strip();
+		while (base.endsWith("/")) {
+			base = base.substring(0, base.length() - 1);
+		}
+		this.planUrl = base + "/plan";
+		this.settingsUrl = base + "/settings/notifications";
+	}
 
 	/** 유형별 제목과 본문을 만든다. payload가 JSON이 아니면 예외를 던지고, 호출한 발송기가 실패로 기록한다 */
 	public RenderedMail render(NotificationType type, String payloadJson) {
@@ -54,6 +71,8 @@ public class NotificationMailRenderer {
 		variables.put("payload", payload);
 		variables.put("userName", userName);
 		variables.put("dataDate", dataDate);
+		variables.put("planUrl", planUrl); // 링크는 우리 사이트 고정 주소만 쓰고 payload 값은 넣지 않는다
+		variables.put("settingsUrl", settingsUrl);
 		context.setVariables(variables);
 		String htmlBody = templateEngine.process(templateName(type), context);
 

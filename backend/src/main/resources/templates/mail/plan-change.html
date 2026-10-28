@@ -1,13 +1,31 @@
 <!DOCTYPE html>
-<!-- 확정된 플랜의 작품이 빠지는 등 변경 알림(PLAN_CHANGE). 본문 내용은 Task 073에서 payload 필드와 함께 채운다 -->
-<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section})}">
+<!--/* 확정된 플랜의 작품이 빠지는 등 변경 알림(PLAN_CHANGE). payload: summary, leftTitles, changeReasons, currentProducts (PlanChangePayload) */-->
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section}, '#f59e0b')}">
 <head>
     <title>구독 플랜 변경 안내</title>
 </head>
 <body>
 <section>
-    <p>저장한 구독 플랜에 바뀐 내용이 있어요. OTT내비에서 변경된 부분을 확인해 보세요.</p>
-    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}">요약</p>
+    <h1 style="margin:0 0 12px;font-size:20px;line-height:1.4;">저장한 플랜에 바뀐 내용이 있어요</h1>
+    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}" style="margin:0 0 20px;font-size:14px;line-height:1.7;">요약</p>
+
+    <!--/* 색만으로 구분하지 않도록 "[변경]" 글자를 함께 둔다 */-->
+    <div th:if="${!#lists.isEmpty(payload['leftTitles'])}">
+        <div th:replace="~{mail/fragments :: heading('[변경] 배정된 서비스에서 빠진 작품', '#b45309')}"></div>
+        <div th:replace="~{mail/fragments :: titleList(${payload['leftTitles']}, '에서 제공 종료')}"></div>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(payload['changeReasons'])}">
+        <div th:replace="~{mail/fragments :: heading('바뀐 이유', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: textList(${payload['changeReasons']})}"></div>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(payload['currentProducts'])}">
+        <div th:replace="~{mail/fragments :: heading('바뀐 플랜의 이번 달 구독', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: productList(${payload['currentProducts']})}"></div>
+    </div>
+
+    <div th:replace="~{mail/fragments :: button('바뀐 플랜 확인하기', ${planUrl})}"></div>
 </section>
 </body>
 </html>

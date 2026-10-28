@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -22,6 +22,7 @@ import type {
 } from 'msw';
 
 import type {
+  CommonResponseAdminNotificationSummary,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
@@ -68,6 +69,8 @@ export const getCreatePlanRecalcExecutionResponseMock = (): CommonResponsePlanRe
 export const getCreateRetentionExecutionResponseMock = (): CommonResponseRetentionExecutionAccepted => ({"success":true,"data":{"executionId":21}})
 
 export const getCreatePopularityExecutionResponseMock = (): CommonResponsePopularityExecutionAccepted => ({"success":true,"data":{"executionId":31}})
+
+export const getGetAdminNotificationSummaryResponseMock = (): CommonResponseAdminNotificationSummary => ({"success":true,"data":{"windowDays":7,"pendingCount":2,"sentCount":148,"failedCount":1,"latestSentAt":"2026-11-01T03:51:12+09:00"}})
 
 export const getCreatePlanBenchmarkResponseMock = (overrideResponse: Partial<Extract<CommonResponsePlanBenchmark, object>> = {}): CommonResponsePlanBenchmark => ({success: faker.datatype.boolean(), data: {"measuredRuns":3,"warmupRuns":1,"caseCount":1,"cases":[{"caseName":"case-07-greedy-trap","inputHash":"9f2c000000000000000000000000000000000000000000000000000000000000","candidateCount":27,"exact":{"calcRunId":101,"mustCompleted":1,"score":4,"totalCost":28000,"elapsedMicros":21,"elapsedMs":0,"matchesExpected":true},"greedy":{"calcRunId":102,"mustCompleted":1,"score":2,"totalCost":8000,"elapsedMicros":9,"elapsedMs":0,"matchesExpected":true},"mustDiff":0,"scoreDiff":-2,"costDiff":-20000}],"skippedCaseNames":[]}, ...overrideResponse})
 
@@ -274,6 +277,18 @@ export const getCreatePopularityExecutionMockHandler = (overrideResponse?: Commo
   }, options)
 }
 
+export const getGetAdminNotificationSummaryMockHandler = (overrideResponse?: CommonResponseAdminNotificationSummary | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseAdminNotificationSummary> | CommonResponseAdminNotificationSummary), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/notifications/summary', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetAdminNotificationSummaryResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonResponsePlanBenchmark | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanBenchmark> | CommonResponsePlanBenchmark), options?: RequestHandlerOptions) => {
   return http.post('/api/admin/plan-benchmarks', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -303,5 +318,6 @@ export const getAdminMock = () => [
   getCreatePlanRecalcExecutionMockHandler(),
   getCreateRetentionExecutionMockHandler(),
   getCreatePopularityExecutionMockHandler(),
+  getGetAdminNotificationSummaryMockHandler(),
   getCreatePlanBenchmarkMockHandler()
 ]

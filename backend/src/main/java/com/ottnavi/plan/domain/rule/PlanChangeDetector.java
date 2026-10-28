@@ -331,7 +331,7 @@ public final class PlanChangeDetector {
 				list.sort(Comparator.comparing(AvailabilityShift::changedAt));
 				boolean wasAvailable = list.get(0).beforeAvailable();
 				boolean isAvailable = list.get(list.size() - 1).afterAvailable();
-				if (wasAvailable && !isAvailable) {
+				if (isLeft(list)) {
 					left.add(new ShiftCandidate(unit, serviceId));
 				} else if (!wasAvailable && isAvailable) {
 					joined.add(new ShiftCandidate(unit, serviceId));
@@ -437,6 +437,22 @@ public final class PlanChangeDetector {
 			return "서비스 " + ottServiceId;
 		}
 		return name;
+	}
+
+	/**
+	 * 한 (시청 단위, 서비스)의 제공 상태 변경들로 "서비스에서 빠졌는가"를 판정한다. 가장 이른 변경의 이전 상태가 있음이고
+	 * 가장 늦은 변경의 이후 상태가 있음 아님이면 true다(중간에 빠졌다 돌아온 것은 빠짐이 아니다). 변경이 없으면 false다.
+	 * 변경 요약의 이유 판정과 PlanChangeAlertRule(변경 알림)이 같은 판정을 쓰도록 공용으로 뺐다.
+	 */
+	static boolean isLeft(List<AvailabilityShift> shifts) {
+		if (shifts.isEmpty()) {
+			return false;
+		}
+		List<AvailabilityShift> sorted = new ArrayList<>(shifts);
+		sorted.sort(Comparator.comparing(AvailabilityShift::changedAt));
+		boolean wasAvailable = sorted.get(0).beforeAvailable();
+		boolean isAvailable = sorted.get(sorted.size() - 1).afterAvailable();
+		return wasAvailable && !isAvailable;
 	}
 
 	private static String labelOf(Unit unit) {
