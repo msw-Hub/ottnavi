@@ -1665,9 +1665,11 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 배경: 데모 계정은 메일을 받지 않는다(109). 대신 플랜을 저장하면 실제 회원이 받았을 메일을 팝업으로 보여 준다. 관리자 메뉴의 고정 샘플 미리보기안은 사용자가 정정해 폐기했다.
 - 설계(opus 2026-10-28, 확정 결정): 저장 응답(201) 뒤 프론트가 DEMO일 때만 읽기 전용 `GET /api/me/plans/current/mail-preview`(`getCurrentPlanMailPreview`)를 호출한다. 서버는 plan 패키지의 `PlanMailPreviewService`가 본인 ACTIVE 플랜으로 운영과 같은 `PlanNotificationComposer.composeSubscribeGuide`와 `NotificationMailRenderer`(`render(type, Object payload)` 오버로드 추가)를 써서 제목·HTML을 만든다. outbox·`MailClient`·알림 설정은 건드리지 않는다. DEMO 아니면 403(`SecurityConfig` `hasRole("DEMO")`). 가입할 상품이 없으면 200 + `noMailReason`(`NO_SUBSCRIBE_GUIDE`, `NO_CURRENT_PLAN`). 팝업은 `iframe srcDoc sandbox`로 격리하고 링크는 새 탭. **팝업 내용은 구독 안내(저장하면 오는 메일) + 월초 안내 탭(매월 1일 메일 예시, `composeMonthly(userId, plan, Optional.empty())` 읽기 전용)**(사용자 Q1 B). 현재 플랜 화면에 DEMO 전용 "알림 메일 예시 보기" 버튼으로 다시 볼 수 있다. 화면 이름 `SUBSCRIBE_GUIDE`는 "구독 안내"(109에서 변경).
 - 구현 사항
-  - [ ] 계약: operation 1개(`getCurrentPlanMailPreview`, 월초 안내 탭을 위해 응답이 2건이 되도록 스키마 확정), 새 오류 코드 없음
-  - [ ] 백엔드 `PlanMailPreviewService`·컨트롤러·보안 규칙·렌더러 오버로드, 테스트(권한 매트릭스, 플랜 없음, outbox 행 수 불변)
-  - [ ] 프론트 `DemoMailPreviewDialog`, `PlanScreen` 저장 성공 콜백(대화상자는 분기 밖 최상위), `CurrentPlanView` 다시 보기 버튼, 목업, 테스트
+  - [x] 계약: operation 1개(`getCurrentPlanMailPreview`, 응답 `mails[]`(type·subject·html)와 `noMailReasons[]`), 새 오류 코드 없음, 머리말 operation 51개
+  - [x] 백엔드 `PlanMailPreviewService`·컨트롤러·보안 규칙·렌더러 오버로드, 테스트(권한 매트릭스, 플랜 없음, outbox 행 수 불변), 메일 소제목 "이번 달 구독할 서비스"로 변경(템플릿 2곳)
+  - [x] 프론트 `PlanMailPreviewDialog`(탭·iframe `sandbox`·`<base target="_blank">` 주입), `PlanScreen` 저장 성공 콜백(대화상자는 분기 밖 최상위, 받은 뒤에 열고 실패하면 조용히 넘김), `CurrentPlanView` 다시 보기 버튼, 목업 시나리오(`mail-*`), 테스트
+  - [ ] [H] 운영: `main` 배포 뒤 실제 DB 플랜으로 메일 예시가 만들어지는지 확인(실서버는 아직 보지 못함)
+- 결정(2026-10-28 사용자): 구독 안내를 못 만들면 탭 없이 월초만 + 사유 한 줄(Q1 A), 응답을 받은 뒤에 연다(Q2 A), 모바일은 아래에서 올라오는 시트(Q3 A), 저장할 때마다 연다(Q4 A), 설명 문구는 "알림을 켠 회원은…"(알림이 꺼진 회원에게는 메일이 만들어지지 않는다), 저장 토스트가 팝업 설명을 잠깐 가리는 것은 그대로 둔다. 메일 요약 문장의 "새로 가입할 서비스" 표기는 아직 "구독"으로 맞추지 않았다(미결).
 - 완료 기준
   - V-API: 비로그인 401·USER 403·ADMIN 403·DEMO 200, 호출 전후 `notification_outbox` 행 수 동일. V-F: 375px·데스크톱 팝업, 링크 새 탭, 콘솔 에러 0건
 
