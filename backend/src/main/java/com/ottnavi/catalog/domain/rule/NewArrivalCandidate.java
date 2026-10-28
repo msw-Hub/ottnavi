@@ -8,5 +8,6 @@ public record NewArrivalCandidate(
         long titleId,
         long ottServiceId,
         ArrivalType type,
-        LocalDate date) { // ARRIVAL이면 있음으로 바뀐 것을 확인한 날(KST), RELEASE면 공개일
+        LocalDate date, // ARRIVAL이면 있음으로 바뀐 것을 확인한 날(KST), RELEASE면 공개일
+        LocalDate titleReleaseDate) { // 작품 자체의 개봉일(영화 개봉일, 드라마 첫 방영일). 모르면 null. 정렬 그룹을 정할 때 쓴다
 }

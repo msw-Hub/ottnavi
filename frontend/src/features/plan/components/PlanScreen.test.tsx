@@ -81,6 +81,16 @@ describe('플랜 결과 화면', () => {
     expect(await screen.findByText('추천형 플랜을 저장했어요')).toBeInTheDocument()
   })
 
+  it('결과 위쪽에는 "다시 계산하기" 대신 찜 목록으로 가는 "찜 목록 고치러 가기" 링크가 있다', async () => {
+    await renderPlanAfterCalculate(null)
+
+    expect(screen.getByRole('link', { name: '찜 목록 고치러 가기' })).toHaveAttribute(
+      'href',
+      '/wishlist',
+    )
+    expect(screen.queryByRole('button', { name: '다시 계산하기' })).not.toBeInTheDocument()
+  })
+
   it('세 유형의 선택이 같으면 카드 한 장에 이름을 함께 쓰고 "세 기준 모두 같은 결과"를 알린다', async () => {
     await renderPlanAfterCalculate('same')
 

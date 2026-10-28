@@ -15,6 +15,7 @@ import com.ottnavi.infra.tmdb.exception.TmdbUnavailableException;
 import feign.FeignException;
 import feign.codec.DecodeException;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.LocalDate;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class TmdbClient {
     private static final String REGION = "KR";                        // PRD: 한국 제공처만 본다
     private static final String LANGUAGE_KO = "ko-KR";
     private static final String MONETIZATION_FLATRATE = "flatrate";   // 후보 수집은 구독형만
+    private static final String ORIGIN_COUNTRY_KR = "KR";                 // 인기 순위는 한국 제작 작품만(with_origin_country, ISO 3166-1 alpha-2)
     private static final String SORT_POPULARITY_DESC = "popularity.desc";   // 인기 순위 스냅샷은 TMDB 인기도 높은 순
 
     // tmdb.call 카운터: 이름과 태그 값. 값 집합은 닫혀 있다(작품 ID·검색어·URL·페이지 번호는 태그로 쓰지 않는다, 3.6절)
@@ -77,16 +79,22 @@ public class TmdbClient {
                 () -> api.discoverTvs(withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, page));
     }
 
-    /** 제공처별 KR 구독 영화를 인기도 높은 순(popularity.desc)으로 한 쪽 가져온다. 서비스별 인기 순위 스냅샷이 쓴다 */
-    public TmdbPage<TmdbMovieSummary> discoverPopularMovies(String withWatchProviders, int page) {
+    /**
+     * 제공처별 KR 구독 영화 중 한국 제작(with_origin_country=KR)이고 개봉일이 releasedFrom 이후인 작품을
+     * 인기도 높은 순(popularity.desc)으로 한 쪽 가져온다. 서비스별 인기 순위 스냅샷 전용이며 후보 수집에는 영향이 없다.
+     * 예: releasedFrom=2024-10-27 → primary_release_date.gte=2024-10-27
+     */
+    public TmdbPage<TmdbMovieSummary> discoverPopularMovies(String withWatchProviders, LocalDate releasedFrom, int page) {
         return call(EP_DISCOVER_POPULAR_MOVIE, () -> api.discoverPopularMovies(
-                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC, page));
+                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC,
+                ORIGIN_COUNTRY_KR, releasedFrom.toString(), page));
     }
 
-    /** 제공처별 KR 구독 드라마를 인기도 높은 순으로 한 쪽 가져온다 */
-    public TmdbPage<TmdbTvSummary> discoverPopularTvs(String withWatchProviders, int page) {
+    /** 제공처별 KR 구독 드라마 중 한국 제작이고 첫 방영일이 releasedFrom 이후인 작품을 인기도 높은 순으로 한 쪽 가져온다(first_air_date.gte) */
+    public TmdbPage<TmdbTvSummary> discoverPopularTvs(String withWatchProviders, LocalDate releasedFrom, int page) {
         return call(EP_DISCOVER_POPULAR_TV, () -> api.discoverPopularTvs(
-                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC, page));
+                withWatchProviders, REGION, MONETIZATION_FLATRATE, LANGUAGE_KO, SORT_POPULARITY_DESC,
+                ORIGIN_COUNTRY_KR, releasedFrom.toString(), page));
     }
 
     /** 영화를 제목으로 검색한다 (성인물 제외). query는 사용자 입력이라 로그·태그에 쓰지 않는다 */

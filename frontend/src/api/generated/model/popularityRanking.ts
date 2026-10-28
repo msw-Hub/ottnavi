@@ -29,7 +29,7 @@ export interface PopularityRanking {
   snapshotDate: string | null;
   /** 평균에 쓴 스냅샷 날 수. 스냅샷이 없으면 0, 있으면 TODAY는 1, WEEK는 1~7 */
   daysCounted: number;
-  /** 화면에 함께 적을 기준 안내 문구. 예 "TMDB 인기도 기준, OTT 공식 순위 아님" */
+  /** 화면에 함께 적을 기준 안내 문구. 예 "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)" */
   notice: string;
   /** 인기도 높은 순위(없으면 빈 배열) */
   items: PopularityRankingItem[];

@@ -20,6 +20,9 @@ const ACTION_CLASS_NAME =
   'relative z-10 inline-flex size-11 items-center justify-center rounded-full bg-background/80 text-foreground backdrop-blur-sm hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 /**
+ * 현재 사용처 없음(H-2, 사용자 확정): 홈·랭킹·탐색 카드(HomeTitleCard)의 찜 버튼 자리를 "볼 수 있는 곳" OTT 로고로 바꿔 이 부품을 쓰지 않는다.
+ * 홈에서 영화를 바로 찜하는 기능이 빠지는 것은 사용자가 감수하기로 했다. 다시 쓸 수 있게 지우지 않고 둔다.
+ *
  * 홈 목록 카드의 찜 버튼이다. 세 가지로 나뉜다.
  *
  * 1. 비로그인: 찜은 회원 기능이라 로그인 화면으로 보내는 링크다. 로그인 뒤 이 화면으로 돌아오게 from을 넘긴다.

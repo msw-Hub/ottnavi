@@ -23,5 +23,8 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     // 테스트는 소스 옆(*.test.ts(x))이나 src/test에 둔다. 생성물·산출물은 대상에서 뺀다
     include: ['src/**/*.test.{ts,tsx}'],
+    // 기본 5초는 화면 테스트 파일을 병렬로 돌릴 때 부족하다. 관리자 상품 화면처럼 입력 단계가 많은 테스트가 PC 부하에 따라
+    // 5초를 넘겨 들쭉날쭉 실패했고(2026-10-27, 변경 없는 코드에서도 재현), 단독 실행에서는 통과했다. 15초로 여유를 둔다.
+    testTimeout: 15000,
   },
 })

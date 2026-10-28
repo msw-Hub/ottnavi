@@ -1,5 +1,5 @@
 import { http as mswHttp, HttpResponse } from 'msw'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -38,14 +38,15 @@ afterEach(() => {
 afterAll(() => server.close())
 
 // 설정 화면을 열고, 돌아갈 곳을 확인할 수 있게 도착 화면 자리표시를 둔다. state가 있으면 로그인 전에 보던 화면(from)을 흉내 낸다
-function renderSettings(state?: unknown) {
+// hash가 있으면 다른 화면에서 특정 구역으로 바로 이동해 온 경우를 흉내 낸다(예: 요금 확인 화면의 "#price-mode")
+function renderSettings(state?: unknown, hash = '') {
   const router = createMemoryRouter(
     [
       { path: '/settings', element: <SettingsScreen /> },
       { path: '/', element: <h1>첫 화면</h1> },
       { path: '/wishlist', element: <h1>찜 목록 화면</h1> },
     ],
-    { initialEntries: [{ pathname: '/settings', state }] },
+    { initialEntries: [{ pathname: '/settings', state, hash }] },
   )
   render(
     <Providers>
@@ -94,15 +95,43 @@ describe('내 설정 저장 후 이동', () => {
   })
 })
 
+describe('계산할 요금제 구역으로 바로 이동', () => {
+  it('주소가 #price-mode면 설정을 불러온 뒤 "계산할 요금제" 구역으로 스크롤하고 체크박스에 포커스를 준다', async () => {
+    // jsdom에는 scrollIntoView가 없어 빈 함수로 대신하고, 불렸는지만 본다
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    setMockOnboardingDone(true)
+    renderSettings(undefined, '#price-mode')
+
+    const checkbox = await screen.findByRole('checkbox', {
+      name: /가장 저렴한 요금제로 계산할래요/,
+    })
+    await waitFor(() => expect(checkbox).toHaveFocus())
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(scrollIntoView.mock.contexts[0]).toHaveAttribute('id', 'price-mode')
+  })
+
+  it('hash가 없으면 포커스를 옮기지 않는다', async () => {
+    setMockOnboardingDone(true)
+    renderSettings()
+
+    const checkbox = await screen.findByRole('checkbox', {
+      name: /가장 저렴한 요금제로 계산할래요/,
+    })
+    expect(checkbox).not.toHaveFocus()
+  })
+})
+
 describe('회원 탈퇴 링크(Task 081)', () => {
-  it('가입을 마친 회원의 내 설정 화면 맨 아래에 탈퇴 화면으로 가는 링크가 있다', async () => {
+  // 이전: '가입을 마친 회원의 내 설정 화면 맨 아래에 탈퇴 화면으로 가는 링크가 있다'(링크를 찾아 href가 /settings/withdraw인지 확인).
+  // 탈퇴 링크를 푸터(app/RootLayout)로 옮겨(사용자 확정) 내 설정에서는 사라진 것을 확인하도록 바꿨다. 푸터 쪽은 app/RootLayout.test.tsx가 본다
+  it('가입을 마친 회원의 내 설정 화면에도 탈퇴 링크가 없다(푸터로 옮김)', async () => {
     setMockOnboardingDone(true) // 목업 서버가 기본 설정(isOnboardingDone=true)을 돌려준다
     renderSettings()
-    // 제목은 불러오는 중에도 "내 설정"이라, 폼(맨 아래 링크 포함)이 그려질 때까지 링크를 기다린다
-    expect(await screen.findByRole('link', { name: '회원 탈퇴' })).toHaveAttribute(
-      'href',
-      '/settings/withdraw',
-    )
+    // 제목은 불러오는 중에도 "내 설정"이라, 폼이 다 그려진 표시인 저장 버튼을 기다린 뒤 링크가 없는지 본다
+    await screen.findByRole('button', { name: '저장하기' })
+
+    expect(screen.queryByRole('link', { name: '회원 탈퇴' })).not.toBeInTheDocument()
   })
 
   it('첫 방문(온보딩) 화면에는 탈퇴 링크가 없다', async () => {

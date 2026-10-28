@@ -16,7 +16,7 @@ import type { PageMeta } from './pageMeta';
  * 서비스별 독점 목록 한 페이지(페이지네이션 고정 형태 + 서비스 ID·판정 여부·데이터 기준일)
  */
 export type ExclusiveTitlePage = PageMeta & {
-  /** 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열) */
+  /** 이 페이지의 작품들(최근 2년 개봉작 먼저, 각 그룹 안은 인기도 높은 순, 없으면 빈 배열) */
   content: ExclusiveTitle[];
   /** 요청한 서비스 ID */
   ottServiceId: number;

@@ -98,21 +98,26 @@ export function ExclusivesScreen() {
   }
 
   return (
-    <section className="flex flex-col gap-5">
-      <div className="grid gap-2">
-        {/* 제목은 라우터 경로표(router.test)와 준비 중 화면의 이름 "독점 작품 목록"에 맞췄다(1차안 처음엔 "서비스별 독점 작품") */}
-        <h1 className="text-2xl font-semibold">독점 작품 목록</h1>
-        <p className="break-keep text-muted-foreground">
-          국내 OTT 7곳 중 <strong className="font-semibold text-foreground">한 곳에서만</strong>{' '}
-          구독으로 볼 수 있다고 확인된 작품이에요. 어디를 구독할지 고를 때 참고해 주세요.
-        </p>
-        {/* 기준일은 서버가 독점을 계산한 날이다. 목록을 받기 전에는 "기준일 정보 없음"으로 보인다 */}
-        <DataAsOf value={exclusives.data?.dataAsOf ?? null} />
+    // 본문(제목 → 산정 기준 → 서비스 탭과 목록)과 출처 묶음 사이를 gap-section(40/48px)으로 띄운다(styles/tokens.css R1·R2).
+    // 본문 안은 산정 기준이 바로 아래 목록을 설명하는 한 덩어리라 이전과 같은 20px(gap-5)로 붙인다.
+    // 이전: <section className="flex flex-col gap-5"> (출처 묶음까지 모두 20px)
+    <section className="flex flex-col gap-section">
+      <div className="flex flex-col gap-5">
+        <div className="grid gap-2">
+          {/* 제목은 라우터 경로표(router.test)와 준비 중 화면의 이름 "독점 작품 목록"에 맞췄다(1차안 처음엔 "서비스별 독점 작품") */}
+          <h1 className="text-2xl font-semibold">독점 작품 목록</h1>
+          <p className="break-keep text-muted-foreground">
+            국내 OTT 7곳 중 <strong className="font-semibold text-foreground">한 곳에서만</strong>{' '}
+            구독으로 볼 수 있다고 확인된 작품이에요. 어디를 구독할지 고를 때 참고해 주세요.
+          </p>
+          {/* 기준일은 서버가 독점을 계산한 날이다. 목록을 받기 전에는 "기준일 정보 없음"으로 보인다 */}
+          <DataAsOf value={exclusives.data?.dataAsOf ?? null} />
+        </div>
+
+        <CriteriaNote />
+
+        {tabsContent}
       </div>
-
-      <CriteriaNote />
-
-      {tabsContent}
 
       <div className="grid gap-1.5 border-t border-border pt-4">
         <SourceAttribution />
@@ -185,7 +190,12 @@ function CriteriaNote() {
           {/* 이전: "쿠팡플레이는 제공 정보가 부족해 쿠팡플레이의 독점 여부는 판단하지 않아요(드라마 비교에는 포함해요)."
               서버가 쿠팡플레이도 드라마 독점은 판정하게 바뀌어 문구를 맞췄다 */}
           <li>쿠팡플레이는 영화 제공 정보를 받지 못해, 쿠팡플레이 독점은 드라마만 확인해요.</li>
-          <li>매일 수집이 끝난 뒤 다시 계산해요. 순서는 TMDB 인기도 순이에요.</li>
+          {/* 정렬 규칙 변경(독점: 공개일이 최근 6개월 안인 작품이 먼저, 같은 묶음 안에서는 인기도순)에 맞춘 문구.
+              이전: "매일 수집이 끝난 뒤 다시 계산해요. 순서는 TMDB 인기도 순이에요." */}
+          <li>
+            매일 수집이 끝난 뒤 다시 계산해요. 순서는 최근 6개월 안에 공개된 작품이 먼저이고, 같은
+            묶음 안에서는 TMDB 인기도가 높은 순이에요.
+          </li>
         </ol>
       </details>
     </aside>
@@ -274,7 +284,8 @@ function ServicePanelBody({ service, exclusives }: ServicePanelProps) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="text-sm text-muted-foreground tabular-nums">
           <strong className="font-semibold text-foreground">{service.name}</strong> 독점으로 확인된
-          작품 {totalElements}편 · 인기순
+          작품 {totalElements}편 · 최근 공개작 먼저
+          {/* 이전: "· 인기순". 최근 6개월 안 공개작이 앞에 오도록 정렬이 바뀌어 순서의 뜻을 맞췄다 */}
         </p>
         {/* {isMultiPage && (
           <p className="text-xs text-muted-foreground tabular-nums">
@@ -295,8 +306,9 @@ function ServicePanelBody({ service, exclusives }: ServicePanelProps) {
         isLoadMoreError={exclusives.isFetchNextPageError}
         onLoadMore={() => void exclusives.fetchNextPage()}
       >
-        {/* 순위 = 지금까지 불러온 목록에서의 위치(1부터). 서버가 인기도 내림차순(동률은 작품 ID)으로 주므로
-            다음 쪽이 뒤에 붙어도 25, 26…으로 이어진다. 요약 줄의 "인기순"이 이 숫자의 뜻을 이미 말한다 */}
+        {/* 순위 = 지금까지 불러온 목록에서의 위치(1부터). 서버가 정한 순서(최근 6개월 안 공개작 먼저 → 같은 묶음 안 인기도순)대로 주므로
+            다음 쪽이 뒤에 붙어도 25, 26…으로 이어진다. 요약 줄의 "최근 공개작 먼저"가 이 숫자의 뜻을 말한다.
+            이전 설명: 서버가 인기도 내림차순(동률은 작품 ID)으로 주고, 요약 줄의 "인기순"이 숫자의 뜻을 말했다 */}
         {titles.map((title, index) => (
           <ExclusiveTitleRailItem key={`${title.mediaType}-${title.tmdbId}`}>
             <ExclusiveTitleCard title={title} rank={index + 1} />

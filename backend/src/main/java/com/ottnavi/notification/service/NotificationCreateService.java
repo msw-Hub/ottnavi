@@ -52,6 +52,10 @@ public class NotificationCreateService {
 	/**
 	 * 새 트랜잭션에서 알림 행을 만들고 바로 커밋한다. 저장 커밋 뒤(AFTER_COMMIT)에는 원래 트랜잭션이 끝나 있어
 	 * 그 안에서는 쓰기가 반영되지 않으므로 가입 안내가 이 메서드를 쓴다.
+	 *
+	 * <p>users 행을 잠그지 않는 이유: 알림 행의 user_id FK가 ON DELETE CASCADE(V7)이고 INSERT가 FK를 확인하므로
+	 * 탈퇴 삭제와 줄이 선다. 탈퇴 뒤에는 설정 행이 없어 isNotificationEnabled가 false라 고아 행이 생기지 않는다.
+	 * (재계산 경로는 PlanRecalcWriter.write가 이미 users 행을 잠가 create를 호출한다.)
 	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
 	public Optional<Long> createInNewTransaction(Long userId, NotificationType type, String dedupeKey, Object payload) {

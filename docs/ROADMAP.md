@@ -638,7 +638,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 024: Redis·캐시·Feign 공통 설정 구성으로 외부 연동 기반 마련 ✅
 - 태그: [B] · PRD: B0 · 선행: 016 · 브랜치: `feature/b0-redis-feign-config`
 - 구현 사항
-  - [x] `global/config/RedisConfig`: 캐시 값 JSON 직렬화(Jackson 3용 클래스명은 구현 시 확인), 캐시 이름·TTL 자리(`titleDetail`, `planCalc`, `exclusiveTitles`)
+  - [x] `global/config/RedisConfig`: 캐시 값 JSON 직렬화(Jackson 3용 클래스명은 구현 시 확인), 캐시 이름·TTL 자리(`titleDetail`, `planCalc`, `exclusiveTitlesV2`)
   - [x] `global/config/FeignConfig`: `spring.cloud.openfeign.client.config.tmdb.*` 타임아웃. 앱 직렬화는 Jackson 3만
 - 완료 기준
   - V-B: Testcontainers Redis에 캐시를 저장·조회하고 값이 JSON인지 확인하는 테스트가 통과한다.
@@ -1308,6 +1308,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 구현 사항
   - [x] 계약 추가(`docs/api/openapi.yaml`, `contract-checker`로 검사): 인기 순위(서비스별 오늘/최근 7일), 찜 많은 작품, 새로 볼 수 있게 된 작품, 장르·인물 탐색
   - [x] **인기 순위 수집(설계 확정, 2026-10-17)**: TMDB `popularity`는 그날 값 하나만 주고 `trending`은 서비스·지역 필터가 없어서 우리가 만든다. 오늘 순위 = 서비스 7곳 × 영화·드라마별 `discover`(`watch_region=KR`, 서비스 필터, 인기순)를 하루 1회(약 14호출). 최근 7일 = 일별 스냅샷 표(7~14일 보관)의 7일 평균. 가벼운 별도 수집 Job. 공개 직후 7일 미만이면 있는 날 수만큼 평균. 화면 표기 "TMDB 인기도 기준, OTT 공식 순위 아님"
+  - [x] **의미 변경(2026-10-27, PR #104)**: 인기 순위 수집을 한국 제작(`with_origin_country=KR`) + 첫 공개일 최근 2년(`app.popularity.recent-years: 2`)으로 제한했다. 위 "서비스별 discover" 설계는 이 두 조건이 추가된 형태로 운영 중이다. 서버 notice 문구도 함께 바뀌었다.
   - [x] 스냅샷 표는 새 Flyway 마이그레이션(병합된 V1~V7 수정 금지, V8 이후) — `V9__create_popularity_snapshot.sql`
   - [x] 설계 미정 3가지를 결정 질문으로 묶어 확정(PRD 11절 39번 → 42번): "신작"의 뜻(서비스에 새로 들어온 작품, 첫 적재분 제외로 가정), 찜 최소 표시 인원, 사용자가 적을 때 목록을 숨길지 인기작으로 채울지 — 2026-10-18 확정(아래 결과)
 - 완료 기준
@@ -1399,6 +1400,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B(GreenMail + Testcontainers): 재시도·FAILED 전이, 동시 스케줄러 2개 중복 점유 없음, 로그의 실제 SQL이 `SKIP LOCKED`.
 - 기록(2026-10-21, 구현·테스트 완료, 병합은 공개 뒤): 최대 5회, 재시도 간격 1분 → 5분 → 30분 → 2시간(5회째 실패 시 FAILED), 임대 5분, 배치 10건, `lockAtMostFor` 4분(TECH 5절). 실제 SQL은 `... order by id fetch first ? rows only for no key update of no1_0 skip locked`(Hibernate 7 + PostgreSQL). 수신 주소는 발송 직전 `users.email`을 다시 읽는다. 테스트 구현 중 발견한 함정: 메일 설정이 있으면 Boot가 메일 헬스 체크를 켜서 SMTP에 접속하고 실패하면 `/actuator/health`가 503이 되므로 `management.health.mail.enabled: false`로 껐다. ShedLock은 락 행을 기억하므로 테스트에서 락 해제는 행 삭제가 아니라 `lock_until` 갱신으로 한다. 이 Task는 outbox 행을 만들지 않는다(생성은 073, 현재는 수동 INSERT로 시험)
+- 기록(2026-10-26): 메일 템플릿 디자인 반영, 링크 기준 주소는 기존 `app.frontend-origin` 사용(자세한 내용은 Task 073 기록)
 
 #### Task 073: 알림 생성 트리거와 설정·이력 API 구현으로 월초·변경 알림 제공 ⬜ `[3단계 이월]`
 - 태그: [B] · PRD: O2, FR-15, 16 · 선행: 071, 072, 069, 045 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 기한 전제: R11-17, R11-22(2026-11-05) · 브랜치: `feature/o2-notification-api`
@@ -1411,6 +1413,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-B: `dedupe_key` 중복 차단, 알림 꺼짐 미생성, 월이 바뀐 재계산에서만 MONTHLY 행 생성, 재실행해도 사용자당 1건.
   - V-API: 저장 → 테스트 계정 메일 수신. local에서 `targetDate`를 월 1일로 지정한 수집 → 재계산 → MONTHLY 생성이 이어지는 것을 확인. 실제 cron 경로 확인은 Task 102.
 - 기록(2026-10-22, 1~3단계 구현 완료, 병합은 공개 뒤): 알림 생성 관문 `NotificationCreateService`(설정 확인 → `INSERT ... ON CONFLICT (dedupe_key) DO NOTHING` → ID), 즉시 발송 `dispatchNow`(`claimOne` REQUIRES_NEW로 스케줄러와 경합 방지, `app.notification.immediate-send-enabled`), 가입 안내 `SubscribeGuideListener`(`@Async` + AFTER_COMMIT, 이번 달 가입 상품 1개 이상일 때), MONTHLY·PLAN_CHANGE는 `PlanRecalcWriter`에서 같은 트랜잭션으로 생성, 변경 알림 판정 `PlanChangeAlertRule`(작품이 "시청을 끝내는 달"이 이번 달 확정 달이고 그 서비스에서 이전 플랜 이후 빠짐). 메일 템플릿 3종을 payload 필드로 채웠다. 1단계 API: 설정 GET은 온보딩 전에도 200(꺼짐), PUT은 온보딩 전 409 `ONBOARDING_REQUIRED`, 이력은 본인 것만 최신순, 관리자 요약은 최근 7일 기준이다. 아직 안 한 것: 관리자 수동 재실행, 요약/이력 쿼리용 인덱스(V10, 필요 시).
+- 기록(2026-10-26, 메일 템플릿 디자인 반영): 확정 디자인(표 레이아웃·인라인 style, 가입·월초 하늘색 띠, 변경 주황 띠, `[해지 예약 권장]`·`[변경]` 글자 병기)으로 `templates/mail` 5개를 교체했다. 링크 기준 주소는 새 설정을 만들지 않고 기존 `app.frontend-origin`(`APP_FRONTEND_ORIGIN`, prod 필수·기본값 없음)을 쓴다. 큰 버튼은 `{기본 주소}/plan`, 꼬리말 "알림 설정"은 `{기본 주소}/settings/notifications`로 간다.
 
 #### Task 074: 알림 화면 실제 API 연결로 O2 완성 ⬜ `[3단계 이월]`
 - 태그: [F] · PRD: O2, SCR-12, 16 · 선행: 073 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 브랜치: `feature/o2-notification-api-connect`
@@ -1458,7 +1461,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 #### Task 078: 독점 목록 사전 계산과 공개 API 구현으로 서비스별 독점 조회 제공 ✅ `[v0.1.0 포함]`
 - 태그: [B] · PRD: O3, FR-04 · 선행: 075, 044, 049 · 브랜치: `feature/o3-exclusive-titles`
 - 구현 사항
-  - [x] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitles`에 저장(테이블 없음)
+  - [x] 계약 추가 + 수집 완료 후 "7개 중 이 서비스에서만 구독 제공"을 계산해 Redis `exclusiveTitlesV2`에 저장(테이블 없음)
   - [x] 구조적 공백 제외·명시, `INSUFFICIENT` 서비스는 안내 플래그, `/api/public/...`(요청 제한 적용)
 - 완료 기준
   - V-B: 독점 판정·공백 제외·데이터 부족 테스트. V-API: 서비스별 목록.
@@ -1466,7 +1469,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 판정(`ExclusiveRules`, 순수 규칙): 시청 단위(영화 1편·시즌 1개)마다 AVAILABLE인 서비스가 정확히 하나면 그 서비스의 독점이다. 다른 서비스의 없음·모름은 모두 "다른 곳에 없음"으로 본다(모름 수는 `unknownElsewhereCount`). 모름 중 이유가 `STRUCTURAL_GAP`(쿠팡플레이 영화)인 서비스는 비교에서 빼서 `comparedServiceCount`에 세지 않는다(영화 5, 드라마 6). 판정 행이 없는 서비스는 모름으로 센다. 광고형(`in_ad_tier`)도 구독 제공(AVAILABLE)이다(Task 076: 저가형은 시청 범위를 제한하지 않음). 드라마는 독점 시즌만 `exclusiveSeasonNumbers`(오름차순)에 담고, 비교·모름 수는 독점 시즌 중 가장 큰 값이다. 정렬은 TMDB 인기도 내림차순(없으면 뒤, 동률은 작품 ID).
   - 데이터 부족 서비스(`dataQuality=INSUFFICIENT`, 쿠팡플레이)도 같은 규칙으로 판정한다(2026-10-19 후속 변경, PRD 11절 44번). 쿠팡플레이 영화는 모두 모름(구조적 공백)이라 독점 영화가 나오지 않고 드라마 시즌만 목록에 나오며, `isJudged`는 계약 호환을 위해 남기고 항상 true다. 쿠팡플레이에 있는 작품은 다른 서비스 독점에서 정상적으로 빠진다(기존 동작).
   - 후속 변경 기록(2026-10-19): `ExclusiveTitleCalculator`의 INSUFFICIENT 건너뛰기 분기를 없앴다. `ExclusiveRulesTest`에 쿠팡플레이 영화·시즌 케이스 2개를 추가하고 `ExclusiveTitleApiTest`의 쿠팡플레이 테스트를 새 동작으로 바꿨다. 계약은 구조 변경 없이 `isJudged`와 operation 설명만 고쳤다(프론트는 `dataQuality`로 "영화는 판정하지 못했다"를 안내, Task 079).
-  - 캐시: 서비스마다 `ExclusiveTitleList` 전체를 `exclusiveTitles`에 저장(키 서비스 ID, TTL `app.exclusive.cache.ttl` 기본 24h). 수집 Job이 COMPLETED로 끝나면 `ExclusiveTitlesRefreshListener`가 7개를 새로 계산해 채우고, 실패·중단이면 비운다. 정리 Job(`RetentionService`)이 작품을 갱신·삭제하면 비운다. 조회 API는 캐시를 읽고, 비어 있으면(재시작·만료·비운 뒤) 7개를 즉석에서 계산해 채운다. 매월 재계산 Job은 제공 상태를 바꾸지 않아 연결하지 않았다. 조회 경로는 Redis 읽기·쓰기 실패 시 DB 계산 결과로 응답한다.
+  - 캐시: 서비스마다 `ExclusiveTitleList` 전체를 `exclusiveTitlesV2`에 저장(키 서비스 ID, TTL `app.exclusive.cache.ttl` 기본 24h). 수집 Job이 COMPLETED로 끝나면 `ExclusiveTitlesRefreshListener`가 7개를 새로 계산해 채우고, 실패·중단이면 비운다. 정리 Job(`RetentionService`)이 작품을 갱신·삭제하면 비운다. 조회 API는 캐시를 읽고, 비어 있으면(재시작·만료·비운 뒤) 7개를 즉석에서 계산해 채운다. 매월 재계산 Job은 제공 상태를 바꾸지 않아 연결하지 않았다. 조회 경로는 Redis 읽기·쓰기 실패 시 DB 계산 결과로 응답한다.
   - 테스트: `ExclusiveRulesTest`(판정 8), `ExclusiveTitleApiTest`(목록·페이지·쿠팡플레이·404/400·캐시 적중/갱신/폴백 4), `OpenApiContractTest`, `ErrorCodeDocumentTest`, `RetentionHomeCacheEvictTest`(독점 캐시 비우기 확인 추가).
   - 프론트(Task 079)에 넘길 내용: 응답 모양은 위와 같고, 목업 임시 타입 `ExclusiveTitle`/`ExclusiveTitlePage`는 생성 타입으로 바꾸며 `posterUrl` 대신 `posterPath`(TMDB 상대 경로)를 쓴다. `errorMessages.ts`의 `TECH_ERROR_MESSAGES`에 `OTT_SERVICE_NOT_FOUND`("서비스를 찾을 수 없습니다.")를 추가해야 한다(`errorMessages.test.ts`가 `error-codes.md` 행과 대조). 홈의 독점 줄은 이 API의 첫 페이지(`size`를 작게)로 연결한다.
 
@@ -1591,6 +1594,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 #### Task 092: MVP 운영 인프라 전환과 도메인 연결로 공개 준비 ⬜ `[v0.1.0 포함]`
 - 태그: [H] · PRD: B8·F8, R11-3, R11-4 · 선행: 005, 067 · 기한: 2026-11-04
+- 진행(2026-10-27): Google 동의 화면 Branding(앱 이름 OTT내비, 홈페이지 `https://ottnavi.shop`, 방침 `https://ottnavi.shop/privacy`, 승인된 도메인 `ottnavi.shop`, 범위 openid·email·profile)을 입력하고 **프로덕션으로 게시**했다. 로그인 동의 화면에 방침 링크가 보이는 것을 사용자가 확인했다. 리디렉션 URI는 `ottnavi.shop`만 등록했다. 프론트 대표 주소는 `ottnavi.shop`이고 Cloudtype 도메인 연결은 하지 않는다(결정). Cloudtype 플랜 전환 여부는 이 기록에서 확인하지 못했다.
 - 구현 사항
   - [ ] Cloudtype Hobby(512MB당 월 6,600원, 메모리는 실측 후 결정) 전환, `ottnavi.shop`을 Vercel에 연결(HTTPS)
   - [ ] `APP_FRONTEND_ORIGIN`, `OAUTH2_REDIRECT_BASE_URL` 확정, Google OAuth 운영 리다이렉트 URI(`https://{도메인}/api/login/oauth2/code/google`) 추가. **승인된 JavaScript 원본(출처)은 필요 없다**: 프론트가 `window.location.assign('/api/oauth2/authorization/google')`로 이동만 하고 구글 JS 라이브러리를 쓰지 않는 서버 측 authorization code 흐름이기 때문이다
@@ -1603,15 +1607,18 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 #### Task 093: 백엔드 운영 설정 점검과 수집 cron 활성화로 자동 운영 준비 ⬜ `[v0.1.0 포함]`
 - 태그: [B] · PRD: B8, FR-18, R11-4 · 선행: 092, 047 · 브랜치: `feature/b8-prod-config`
+- 진행(2026-10-27): 주간 수집(WEEKLY)을 일요일에서 **수요일 03:17(KST)**로 옮겼다(PR #106, DAILY는 수요일을 뺀 나머지 6일). **저장소 변수 `CRON_ENABLED`는 아직 만들지 않았다**(예약 실행은 모두 건너뜀). 사용자가 수요일 03:17 이후에 켜기로 했고, 켜면 첫 WEEKLY는 2026-11-04다. 인기 수집·`calculateAll` 시간 측정은 cron을 켠 뒤 기록한다.
 - 구현 사항
   - [ ] prod 프로필 최종 점검(`ddl-auto=validate`, 풀 약 5, `forward-headers-strategy=framework`, 오리진 비밀 헤더 검사 켬)
   - [x] (2026-10-21, `feature/docs-cron-enable-domain`) 세 워크플로의 `schedule` 주석을 풀었다: `collect.yml`(DAILY·WEEKLY 두 cron), `popularity.yml`(KST 02:47), `retention.yml`(주 1회). Cloudtype 직접 호출 + 두 헤더. 매일 수집이 Supabase 7일 비활성 일시정지도 막는다. schedule은 기본 브랜치(`main`) 파일만 실행되므로 `develop`에서는 돌지 않고 Task 095 병합 때 한꺼번에 켜진다. 그 전에 Hobby 전환, 환경 변수(Task 092), GitHub 시크릿 `BACKEND_BASE_URL`이 준비돼야 첫 실행이 실패하지 않는다
+  - [x] (2026-10-26, `feature/docs-predeploy-cleanup`) 예약 실행 안전장치: 세 워크플로의 작업에 `if: github.event_name == 'workflow_dispatch' || vars.CRON_ENABLED == 'true'`를 달았다. `main` 병합 직후에는 예약 실행이 건너뛰기(skipped)로 끝나고, 수동 실행은 항상 돈다. **095에서 첫 수집·스모크로 안정화를 확인한 뒤** GitHub 저장소 Settings → Secrets and variables → Actions → Variables에서 `CRON_ENABLED=true`를 만들어 켠다(코드 변경·배포 불필요, 지우면 다시 멈춘다).
   - [ ] 인기 수집이 30분 안에 끝나는지(WEEKLY 수집 시작 KST 03:17 전), 호출량, `calculateAll` 시간을 cron을 켠 뒤 측정해 기록
 - 완료 기준
   - PR 수준: YAML 문법 유효, prod 프로필로 로컬 기동(환경 변수는 로컬 값) 성공. `main` 반영 후 cron·배포 확인은 Task 095.
 
 #### Task 094: 프론트 운영 배포 설정으로 실제 API 연결 배포 준비 ⬜ `[v0.1.0 포함]`
 - 태그: [F] · PRD: F8, T-8 · 선행: 092 · 브랜치: `feature/f8-deploy`
+- 진행(2026-10-27): 개인정보처리방침 화면(`/privacy`, PR #106)과 이용약관 화면(`/terms`, PR #108 열림)을 추가했다. Vercel Analytics·Speed Insights는 대시보드에서 꺼져 있고 코드에도 관련 패키지가 없다(사용자 확인). 홈 개편(큰 포스터 배너, OTT 로고 카드)과 전체 구간 간격 규칙은 `feature/f-home-redesign`에서 진행 중이다.
 - 구현 사항
   - [ ] `vercel.json` 운영 백엔드 주소, `/api` 우선 순서, `routes[].transforms` 헤더 주입, rewrite 캐시 비활성화(`respectOriginCacheControl: false`, 또는 Task 021 기록에서 효과가 확인된 방식)를 Task 021 기록 기준으로 점검
   - [ ] `VITE_USE_MOCK=false`, 운영 빌드에 MSW 미포함 확인
@@ -1627,6 +1634,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 #### Task 095: 첫 공개 배포 스모크 테스트와 v0.1.0 태그로 첫 공개 ⬜ `[v0.1.0 포함]`
 - 태그: [H] · PRD: B8·F8, MVP 완료 기준 ①~④ · 선행: 093, 094, 052, 061, 065, 067, 037, 070, 079, 084, 089, 090, 101, 108 (2026-10-17 개정: 첫 공개 범위에 맞춰 선행 추가. MVP 완료 기준 ①~④는 그대로 두고 "첫 공개 범위"를 3.2에 따로 적는다)
+- 진행(2026-10-27): ① `develop`→`main` 병합 두 번(PR #105, #107)과 Cloudtype 배포를 마쳤다. ④ 첫 운영 수집은 `executionId=1`, `tier=ALL`, COMPLETED, 8시간 33분이다(상세는 `docs/guides/FIRST_DEPLOY_RECORD.md` 4절). ⑤ 스모크에서 로그인 유지, 검색, 찜, 플랜 계산·저장, 요금 확인, 관리자 화면에 큰 문제가 없었다(사용자 확인). **남은 것**: 운영 비교 측정 1회(`POST /api/admin/plan-benchmarks`, ADMIN 토큰), 상품 가격 재확인(조사일 2026-10-05, 쿠팡플레이는 비공식), 검색 엔진 등록, `v0.1.0` 태그. ②·③은 이 기록에서 개별로 확인하지 못했다.
 - 구현 사항(이 순서로 진행)
   - [ ] ① `develop` → `main` PR merge commit, `backend-deploy.yml`·Vercel Production 성공 확인(Task 093 이관분). 병합 전 `openapi.yaml`에 `x-planned`가 남아 있지 않음을 확인(4.2)
   - [ ] ② 운영 ADMIN 지정(R-5 확정, 2026-10-09): 운영 관리자는 **2명**(본인 계정과 포트폴리오 평가용 계정)이고 **DB에서 `users.role`을 직접 수정**한다. 순서: 그 사람이 Google로 **한 번 로그인**해 `users` 행이 생기게 한 뒤 `UPDATE users SET role = 'ADMIN' WHERE email = '해당 이메일'`을 실행하고(README에 이 SQL을 기록) 다시 로그인한다. 주의: 평가용 계정에 ADMIN을 주면 상품 가격 수정·수집 실행·제공처 매핑 변경으로 운영 데이터를 바꿀 수 있으니 평가 전에 가격표(Task 004)를 백업해 두고 확인한다. 평가자의 Google 이메일이 `users`에 저장되므로 개인정보 안내(About)와 탈퇴 정책과 일관되게 처리한다. 읽기 전용 관리자 역할은 지금 만들지 않고, 필요해지면 `role` 값을 추가한다

@@ -16,7 +16,7 @@ import type { TitleSearchItem } from './titleSearchItem';
  * 탐색 결과 한 페이지(페이지네이션 고정 형태 + 데이터 기준일)
  */
 export type TitleExplorePage = PageMeta & {
-  /** 이 페이지의 작품들(인기도 높은 순, 없으면 빈 배열) */
+  /** 이 페이지의 작품들(최근 2년 개봉작 먼저, 각 그룹 안은 인기도 높은 순, 없으면 빈 배열) */
   content: TitleSearchItem[];
   /** 제공 상태의 데이터 기준일(KST) */
   dataAsOf: string;

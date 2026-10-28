@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.ottnavi.collect.job.ExclusiveTitlesRefreshListener;
 import com.ottnavi.global.config.RedisConfig;
 import com.ottnavi.support.IntegrationTestSupport;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -139,6 +141,31 @@ class ExclusiveTitleApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 최근_6개월_개봉작이_먼저이고_과거_다음_미래와_개봉일_모름이_맨_뒤이며_그룹_안은_인기도_순이다() throws Exception {
+		// given: 오늘(KST)에서 상대 날짜로 만든 넷플릭스 독점 영화 4개. 인기도는 과거·미래가 최근보다 훨씬 높다
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		int recentLow = 9610001; // 1개월 전, 인기도 100
+		int recentHigh = 9610002; // 5개월 전, 인기도 200
+		int past = 9610003; // 2000년, 인기도 9999999
+		int future = 9610004; // 30일 뒤, 인기도 950000(개봉일이 null인 A의 900000보다 높다)
+		exclusiveMovie(recentLow, "최근 낮은 인기", "100", today.minusMonths(1));
+		exclusiveMovie(recentHigh, "최근 높은 인기", "200", today.minusMonths(5));
+		exclusiveMovie(past, "옛 고전", "9999999", LocalDate.of(2000, 1, 1));
+		exclusiveMovie(future, "미래 개봉", "950000", today.plusDays(30));
+		cacheManager.getCache(RedisConfig.EXCLUSIVE_TITLES).clear();
+
+		// when, then: 최근(인기도 200 → 100) → 과거 → 미래(950000) → 개봉일 모름 A(900000) → B(800000)
+		mockMvc.perform(get("/api/public/ott-services/" + serviceIds.get("NETFLIX") + "/exclusive-titles"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].tmdbId").value(recentHigh))
+				.andExpect(jsonPath("$.data.content[1].tmdbId").value(recentLow))
+				.andExpect(jsonPath("$.data.content[2].tmdbId").value(past))
+				.andExpect(jsonPath("$.data.content[3].tmdbId").value(future))
+				.andExpect(jsonPath("$.data.content[4].tmdbId").value(MOVIE_A))
+				.andExpect(jsonPath("$.data.content[5].tmdbId").value(TV_B));
+	}
+
+	@Test
 	void 쿠팡플레이도_드라마_시즌만_판정해_독점_목록을_200으로_돌려준다() throws Exception {
 		mockMvc.perform(get("/api/public/ott-services/" + serviceIds.get("COUPANG_PLAY") + "/exclusive-titles"))
 				.andExpect(status().isOk())
@@ -238,6 +265,15 @@ class ExclusiveTitleApiTest extends IntegrationTestSupport {
 
 	private long movie(int tmdbId, String name, String popularity) {
 		return unit(title("MOVIE", tmdbId, name, popularity), "MOVIE", null);
+	}
+
+	/** 개봉일을 정해 넷플릭스에만 있는 영화(독점)를 넣는다. 쿠팡플레이는 영화라 구조적 공백이다 */
+	private void exclusiveMovie(int tmdbId, String name, String popularity, LocalDate releaseDate) {
+		long unitId = movie(tmdbId, name, popularity);
+		jdbcTemplate.update("UPDATE title SET release_date = ? WHERE tmdb_id = ?", releaseDate, tmdbId);
+		availability(unitId, "NETFLIX", "AVAILABLE", null);
+		availability(unitId, "COUPANG_PLAY", "UNKNOWN", "STRUCTURAL_GAP");
+		fillRest(unitId);
 	}
 
 	private long unitIdOf(int tmdbId) {
