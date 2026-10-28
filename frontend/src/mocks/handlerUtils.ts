@@ -71,6 +71,15 @@ export function denyDemo(request: Request) {
   return problemResponse(request, 403, 'Forbidden', 'FORBIDDEN', '접근 권한이 없습니다.')
 }
 
+/**
+ * 데모 계정(DEMO)이 아니면 403 FORBIDDEN 응답을, 데모 계정이면 undefined를 돌려준다(Task 110).
+ * denyDemo의 반대다. 알림 메일 예시 조회는 데모 계정 전용이라 일반 회원·관리자는 403이다(openapi.yaml getCurrentPlanMailPreview).
+ */
+export function denyNonDemo(request: Request) {
+  if (getMockRole() === 'DEMO') return undefined
+  return problemResponse(request, 403, 'Forbidden', 'FORBIDDEN', '접근 권한이 없습니다.')
+}
+
 // 목업 서버가 메모리에 들고 있는 찜 한 건. 추가 요청 내용에 "다 봤음" 시각이 붙는다
 export type MockWishlistEntry = AddWishlistItemRequest & { watchedAt: string | null }
 

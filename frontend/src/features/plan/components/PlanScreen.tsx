@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   CalculatorIcon,
   CircleCheckIcon,
@@ -7,6 +8,7 @@ import {
   HistoryIcon,
   InfoIcon,
   LoaderCircleIcon,
+  MailIcon,
   RefreshCwIcon,
   SaveIcon,
   // TriangleAlertIcon, // 이전: "다시 계산하기" 실패 안내의 경고 아이콘
@@ -21,7 +23,13 @@ import { LoadingState } from '@/components/common/LoadingState'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { PlanDetail } from '@/features/plan/components/PlanDetail'
+import { PlanMailPreviewDialog } from '@/features/plan/components/PlanMailPreviewDialog'
 import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
+import {
+  getPlanMailPreviewFetchOptions,
+  resetPlanMailPreview,
+} from '@/features/plan/hooks/usePlanMailPreview'
+import { useIsDemo } from '@/hooks/useIsDemo'
 // 이전: useCalculatePlan도 불러왔다("다시 계산하기" 버튼용)
 import { useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
@@ -59,6 +67,32 @@ export function PlanScreen() {
   const [hasRecalculatedNotice, setHasRecalculatedNotice] = useState(false)
   // 저장하려던 초안이 서버에 없었는지(404). 훅이 초안을 다시 불러오므로 안내만 띄운다
   const [hasNotFoundNotice, setHasNotFoundNotice] = useState(false)
+
+  // ----- 알림 메일 예시 팝업(Task 110, 데모 계정 전용) -----
+  const isDemo = useIsDemo()
+  const queryClient = useQueryClient()
+  // 팝업이 열려 있는지. 저장 직후 자동 열기와 "알림 메일 예시 보기" 버튼이 같은 팝업 하나를 쓴다
+  const [isMailPreviewOpen, setIsMailPreviewOpen] = useState(false)
+  // 닫힌 뒤 포커스를 돌려받을 버튼. 자동으로 열렸다면 저장 버튼은 이미 사라졌으므로 이 버튼이 유일한 되돌아갈 곳이다
+  const mailPreviewButtonRef = useRef<HTMLButtonElement>(null)
+
+  // 저장 직후 자동 열기. 먼저 메일을 받아 보고 1통 이상일 때만 연다.
+  // 단순히 팝업을 먼저 열고 안에서 조회하면, 실패·0통일 때 빈 팝업이 번쩍 떴다 사라지거나 저장 성공 표시를 가린다.
+  // 그래서 실패(403·500·네트워크)나 0통이면 팝업도 토스트도 없이 조용히 넘어간다(메일 예시는 덤이라 저장 결과를 흐리지 않는다)
+  const openMailPreviewAfterSave = async () => {
+    try {
+      const res = await queryClient.fetchQuery(getPlanMailPreviewFetchOptions())
+      if (res.data.mails.length > 0) setIsMailPreviewOpen(true)
+    } catch {
+      // 조용히 넘어간다
+    }
+  }
+
+  // 버튼으로 열기: 캐시를 비우고 열어, 팝업이 로딩 → 결과를 새로 거치게 한다(이유는 resetPlanMailPreview 주석)
+  const openMailPreviewByButton = () => {
+    resetPlanMailPreview(queryClient)
+    setIsMailPreviewOpen(true)
+  }
 
   let content: ReactNode
   if (drafts.isPending || currentPlan.isPending || services.isPending) {
@@ -101,6 +135,8 @@ export function PlanScreen() {
                   setHasRecalculatedNotice(false)
                   toast.success('플랜을 저장했어요')
                   window.scrollTo({ top: 0 })
+                  // 데모 계정은 저장할 때마다 실제 회원이 받을 메일 예시를 보여 준다
+                  if (isDemo) void openMailPreviewAfterSave()
                 } else {
                   // 저장 중 409(데이터 갱신) → 훅이 이미 다시 계산했다. 사용자가 새 결과를 확인하고 다시 저장해야 한다
                   setHasRecalculatedNotice(true)
@@ -124,6 +160,9 @@ export function PlanScreen() {
         services={services.data}
         search={location.search}
         isJustSaved={savedPlanType !== null}
+        isDemo={isDemo}
+        mailPreviewButtonRef={mailPreviewButtonRef}
+        onOpenMailPreview={openMailPreviewByButton}
       />
     )
   } else {
@@ -158,6 +197,15 @@ export function PlanScreen() {
         </Alert>
       )}
       {content}
+      {/* 팝업은 결과/현재 플랜 분기 밖 최상위에 한 번만 둔다. 저장하면 PlanResult가 사라지고 CurrentPlanView로 바뀌는데,
+          분기 안에 두면 그때 팝업도 함께 지워져 자동 열기가 안 보인다. 데모 계정에게만 마운트한다 */}
+      {isDemo && (
+        <PlanMailPreviewDialog
+          isOpen={isMailPreviewOpen}
+          onOpenChange={setIsMailPreviewOpen}
+          focusReturnRef={mailPreviewButtonRef}
+        />
+      )}
     </section>
   )
 }
@@ -167,10 +215,21 @@ interface CurrentPlanViewProps {
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름 표시용)
   search: string // 목업 확인용 주소 파라미터(?mock…)를 이동 링크에 이어 붙이기 위한 값
   isJustSaved: boolean // 방금 저장해서 이 화면으로 넘어왔는지(완료 안내 띠를 보일지)
+  isDemo: boolean // 데모 계정인지("알림 메일 예시 보기" 버튼을 보일지)
+  mailPreviewButtonRef: RefObject<HTMLButtonElement | null> // 팝업을 닫은 뒤 포커스를 돌려받을 버튼의 ref
+  onOpenMailPreview: () => void // "알림 메일 예시 보기"를 눌렀을 때
 }
 
 // 저장해 둔 "내 현재 플랜". 초안 결과와 같은 내용 컴포넌트(PlanDetail)를 읽기 전용으로 재사용한다
-function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanViewProps) {
+function CurrentPlanView({
+  plan,
+  services,
+  search,
+  isJustSaved,
+  isDemo,
+  mailPreviewButtonRef,
+  onOpenMailPreview,
+}: CurrentPlanViewProps) {
   const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
   const typeName = PLAN_TYPE_LABELS[plan.planType]
   // 서비스 화면의 다른 날짜("2026년 10월 9일")와 같은 말투로 맞춘 저장 시각(관리자용 숫자 형식 formatDateTime은 쓰지 않는다)
@@ -220,6 +279,18 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
             <BellIcon aria-hidden="true" className="size-4" />
             알림 설정
           </Link>
+          {/* 데모 계정 전용: 팝업을 닫았거나 놓쳤을 때 메일 예시를 다시 본다. 옆 링크와 같은 글자 모양으로 맞췄다 */}
+          {isDemo && (
+            <button
+              ref={mailPreviewButtonRef}
+              type="button"
+              onClick={onOpenMailPreview}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-3 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <MailIcon aria-hidden="true" className="size-4" />
+              알림 메일 예시 보기
+            </button>
+          )}
         </div>
       </div>
 
