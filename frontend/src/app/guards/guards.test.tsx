@@ -166,6 +166,14 @@ describe('RequireAdmin', () => {
     expect(await screen.findByRole('heading', { name: '수집 화면' })).toBeInTheDocument()
   })
 
+  // 데모 계정은 관리자 화면을 조회만 할 수 있어 가드는 통과시킨다(쓰기는 화면의 막힌 버튼과 서버 403이 막는다, Task 109)
+  it('데모 계정(DEMO)도 통과한다', async () => {
+    useAuthStore.getState().setSession('t', 'DEMO')
+    renderAt('/admin/collect')
+
+    expect(await screen.findByRole('heading', { name: '수집 화면' })).toBeInTheDocument()
+  })
+
   it('비로그인이면 권한 없음이 아니라 로그인 화면으로 보낸다', async () => {
     renderAt('/admin/collect')
 

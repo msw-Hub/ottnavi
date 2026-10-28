@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { InfoIcon, TriangleAlertIcon } from 'lucide-react'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -17,6 +19,9 @@ interface CollectRunFormProps {
   onSubmit: (targetDate: string, tier: CollectTier) => void // [수집 실행]을 눌렀다
   onViewRun: (executionId: number) => void // 안내 띠의 [이력에서 보기]. 그 행으로 포커스를 옮긴다
 }
+
+// 데모 계정에게 [수집 실행]이 막힌 이유를 적은 문장의 id(버튼이 aria-describedby로 가리킨다)
+const COLLECT_RUN_LOCK_NOTE_ID = 'collect-run-demo-note'
 
 // 범위 선택지. DAILY·WEEKLY는 보이되 고를 수 없다(2단계, 사용자 결정 2026-10-11)
 const TIER_OPTIONS: { value: CollectTier; isEnabled: boolean }[] = [
@@ -149,10 +154,18 @@ export function CollectRunForm({
         </RadioGroup>
       </fieldset>
 
-      <div>
-        <Button type="submit" disabled={isPending}>
+      {/* 데모 계정이면 [수집 실행]이 막히고(눌러도 요청 없음, Enter 제출도 막힌다) 옆에 이유를 둔다(Task 109) */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <DemoLockedButton
+          type="submit"
+          disabled={isPending}
+          lockedDescriptionId={COLLECT_RUN_LOCK_NOTE_ID}
+        >
           {isPending ? '접수 중…' : '수집 실행'}
-        </Button>
+        </DemoLockedButton>
+        <DemoReadOnlyHint variant="inline" id={COLLECT_RUN_LOCK_NOTE_ID}>
+          데모 계정은 실행할 수 없어요
+        </DemoReadOnlyHint>
       </div>
 
       {notice && notice.kind === 'ERROR' && (

@@ -7,6 +7,7 @@ import type {
 } from '@/api/generated/model'
 import { MOCK_ADMIN_NOTIFICATION_SUMMARY, MOCK_NOTIFICATIONS } from '@/mocks/fixtures/notifications'
 import {
+  denyDemo,
   denyGuest,
   getRequestMockPageSize,
   hasMockScenario,
@@ -14,6 +15,7 @@ import {
   readMockJson,
   writeMockJson,
 } from '@/mocks/handlerUtils'
+import { getMockRole } from '@/mocks/mockSession'
 
 /*
  * ===== 알림 설정·발송 이력 목업 핸들러 (Task 071) =====
@@ -30,6 +32,9 @@ import {
  * - error:               조회(설정·이력·관리자 요약)와 저장이 500 오류를 돌려준다
  * - save-error:          설정 저장만 500 오류를 돌려준다(저장 실패 시 스위치가 되돌아가는지 확인)
  * - onboarding-required: 설정 저장이 409 ONBOARDING_REQUIRED를 돌려준다(내 설정을 한 번도 저장하지 않은 계정)
+ *
+ * 데모 계정(목업 역할 DEMO, Task 109): 서버와 같게 설정 조회는 항상 꺼짐, 설정 변경은 403 FORBIDDEN, 이력은 빈 목록이다
+ * (서버는 데모 계정에 알림을 만들지 않는다).
  */
 
 // 목업 계정의 이메일. 계약에서 수신 이메일은 로그인한 계정의 이메일이다
@@ -37,6 +42,9 @@ const MOCK_ACCOUNT_EMAIL = 'user@example.com'
 
 // 알림 켬 여부를 새로고침 뒤에도 남기는 sessionStorage 키(mockSession·찜 목록과 같은 방식)
 const ENABLED_STORAGE_KEY = 'ottnavi:mock-notification-enabled'
+
+// 데모 계정 행의 이메일(백엔드 DemoAccount.EMAIL). 메일이 가지 않는 예약 도메인(.invalid)이다
+const MOCK_DEMO_EMAIL = 'demo@ottnavi.invalid'
 
 // 계약 기본값은 꺼짐이다(동의 없이 메일을 보내지 않는다). 저장된 값이 true일 때만 켜짐으로 되살린다
 let isNotificationEnabled = readMockJson(ENABLED_STORAGE_KEY) === true
@@ -69,9 +77,13 @@ export const notificationHandlers: RequestHandler[] = [
     if (denied) return denied
     if (hasMockScenario(request, 'error')) return internalError(request)
 
+    // 데모 계정은 저장된 값과 상관없이 늘 꺼짐이다(서버 규칙)
+    const isDemo = getMockRole() === 'DEMO'
     const body: CommonResponseNotificationSetting = {
       success: true,
-      data: { isNotificationEnabled, email: MOCK_ACCOUNT_EMAIL },
+      data: isDemo
+        ? { isNotificationEnabled: false, email: MOCK_DEMO_EMAIL }
+        : { isNotificationEnabled, email: MOCK_ACCOUNT_EMAIL },
     }
     return HttpResponse.json(body)
   }),
@@ -80,6 +92,9 @@ export const notificationHandlers: RequestHandler[] = [
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
+    // 데모 계정은 알림 설정을 바꿀 수 없다(서버 403). 권한 검사는 본문 검사보다 먼저다
+    const demoDenied = denyDemo(request)
+    if (demoDenied) return demoDenied
 
     // 1. 본문 검사: isNotificationEnabled는 true/false여야 한다(서버 Bean Validation, 400)
     const requestBody = (await request
@@ -140,7 +155,9 @@ export const notificationHandlers: RequestHandler[] = [
       )
     }
 
-    const all = hasMockScenario(request, 'empty') ? [] : MOCK_NOTIFICATIONS
+    // 데모 계정에는 알림이 만들어지지 않아 이력도 늘 비어 있다
+    const all =
+      hasMockScenario(request, 'empty') || getMockRole() === 'DEMO' ? [] : MOCK_NOTIFICATIONS
     const body: CommonResponseNotificationHistoryPage = {
       success: true,
       data: {

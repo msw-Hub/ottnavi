@@ -1,12 +1,16 @@
 import { CalendarRangeIcon, HeartIcon, SaveIcon } from 'lucide-react'
 import { createSearchParams, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { DemoLoginSection } from '@/features/auth/components/DemoLoginSection'
 import { saveLoginReturnTo } from '@/lib/loginReturn'
 import { isMockMode, MOCK_SCENARIO_PARAM } from '@/lib/mockScenario'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
 
 // 백엔드가 Google 로그인을 시작하는 경로(TECH 4절). 프론트 화면 주소가 아니라 서버 주소라 router가 아닌 브라우저 이동으로 간다
 const GOOGLE_AUTHORIZATION_PATH = '/api/oauth2/authorization/google'
+
+// 데모 계정 폼을 펼친 채로 열게 하는 로그인 화면 주소 파라미터(/login?demo=1, Task 109)
+const DEMO_QUERY_PARAM = 'demo'
 
 // 로그인하면 쓸 수 있는 기능 안내(PRD SCR-06 "로그인 혜택 안내")
 const LOGIN_BENEFITS = [
@@ -39,6 +43,8 @@ export function LoginScreen() {
 
   // 목업 시나리오(?mockScenario=login-failed)를 로그인 화면 주소에 붙여 열었다면 콜백 화면으로도 이어 준다
   const mockScenario = new URLSearchParams(location.search).get(MOCK_SCENARIO_PARAM)
+  // 제출 문서의 데모 로그인 링크(/login?demo=1)로 들어왔는지. 참이면 데모 계정 폼을 펼친 채로 보인다
+  const isDemoLinkOpened = new URLSearchParams(location.search).get(DEMO_QUERY_PARAM) === '1'
 
   function handleLogin() {
     // 1. 실제 환경: 돌아갈 곳을 보관하고 Google 로그인으로 보낸다
@@ -88,6 +94,9 @@ export function LoginScreen() {
           Google로 로그인
         </Button>
       </div>
+
+      {/* 데모 계정 로그인(Task 109). 평소에는 접혀 있고 /login?demo=1이면 펼쳐진 채로 시작한다(사용자 결정 Q1) */}
+      <DemoLoginSection from={from} isInitiallyOpen={isDemoLinkOpened} />
     </section>
   )
 }

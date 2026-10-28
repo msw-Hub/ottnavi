@@ -13,7 +13,8 @@ import type {
 
 // 알림 유형 → 화면 글자 (계약 NotificationHistoryItem.type)
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationHistoryItemType, string> = {
-  SUBSCRIBE_GUIDE: '가입 안내',
+  // 이전: '가입 안내'. 회원가입 안내로 오해돼 "구독 안내"로 바꿨다(Task 109 사용자 결정). 코드 값(SUBSCRIBE_GUIDE)은 그대로다
+  SUBSCRIBE_GUIDE: '구독 안내',
   MONTHLY: '월초 안내',
   PLAN_CHANGE: '플랜 변경 알림',
 }

@@ -56,6 +56,31 @@ describe('응답 인터셉터 (MSW 목업 응답)', () => {
     })
   })
 
+  // Task 109: 429 응답의 Retry-After(초)를 ApiError에 담는다(목업 rate-limit 시나리오는 30초)
+  it('429 응답의 Retry-After 헤더를 retryAfterSeconds로 읽는다', async () => {
+    const error = (await catchRequestError('/public/ott-services', {
+      'X-Mock-Scenario': 'rate-limit',
+    })) as ApiError
+    expect(error.retryAfterSeconds).toBe(30)
+  })
+
+  // Task 109: 화면이 대기 시간을 직접 안내하는 요청(_skipRateLimitToast)은 429여도 전역 토스트를 띄우지 않는다. 오류는 그대로 던진다
+  it('_skipRateLimitToast를 켠 요청의 429는 토스트 없이 ApiError만 던진다', async () => {
+    let caught: unknown = null
+    try {
+      await AXIOS_INSTANCE.get('/public/ott-services', {
+        headers: { 'X-Mock-Scenario': 'rate-limit' },
+        _skipRateLimitToast: true,
+      })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(ApiError)
+    expect((caught as ApiError).isRateLimited).toBe(true)
+    expect((caught as ApiError).hasNotifiedUser).toBe(false)
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
   it('VALIDATION_FAILED의 fieldErrors를 꺼내고, 형식이 어긋난 항목은 버린다. 429가 아니면 토스트를 띄우지 않는다', async () => {
     server.use(
       mswHttp.get('/api/me/settings', () =>

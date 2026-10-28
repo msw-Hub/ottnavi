@@ -7,6 +7,7 @@ const MOCK_ROLE_OPTIONS: { value: MockRole; label: string }[] = [
   { value: 'GUEST', label: '비로그인' },
   { value: 'USER', label: '회원' },
   { value: 'ADMIN', label: '관리자' },
+  { value: 'DEMO', label: '데모 계정' }, // 공용 데모 계정(Task 109). 관리자 화면은 조회만, 탈퇴·알림 설정 변경은 막힌 화면을 본다
 ]
 
 /**

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 50개이고 모두 구현됐다(Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -33,6 +33,7 @@ import type {
   CommonResponseNotificationHistoryPage,
   CommonResponseNotificationSetting,
   ConflictResponse,
+  ForbiddenResponse,
   InternalErrorResponse,
   ListMyNotificationsParams,
   UnauthorizedResponse,
@@ -160,7 +161,8 @@ export function useGetMyNotificationSetting<TData = Awaited<ReturnType<typeof ge
 /**
  * 알림 수신 여부를 켜거나 끈다. 끄면 이후 알림이 생성되지 않는다(이미 대기 중인 알림은 발송된다). 켜는 것 자체로는 메일이 나가지 않는다.
  * 내 설정(온보딩)을 한 번도 저장하지 않았으면 저장할 설정 행이 없어 `ONBOARDING_REQUIRED`(409)다.
- * 오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
+ * 데모 계정(`role: DEMO`)은 알림 설정을 바꿀 수 없다(403 `FORBIDDEN`). 데모 계정에는 알림이 만들어지지 않으며 조회(`getMyNotificationSetting`)는 항상 꺼짐이다.
+ * 오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
  * @summary 알림 설정 저장
  */
 export const updateMyNotificationSetting = (
@@ -182,7 +184,7 @@ export const updateMyNotificationSetting = (
 
 export const getUpdateMyNotificationSettingMutationKey = () => ['updateMyNotificationSetting'] as const;
 
-export const getUpdateMyNotificationSettingMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>,
+export const getUpdateMyNotificationSettingMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext> => {
 
@@ -211,13 +213,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateMyNotificationSettingMutationResult = NonNullable<Awaited<ReturnType<typeof updateMyNotificationSetting>>>
     export type UpdateMyNotificationSettingMutationBody = BodyType<UpdateMyNotificationSettingRequest>
-    export type UpdateMyNotificationSettingMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>
+    export type UpdateMyNotificationSettingMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
     export type UpdateMyNotificationSettingMutationVariables = {data: BodyType<UpdateMyNotificationSettingRequest>}
 
     /**
  * @summary 알림 설정 저장
  */
-export const useUpdateMyNotificationSetting = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>,
+export const useUpdateMyNotificationSetting = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateMyNotificationSetting>>,

@@ -27,6 +27,11 @@ public class TestTokens {
 		return bearer(DEFAULT_USER_ID, UserRole.ADMIN);
 	}
 
+	/** DEMO 권한(데모 계정) 토큰의 Authorization 헤더 값("Bearer ...") */
+	public String demoBearer() {
+		return bearer(DEFAULT_USER_ID, UserRole.DEMO);
+	}
+
 	/** 지정한 사용자 id·권한의 Authorization 헤더 값 */
 	public String bearer(long userId, UserRole role) {
 		return "Bearer " + jwtTokenProvider.issueAccessToken(userId, role);

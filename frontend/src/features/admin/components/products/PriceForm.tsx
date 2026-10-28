@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 import { isApiError } from '@/api/http'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -115,6 +117,7 @@ export function PriceForm({ productId, sortedPrices, today, editingRow, onClose 
   const startInputId = `${idPrefix}-start`
   const priceErrorId = `${priceInputId}-error`
   const startMessageId = `${startInputId}-message`
+  const lockNoteId = `${idPrefix}-demo-note` // 데모 계정에게 저장이 막힌 이유 문장의 id
 
   return (
     <form
@@ -181,13 +184,17 @@ export function PriceForm({ productId, sortedPrices, today, editingRow, onClose 
         </div>
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2">
+      {/* 데모 계정이면 확정 버튼이 막히고(Enter 제출 포함) 앞에 이유를 둔다(Task 109). 폼은 열어 볼 수 있다 */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <DemoReadOnlyHint variant="inline" id={lockNoteId} className="mr-auto">
+          데모 계정은 저장할 수 없어요
+        </DemoReadOnlyHint>
         <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
           취소
         </Button>
-        <Button type="submit" disabled={isPending}>
+        <DemoLockedButton type="submit" disabled={isPending} lockedDescriptionId={lockNoteId}>
           {isPending ? '저장하는 중…' : isEditing ? '저장' : '추가'}
-        </Button>
+        </DemoLockedButton>
       </div>
     </form>
   )

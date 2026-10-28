@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 50개이고 모두 구현됐다(Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -21,14 +21,16 @@ import type {
 
 import type {
   CommonResponseAccessToken,
+  DemoLoginRequest,
   ForbiddenResponse,
   InternalErrorResponse,
+  NotFoundResponse,
   TooManyRequestsResponse,
   UnauthorizedResponse
 } from '../model';
 
 import { customInstance } from '../../http';
-import type { ErrorType } from '../../http';
+import type { ErrorType , BodyType } from '../../http';
 
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -172,4 +174,78 @@ export const useLogout = <TError = ErrorType<ForbiddenResponse | TooManyRequests
         TContext
       > => {
       return useMutation(getLogoutMutationOptions(options), queryClient);
+    }
+    /**
+ * 서버 설정(`DEMO_LOGIN_ID`·`DEMO_LOGIN_PASSWORD`)에 둔 아이디·비밀번호 한 쌍으로 공용 데모 계정에 로그인한다. 일반 회원용 아이디·비밀번호 로그인이 아니며 계정은 하나뿐이다(TECH 4절).
+ * 성공하면 Refresh Token을 HttpOnly 쿠키 `rt`(`Path=/api/auth`, 재발급과 같은 속성)로 심고, 응답 본문에 Access Token과 `role: DEMO`를 바로 담는다(구글 로그인과 달리 `/auth/refresh`를 따로 부르지 않아도 된다). 이후 재발급·로그아웃은 회원과 같다.
+ * 데모 계정 행(`users`)은 첫 데모 로그인 때 서버가 만든다. 데모 계정은 회원 기능(`/me/**`)을 쓰고 관리자 화면은 조회(GET)만 하며, 관리자 쓰기·실행과 회원 탈퇴·알림 설정 변경은 403이다. 데모 계정에는 알림이 만들어지지 않는다.
+ * 확인 순서: 데모 로그인이 꺼져 있으면(서버에 아이디·비밀번호가 없으면) 경로가 없는 것처럼 404 → `Origin`이 프론트 주소와 다르면 403(로그인 CSRF 방지) → 같은 IP의 시도가 15분 5회를 넘으면 429(성공·실패 모두 센다, 계정 잠금은 없다) → 아이디나 비밀번호가 틀리면 401(어느 쪽이 틀렸는지는 알리지 않는다).
+ * 빈 값도 400이 아니라 401이다(꺼진 상태에서 경로가 드러나지 않게 본문 필드 검증을 하지 않는다). 인증 경로라 공개 API와 같은 일반 요청 제한도 함께 받는다.
+ * 데모 로그인을 끄면 남아 있는 데모 세션은 다음 재발급(`/auth/refresh`)에서 401로 끝난다.
+ * 오류: `DEMO_LOGIN_FAILED`(401), `FORBIDDEN`(403, Origin 불일치), `RESOURCE_NOT_FOUND`(404, 데모 로그인 꺼짐), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * @summary 데모 계정 로그인
+ */
+export const loginDemo = (
+    demoLoginRequest: BodyType<DemoLoginRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseAccessToken>(
+      {url: `/auth/demo-login`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: demoLoginRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getLoginDemoMutationKey = () => ['loginDemo'] as const;
+
+export const getLoginDemoMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginDemo>>, TError,LoginDemoMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginDemo>>, TError,LoginDemoMutationVariables, TContext> => {
+
+const mutationKey = getLoginDemoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginDemo>>, LoginDemoMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginDemo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginDemoMutationResult = NonNullable<Awaited<ReturnType<typeof loginDemo>>>
+    export type LoginDemoMutationBody = BodyType<DemoLoginRequest>
+    export type LoginDemoMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>
+    export type LoginDemoMutationVariables = {data: BodyType<DemoLoginRequest>}
+
+    /**
+ * @summary 데모 계정 로그인
+ */
+export const useLoginDemo = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | TooManyRequestsResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginDemo>>, TError,LoginDemoMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof loginDemo>>,
+        TError,
+        LoginDemoMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLoginDemoMutationOptions(options), queryClient);
     }

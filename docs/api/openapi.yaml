@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - operation은 50개이고 모두 구현됐다(Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -527,12 +527,15 @@ paths:
         찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
         서버는 그 사용자의 Refresh Token 계열을 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
         요청 본문은 없다. Access Token은 만료(30분) 전이라도 탈퇴한 계정으로는 쓸 수 없다: 같은 토큰으로 다시 탈퇴하거나 설정 저장·찜 추가 같은 쓰기를 하면 사용자를 찾을 수 없어 `UNAUTHORIZED`이고, 내 설정 조회는 온보딩 전 상태(200)로 보인다.
-        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+        데모 계정(`role: DEMO`)은 여러 사람이 함께 쓰는 공용 계정이라 탈퇴할 수 없다(403 `FORBIDDEN`).
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `INTERNAL_ERROR`(500).
       responses:
         '204':
           description: 탈퇴됨(본문 없음)
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
   /me/settings:
@@ -845,7 +848,8 @@ paths:
       description: |
         알림 수신 여부를 켜거나 끈다. 끄면 이후 알림이 생성되지 않는다(이미 대기 중인 알림은 발송된다). 켜는 것 자체로는 메일이 나가지 않는다.
         내 설정(온보딩)을 한 번도 저장하지 않았으면 저장할 설정 행이 없어 `ONBOARDING_REQUIRED`(409)다.
-        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
+        데모 계정(`role: DEMO`)은 알림 설정을 바꿀 수 없다(403 `FORBIDDEN`). 데모 계정에는 알림이 만들어지지 않으며 조회(`getMyNotificationSetting`)는 항상 꺼짐이다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
       requestBody:
         required: true
         content:
@@ -863,6 +867,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
         '500':
@@ -1562,6 +1568,44 @@ paths:
           description: 로그아웃됨(본문 없음)
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/demo-login:
+    post:
+      tags:
+        - auth
+      operationId: loginDemo
+      security: []
+      summary: 데모 계정 로그인
+      description: |
+        서버 설정(`DEMO_LOGIN_ID`·`DEMO_LOGIN_PASSWORD`)에 둔 아이디·비밀번호 한 쌍으로 공용 데모 계정에 로그인한다. 일반 회원용 아이디·비밀번호 로그인이 아니며 계정은 하나뿐이다(TECH 4절).
+        성공하면 Refresh Token을 HttpOnly 쿠키 `rt`(`Path=/api/auth`, 재발급과 같은 속성)로 심고, 응답 본문에 Access Token과 `role: DEMO`를 바로 담는다(구글 로그인과 달리 `/auth/refresh`를 따로 부르지 않아도 된다). 이후 재발급·로그아웃은 회원과 같다.
+        데모 계정 행(`users`)은 첫 데모 로그인 때 서버가 만든다. 데모 계정은 회원 기능(`/me/**`)을 쓰고 관리자 화면은 조회(GET)만 하며, 관리자 쓰기·실행과 회원 탈퇴·알림 설정 변경은 403이다. 데모 계정에는 알림이 만들어지지 않는다.
+        확인 순서: 데모 로그인이 꺼져 있으면(서버에 아이디·비밀번호가 없으면) 경로가 없는 것처럼 404 → `Origin`이 프론트 주소와 다르면 403(로그인 CSRF 방지) → 같은 IP의 시도가 15분 5회를 넘으면 429(성공·실패 모두 센다, 계정 잠금은 없다) → 아이디나 비밀번호가 틀리면 401(어느 쪽이 틀렸는지는 알리지 않는다).
+        빈 값도 400이 아니라 401이다(꺼진 상태에서 경로가 드러나지 않게 본문 필드 검증을 하지 않는다). 인증 경로라 공개 API와 같은 일반 요청 제한도 함께 받는다.
+        데모 로그인을 끄면 남아 있는 데모 세션은 다음 재발급(`/auth/refresh`)에서 401로 끝난다.
+        오류: `DEMO_LOGIN_FAILED`(401), `FORBIDDEN`(403, Origin 불일치), `RESOURCE_NOT_FOUND`(404, 데모 로그인 꺼짐), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemoLoginRequest'
+      responses:
+        '200':
+          description: 로그인됨. 새 Access Token(권한 DEMO)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -3711,7 +3755,7 @@ components:
         type:
           type: string
           enum: [SUBSCRIBE_GUIDE, MONTHLY, PLAN_CHANGE]
-          description: 가입 안내 / 월초 안내 / 플랜 변경 알림
+          description: 구독 안내 / 월초 안내 / 플랜 변경 알림
         status:
           type: string
           enum: [PENDING, SENT, FAILED]
@@ -5008,7 +5052,21 @@ components:
           enum:
             - USER
             - ADMIN
-          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다
+            - DEMO
+          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다. `DEMO`는 데모 계정으로, 회원 기능은 쓰고 관리자 화면은 조회만 하며 탈퇴·알림 설정 변경은 할 수 없다(서버가 403으로 막는다)
+    DemoLoginRequest:
+      type: object
+      description: 데모 계정 로그인 요청. 값이 비어도 400이 아니라 401(`DEMO_LOGIN_FAILED`)이다
+      required:
+        - loginId
+        - password
+      properties:
+        loginId:
+          type: string
+          description: 데모 아이디(제출 문서로 전달한 값)
+        password:
+          type: string
+          description: 데모 비밀번호. 화면은 입력 칸을 비밀번호 형식(가림)으로 둔다
     CommonResponseAccessToken:
       type: object
       required:

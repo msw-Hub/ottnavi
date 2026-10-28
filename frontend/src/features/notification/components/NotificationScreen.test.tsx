@@ -127,7 +127,9 @@ describe('발송 이력', () => {
     expect(within(list).getByText('발송 대기')).toBeInTheDocument()
     expect(within(list).getByText('발송 실패')).toBeInTheDocument()
     expect(within(list).getAllByText('발송됨').length).toBeGreaterThan(0)
-    expect(within(list).getByText('가입 안내')).toBeInTheDocument()
+    // SUBSCRIBE_GUIDE는 "구독 안내"로 보인다(이전 "가입 안내"는 회원가입으로 오해돼 바꿨다, Task 109)
+    expect(within(list).getByText('구독 안내')).toBeInTheDocument()
+    expect(within(list).queryByText('가입 안내')).not.toBeInTheDocument()
     expect(within(list).getAllByText('플랜 변경 알림')).toHaveLength(2)
     // 발송 전·실패는 발송 시각이 없으므로 글자로 상황을 알린다
     expect(within(list).getByText('아직 발송 전이에요')).toBeInTheDocument()
@@ -154,5 +156,33 @@ describe('발송 이력', () => {
 
     expect(await screen.findByText('발송 이력을 불러오지 못했어요')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /다시 시도/ }).length).toBeGreaterThan(0)
+  })
+})
+
+/*
+ * 데모 계정(Task 109). 확인하는 것: 스위치가 잠겨 눌러도 저장 요청이 나가지 않고, 막힌 이유와 데모 전용 빈 이력 안내가 보이는지.
+ * 막으려는 사고: 공용 계정에서 누군가 알림을 켜 엉뚱한 사람에게 메일이 가는 것(서버도 403으로 막지만 화면에서 먼저 막는다).
+ */
+describe('데모 계정', () => {
+  it('알림 스위치가 잠겨 있고 눌러도 저장 요청이 나가지 않는다', async () => {
+    setMockRole('DEMO')
+    const user = userEvent.setup()
+    const updateRequests: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'PUT') updateRequests.push(new URL(request.url).pathname)
+    })
+    renderNotifications()
+
+    const toggle = await screen.findByRole('switch', { name: '이메일 알림 받기' })
+    expect(toggle).toBeDisabled()
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText('지금 꺼져 있어요 · 데모 계정은 바꿀 수 없어요')).toBeInTheDocument()
+    expect(toggle).toHaveAccessibleDescription(/데모 계정은 알림 메일을 받지 않아요/)
+
+    await user.click(toggle)
+    expect(updateRequests).toHaveLength(0)
+    // 데모 계정에는 알림이 만들어지지 않아 이력 대신 데모 전용 안내가 보인다
+    expect(await screen.findByText('데모 계정은 알림을 받지 않아요')).toBeInTheDocument()
+    server.events.removeAllListeners()
   })
 })

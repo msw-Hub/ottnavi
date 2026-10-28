@@ -50,6 +50,8 @@ const TECH_ERROR_MESSAGES = {
   SERVICE_PRICE_NOT_FOUND: '이 서비스의 요금 정보를 찾을 수 없습니다.',
   // Task 078: 독점 목록 조회의 서비스 ID가 7개 서비스에 없을 때(error-codes.md와 문구를 맞춘다)
   OTT_SERVICE_NOT_FOUND: '서비스를 찾을 수 없습니다.',
+  // Task 109: 데모 계정 로그인의 아이디·비밀번호가 틀림(어느 쪽인지는 알리지 않는다). 로그인 화면은 이 문장 뒤에 확인 안내를 덧붙여 보인다
+  DEMO_LOGIN_FAILED: '아이디 또는 비밀번호가 올바르지 않습니다.',
 } as const
 
 // 두 표를 합친 전체 매핑. 화면 코드는 이 값이 아니라 getErrorMessage를 쓴다

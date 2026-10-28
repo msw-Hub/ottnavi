@@ -160,6 +160,21 @@ class NotificationCreateServiceTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 데모_계정은_알림을_켜_두어도_행을_만들지_않는다() {
+		// given: 데모 계정에 설정 행을 만들고 DB에서 직접 알림을 켠다(API는 403으로 막지만 값이 켜져 있어도 막히는지 본다)
+		User demo = userRepository.save(User.createDemo(EMAIL_PREFIX + "demo@example.com", "데모", "task073-create-demo"));
+		userSettingService.updateSettings(demo.getId(), 20_000, 600, WatchPreset.NORMAL, false, new ArrayList<>());
+		setNotification(demo.getId(), true);
+
+		// when
+		Optional<Long> id = createService.create(demo.getId(), NotificationType.MONTHLY, "t109:demo", payload());
+
+		// then
+		assertThat(id).isEmpty();
+		assertThat(countRows("t109:demo")).isZero();
+	}
+
+	@Test
 	void 설정_행이_없는_사용자에게는_행을_만들지_않는다() {
 		// given
 		Long noSettingUser = saveUser("b", false);

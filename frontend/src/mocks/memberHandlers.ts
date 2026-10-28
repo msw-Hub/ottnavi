@@ -23,6 +23,7 @@ import type {
   WishlistItem,
 } from '@/api/generated/model'
 import {
+  denyDemo,
   denyGuest,
   hasMockScenario,
   mockWishlist,
@@ -531,6 +532,9 @@ export const memberHandlers: RequestHandler[] = [
     await wait()
     const denied = denyGuest(request)
     if (denied) return denied
+    // 데모 계정은 공용 계정이라 탈퇴할 수 없다(서버 403, Task 109). 화면은 버튼을 막아 이 요청을 보내지 않는다
+    const demoDenied = denyDemo(request)
+    if (demoDenied) return demoDenied
     // 실패 안내(모달 안 오류 문구)를 눈으로 보는 용도. 데이터는 지우지 않는다
     if (hasMockScenario(request, 'error')) {
       return problemResponse(

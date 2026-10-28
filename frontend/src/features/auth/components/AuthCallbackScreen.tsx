@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
-import { getGetMySettingsQueryKey, getMySettings } from '@/api/generated/user/user'
 import { refreshSession } from '@/api/http'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
 import { PageTitle } from '@/components/common/PageTitle'
+import { resolveLoginDestination } from '@/features/auth/loginDestination'
 import { clearLoginReturnTo, readLoginReturnTo } from '@/lib/loginReturn'
 import { isMockMode, MOCK_SCENARIO_PARAM } from '@/lib/mockScenario'
 import { getSafeRedirectPath } from '@/lib/safeRedirect'
@@ -14,35 +14,11 @@ import { setMockRole } from '@/mocks/mockSession'
 // 로그인 처리에 걸리는 시간 흉내(밀리초). 로딩 화면이 눈에 보이게 하려는 값이다(목업 모드 전용)
 const MOCK_CALLBACK_DELAY_MS = 700
 
-// 온보딩(내 설정) 화면 경로. 처음 로그인한 사람은 원래 화면보다 먼저 여기로 보낸다(PRD SCR-06)
-const ONBOARDING_PATH = '/settings'
-
 // 백엔드가 로그인 실패 때 /auth/callback으로 붙여 보내는 값(TECH 4절: /auth/callback?error=login_failed)
 const LOGIN_FAILED_QUERY = { name: 'error', value: 'login_failed' }
 
-/**
- * 로그인 직후 이동할 곳을 정한다. 내 설정을 불러와 온보딩(첫 설정 저장)을 아직 안 했으면 SCR-07(/settings)로, 마쳤으면 원래 화면으로 보낸다(PRD SCR-06).
- * 판단 근거는 내 설정 조회(getMySettings)의 isOnboardingDone이다(설정 행이 없으면 false, 계약).
- * 목업·실제 환경이 같은 코드를 쓴다(목업은 MSW가 같은 API에 답한다).
- * 쿼리 캐시(fetchQuery)에 넣어 두므로 내 설정 화면이 이어서 같은 값을 쓴다.
- * 조회가 실패하면 로그인 자체는 성공했으므로 원래 화면으로 보낸다(설정 화면이 필요하면 거기서 다시 안내한다).
- */
-async function resolveLoginDestination(
-  queryClient: QueryClient,
-  target: string,
-): Promise<{ path: string; state?: { from: string } }> {
-  try {
-    const settings = await queryClient.fetchQuery({
-      queryKey: getGetMySettingsQueryKey(),
-      queryFn: ({ signal }) => getMySettings(undefined, signal),
-      staleTime: 0, // 방금 로그인했으므로 캐시에 남은 이전 사용자의 설정을 쓰지 않고 새로 받는다
-    })
-    if (!settings.data.isOnboardingDone) return { path: ONBOARDING_PATH, state: { from: target } }
-  } catch {
-    // 조회 실패: 아래에서 원래 화면으로 보낸다
-  }
-  return { path: target }
-}
+// 로그인 직후 이동할 곳을 정하는 resolveLoginDestination(온보딩 미완료면 /settings)은 데모 계정 로그인(Task 109)과 함께 쓰려고
+// features/auth/loginDestination.ts로 옮겼다. 내용은 그대로다.
 
 /**
  * SCR-06 로그인 콜백 화면이다. 로그인 처리 중 로딩 → 성공이면 이동 / 실패면 안내와 "다시 시도".
