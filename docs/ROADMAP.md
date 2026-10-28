@@ -45,9 +45,9 @@
 | 2 | 공통 모듈/컴포넌트 개발 | 14/14 | ✅ 완료 |
 | 3 | 핵심 기능 개발 | 30/30 | ✅ 완료 (프론트 연결 052·057·058·061·067은 PR #74로 병합, 실서버 확인 전) |
 | 3b | 공개 전 추가 화면 (홈·랭킹·탐색, 2026-10-17 신설) | 3/3 | ✅ 완료 (106 화면 1차안은 PR #75, 107 홈·탐색 API는 PR #84, 108 홈·탐색 실제 API 연결은 PR #86으로 병합) |
-| 4 | 추가 기능 개발 | 16/24 | 🔄 진행 중 (079 번들·독점 화면 실제 API 연결 PR #90, 077 계층별 갱신 PR #91, 078 독점 목록 API PR #88, 084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
-| 5 | 최적화 및 배포 | 0/14 | ⬜ 대기 |
-| 합계 | | 86/108 | |
+| 4 | 추가 기능 개발 | 20/24 | 🔄 진행 중 (079 번들·독점 화면 실제 API 연결 PR #90, 077 계층별 갱신 PR #91, 078 독점 목록 API PR #88, 084 탈퇴 화면 실제 API 연결 PR #87, 082 탈퇴 API PR #85, 068 화면 1차안 PR #76, 069 매월 재계산·변경 내역 API PR #79, 075 번들·독점 화면 1차안 PR #78, 076 번들·저가형 요금제 PR #80, 070 변경 내역 화면 실제 API 연결 PR #81, 083 6개월 정리 작업 PR #82, 081 탈퇴 화면 목업 PR #83 병합) |
+| 5 | 최적화 및 배포 | 0/16 | ⬜ 대기 (2026-10-28 Task 109 데모 계정 로그인, Task 110 데모 저장 메일 팝업 추가. 095는 `v0.1.0` 태그까지 마쳤으나 선행 092~094의 체크가 문서에 남아 있어 완료 처리는 정리 뒤) |
+| 합계 | | 90/110 | |
 
 - **2026-10-17 범위 개정**: 첫 공개(`v0.1.0`)에 2단계 일부(변경 내역·번들·독점·탈퇴·정리)와 홈·탐색을 포함한다. 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 공개 뒤 3단계로 이월한다. Phase 구분과 Task 번호는 그대로 두고 Task 제목에 `[v0.1.0 포함]` 또는 `[3단계 이월]` 태그를 붙였다(3.2의 "개정 일정" 참고). 총 Task는 105 → 108개다.
 
@@ -1381,7 +1381,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-FS: 재계산이 일어난 계정에서 변경 내역이 API 값대로 보이고, 관리자 수집 화면의 재계산 대상 플랜 수가 API 값과 같다.
   - 기록(2026-10-17): 변경 내역 화면을 `GET /api/me/plan-changes` 생성 훅으로 교체하고 `mockTypes.ts`·샘플 데이터를 지웠다(번들 상품은 구성 서비스 이름을 한 줄 덧붙임). 수집 이력의 재계산 대상 플랜 수는 `recalcTargetCount`에 연결했다(null이면 "집계 전"). 목업 핸들러에 `/me/plan-changes`(빈 목록·오류 시나리오 포함) 추가, `PlanHistoryPage`의 운영 분기 제거. 검증: lint·format·test 549·build 통과(에이전트 보고, 실서버 확인은 하지 않음).
 
-#### Task 071: 알림 설정·이력 화면과 관리자 알림 상태 목업 구현으로 알림 표현 확정 ⬜ `[3단계 이월]`
+#### Task 071: 알림 설정·이력 화면과 관리자 알림 상태 목업 구현으로 알림 표현 확정 ✅ `[3단계 이월, develop 병합 2026-10-28]`
 - 태그: [F] · PRD: O2, FR-16, SCR-07(링크), 10(알림 켜기), 12, 16(R11-24) · 선행: 037 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 브랜치: `feature/o2-notification-mock`
 - 구현 사항
   - [ ] on/off, 수신 이메일, 발송 이력(유형, PENDING/SENT/FAILED, 시각), 설정·결과 화면의 링크, 관리자 수집 화면 알림 상태 요약
@@ -1389,7 +1389,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-F: 목업 흐름 재현, 콘솔 에러 0건.
 
-#### Task 072: 알림 outbox와 발송 기반 구현으로 신뢰성 있는 메일 발송 확보 ⬜ `[3단계 이월]`
+#### Task 072: 알림 outbox와 발송 기반 구현으로 신뢰성 있는 메일 발송 확보 ✅ `[3단계 이월, develop 병합 2026-10-28]`
 - 태그: [B] · PRD: O2, FR-15, 6절 신뢰성 · 선행: 022 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 브랜치: `feature/o2-notification-outbox`
 - 관련: R11-5, R11-11, TECH 5절
 - 구현 사항
@@ -1402,7 +1402,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 기록(2026-10-21, 구현·테스트 완료, 병합은 공개 뒤): 최대 5회, 재시도 간격 1분 → 5분 → 30분 → 2시간(5회째 실패 시 FAILED), 임대 5분, 배치 10건, `lockAtMostFor` 4분(TECH 5절). 실제 SQL은 `... order by id fetch first ? rows only for no key update of no1_0 skip locked`(Hibernate 7 + PostgreSQL). 수신 주소는 발송 직전 `users.email`을 다시 읽는다. 테스트 구현 중 발견한 함정: 메일 설정이 있으면 Boot가 메일 헬스 체크를 켜서 SMTP에 접속하고 실패하면 `/actuator/health`가 503이 되므로 `management.health.mail.enabled: false`로 껐다. ShedLock은 락 행을 기억하므로 테스트에서 락 해제는 행 삭제가 아니라 `lock_until` 갱신으로 한다. 이 Task는 outbox 행을 만들지 않는다(생성은 073, 현재는 수동 INSERT로 시험)
 - 기록(2026-10-26): 메일 템플릿 디자인 반영, 링크 기준 주소는 기존 `app.frontend-origin` 사용(자세한 내용은 Task 073 기록)
 
-#### Task 073: 알림 생성 트리거와 설정·이력 API 구현으로 월초·변경 알림 제공 ⬜ `[3단계 이월]`
+#### Task 073: 알림 생성 트리거와 설정·이력 API 구현으로 월초·변경 알림 제공 ✅ `[3단계 이월, develop 병합 2026-10-28]`
 - 태그: [B] · PRD: O2, FR-15, 16 · 선행: 071, 072, 069, 045 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 기한 전제: R11-17, R11-22(2026-11-05) · 브랜치: `feature/o2-notification-api`
 - 구현 사항
   - [x] 계약 추가(Task 071 변경안), 알림 설정 조회·변경·이력·관리자 요약 API 4개(`/api/me/...`, `/api/admin/notifications/summary`, `x-planned` 해제, `ONBOARDING_REQUIRED` 409) (1단계 구현)
@@ -1412,13 +1412,14 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 완료 기준
   - V-B: `dedupe_key` 중복 차단, 알림 꺼짐 미생성, 월이 바뀐 재계산에서만 MONTHLY 행 생성, 재실행해도 사용자당 1건.
   - V-API: 저장 → 테스트 계정 메일 수신. local에서 `targetDate`를 월 1일로 지정한 수집 → 재계산 → MONTHLY 생성이 이어지는 것을 확인. 실제 cron 경로 확인은 Task 102.
-- 기록(2026-10-22, 1~3단계 구현 완료, 병합은 공개 뒤): 알림 생성 관문 `NotificationCreateService`(설정 확인 → `INSERT ... ON CONFLICT (dedupe_key) DO NOTHING` → ID), 즉시 발송 `dispatchNow`(`claimOne` REQUIRES_NEW로 스케줄러와 경합 방지, `app.notification.immediate-send-enabled`), 가입 안내 `SubscribeGuideListener`(`@Async` + AFTER_COMMIT, 이번 달 가입 상품 1개 이상일 때), MONTHLY·PLAN_CHANGE는 `PlanRecalcWriter`에서 같은 트랜잭션으로 생성, 변경 알림 판정 `PlanChangeAlertRule`(작품이 "시청을 끝내는 달"이 이번 달 확정 달이고 그 서비스에서 이전 플랜 이후 빠짐). 메일 템플릿 3종을 payload 필드로 채웠다. 1단계 API: 설정 GET은 온보딩 전에도 200(꺼짐), PUT은 온보딩 전 409 `ONBOARDING_REQUIRED`, 이력은 본인 것만 최신순, 관리자 요약은 최근 7일 기준이다. 아직 안 한 것: 관리자 수동 재실행, 요약/이력 쿼리용 인덱스(V10, 필요 시).
+- 기록(2026-10-22, 1~3단계 구현 완료, 병합은 공개 뒤): 알림 생성 관문 `NotificationCreateService`(설정 확인 → `INSERT ... ON CONFLICT (dedupe_key) DO NOTHING` → ID), 즉시 발송 `dispatchNow`(`claimOne` REQUIRES_NEW로 스케줄러와 경합 방지, `app.notification.immediate-send-enabled`), 가입 안내 `SubscribeGuideListener`(`@Async` + AFTER_COMMIT, 이번 달 가입 상품 1개 이상일 때), MONTHLY·PLAN_CHANGE는 `PlanRecalcWriter`에서 같은 트랜잭션으로 생성, 변경 알림 판정 `PlanChangeAlertRule`(작품이 "시청을 끝내는 달"이 이번 달 확정 달이고 그 서비스에서 이전 플랜 이후 빠짐). 메일 템플릿 3종을 payload 필드로 채웠다. 1단계 API: 설정 GET은 온보딩 전에도 200(꺼짐), PUT은 온보딩 전 409 `ONBOARDING_REQUIRED`, 이력은 본인 것만 최신순, 관리자 요약은 최근 7일 기준이다. 아직 안 한 것: 관리자 수동 재실행, 요약/이력 쿼리용 인덱스(필요 시 다음 Flyway 번호. V10은 2026-10-28 Task 109 데모 계정이 사용).
 - 기록(2026-10-26, 메일 템플릿 디자인 반영): 확정 디자인(표 레이아웃·인라인 style, 가입·월초 하늘색 띠, 변경 주황 띠, `[해지 예약 권장]`·`[변경]` 글자 병기)으로 `templates/mail` 5개를 교체했다. 링크 기준 주소는 새 설정을 만들지 않고 기존 `app.frontend-origin`(`APP_FRONTEND_ORIGIN`, prod 필수·기본값 없음)을 쓴다. 큰 버튼은 `{기본 주소}/plan`, 꼬리말 "알림 설정"은 `{기본 주소}/settings/notifications`로 간다.
 
-#### Task 074: 알림 화면 실제 API 연결로 O2 완성 ⬜ `[3단계 이월]`
+#### Task 074: 알림 화면 실제 API 연결로 O2 완성 ✅ `[3단계 이월, develop 병합 2026-10-28]`
 - 태그: [F] · PRD: O2, SCR-12, 16 · 선행: 073 (미리 준비하되 병합은 v0.1.0 공개 뒤) · 브랜치: `feature/o2-notification-api-connect`
 - 완료 기준
   - V-FS: 알림 끄기·켜기와 발송 이력이 API 값대로 보이고, 관리자 화면 알림 상태가 표시된다.
+- 기록(2026-10-28, Task 071~074 develop 병합): 쌓은 PR #97(outbox)·#99(API)·#100(화면 연결)을 위에서 아래로 합쳐(#100→#99→#97) `develop`에 한 커밋(`49a0ab3`, PR #97 Squash, 제목은 "Task 072"만 적혀 있으나 072~074 전부 포함)으로 들어갔다. #98(목업)은 같은 내용이 이미 포함돼 닫았다. `develop`이 7커밋 앞서 충돌(`CLAUDE.md`·`error-codes.md`·`SettingsForm.tsx`·`PlanScreen.tsx`)이 나서 리베이스 대신 각 브랜치에 `develop`을 병합해 풀었다(Squash라 리베이스 이점이 없고 강제 푸시 위험만 있음). 검증: 백엔드 전체 1,115건, 프론트 636건·lint·포맷·빌드 통과. **`main` 배포는 다른 기능과 묶어서 한다**(그 전에 `develop`→`main`을 하면 알림이 같이 나간다). `main` 배포 전 확인: 메일 스위치(`app.notification.scheduler-enabled`, `immediate-send-enabled`)의 운영 기본값, SMTP 환경 변수와 Cloudtype `배포하기`.
 
 #### Task 075: 번들 관리·독점 목록 화면 목업 구현으로 데이터 확장 표현 확정 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: O3, FR-04, FR-19, SCR-03, SCR-14(번들) · 선행: 037 · 브랜치: `feature/o3-bundle-exclusive-mock`
@@ -1586,7 +1587,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 ---
 
-## 9. Phase 5 — 최적화 및 배포 · 0/14
+## 9. Phase 5 — 최적화 및 배포 · 0/15
 
 **목표.**
 - MVP 배포(B8·F8)로 무료 기간을 끝내고 Hobby로 전환해 cron을 켠다. Task 092~095는 Phase 4보다 먼저 한다.
@@ -1634,18 +1635,41 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 
 #### Task 095: 첫 공개 배포 스모크 테스트와 v0.1.0 태그로 첫 공개 ⬜ `[v0.1.0 포함]`
 - 태그: [H] · PRD: B8·F8, MVP 완료 기준 ①~④ · 선행: 093, 094, 052, 061, 065, 067, 037, 070, 079, 084, 089, 090, 101, 108 (2026-10-17 개정: 첫 공개 범위에 맞춰 선행 추가. MVP 완료 기준 ①~④는 그대로 두고 "첫 공개 범위"를 3.2에 따로 적는다)
-- 진행(2026-10-27): ① `develop`→`main` 병합 두 번(PR #105, #107)과 Cloudtype 배포를 마쳤다. ④ 첫 운영 수집은 `executionId=1`, `tier=ALL`, COMPLETED, 8시간 33분이다(상세는 `docs/guides/FIRST_DEPLOY_RECORD.md` 4절). ⑤ 스모크에서 로그인 유지, 검색, 찜, 플랜 계산·저장, 요금 확인, 관리자 화면에 큰 문제가 없었다(사용자 확인). **남은 것**: 운영 비교 측정 1회(`POST /api/admin/plan-benchmarks`, ADMIN 토큰), 상품 가격 재확인(조사일 2026-10-05, 쿠팡플레이는 비공식), 검색 엔진 등록, `v0.1.0` 태그. ②·③은 이 기록에서 개별로 확인하지 못했다.
+- 진행(2026-10-27): ① `develop`→`main` 병합 두 번(PR #105, #107)과 Cloudtype 배포를 마쳤다. ④ 첫 운영 수집은 `executionId=1`, `tier=ALL`, COMPLETED, 8시간 33분이다(상세는 `docs/guides/FIRST_DEPLOY_RECORD.md` 4절). ⑤ 스모크에서 로그인 유지, 검색, 찜, 플랜 계산·저장, 요금 확인, 관리자 화면에 큰 문제가 없었다(사용자 확인). **2026-10-28 갱신**: ②·③은 `FIRST_DEPLOY_RECORD.md`의 10-26 기록(운영 ADMIN 지정, 상품·가격 17개 입력)으로 확인했다. 상품 가격 재확인(조사일 2026-10-05, 쿠팡플레이 와우 7,890은 비공식)은 사용자가 검색 AI로 대조해 변동 없음을 확인했다. 운영 비교 측정은 사용자가 ADMIN 토큰으로 `POST /api/admin/plan-benchmarks`를 1회 호출했다(201, 케이스 21개, 건너뜀 0, 두 알고리즘 모두 기대값 일치, 상세는 `FIRST_DEPLOY_RECORD.md` 4절). `CRON_ENABLED`는 10-28 10:53(KST)에 켰고 첫 예약 실행은 10-29 새벽이다. `main`(`006761e`)에 `v0.1.0` 태그를 달았다. **남은 것**: 첫 예약 실행 기록 확인(④), 검색 엔진 등록 결정.
 - 구현 사항(이 순서로 진행)
-  - [ ] ① `develop` → `main` PR merge commit, `backend-deploy.yml`·Vercel Production 성공 확인(Task 093 이관분). 병합 전 `openapi.yaml`에 `x-planned`가 남아 있지 않음을 확인(4.2)
-  - [ ] ② 운영 ADMIN 지정(R-5 확정, 2026-10-09): 운영 관리자는 **2명**(본인 계정과 포트폴리오 평가용 계정)이고 **DB에서 `users.role`을 직접 수정**한다. 순서: 그 사람이 Google로 **한 번 로그인**해 `users` 행이 생기게 한 뒤 `UPDATE users SET role = 'ADMIN' WHERE email = '해당 이메일'`을 실행하고(README에 이 SQL을 기록) 다시 로그인한다. 주의: 평가용 계정에 ADMIN을 주면 상품 가격 수정·수집 실행·제공처 매핑 변경으로 운영 데이터를 바꿀 수 있으니 평가 전에 가격표(Task 004)를 백업해 두고 확인한다. 평가자의 Google 이메일이 `users`에 저장되므로 개인정보 안내(About)와 탈퇴 정책과 일관되게 처리한다. 읽기 전용 관리자 역할은 지금 만들지 않고, 필요해지면 `role` 값을 추가한다
-  - [ ] ③ 관리자 화면(SCR-14)으로 운영 상품·가격 입력(Task 004 가격표)
+  - [x] ① `develop` → `main` PR merge commit, `backend-deploy.yml`·Vercel Production 성공 확인(Task 093 이관분). 병합 전 `openapi.yaml`에 `x-planned`가 남아 있지 않음을 확인(4.2)
+  - [x] ② 운영 ADMIN 지정(R-5 확정 2026-10-09, 2026-10-28 갱신): 운영 관리자는 **본인 계정 1명**이고 **DB에서 `users.role`을 직접 수정**한다. 순서: Google로 **한 번 로그인**해 `users` 행이 생기게 한 뒤 `UPDATE users SET role = 'ADMIN' WHERE email = '해당 이메일'`을 실행하고(README에 이 SQL을 기록) 다시 로그인한다. 포트폴리오를 보는 사람에게는 ADMIN을 주지 않고 **데모 계정(Task 109)** 을 쓴다(처음 결정은 그 사람의 Google 계정에 ADMIN을 주는 2명 안이었다): 서버 설정 아이디·비밀번호로 로그인하는 공용 계정(`role = DEMO`)이라 개인 Google 이메일이 저장되지 않고, 관리자 화면은 조회만 되며 상품 가격 수정·수집 실행·제공처 매핑 변경 같은 쓰기·실행은 403이다(읽기 전용 관리자 역할을 이 형태로 추가했다)
+  - [x] ③ 관리자 화면(SCR-14)으로 운영 상품·가격 입력(Task 004 가격표)
   - [ ] ④ 첫 운영 수집 적재(R-14 확정): `collect.yml` `workflow_dispatch` 202·재실행 409(Task 047 이관분), SCR-16에서 완료·처리 건수 확인. 다음 날 cron 실행 기록 확인
   - [ ] ⑤ 스모크: V-DEPLOY 전체(인증, 기능, 헤더·경로)와 요청 제한 429, 주요 화면 로드(Task 094에서 넘긴 화면 확인)
   - [ ] (2026-10-17 추가) 첫 공개 범위 확인: 홈·랭킹·탐색(인기 순위가 매일 쌓이는지), 변경 내역과 매월 재계산, 번들·광고형 계산, 독점 목록, 탈퇴, tier별 수집 cron(Task 077)의 실행 기록
   - [ ] (2026-10-20 추가, [H]) 검색 엔진 등록: 도메인 연결과 Task 094의 검색 노출 마무리 확인이 끝난 뒤 Google Search Console에 **URL 접두어 속성**으로 등록(소유 확인은 `index.html` HTML 태그 방식, 도메인 속성은 DNS가 필요하다)하고 `sitemap.xml` 제출. 네이버 서치어드바이저도 같은 순서(`vercel.app` 주소로 되는지는 확인하지 못했으므로 커스텀 도메인으로 등록). 도메인을 바꾸는 시점이면 속성을 새로 만든다
-  - [ ] MVP 완료 기준 ①~④ 체크, `main`에 `v0.1.0` 태그
+  - [x] MVP 완료 기준 ①~④ 체크, `main`에 `v0.1.0` 태그(2026-10-28, `006761e`). ③ 비교 기록은 운영 측정 1회로 충족
 - 완료 기준
   - V-H: 스모크 항목별 결과와 날짜를 기록했다. 이 Task 완료가 **MVP 완료 지점**이다.
+
+#### Task 109: 데모 계정 로그인으로 구글 계정 없이 둘러보기 제공 ⬜
+- 태그: 백엔드·프론트 · PRD: 해당 없음(2026-10-28 사용자 결정, C안) · 선행: 054(인증), 082(탈퇴), 073(알림 생성 관문) · 근거: TECH 4절 "데모 계정 로그인"
+- 진행(2026-10-28): 백엔드 구현·테스트(전체 1,137건 통과)와 프론트 구현·테스트(651건, lint·포맷·빌드 통과)를 마쳤다(`feature/demo-login`, 커밋 전). 남은 것: 실서버(Origin 403, 실제 쿠키, `Retry-After` 헤더, 쓰기 403) 확인과 Cloudtype 환경 변수 등록.
+- 확정 결정: 이름·문구는 "데모 계정"(코드 `demo`/`DEMO`, "평가용" 표현을 쓰지 않는다). 서버 설정 아이디·비밀번호 한 쌍만 통과(일반 회원 아이디·비밀번호 로그인은 만들지 않는다). 새 역할 `DEMO`, 로그인 방식 `DEMO`. 회원 기능은 쓰고 탈퇴·알림 설정 변경은 403, 알림은 생성되지 않게 이중 차단. 관리자 화면은 GET만(쓰기·실행·비교 측정은 403). 공용 데이터 초기화 기능은 두지 않는다(필요하면 SQL). `users` 행은 첫 로그인 때 서버가 만든다. 시도 제한은 IP당 15분 5회, 계정 잠금 없음. 메일 미리보기는 별도 설계로 뺐다.
+- 구현 사항
+  - [x] 백엔드: V10(`ck_users_role`에 DEMO, `ck_users_oauth_provider`에 DEMO), `UserRole.DEMO`·`OAuthProvider.DEMO`·`User.createDemo`·`DemoAccount`, `SecurityConfig` 규칙(탈퇴·알림 설정 변경은 USER·ADMIN만, 관리자 GET은 ADMIN·DEMO), `UserQueryService.isNotificationEnabled`가 DEMO면 false, `POST /api/auth/demo-login`(`DemoLoginService`, `DemoLoginProperties`, `DemoLoginRateLimiter`, 본문에 AT), 데모를 끈 뒤 재발급 401, 오류 코드 `DEMO_LOGIN_FAILED`, 계약(`loginDemo`, `DemoLoginRequest`, `AccessToken.role`에 DEMO), `.env.example`에 `DEMO_LOGIN_ID`·`DEMO_LOGIN_PASSWORD`
+  - [x] 프론트: 로그인 화면의 데모 로그인 입력 폼(접어 두고 `/login?demo=1`이면 펼침), 역할 DEMO의 관리자 메뉴·라우트(조회만), 관리자 화면 쓰기 버튼 비활성화, 탈퇴·알림 설정 화면 막기, 데모 계정 안내 띠, `errorMessages.ts`에 `DEMO_LOGIN_FAILED`
+  - [ ] [H] 운영: Cloudtype 환경 변수 `DEMO_LOGIN_ID`·`DEMO_LOGIN_PASSWORD`(비밀번호 16자 이상) 등록 후 배포, 아이디·비밀번호는 화면에 적지 않고 제출 문서(README·지원서)로만 전달한다
+- 완료 기준
+  - 권한 매트릭스(`SecurityRulesApiTest`), 데모 로그인 성공·실패·Origin·429·재발급 유지·꺼짐 404·끈 뒤 재발급 401(`DemoLoginApiTest`, `DemoLoginDisabledApiTest`), 알림 제외(`NotificationCreateServiceTest`) 통과, 계약 비교·오류 코드표 테스트 통과
+  - 운영에서 데모 로그인 → 내 설정·찜·플랜 계산·저장, 관리자 화면 조회 성공과 쓰기 403을 확인했다
+
+#### Task 110: 데모 계정이 플랜을 저장하면 알림 메일 모양을 팝업으로 보여 주기 ⬜
+- 태그: 백엔드·프론트 · PRD: 해당 없음(2026-10-28 사용자 결정) · 선행: 109, 073 · 브랜치(예정): `feature/demo-mail-popup`(Task 109 병합 뒤 `origin/develop`에서)
+- 배경: 데모 계정은 메일을 받지 않는다(109). 대신 플랜을 저장하면 실제 회원이 받았을 메일을 팝업으로 보여 준다. 관리자 메뉴의 고정 샘플 미리보기안은 사용자가 정정해 폐기했다.
+- 설계(opus 2026-10-28, 확정 결정): 저장 응답(201) 뒤 프론트가 DEMO일 때만 읽기 전용 `GET /api/me/plans/current/mail-preview`(`getCurrentPlanMailPreview`)를 호출한다. 서버는 plan 패키지의 `PlanMailPreviewService`가 본인 ACTIVE 플랜으로 운영과 같은 `PlanNotificationComposer.composeSubscribeGuide`와 `NotificationMailRenderer`(`render(type, Object payload)` 오버로드 추가)를 써서 제목·HTML을 만든다. outbox·`MailClient`·알림 설정은 건드리지 않는다. DEMO 아니면 403(`SecurityConfig` `hasRole("DEMO")`). 가입할 상품이 없으면 200 + `noMailReason`(`NO_SUBSCRIBE_GUIDE`, `NO_CURRENT_PLAN`). 팝업은 `iframe srcDoc sandbox`로 격리하고 링크는 새 탭. **팝업 내용은 구독 안내(저장하면 오는 메일) + 월초 안내 탭(매월 1일 메일 예시, `composeMonthly(userId, plan, Optional.empty())` 읽기 전용)**(사용자 Q1 B). 현재 플랜 화면에 DEMO 전용 "알림 메일 예시 보기" 버튼으로 다시 볼 수 있다. 화면 이름 `SUBSCRIBE_GUIDE`는 "구독 안내"(109에서 변경).
+- 구현 사항
+  - [ ] 계약: operation 1개(`getCurrentPlanMailPreview`, 월초 안내 탭을 위해 응답이 2건이 되도록 스키마 확정), 새 오류 코드 없음
+  - [ ] 백엔드 `PlanMailPreviewService`·컨트롤러·보안 규칙·렌더러 오버로드, 테스트(권한 매트릭스, 플랜 없음, outbox 행 수 불변)
+  - [ ] 프론트 `DemoMailPreviewDialog`, `PlanScreen` 저장 성공 콜백(대화상자는 분기 밖 최상위), `CurrentPlanView` 다시 보기 버튼, 목업, 테스트
+- 완료 기준
+  - V-API: 비로그인 401·USER 403·ADMIN 403·DEMO 200, 호출 전후 `notification_outbox` 행 수 동일. V-F: 375px·데스크톱 팝업, 링크 새 탭, 콘솔 에러 0건
 
 #### Task 096: Grafana Cloud 계정 생성으로 관측 연동 준비 ⬜ `[3단계 이월]`
 - 태그: [H] · PRD: Q1, 6절 관측 · 선행: 없음 · 기한: 2026-11-19(3단계 착수 전)
@@ -1814,3 +1838,4 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | 2026-10-17 | 첫 공개 범위 개정(사용자 결정). 첫 공개 `v0.1.0`에 2단계 일부(변경 내역 068~070, 번들·독점 075~079, 탈퇴 080~084)와 정리(089·090·101), 홈·탐색(신설 Task 106~108, Phase 3b)을 포함하고 알림(071~074)·LLM(085~088)·관측(096~099)·성능(100)·정확도 보강(103)은 3단계로 이월. Phase 구분과 Task 번호는 유지하고 제목에 `[v0.1.0 포함]`·`[3단계 이월]` 태그를 붙임. 총 108개 Task, 진행 66/108. 3.2에 개정 일정(11월 중순~하순, 기존 일정 폐기), 3.3에 첫 공개 범위 추가, 095 선행·확인 항목 확장, 102를 3단계 공개 태그로 재정의, 공개 전 Task 선행에서 095 제거, 082 선행에서 072 제거(알림 연동은 072로 이월), 069·076은 opus 설계 먼저, 홈의 독점 줄은 078 뒤 연결, 인기 순위 설계(7곳×영화·드라마 discover, 일별 스냅샷 7일 평균) 기록. Task 번호 체계는 바꾸지 않음 |
 | 2026-10-17 | 시즌 제공처 작품 단위 대체 판정(PRD 11절 43번, R11-43)과 수집 재실행 `scope` 경로를 Task 044·045 후속으로 기록. 재수집 측정값은 실행 뒤 기록 |
 | 2026-10-17 | Task 076(번들·저가형 요금제) 구현 완료로 진행 70/108(069·075 ✅). 076 항목을 최종 설계(구성 편집 API 없음, `ottServiceIds`, `low_cost` 저가형 분류, 모드, 시청 범위 제한 없음)로 정정하고 075의 번들 계약안 6개를 076 최종안으로 교체. 4.2에 V8=076·V9=107 순서 제약 추가. Task 080 확정 결정(R-10 갱신 후 삭제, `BATCH_*` 180일, `calc_run` 180일, 별도 정리 Job)을 080·083·R-10에 기록 |
+| 2026-10-28 | Task 109(데모 계정 로그인, Phase 5) 신설로 총 109개 Task, 진행 86/109. 포트폴리오를 보는 사람에게 ADMIN을 주는 대신 공용 데모 계정(`role = DEMO`, 관리자 조회만)을 쓰기로 하고(사용자 결정, C안) Task 095 ② 문구를 갱신 |

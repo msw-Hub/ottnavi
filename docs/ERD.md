@@ -279,7 +279,7 @@ erDiagram
   users {
     bigint id PK
     varchar email UK
-    varchar role "USER / ADMIN"
+    varchar role "USER / ADMIN / DEMO"
     varchar oauth_subject "UK(provider, subject)"
   }
   user_setting {
@@ -315,7 +315,7 @@ erDiagram
 
 | 테이블 | 핵심 컬럼 | 설명 |
 |---|---|---|
-| users | id, email UK, name, role, oauth_provider, oauth_subject | `UNIQUE(oauth_provider, oauth_subject)`. 테이블명은 예약어(user)를 피하려고 복수형 |
+| users | id, email UK, name, role, oauth_provider, oauth_subject | `UNIQUE(oauth_provider, oauth_subject)`. 테이블명은 예약어(user)를 피하려고 복수형. role = USER / ADMIN / DEMO, oauth_provider = GOOGLE / DEMO(V10, Task 109). DEMO는 공용 데모 계정 한 행(`oauth_subject = demo`, 이메일 `demo@ottnavi.invalid`)이고 첫 데모 로그인 때 서버가 만든다. 지우려면 `DELETE FROM users WHERE oauth_provider = 'DEMO'`(하위 행은 CASCADE) |
 | user_setting | user_id PK·FK, monthly_budget, monthly_watch_minutes, watch_preset, notification_enabled, lowest_price_mode | 1:1. `lowest_price_mode`(V8, Task 076)는 "가장 저렴한 요금제로 계산할래요" 체크이며 기본 꺼짐이다. 예산·시청 시간 필수(FR-10). watch_preset = LIGHT / NORMAL / HEAVY / CUSTOM. **행이 있으면 온보딩(첫 설정 저장)을 마친 사용자**이고 행은 `PUT /me/settings`가 처음 만든다(가입 때 만들지 않는다). 구독 행 수로는 온보딩 여부를 알 수 없다(모두 미구독이면 0행). 환산 입력(주 N회·회당 M시간)은 저장하지 않는다(R11-18 A안) |
 | user_subscription | id, user_id FK, ott_service_id FK, status, product_id FK NULL, plan_name NULL, billing_day NULL | `UNIQUE(user_id, ott_service_id)`. status = SUBSCRIBED(구독 중) / FREE(무료 이용) / UNKNOWN(잘 모르겠음, 저장하며 계산에서는 미구독과 같이 취급). **미구독(NOT_SUBSCRIBED)은 행을 두지 않는다**(API가 행이 없는 서비스를 NOT_SUBSCRIBED로 채워 준다). plan_name(VARCHAR(30))은 표시용 요금제 이름, billing_day(1~31)는 결제일이며 둘 다 SUBSCRIBED일 때만 값이 있고 나머지 상태에서는 NULL(`CHECK`). 결제일이 비어 들어오면 서비스가 1을 채운다(DB 기본값이 아니다). MVP는 product_id를 NULL로 두고 계산 입력 단계가 서비스의 판매 중 단품을 찾는다. 번들 이용 시 구성 서비스 행들이 같은 product_id를 가리킨다(2단계) |
 | user_price_override | id, user_id FK, product_id FK, monthly_price | `UNIQUE(user_id, product_id)`. 관리자 가격을 바꾸지 않는 사용자별 덮어쓰기(FR-11) |

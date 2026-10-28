@@ -12,7 +12,7 @@ com.ottnavi
 │   ├── common/            CommonResponse(성공 응답 틀), PageResponse(목록 응답 틀), BaseTimeEntity(생성·수정 시각)
 │   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정, 시계(ClockConfig, KST 기준 Clock 빈), 스케줄러(SchedulingConfig: @EnableScheduling, ShedLock 락 제공자 JDBC·DB 시각), 비동기(AsyncConfig: @EnableAsync만, 실행기는 Boot 자동 구성 `spring.task.execution.*`)
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
-│   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter), Redis 버킷 창구, 설정
+│   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집·데모 로그인 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter, DemoLoginRateLimiter: `rl:demo:{ip}` IP당 15분 5회, Task 109), Redis 버킷 창구, 설정
 │   └── security/          보안 설정(SecurityConfig), 오리진 비밀 헤더 필터, 배치 토큰 인증 필터(BatchTokenAuthenticationFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리, AuthUser(인증 주체)
 │       ├── jwt/             Access Token 발급·검증(JwtTokenProvider), Bearer 인증 필터(JwtAuthenticationFilter), 설정(JwtProperties)
 │       ├── oauth/           구글 로그인: 인가 요청 쿠키 저장소, 성공·실패 핸들러, Google 토큰 미저장(NoOpOAuth2AuthorizedClientRepository)
@@ -43,12 +43,12 @@ com.ottnavi
 │   ├── service/           ProviderCollectService, AdminProviderService(매핑 조회·변경) 등 + model/ (MappedProvider, AdminProviderView …)
 │   └── domain/            entity · enums · repository
 ├── user/                회원·로그인·내 설정
-│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout), UserSettingController (GET·PUT /api/me/settings), UserController (DELETE /api/me 탈퇴)
+│   ├── controller/        AuthController (POST /api/auth/refresh, /api/auth/logout, /api/auth/demo-login), UserSettingController (GET·PUT /api/me/settings), UserController (DELETE /api/me 탈퇴)
 │   ├── dto/
-│   │   ├── request/         UpdateMySettingsRequest, UserSubscriptionRequest
+│   │   ├── request/         UpdateMySettingsRequest, UserSubscriptionRequest, DemoLoginRequest(데모 로그인, toString에서 입력값을 가림)
 │   │   └── response/        AccessTokenResponse, UserSettingsResponse, UserSubscriptionResponse
-│   ├── service/           UserLoginService(가입·갱신·역할 조회), AuthTokenService(재발급·로그아웃, Origin 검사), UserSettingService(내 설정 조회·전체 교체, 알림 수신 여부 변경 `updateNotificationEnabled`, users 행 잠금), UserWithdrawService·UserWithdrawWriter(탈퇴: DB 삭제 커밋 뒤 Redis 계열 삭제), UserQueryService(다른 도메인용 사용자 행 잠금·이용 가능 서비스 조회·서비스별 이용 상태 맵 조회·이메일 조회(findEmail, 알림 발송 직전 수신 주소 확인)) + model/ (GoogleProfile, LoginUser, TokenIssue, SubscriptionState, UserSettingsState)
-│   ├── exception/         OnboardingRequiredException (409 ONBOARDING_REQUIRED, 알림 설정 저장, Task 073)
+│   ├── service/           UserLoginService(가입·갱신·역할 조회, 데모 계정 행 찾기·만들기 `findOrCreateDemo`), AuthTokenService(재발급·로그아웃, Origin 검사, 데모 로그인 직후 토큰 발급 `issueForLogin`, 데모를 끈 뒤 남은 데모 세션 폐기), DemoLoginService(데모 로그인: 꺼짐 404·시도 한도·아이디·비밀번호 상수 시간 비교, Task 109)·DemoLoginProperties(`app.demo-login.*`, 기동 검증)·DemoLoginConfig(설정 등록)·DemoAccount(데모 행 고정값: subject·이메일·이름), UserSettingService(내 설정 조회·전체 교체, 알림 수신 여부 변경 `updateNotificationEnabled`, users 행 잠금), UserWithdrawService·UserWithdrawWriter(탈퇴: DB 삭제 커밋 뒤 Redis 계열 삭제), UserQueryService(다른 도메인용 사용자 행 잠금·이용 가능 서비스 조회·서비스별 이용 상태 맵 조회·이메일 조회(findEmail, 알림 발송 직전 수신 주소 확인)) + model/ (GoogleProfile, LoginUser, TokenIssue, SubscriptionState, UserSettingsState)
+│   ├── exception/         OnboardingRequiredException (409 ONBOARDING_REQUIRED, 알림 설정 저장, Task 073), DemoLoginFailedException (401 DEMO_LOGIN_FAILED, Task 109)
 │   └── domain/            entity(User, UserSetting, UserSubscription) · enums(OAuthProvider, UserRole, WatchPreset, SubscriptionStatus, ServiceSubscriptionStatus) · repository(UserRepository, UserSettingRepository, UserSubscriptionRepository)
 ├── wishlist/            찜·우선순위·"다 봤음" (Task 056)
 │   ├── controller/        WishlistController (GET·POST /api/me/wishlist-items, PATCH·DELETE /api/me/wishlist-items/{id})
