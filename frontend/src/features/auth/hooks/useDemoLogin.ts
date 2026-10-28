@@ -39,11 +39,14 @@ export function useDemoLogin(from: string) {
     request: DEMO_LOGIN_REQUEST_OPTIONS,
     mutation: {
       onSuccess: async (response) => {
-        // 1. 실제 환경: 토큰과 역할을 메모리에 넣는다(목업 모드는 핸들러가 이미 역할을 바꿨다)
+        // 1. 이전 사용자의 쿼리 캐시를 비운다. 이미 Google로 로그인한 채 이 화면에서 데모 로그인하면 "로그인함 → 로그인함"이라
+        //    providers.tsx의 "로그인함 → 로그아웃" 정리가 돌지 않아, 앞 사용자의 찜·플랜이 데모 화면에 잠깐 보일 수 있다(PR #113 검수 지적)
+        queryClient.clear()
+        // 2. 실제 환경: 토큰과 역할을 메모리에 넣는다(목업 모드는 핸들러가 이미 역할을 바꿨다)
         if (!isMockMode()) {
           useAuthStore.getState().setSession(response.data.accessToken, response.data.role)
         }
-        // 2. 온보딩 여부를 보고 이동할 곳을 정한 뒤 이동한다(뒤로 가기로 로그인 화면이 다시 나오지 않게 replace)
+        // 3. 온보딩 여부를 보고 이동할 곳을 정한 뒤 이동한다(뒤로 가기로 로그인 화면이 다시 나오지 않게 replace)
         const { path, state } = await resolveLoginDestination(queryClient, from || '/')
         navigate(path, { replace: true, state })
       },
