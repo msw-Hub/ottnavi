@@ -143,7 +143,7 @@ export const routes: RouteObject[] = [
                 },
               },
               {
-                path: 'settings/notifications', // SCR-12 알림 설정 (목업 화면 Task 071, 실제 API는 Task 073·074)
+                path: 'settings/notifications', // SCR-12 알림 설정 (Task 071 화면, Task 074 실제 API 연결)
                 lazy: {
                   Component: () =>
                     import('@/pages/NotificationSettingsPage').then(

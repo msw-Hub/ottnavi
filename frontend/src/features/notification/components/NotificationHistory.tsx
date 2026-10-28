@@ -34,7 +34,8 @@ export function NotificationHistory() {
     return (
       <EmptyState
         title="아직 받은 알림이 없어요"
-        description="알림을 켜면 월초 안내나 플랜 변경 알림이 만들어지는 대로 여기에 기록돼요."
+        // 이전: "알림을 켜면 …". 이미 켜 둔 사람에게도 어색하지 않게 켜짐·꺼짐 어느 쪽에서나 맞는 문장으로 바꿨다
+        description="알림이 켜져 있으면 월초 안내나 플랜 변경 알림이 만들어지는 대로 여기에 기록돼요."
       />
     )
   }

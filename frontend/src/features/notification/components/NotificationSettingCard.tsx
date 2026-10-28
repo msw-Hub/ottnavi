@@ -61,7 +61,9 @@ export function NotificationSettingCard() {
           checked={isOn}
           disabled={update.isPending}
           onCheckedChange={(next) => update.mutate(next)}
-          className="mt-1 scale-150 origin-right"
+          // ring-offset: 켜짐 상태의 스위치 바탕(--primary)과 포커스 테두리(--ring)가 같은 하늘색이라 붙어 있으면 테두리가 안 보인다.
+          // 카드 바탕색으로 2px 틈을 두어 켜짐·꺼짐 모두에서 키보드 포커스가 보이게 한다(WCAG 2.4.7)
+          className="mt-1 origin-right scale-150 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
         />
       </div>
 
@@ -91,11 +93,14 @@ function UpdateErrorAlert({ error }: { error: unknown }) {
       <TriangleAlertIcon aria-hidden="true" />
       <AlertTitle>알림 설정을 바꾸지 못했어요</AlertTitle>
       <AlertDescription className="text-destructive/90">
-        <p>{message}</p>
+        {/* mb-0!: shadcn AlertDescription이 마지막이 아닌 문단에 붙이는 아래 여백(16px)을 없애 링크가 안내 문장 바로 밑에 붙게 한다.
+            원본(components/ui/alert.tsx)은 고치지 않고 이 자리에서만 덮어쓴다. 링크가 없으면 이 문단이 마지막이라 원래도 여백이 없다 */}
+        <p className="mb-0!">{message}</p>
         {isOnboardingRequired && (
           <Link
             to="/settings"
-            className="mt-1 inline-flex min-h-11 items-center rounded-md font-semibold underline underline-offset-3 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            // -mt-2: 누르는 높이 44px(min-h-11)는 지키면서 글자 위 빈 칸 때문에 링크가 안내 문장과 떨어져 보이지 않게 당긴다. 이전: mt-1
+            className="-mt-2 inline-flex min-h-11 items-center rounded-md font-semibold underline underline-offset-3 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             내 설정 입력하러 가기
           </Link>
