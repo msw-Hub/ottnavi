@@ -87,6 +87,8 @@ public class SecurityConfig {
 						// 데모 계정(DEMO): 탈퇴·알림 설정 변경은 막는다(공용 계정이라 한 사람이 지우거나 메일을 켜면 안 된다)
 						.requestMatchers(HttpMethod.DELETE, "/api/me").hasAnyRole("USER", "ADMIN")
 						.requestMatchers(HttpMethod.PUT, "/api/me/notification-setting").hasAnyRole("USER", "ADMIN")
+						// 알림 메일 예시는 데모 계정 전용이다. 아래 /api/** authenticated() 보다 앞에 둬야 USER·ADMIN이 403이 된다
+						.requestMatchers(HttpMethod.GET, "/api/me/plans/current/mail-preview").hasRole("DEMO")
 						// 데모 계정은 관리자 화면을 조회(GET)만 한다. 배치 토큰의 GET은 기존대로 배치 경로에서만 통과한다.
 						// HEAD·OPTIONS는 GET 매처에 걸리지 않아 아래 기존 ADMIN 규칙으로 간다
 						.requestMatchers(HttpMethod.GET, "/api/admin/collect/**", "/api/admin/plans/monthly/**",

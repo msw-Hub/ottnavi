@@ -51,7 +51,7 @@ public class PlanNotificationComposer {
 	private final Clock clock;
 
 	/**
-	 * 저장한 플랜의 가입 안내 재료를 만든다. 이번 달 가입할 상품이 없거나 플랜의 첫 달이 이번 달이 아니면 빈 값이다.
+	 * 저장한 플랜의 구독 안내 재료를 만든다. 이번 달 가입할 상품이 없거나 플랜의 첫 달이 이번 달이 아니면 빈 값이다.
 	 * 플랜·사용자가 사라졌어도(그 사이 삭제·탈퇴) 빈 값이다.
 	 */
 	public Optional<SubscribeGuidePayload> composeSubscribeGuide(Long userId, Long planId) {
@@ -86,7 +86,7 @@ public class PlanNotificationComposer {
 	// 값 만들기 (DB를 쓰지 않는 순수 변환)
 
 	/**
-	 * 가입 안내 재료를 만든다. 첫 달이 이번 달이 아니거나 가입할 상품이 하나도 없으면 빈 값이다.
+	 * 구독 안내 재료를 만든다. 첫 달이 이번 달이 아니거나 가입할 상품이 하나도 없으면 빈 값이다.
 	 *
 	 * @param thisMonth 이번 달(KST)의 1일
 	 */

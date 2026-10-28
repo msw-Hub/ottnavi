@@ -10,7 +10,7 @@
     <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}" style="margin:0 0 20px;font-size:14px;line-height:1.7;">요약</p>
 
     <div th:if="${!#lists.isEmpty(payload['joinProducts'])}">
-        <div th:replace="~{mail/fragments :: heading('이번 달 가입할 서비스', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: heading('이번 달 구독할 서비스', '#0369a1')}"></div>
         <div th:replace="~{mail/fragments :: productList(${payload['joinProducts']})}"></div>
     </div>
 

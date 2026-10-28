@@ -3,7 +3,7 @@ package com.ottnavi.notification.service.model;
 import java.util.List;
 
 /**
- * 가입 안내(SUBSCRIBE_GUIDE) 메일의 재료. outbox payload(JSON)로 저장되고 템플릿 subscribe-guide.html이 읽는다.
+ * 구독 안내(SUBSCRIBE_GUIDE) 메일의 재료. outbox payload(JSON)로 저장되고 템플릿 subscribe-guide.html이 읽는다.
  * 공통 필드(v, userName, dataDate, month, summary)는 메일 렌더러가 읽는 이름과 같다.
  *
  * @param v                     payload 형식 버전

@@ -12,7 +12,7 @@ import java.time.ZoneId;
  * 알림 이력 한 건 응답(계약 NotificationHistoryItem). 본문 재료와 실패 사유는 담지 않는다.
  *
  * @param notificationId 알림 ID
- * @param type           가입 안내 / 월초 안내 / 플랜 변경 알림
+ * @param type           구독 안내 / 월초 안내 / 플랜 변경 알림
  * @param status         대기 / 발송 / 실패(재시도 5회를 넘김)
  * @param createdAt      알림이 만들어진 시각(KST)
  * @param sentAt         발송 성공 시각(KST). 발송 전이거나 실패면 null

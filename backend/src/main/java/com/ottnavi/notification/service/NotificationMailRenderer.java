@@ -47,6 +47,14 @@ public class NotificationMailRenderer {
 		this.settingsUrl = base + "/settings/notifications";
 	}
 
+	/**
+	 * payload record를 JSON으로 바꿔 유형별 제목과 본문을 만든다. outbox에 쌓지 않고 바로 보여 줄 때(예시 메일) 쓴다.
+	 * NotificationCreateService가 outbox에 저장하는 JSON과 같은 변환이다.
+	 */
+	public RenderedMail render(NotificationType type, Object payload) {
+		return render(type, objectMapper.writeValueAsString(payload));
+	}
+
 	/** 유형별 제목과 본문을 만든다. payload가 JSON이 아니면 예외를 던지고, 호출한 발송기가 실패로 기록한다 */
 	public RenderedMail render(NotificationType type, String payloadJson) {
 		// 1. payload JSON을 템플릿에서 읽을 수 있는 Map으로 바꾼다
