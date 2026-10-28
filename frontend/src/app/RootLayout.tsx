@@ -1,11 +1,16 @@
 import { useRef } from 'react'
-import { Link, Outlet, useLocation } from 'react-router'
+import { Link, Outlet, ScrollRestoration } from 'react-router'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
+import { useSession } from '@/hooks/useSession'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
 import { HeaderPrimaryNav } from '@/app/HeaderPrimaryNav'
 import { TitleSearchForm } from '@/components/common/TitleSearchForm'
 import { WishlistAddedDialog } from '@/components/common/WishlistAddedDialog'
-import { isMockMode } from '@/lib/mockScenario'
+// import { isMockMode } from '@/lib/mockScenario' // 이전: 개발용 이동 링크(주석 처리됨)용
+
+// 푸터 링크 공통 모양. 글자색은 푸터의 회색(muted)을 그대로 받고, 마우스를 올리면 밑줄이 생긴다.
+// 키보드 포커스 표시는 index.css의 전역 :focus-visible 윤곽선이 맡는다(이전 About 링크와 같은 방식)
+const FOOTER_LINK_CLASS = 'inline-flex min-h-10 items-center underline-offset-4 hover:underline'
 
 // 이전(홈 1차안 첫 판): 본문에 큰 검색창이 있는 화면에서 머리글 검색창을 숨기던 목록. 검색창을 머리글로 통일하며 쓰지 않는다
 // const PAGES_WITH_OWN_SEARCH = ['/', '/search']
@@ -18,11 +23,13 @@ import { isMockMode } from '@/lib/mockScenario'
  * 색은 디자인 토큰(bg-background, text-muted-foreground 등)만 쓴다.
  */
 export function RootLayout() {
-  // 개발용 이동 링크가 목업 확인용 주소 파라미터(?mockScenario=… 등)를 이어 붙이도록 현재 주소의 쿼리를 읽는다
-  const { search } = useLocation()
+  // 이전: 개발용 이동 링크가 목업 확인용 주소 파라미터를 이어 붙이도록 현재 주소의 쿼리를 읽었다(링크를 주석 처리해 쓰지 않는다)
+  // const { search } = useLocation()
   // 머리글의 실제 높이를 재서 토스트 위치 변수에 반영한다(줄 수가 바뀌어도 토스트가 머리글을 덮지 않게, Task 090)
   const headerRef = useRef<HTMLElement>(null)
   useMeasuredHeaderHeight(headerRef)
+  // 푸터의 회원 탈퇴 링크를 보일지 정한다. 머리글 계정 영역(HeaderAccountNav)과 같은 훅이라 목업·실제 환경에서 같은 판단을 한다
+  const isAuthenticated = useSession().status === 'authenticated'
   return (
     <div className="flex min-h-svh flex-col">
       {/* 키보드 사용자가 헤더 링크를 매번 거치지 않고 본문으로 바로 가도록 하는 링크. 포커스를 받을 때만 보인다 */}
@@ -82,52 +89,54 @@ export function RootLayout() {
       >
         <Outlet />
       </main>
+      {/*
+        화면을 옮길 때 스크롤 위치를 다룬다(앱에 하나만 둔다. React Router 공식 문서).
+        - 이전: 이 컴포넌트가 없어서 설정 화면에서 아래로 내려간 채 홈으로 가면 홈이 맨 위가 아닌 같은 높이에서 시작했다(운영 피드백).
+        - 새로 이동(링크 클릭)하면 맨 위에서 시작하고, 뒤로 가기·앞으로 가기에서는 그 화면을 떠날 때의 위치로 돌아온다
+          (기본 키가 location.key라서 같은 주소라도 이동할 때마다 새 위치로 본다).
+      */}
+      <ScrollRestoration />
 
       {/* 푸터 링크는 inline-flex min-h-10으로 누르는 영역을 세로 40px로 넓혔다(Task 037 ⑫) */}
       <footer className="border-t">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 py-4 text-center text-sm text-muted-foreground">
-          <Link
-            to="/about"
-            className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-          >
+          <Link to="/about" className={FOOTER_LINK_CLASS}>
             서비스 소개(About)
+          </Link>
+          {/* 개인정보처리방침: 로그인 여부와 상관없이 모두에게 보인다(Google 로그인 동의 화면 게시에 필요한 공개 주소) */}
+          <Link to="/privacy" className={FOOTER_LINK_CLASS}>
+            개인정보처리방침
+          </Link>
+          <Link to="/terms" className={FOOTER_LINK_CLASS}>
+            이용약관
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>
           {/*
-            목업 확인용 이동 링크(Task 028). 로그인 후 화면(SCR-07~10)으로 가는 메뉴가 아직 없고(Task 057에서 "내 메뉴"를 만든다),
-            주소를 직접 입력하면 새로고침으로 목업 로그인·찜 상태가 사라져 화면 사이를 옮겨 다니며 확인할 수 없어 둔다.
-            목업 모드에서만 보이고 운영에서는 그려지지 않는다. Task 057에서 실제 메뉴가 생기면 이 줄은 지운다.
+            회원 탈퇴 링크(SCR-13). 이전에는 내 설정 맨 아래 오른쪽에 작은 빨간 글자로 있어 뜬금없어 보였다(운영 피드백, 사용자 확정으로 푸터로 옮김).
+            - 로그인한 사용자에게만 보인다(useSession의 authenticated). 확인 중(checking)·비로그인·재발급 오류에서는 숨긴다.
+            - 색은 다른 푸터 링크와 같은 회색(muted)이다. 빨강은 실제로 지우는 확인 화면(WithdrawScreen)에서만 쓴다:
+              여기서 누르면 바로 지워지는 것이 아니라 설명과 동의 단계가 있는 화면으로 갈 뿐이라, 위험 색으로 겁을 줄 이유가 없다.
+            - 맨 끝에 둔 이유: 자주 쓰는 링크가 아니라 눈에 덜 띄는 자리가 맞다. 모바일에서 줄이 넘치면 마지막 줄로 내려간다.
           */}
+          {isAuthenticated && (
+            <Link to="/settings/withdraw" className={FOOTER_LINK_CLASS}>
+              회원 탈퇴
+            </Link>
+          )}
+          {/*
+            이전: 목업 확인용 "개발용 이동" 링크(Task 028). 로그인 후 화면으로 가는 상시 메뉴가 없어 목업 모드에만 두었다.
+            머리글 "내 메뉴"(HeaderAccountMenu)가 생겨 지운다(주석 처리). 목업 파라미터는 메뉴 링크가 이어 붙인다.
           {isMockMode() && (
             <nav aria-label="개발용 이동" className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>개발용 이동</span>
-              <Link
-                to={{ pathname: '/settings', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                내 설정
-              </Link>
-              <Link
-                to={{ pathname: '/wishlist', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                찜 목록
-              </Link>
-              <Link
-                to={{ pathname: '/pricing', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                요금 확인
-              </Link>
-              <Link
-                to={{ pathname: '/plan', search }}
-                className="inline-flex min-h-10 items-center underline-offset-4 hover:underline"
-              >
-                플랜 결과
-              </Link>
+              <Link to={{ pathname: '/settings', search }} className="inline-flex min-h-10 items-center underline-offset-4 hover:underline">내 설정</Link>
+              <Link to={{ pathname: '/wishlist', search }} className="...">찜 목록</Link>
+              <Link to={{ pathname: '/pricing', search }} className="...">요금 확인</Link>
+              <Link to={{ pathname: '/plan', search }} className="...">플랜 결과</Link>
             </nav>
           )}
+          */}
         </div>
       </footer>
 

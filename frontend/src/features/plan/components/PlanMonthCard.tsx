@@ -62,7 +62,9 @@ export function PlanMonthCard({ month, serviceNames, withYear }: PlanMonthCardPr
     <Card className="bg-card ring-1 ring-border">
       <CardHeader className="gap-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-xl font-extrabold">{formatMonthLabel(month.month, withYear)}</h3>
+          {/* 카드 제목(h3)은 구간 제목(h2 text-xl)보다 한 단계 작게 둔다(styles/tokens.css R4). 굵기(extrabold)는 그대로 둬 카드 안에서는 여전히 가장 눈에 띈다.
+              이전: <h3 className="text-xl font-extrabold"> (구간 제목 "달별 구독과 볼 작품"보다 커서 위계가 뒤집혀 있었다) */}
+          <h3 className="text-lg font-extrabold">{formatMonthLabel(month.month, withYear)}</h3>
           <span
             className={cn(
               // shrink-0·whitespace-nowrap: 연도가 붙은 달 이름(예: 2026년 12월)과 한 줄에 놓여 좁은 화면(375px)에서 배지 글자가 "이번 달 / 결제"로 쪼개지지 않게 한다

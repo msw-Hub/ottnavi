@@ -6,7 +6,9 @@ name: popularity
 # schedule은 켜 둔 상태다(Task 093). 다만 기본 브랜치(main)의 파일만 실행되므로 develop에서는 돌지 않고, develop → main 병합(Task 095) 때 켜진다.
 # 병합 전에 Cloudtype Hobby 전환(R11-4, 무료 Cloudtype은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다. TECH 3절),
 # Cloudtype 환경 변수, GitHub 시크릿(BACKEND_BASE_URL·ORIGIN_SECRET·ADMIN_BATCH_TOKEN)이 모두 준비돼 있어야 한다. 아니면 첫 실행부터 실패한다.
-# 멈추려면 schedule 줄을 다시 주석 처리하고 main에 반영한다. 수동 실행(workflow_dispatch)은 그대로 쓸 수 있다.
+# 예약 실행은 저장소 변수 CRON_ENABLED가 'true'일 때만 작업을 돈다(안정화를 확인한 뒤에 켜려는 안전장치. 변수가 없으면 예약 실행은 건너뛴다).
+#   켜기/끄기: GitHub 저장소 Settings → Secrets and variables → Actions → Variables 탭에서 CRON_ENABLED를 true로 만들거나 지운다. 코드 변경과 배포는 필요 없다.
+#   수동 실행(workflow_dispatch)은 변수와 무관하게 항상 돈다. 아예 멈추려면 schedule 줄을 다시 주석 처리하고 main에 반영한다.
 # 주의: 수집·재계산·정리가 실행 중이면 이 요청은 409로 거절된다(서로 막는다). 반대로 이 수집이 도는 동안 끝난 수집의 자동 재계산은
 #       시작되지 않을 수 있다. 일요일 주간 수집은 수 시간 걸려 늦은 시각에 잡으면 겹치므로, 수집(18:17 UTC) 시작 30분 전에 잡는다.
 #       이 수집은 약 14번 호출이라 짧게 끝나 수집 시작 전에 마친다고 보지만 소요 시간은 아직 측정하지 못했다(Task 093에서 측정).
@@ -25,6 +27,8 @@ permissions:
 jobs:
   popularity:
     runs-on: ubuntu-latest
+    # 예약 실행(schedule)은 CRON_ENABLED 변수가 true일 때만, 수동 실행은 항상 돈다. 건너뛴 예약 실행은 Actions 탭에 skipped로 남는다
+    if: github.event_name == 'workflow_dispatch' || vars.CRON_ENABLED == 'true'
     timeout-minutes: 5
     steps:
       # 1. Vercel을 거치지 않고 Cloudtype 주소로 직접 호출한다. 오리진 비밀 헤더와 배치 토큰을 함께 보낸다

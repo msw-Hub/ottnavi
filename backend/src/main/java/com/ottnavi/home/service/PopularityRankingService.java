@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PopularityRankingService {
 
-	public static final String NOTICE = "TMDB 인기도 기준, OTT 공식 순위 아님"; // 화면 표기용 기준 안내 문구
+	public static final String NOTICE = "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)"; // 화면 표기용 기준 안내 문구
 	public static final int WEEK_DAYS = 7; // WEEK는 가장 최근 스냅샷 날짜를 끝으로 이 일수 범위를 본다
 
 	private final PopularitySnapshotRepository snapshotRepository;

@@ -133,8 +133,10 @@ function ReasonChip({ reasonType }: { reasonType: PlanChangeReasonType }) {
 }
 
 // 펼친 영역의 소제목. 같은 모양을 네 번 쓰므로 한곳에 둔다
+// 본문 크기(text-base)·기본 글자색으로 올려 소구간 안의 설명·칩(text-sm)보다 한 단계 위로 읽히게 했다(styles/tokens.css R4).
+// 이전: text-sm font-semibold text-muted-foreground (설명 글자와 크기가 같고 색이 흐려 소구간 시작이 묻혔다)
 function SectionHeading({ children }: { children: string }) {
-  return <h3 className="text-sm font-semibold text-muted-foreground">{children}</h3>
+  return <h3 className="text-base font-semibold">{children}</h3>
 }
 
 // 1. 바뀐 이유: 칩(종류) + 서버가 만든 한 줄 설명

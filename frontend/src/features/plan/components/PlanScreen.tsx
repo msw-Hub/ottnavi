@@ -3,12 +3,13 @@ import {
   CalculatorIcon,
   CircleCheckIcon,
   BellIcon,
+  HeartIcon,
   HistoryIcon,
   InfoIcon,
   LoaderCircleIcon,
   RefreshCwIcon,
   SaveIcon,
-  TriangleAlertIcon,
+  // TriangleAlertIcon, // 이전: "다시 계산하기" 실패 안내의 경고 아이콘
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
@@ -21,7 +22,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { PlanDetail } from '@/features/plan/components/PlanDetail'
 import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
-import { useCalculatePlan, useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
+// 이전: useCalculatePlan도 불러왔다("다시 계산하기" 버튼용)
+import { useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
 import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
 import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
@@ -45,7 +47,9 @@ export function PlanScreen() {
   const drafts = usePlanDrafts()
   const currentPlan = useCurrentPlan()
   const services = useOttServices()
-  const calculate = useCalculatePlan()
+  // 이전: 결과 화면 오른쪽 위 "다시 계산하기" 버튼용 계산 훅. 버튼을 "찜 목록 고치러 가기" 링크로 바꿔 더는 쓰지 않는다(운영 사용 피드백).
+  // 저장 중 409로 다시 계산하는 일은 useSavePlan 훅 안에서 하므로 이 훅이 없어도 그대로 동작한다
+  // const calculate = useCalculatePlan()
   const save = useSavePlan()
   const location = useLocation()
 
@@ -71,19 +75,21 @@ export function PlanScreen() {
         drafts={drafts.data}
         services={services.data}
         hasCurrentPlan={currentPlan.data != null}
-        isCalculating={calculate.isPending}
+        search={location.search}
         isSaving={save.isPending}
-        calculateError={calculate.isError ? calculate.error : null}
         saveError={save.isError && !hasNotFoundNotice ? save.error : null}
         hasRecalculatedNotice={hasRecalculatedNotice}
-        onRecalculate={() =>
-          calculate.mutate(undefined, {
-            onSuccess: () => {
-              setHasRecalculatedNotice(false)
-              setHasNotFoundNotice(false)
-            },
-          })
-        }
+        // 이전: "다시 계산하기" 버튼과 이어진 값들(버튼을 찜 목록 링크로 바꿔 쓰지 않는다)
+        // isCalculating={calculate.isPending}
+        // calculateError={calculate.isError ? calculate.error : null}
+        // onRecalculate={() =>
+        //   calculate.mutate(undefined, {
+        //     onSuccess: () => {
+        //       setHasRecalculatedNotice(false)
+        //       setHasNotFoundNotice(false)
+        //     },
+        //   })
+        // }
         onSave={(planId) => {
           setHasNotFoundNotice(false)
           save.mutate(
@@ -145,8 +151,9 @@ export function PlanScreen() {
         <Alert variant="destructive" role="alert">
           <AlertTitle>저장하려던 플랜을 찾지 못했어요</AlertTitle>
           <AlertDescription className="text-destructive/90">
+            {/* 이전 끝 문장: "…저장하거나, 다시 계산해 주세요." 결과 화면에 "다시 계산하기" 버튼이 없어져 갈 곳을 밝혔다 */}
             다시 계산했거나 이미 저장된 플랜일 수 있어요. 목록을 새로 불러왔으니 플랜을 다시 골라
-            저장하거나, 다시 계산해 주세요.
+            저장하거나, 요금 확인이나 찜 목록 화면에서 다시 계산해 주세요.
           </AlertDescription>
         </Alert>
       )}
@@ -170,6 +177,8 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
   const savedAt = formatDateTimeKorean(plan.activatedAt)
 
   return (
+    // 저장 완료 안내 → 제목 줄 → 플랜 내용 → 이동 버튼. 제목 줄은 아래 플랜 내용의 머리라 24px(gap-6)로 붙여 둔다.
+    // 플랜 내용 안의 구간(요약·달별·남은 작품·출처) 사이는 아래 감싸는 div의 gap-section(40/48px)이 정한다(styles/tokens.css R1·R2)
     <div className="flex flex-col gap-6">
       {isJustSaved && (
         // 저장 완료는 오류가 아니라 안내라 role="status"로 덮어쓴다. shadcn Alert의 기본값 role="alert"는 낭독기가 하던 말을 끊고 급하게 읽는다
@@ -187,7 +196,9 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
           이전: <div className="grid gap-1"> 안에 제목·저장 시각만 있었다 */}
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
         <div className="grid gap-1">
-          <h2 className="text-xl font-semibold">내 현재 플랜 · {typeName}</h2>
+          {/* 다른 구간 제목(h2)과 같은 굵기로 맞췄다(styles/tokens.css R4). 크기는 원래 text-xl이었다.
+              이전: <h2 className="text-xl font-semibold"> (구간 제목 h2는 text-lg semibold라 같은 h2끼리 크기가 달랐다) */}
+          <h2 className="text-xl font-bold">내 현재 플랜 · {typeName}</h2>
           {savedAt && (
             <p className="text-sm text-muted-foreground tabular-nums">{savedAt}에 저장</p>
           )}
@@ -212,7 +223,8 @@ function CurrentPlanView({ plan, services, search, isJustSaved }: CurrentPlanVie
         </div>
       </div>
 
-      <div className="grid gap-6">
+      {/* 이전: <div className="grid gap-6"> (구간 사이 24px가 구간 안 카드 사이 16px와 비슷해 구간 경계가 약했다) */}
+      <div className="grid gap-section">
         <PlanDetail draft={plan} typeNames={typeName} serviceNames={serviceNames} />
       </div>
 
@@ -238,12 +250,14 @@ interface PlanResultProps {
   drafts: PlanDraft[] // 플랜 유형 3종 초안(선택이 같은 것도 3개 그대로 온다)
   services: OttService[] // 서비스 목록 API의 7개 서비스(이름 표시용)
   hasCurrentPlan: boolean // 이미 저장한 현재 플랜이 있는지(있으면 새로 저장할 때 바뀐다는 안내를 보인다)
-  isCalculating: boolean // 다시 계산 중인지
+  search: string // 목업 확인용 주소 파라미터(?mock…)를 "찜 목록 고치러 가기" 링크에 이어 붙이기 위한 값
   isSaving: boolean // 저장 중인지(저장 도중 자동 재계산도 포함)
-  calculateError: unknown // 다시 계산 실패 원인. 없으면 null
   saveError: unknown // 저장 실패 원인. 없으면 null
   hasRecalculatedNotice: boolean // 저장 중 자동 재계산이 있었는지
-  onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
+  // 이전: "다시 계산하기" 버튼용 값들(버튼을 찜 목록 링크로 바꿔 쓰지 않는다)
+  // isCalculating: boolean // 다시 계산 중인지
+  // calculateError: unknown // 다시 계산 실패 원인. 없으면 null
+  // onRecalculate: () => void // "다시 계산하기"를 눌렀을 때
   onSave: (planId: number) => void // 저장 버튼을 눌렀을 때. 합친 그룹이면 그중 첫 초안의 planId를 넘긴다(유형은 서버가 planId로 안다)
 }
 
@@ -252,12 +266,10 @@ function PlanResult({
   drafts,
   services,
   hasCurrentPlan,
-  isCalculating,
+  search,
   isSaving,
-  calculateError,
   saveError,
   hasRecalculatedNotice,
-  onRecalculate,
   onSave,
 }: PlanResultProps) {
   const groups = mergeIdenticalDrafts(drafts)
@@ -268,66 +280,86 @@ function PlanResult({
   const typeNames = selectedGroup.planTypes
     .map((planType) => PLAN_TYPE_LABELS[planType])
     .join(' · ')
-  const isBusy = isCalculating || isSaving
+  // 이전: const isBusy = isCalculating || isSaving (다시 계산 버튼이 없어져 저장 중일 때만 바쁘다)
+  const isBusy = isSaving
 
   const serviceNames = new Map(services.map((service) => [service.ottServiceId, service.name]))
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-muted-foreground">
-          찜한 작품과 예산·시청 시간으로 계산한 3개월 플랜 3가지예요. 하나를 골라 저장하세요.
-          {/* 바뀐다는 안내는 저장 버튼 바로 위 안내 띠로 옮겼다(누르기 직전에 읽히게, 067 검수 제안 1) */}
-          {/* {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'} */}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={isBusy}
-          onClick={onRecalculate}
-          className="h-11"
-        >
+    // 구간(머리 안내 → 유형 고르기 → 요약 → 달별 → 남은 작품 → 출처 → 저장 막대) 사이를 gap-section(40/48px) 하나로 띄운다(styles/tokens.css R1·R2).
+    // 이전: <div className="flex flex-col gap-6"> (구간 사이 24px가 구간 안 간격 12~16px와 비슷해 구간이 어디서 끝나는지 읽히지 않았다)
+    <div className="flex flex-col gap-section">
+      {/* 머리 안내 묶음: 소개 줄 + 진행 안내 + 재계산 안내. 서로 같은 이야기라 16px로 붙여 한 덩어리로 둔다.
+          이전에는 이 셋이 바깥 묶음의 직접 자식이었다(구간 사이 간격을 크게 하면 서로 멀어져서 감쌌다) */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-muted-foreground">
+            찜한 작품과 예산·시청 시간으로 계산한 3개월 플랜 3가지예요. 하나를 골라 저장하세요.
+            {/* 바뀐다는 안내는 저장 버튼 바로 위 안내 띠로 옮겼다(누르기 직전에 읽히게, 067 검수 제안 1) */}
+            {/* {hasCurrentPlan && ' 저장하면 지금 저장해 둔 플랜이 이 플랜으로 바뀌어요.'} */}
+          </p>
+          {/* 결과가 마음에 들지 않을 때 할 일은 같은 조건으로 다시 계산하는 것이 아니라 찜(조건)을 고치는 것이라,
+            같은 자리를 "찜 목록 고치러 가기" 링크로 바꿨다(운영 사용 피드백). 찜을 고친 뒤 계산은 찜 목록·요금 확인 화면에서 한다.
+            저장 중에는 화면을 떠나지 않게 막는다(링크는 disabled가 없어 aria-disabled + 누름 무시로 막는다) */}
+          <Button
+            asChild
+            variant="outline"
+            className="h-11 aria-disabled:pointer-events-none aria-disabled:opacity-50"
+          >
+            <Link
+              to={`/wishlist${search}`}
+              aria-disabled={isBusy || undefined}
+              tabIndex={isBusy ? -1 : undefined}
+            >
+              <HeartIcon aria-hidden="true" />찜 목록 고치러 가기
+            </Link>
+          </Button>
+          {/* 이전 "다시 계산하기" 버튼(같은 조건으로 다시 계산):
+        <Button type="button" variant="outline" disabled={isBusy} onClick={onRecalculate} className="h-11">
           {isCalculating ? (
             <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
           ) : (
             <RefreshCwIcon aria-hidden="true" />
           )}
           {isCalculating ? '계산하는 중' : '다시 계산하기'}
-        </Button>
-      </div>
+        </Button> */}
+        </div>
 
-      {/* 진행 안내: 영역은 항상 두고 안의 글자만 바꿔야 낭독기(aria-live)가 읽어 준다 */}
-      <div role="status" aria-live="polite" className={isBusy ? 'block' : 'sr-only'}>
+        {/* 진행 안내: 영역은 항상 두고 안의 글자만 바꿔야 낭독기(aria-live)가 읽어 준다 */}
+        <div role="status" aria-live="polite" className={isBusy ? 'block' : 'sr-only'}>
+          {/* 이전: 다시 계산 중 안내(버튼이 없어져 쓰지 않는다)
         {isCalculating && (
           <p className="flex items-center gap-2 text-sm font-semibold">
             <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
             3가지 플랜을 다시 계산하고 있어요
           </p>
-        )}
-        {isSaving && (
-          <p className="flex items-center gap-2 text-sm font-semibold">
-            <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
-            플랜을 저장하고 있어요. 데이터가 바뀌었다면 다시 계산해요
-          </p>
-        )}
-      </div>
+        )} */}
+          {isSaving && (
+            <p className="flex items-center gap-2 text-sm font-semibold">
+              {/* loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin */}
+              <LoaderCircleIcon aria-hidden="true" className="size-4 loading-spin" />
+              플랜을 저장하고 있어요. 데이터가 바뀌었다면 다시 계산해요
+            </p>
+          )}
+        </div>
 
-      {/* 저장 중 데이터가 바뀌어 다시 계산한 경우: 결과가 달라졌을 수 있어 확인 후 다시 저장하게 안내한다 */}
-      {/* role="status" 영역은 항상 DOM에 두고 안의 내용만 바꾼다. 조건부로 영역째 새로 만들면 낭독기가 "나중에 생긴 영역"의 글자를 읽지 않는 경우가 많다.
+        {/* 저장 중 데이터가 바뀌어 다시 계산한 경우: 결과가 달라졌을 수 있어 확인 후 다시 저장하게 안내한다 */}
+        {/* role="status" 영역은 항상 DOM에 두고 안의 내용만 바꾼다. 조건부로 영역째 새로 만들면 낭독기가 "나중에 생긴 영역"의 글자를 읽지 않는 경우가 많다.
           비어 있을 때는 높이가 없어 레이아웃에 영향이 없다(flex gap은 빈 요소도 칸을 차지하므로 empty:hidden으로 감춘다) */}
-      <div role="status" className="empty:hidden">
-        {hasRecalculatedNotice && (
-          <p className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info">
-            <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
-            <span className="font-semibold">
-              데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
-            </span>
-          </p>
-        )}
+        <div role="status" className="empty:hidden">
+          {hasRecalculatedNotice && (
+            <p className="flex items-start gap-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-info">
+              <InfoIcon aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+              <span className="font-semibold">
+                데이터가 바뀌어 다시 계산했어요. 결과를 확인하고 저장해 주세요
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
+      {/* 이전: "다시 계산하기" 실패 안내(버튼이 없어져 쓰지 않는다)
       {calculateError != null && (
-        // 경고 아이콘을 넣어 공통 오류 화면(ErrorState)과 같은 모양으로 맞춘다. 색만으로 오류임을 알리지 않는다(067 검수 제안 5)
         <Alert variant="destructive">
           <TriangleAlertIcon aria-hidden="true" />
           <AlertTitle>플랜을 다시 계산하지 못했어요</AlertTitle>
@@ -335,7 +367,7 @@ function PlanResult({
             {getFailureMessage(calculateError)}
           </AlertDescription>
         </Alert>
-      )}
+      )} */}
 
       <PlanTypeSelector
         groups={groups}
@@ -345,7 +377,8 @@ function PlanResult({
       />
 
       <div
-        className={isBusy ? 'grid gap-6 opacity-60 transition-opacity' : 'grid gap-6'}
+        // 이전: isBusy ? 'grid gap-6 opacity-60 transition-opacity' : 'grid gap-6' (구간 사이 24px)
+        className={isBusy ? 'grid gap-section opacity-60 transition-opacity' : 'grid gap-section'}
         aria-busy={isBusy}
       >
         <PlanDetail draft={draft} typeNames={typeNames} serviceNames={serviceNames} />
@@ -380,7 +413,8 @@ function PlanResult({
           className="h-12 w-full text-base md:w-auto md:px-6"
         >
           {isSaving ? (
-            <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
+            // loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin
+            <LoaderCircleIcon aria-hidden="true" className="loading-spin" />
           ) : (
             <SaveIcon aria-hidden="true" />
           )}

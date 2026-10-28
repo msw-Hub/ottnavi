@@ -59,15 +59,18 @@ export function toPeriodParam(period: PopularityPeriod): string {
   return POPULARITY_PERIOD_OPTIONS.find((option) => option.value === period)?.param ?? 'today'
 }
 
-// 응답을 받기 전(불러오는 중·오류)에 쓰는 기준 안내. 응답이 오면 서버가 준 notice를 대신 쓴다
-export const DEFAULT_POPULARITY_NOTICE = 'TMDB 인기도 기준, OTT 공식 순위 아님'
+// 응답을 받기 전(불러오는 중·오류)에 쓰는 기준 안내. 응답이 오면 서버가 준 notice를 대신 쓴다.
+// 순위 수집 기준이 "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순"으로 바뀌어(운영 사용 피드백) 무엇을 줄 세운 것인지 드러나게 고쳤다.
+// 이전: 'TMDB 인기도 기준, OTT 공식 순위 아님'
+export const DEFAULT_POPULARITY_NOTICE =
+  '최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님)'
 
 // 7일 평균을 모두 채운 날 수. 이보다 적으면 "N일치"를 덧붙여 평균이 짧은 기간임을 밝힌다
 const FULL_WEEK_DAYS = 7
 
 /**
  * 인기 순위 기준 문구. "확정"처럼 보이지 않게 무엇을 기준으로 한 순위인지(서버 notice)와 기간, 대상 범위를 함께 쓴다.
- * 예: "TMDB 인기도 기준, OTT 공식 순위 아님 · 오늘 · 넷플릭스에서 볼 수 있다고 확인된 작품만"
+ * 예: "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순(OTT 공식 순위 아님) · 오늘 · 넷플릭스에서 볼 수 있다고 확인된 작품만"
  * 서비스 오픈 직후에는 쌓인 날이 7일 미만이라 최근 7일 평균이 며칠치인지(daysCounted)를 밝힌다("최근 7일 평균(3일치)").
  */
 export function buildPopularityBasisText(

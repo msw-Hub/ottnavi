@@ -141,21 +141,33 @@ describe('서비스별 독점 목록', () => {
     expect(within(list).getAllByRole('heading', { level: 3 })[0].textContent).toBe(firstTitle)
   })
 
-  it('카드마다 인기 순위가 낭독기용 글자로 붙고, 다음 쪽이 붙으면 순위가 25위부터 이어진다', async () => {
+  it('카드마다 목록 안 순서가 낭독기용 글자로 붙고, 다음 쪽이 붙으면 25번째부터 이어진다', async () => {
     renderScreen()
 
     const list = await screen.findByRole('list', { name: '넷플릭스 독점 작품' })
     const links = within(list).getAllByRole('link')
-    // 화면의 큰 숫자는 장식(aria-hidden)이고, 제목 링크 이름이 "인기 1위 {제목}"으로 읽힌다
-    expect(links[0]).toHaveAccessibleName(/^인기 1위 /)
-    expect(links[23]).toHaveAccessibleName(/^인기 24위 /)
+    // 화면의 큰 숫자는 장식(aria-hidden)이고, 제목 링크 이름이 "1번째 {제목}"으로 읽힌다
+    // (정렬이 "최근 공개작 먼저"로 바뀌어 이전의 "인기 1위"는 뜻이 맞지 않게 됐다)
+    expect(links[0]).toHaveAccessibleName(/^1번째 /)
+    expect(links[23]).toHaveAccessibleName(/^24번째 /)
     // 카드 하단의 "다른 N곳" 확인 결과 줄은 2차안에서 뺐다
     expect(within(list).queryByText(/다른 \d+곳/)).not.toBeInTheDocument()
 
     scrollRailToEnd()
 
     await waitFor(() => expect(within(list).getAllByRole('link')).toHaveLength(30))
-    expect(within(list).getAllByRole('link')[24]).toHaveAccessibleName(/^인기 25위 /)
+    expect(within(list).getAllByRole('link')[24]).toHaveAccessibleName(/^25번째 /)
+  })
+
+  // H-3(홈 카드와 같은 규칙): 제목은 한 줄 말줄임이고, 링크 title과 낭독 이름에는 전체 제목이 남는다
+  it('카드 제목은 한 줄 말줄임이고, 링크 title과 낭독 이름에 전체 제목이 남는다', async () => {
+    const { list } = await renderFirstPage()
+    const heading = within(list).getAllByRole('heading', { level: 3 })[0]
+    const link = within(heading).getByRole('link')
+    const fullTitle = link.getAttribute('title') ?? ''
+    expect(heading).toHaveClass('truncate')
+    expect(fullTitle).not.toBe('')
+    expect(link).toHaveAccessibleName(`1번째 ${fullTitle}`)
   })
 
   it('다음 쪽 요청이 실패하면 받아 둔 목록은 두고 줄 끝의 다시 시도로 이어 받는다', async () => {

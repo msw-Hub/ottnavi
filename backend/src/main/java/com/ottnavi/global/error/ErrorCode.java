@@ -34,7 +34,7 @@ public enum ErrorCode {
 	WISHLIST_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "찜 항목을 찾을 수 없습니다."),
 
 	// 플랜
-	PLAN_DRAFT_NOT_FOUND(HttpStatus.NOT_FOUND, "계산된 플랜을 찾을 수 없습니다. 다시 계산해 주세요."),
+	PLAN_DRAFT_NOT_FOUND(HttpStatus.NOT_FOUND, "계산된 플랜을 찾을 수 없습니다. 요금 확인이나 찜 목록 화면에서 다시 계산해 주세요."),
 	PLAN_DRAFT_STALE(HttpStatus.CONFLICT, "데이터가 갱신되어 플랜을 다시 계산하고 있습니다."),
 
 	// 수집(관리자)

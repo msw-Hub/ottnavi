@@ -87,12 +87,23 @@ describe('홈 화면', () => {
       ),
     ).toBeInTheDocument()
     // 서버가 준 기준 안내가 그대로 보인다
-    expect(screen.getByText(/TMDB 인기도 기준, OTT 공식 순위 아님 · 오늘/)).toBeInTheDocument()
-    // 출처·기준일: 목록 3줄마다 한 줄씩
-    await waitFor(() =>
-      expect(screen.getAllByText(/제공처 정보 출처/).length).toBeGreaterThanOrEqual(4),
+    // 순위 기준(최근 2년 안 한국 작품 중 인기도 순, 공식 순위 아님)과 기간이 함께 보인다
+    expect(
+      screen.getByText(
+        /최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순\(OTT 공식 순위 아님\) · 오늘/,
+      ),
+    ).toBeInTheDocument()
+    // 출처: JustWatch 출처는 맨 아래 한 곳(H-1-2), 기준일은 목록마다 제목 아래 "○월 ○일 기준"
+    // 이전: 목록마다 출처 한 줄이 있어 "제공처 정보 출처"·"데이터 기준일"이 4번 이상 보였다
+    expect(screen.getByRole('link', { name: /JustWatch/ })).toHaveAttribute(
+      'href',
+      'https://www.justwatch.com/',
     )
-    expect(screen.getAllByText(/데이터 기준일/).length).toBeGreaterThanOrEqual(4)
+    await waitFor(() =>
+      expect(
+        screen.getAllByText(/\d+월 \d+일/, { selector: 'time' }).length,
+      ).toBeGreaterThanOrEqual(4),
+    )
   })
 
   it('독점 작품 줄은 첫 서비스의 독점 첫 쪽(10편)을 보이고, 쿠팡플레이는 "드라마만 확인" 안내와 함께 목록을 보인다', async () => {
@@ -102,6 +113,10 @@ describe('홈 화면', () => {
     // 넷플릭스 독점은 30편이지만 줄에는 첫 쪽 10편만 온다. 카드는 포스터 이미지 주소가 TMDB 상대 경로에서 만들어진다
     const list = await screen.findByRole('list', { name: '넷플릭스 독점 작품' })
     expect(within(list).getAllByRole('article')).toHaveLength(10)
+    // 탭이 이미 서비스를 말해 카드마다 "넷플릭스 [있음]" 줄을 반복하지 않는다
+    expect(within(list).queryByText('있음')).not.toBeInTheDocument()
+    // 같은 이유로 포스터 위 "볼 수 있는 곳" OTT 로고도 없다(다른 줄의 로고는 아래 H-2·새로 볼 수 있게 된 작품 테스트가 확인한다)
+    expect(within(list).queryByRole('list', { name: '볼 수 있는 곳' })).not.toBeInTheDocument()
     // 더보기는 같은 서비스 탭이 열린 독점 목록 화면으로 간다
     const section = list.closest('section') as HTMLElement
     expect(within(section).getByRole('link', { name: /더보기/ })).toHaveAttribute(
@@ -172,6 +187,9 @@ describe('홈 화면', () => {
     const tabs = await screen.findByRole('tablist', { name: '인기 순위 서비스 선택' })
     await user.click(within(tabs).getByRole('tab', { name: '쿠팡플레이' }))
     expect(await screen.findByText(/영화는 순위에서 빠지고/)).toBeInTheDocument()
+    // 서비스 탭에서는 카드마다 "쿠팡플레이 [있음]" 줄을 반복하지 않는다(H-1-3)
+    const ranking = await screen.findByRole('list', { name: '쿠팡플레이 인기 순위' })
+    expect(within(ranking).queryByText('있음')).not.toBeInTheDocument()
   })
 
   it('우리 DB에 없는 작품 카드는 제공 상태를 단정하지 않고 "제공 정보 수집 전"으로 보인다', async () => {
@@ -230,8 +248,37 @@ describe('홈 화면', () => {
     ).closest('section') as HTMLElement
     expect((await within(section).findAllByText(/월 \d+일 확인/)).length).toBeGreaterThan(0)
     expect(within(section).getAllByText(/월 \d+일 공개/).length).toBeGreaterThan(0)
+    // 카드 아래는 상태 배지("있음") 대신 볼 수 있는 서비스 이름 칩 목록이다
+    expect(within(section).queryByText('있음')).not.toBeInTheDocument()
+    expect(within(section).getAllByRole('list', { name: '볼 수 있는 곳' }).length).toBeGreaterThan(
+      0,
+    )
   })
 
+  // H-2: 카드의 찜 버튼 자리를 "볼 수 있는 곳" OTT 로고로 바꿨다. 로고는 서비스 이름으로 읽히고, 찜 버튼은 카드에 없다
+  it('카드 포스터 위에 볼 수 있는 OTT가 서비스 이름으로 읽히는 로고 목록으로 보이고, 찜 버튼은 없다', async () => {
+    renderHome()
+    const ranking = await screen.findByRole('list', { name: '전체 인기 순위' })
+    const logos = within(ranking).getAllByRole('list', { name: '볼 수 있는 곳' })
+    expect(logos.length).toBeGreaterThan(0)
+    expect(within(logos[0]).getByRole('img', { name: '넷플릭스' })).toBeInTheDocument()
+    expect(within(ranking).queryByRole('link', { name: /찜하기/ })).not.toBeInTheDocument()
+    expect(within(ranking).queryByRole('button', { name: /찜하기/ })).not.toBeInTheDocument()
+  })
+
+  // H-3(B안): 제목은 항상 한 줄 말줄임이다. 잘려 보여도 DOM 글자와 링크 title에는 전체 제목이 있어 낭독기·마우스 사용자가 전체를 안다
+  it('카드 제목은 한 줄 말줄임이고, 링크 이름과 title에는 전체 제목이 남는다', async () => {
+    renderHome()
+    const ranking = await screen.findByRole('list', { name: '전체 인기 순위' })
+    const heading = within(ranking).getAllByRole('heading', { level: 3 })[0]
+    const link = within(heading).getByRole('link')
+    expect(heading).toHaveClass('truncate')
+    expect(link.textContent).not.toBe('')
+    expect(link).toHaveAttribute('title', link.textContent)
+    expect(link).toHaveAccessibleName(link.textContent ?? '')
+  })
+
+  /* 이전(H-2 전): 카드 찜 버튼 테스트 2개. 찜 버튼(CardWishlistAction)을 홈 카드에서 쓰지 않아 주석으로 남긴다
   it('비로그인이면 카드의 찜 버튼이 로그인 화면으로 가는 링크다', async () => {
     renderHome()
     const ranking = await screen.findByRole('list', { name: '전체 인기 순위' })
@@ -266,6 +313,7 @@ describe('홈 화면', () => {
     await user.click(heart)
     await waitFor(() => expect(heart).toHaveAttribute('aria-pressed', 'false'))
   })
+  */
 
   it('회원이면 맨 위에 내 플랜 자리가 보인다', async () => {
     setMockRole('USER')

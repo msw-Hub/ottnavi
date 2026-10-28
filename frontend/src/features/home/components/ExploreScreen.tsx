@@ -88,134 +88,139 @@ export function ExploreScreen() {
   const services = servicesQuery.data ?? []
 
   return (
-    <section aria-labelledby="explore-title" className="flex flex-col gap-6">
-      <div className="grid gap-1">
-        <h1 id="explore-title" className="text-2xl font-bold">
-          탐색
-        </h1>
-        <p className="text-muted-foreground">
-          장르와 작품 구분으로 7곳에서 볼 수 있는 작품을 골라 보세요.
-        </p>
-      </div>
-
-      <div className="grid gap-1.5">
-        <form role="search" onSubmit={handleSubmit} className="flex max-w-2xl items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <SearchIcon
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground"
-            />
-            {/* key={query}: 주소의 검색어가 바뀌면(뒤로 가기 등) 입력창을 새로 만들어 같은 글자로 맞춘다(TitleSearchForm과 같은 방식) */}
-            <input
-              key={query}
-              type="search"
-              name="q"
-              defaultValue={query}
-              aria-label="작품 제목"
-              aria-describedby="explore-search-hint"
-              placeholder="작품 제목"
-              className="h-12 w-full min-w-0 rounded-lg border border-input bg-background pr-3 pl-10 text-base placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-            />
-          </div>
-          <Button type="submit" className="h-12 px-5 text-base">
-            찾기
-          </Button>
-        </form>
-        <p id="explore-search-hint" className="text-sm text-muted-foreground">
-          인물 검색은 준비 중이에요. 지금은 작품 제목으로만 찾아요.
-        </p>
-      </div>
-
-      <div className="grid gap-3">
-        <ChipGroup label="작품 구분">
-          {TYPE_OPTIONS.map((option) => (
-            <ToggleChip
-              key={option.value}
-              label={option.label}
-              isSelected={type === option.value}
-              onClick={() => updateParams({ type: option.value === 'all' ? null : option.value })}
-            />
-          ))}
-        </ChipGroup>
-        <ChipGroup label="장르">
-          <ToggleChip
-            label="전체 장르"
-            isSelected={genreId === null}
-            onClick={() => updateParams({ genre: null })}
-          />
-          {/* 장르 칩은 TMDB 장르 목록 API(이름 가나다순)에서 온다. 받는 중·실패일 때는 "전체 장르"만 남고 아래 줄에 안내가 붙는다 */}
-          {(genresQuery.data ?? []).map((genre) => (
-            <ToggleChip
-              key={genre.genreId}
-              label={genre.name}
-              isSelected={genreId === genre.genreId}
-              onClick={() => updateParams({ genre: String(genre.genreId), q: null, view: null })}
-            />
-          ))}
-        </ChipGroup>
-        {genresQuery.isError && (
-          <p role="status" className="text-sm text-muted-foreground">
-            장르 목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.
+    // 본문(제목 → 검색 → 거르기 → 결과)과 출처 묶음 사이를 gap-section(40/48px)으로 띄운다(styles/tokens.css R1·R2).
+    // 본문 안은 거르기 칩과 그 결과가 한 덩어리라 이전과 같은 24px(gap-6)로 붙인다. 포스터 그리드의 줄 간격(gap-y-6)도 그대로다.
+    // 이전: <section … className="flex flex-col gap-6"> (출처 묶음까지 모두 24px)
+    <section aria-labelledby="explore-title" className="flex flex-col gap-section">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-1">
+          <h1 id="explore-title" className="text-2xl font-bold">
+            탐색
+          </h1>
+          <p className="text-muted-foreground">
+            장르와 작품 구분으로 7곳에서 볼 수 있는 작품을 골라 보세요.
           </p>
-        )}
-        <ChipGroup label="보기">
-          <ToggleChip
-            label="새로 볼 수 있게 된 작품만"
-            isSelected={isNewOnly}
-            onClick={() =>
-              updateParams(isNewOnly ? { view: null } : { view: 'new', q: null, genre: null })
-            }
-          />
-        </ChipGroup>
-      </div>
+        </div>
 
-      {explore.isPending ? (
-        <RailSkeleton heading="탐색 결과" />
-      ) : explore.isError ? (
-        <ErrorState
-          title="작품을 불러오지 못했습니다"
-          error={explore.error}
-          onRetry={explore.refetch}
-        />
-      ) : (
-        <>
-          {/* 결과 개수는 거를 때마다 바뀌어 낭독기에 알린다(role="status", 급하지 않은 알림). 더 받을 페이지가 있으면 "이상"으로 쓴다 */}
-          <p role="status" className="text-sm font-semibold tabular-nums">
-            작품 {results.length}편{explore.hasNextPage ? ' 이상' : ''}
-          </p>
-          {results.length === 0 ? (
-            <EmptyState
-              title="조건에 맞는 작품이 없습니다"
-              description="장르나 작품 구분을 바꾸거나 검색어를 지워 보세요. 아직 수집되지 않은 작품은 보이지 않을 수 있습니다."
-            />
-          ) : (
-            <ul
-              aria-label="탐색 결과"
-              className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
-            >
-              {results.map((title) => (
-                <li key={`${title.mediaType}-${title.tmdbId}`}>
-                  <HomeTitleCard title={title} services={services} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {explore.hasNextPage && (
-            <div className="flex justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                className="h-11 px-6"
-                disabled={explore.isFetchingNextPage}
-                onClick={explore.fetchNextPage}
-              >
-                {explore.isFetchingNextPage ? '불러오는 중…' : '더보기'}
-              </Button>
+        <div className="grid gap-1.5">
+          <form role="search" onSubmit={handleSubmit} className="flex max-w-2xl items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <SearchIcon
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2 text-muted-foreground"
+              />
+              {/* key={query}: 주소의 검색어가 바뀌면(뒤로 가기 등) 입력창을 새로 만들어 같은 글자로 맞춘다(TitleSearchForm과 같은 방식) */}
+              <input
+                key={query}
+                type="search"
+                name="q"
+                defaultValue={query}
+                aria-label="작품 제목"
+                aria-describedby="explore-search-hint"
+                placeholder="작품 제목"
+                className="h-12 w-full min-w-0 rounded-lg border border-input bg-background pr-3 pl-10 text-base placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+              />
             </div>
+            <Button type="submit" className="h-12 px-5 text-base">
+              찾기
+            </Button>
+          </form>
+          <p id="explore-search-hint" className="text-sm text-muted-foreground">
+            인물 검색은 준비 중이에요. 지금은 작품 제목으로만 찾아요.
+          </p>
+        </div>
+
+        <div className="grid gap-3">
+          <ChipGroup label="작품 구분">
+            {TYPE_OPTIONS.map((option) => (
+              <ToggleChip
+                key={option.value}
+                label={option.label}
+                isSelected={type === option.value}
+                onClick={() => updateParams({ type: option.value === 'all' ? null : option.value })}
+              />
+            ))}
+          </ChipGroup>
+          <ChipGroup label="장르">
+            <ToggleChip
+              label="전체 장르"
+              isSelected={genreId === null}
+              onClick={() => updateParams({ genre: null })}
+            />
+            {/* 장르 칩은 TMDB 장르 목록 API(이름 가나다순)에서 온다. 받는 중·실패일 때는 "전체 장르"만 남고 아래 줄에 안내가 붙는다 */}
+            {(genresQuery.data ?? []).map((genre) => (
+              <ToggleChip
+                key={genre.genreId}
+                label={genre.name}
+                isSelected={genreId === genre.genreId}
+                onClick={() => updateParams({ genre: String(genre.genreId), q: null, view: null })}
+              />
+            ))}
+          </ChipGroup>
+          {genresQuery.isError && (
+            <p role="status" className="text-sm text-muted-foreground">
+              장르 목록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.
+            </p>
           )}
-        </>
-      )}
+          <ChipGroup label="보기">
+            <ToggleChip
+              label="새로 볼 수 있게 된 작품만"
+              isSelected={isNewOnly}
+              onClick={() =>
+                updateParams(isNewOnly ? { view: null } : { view: 'new', q: null, genre: null })
+              }
+            />
+          </ChipGroup>
+        </div>
+
+        {explore.isPending ? (
+          <RailSkeleton heading="탐색 결과" />
+        ) : explore.isError ? (
+          <ErrorState
+            title="작품을 불러오지 못했습니다"
+            error={explore.error}
+            onRetry={explore.refetch}
+          />
+        ) : (
+          <>
+            {/* 결과 개수는 거를 때마다 바뀌어 낭독기에 알린다(role="status", 급하지 않은 알림). 더 받을 페이지가 있으면 "이상"으로 쓴다 */}
+            <p role="status" className="text-sm font-semibold tabular-nums">
+              작품 {results.length}편{explore.hasNextPage ? ' 이상' : ''}
+            </p>
+            {results.length === 0 ? (
+              <EmptyState
+                title="조건에 맞는 작품이 없습니다"
+                description="장르나 작품 구분을 바꾸거나 검색어를 지워 보세요. 아직 수집되지 않은 작품은 보이지 않을 수 있습니다."
+              />
+            ) : (
+              <ul
+                aria-label="탐색 결과"
+                className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-5"
+              >
+                {results.map((title) => (
+                  <li key={`${title.mediaType}-${title.tmdbId}`}>
+                    <HomeTitleCard title={title} services={services} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {explore.hasNextPage && (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="h-11 px-6"
+                  disabled={explore.isFetchingNextPage}
+                  onClick={explore.fetchNextPage}
+                >
+                  {explore.isFetchingNextPage ? '불러오는 중…' : '더보기'}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       <div className="grid gap-1.5 border-t border-border pt-4">
         <SourceAttribution />

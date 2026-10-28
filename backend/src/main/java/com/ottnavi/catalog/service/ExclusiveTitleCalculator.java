@@ -7,14 +7,14 @@ import com.ottnavi.catalog.domain.rule.AvailabilityAggregation;
 import com.ottnavi.catalog.domain.rule.ExclusiveRules;
 import com.ottnavi.catalog.domain.rule.ExclusiveSourceRow;
 import com.ottnavi.catalog.domain.rule.ExclusiveTitleGroup;
+import com.ottnavi.catalog.domain.rule.RecentReleaseRules;
 import com.ottnavi.catalog.service.model.ExclusiveTitleItem;
 import com.ottnavi.catalog.service.model.ExclusiveTitleList;
 import com.ottnavi.provider.domain.entity.OttService;
 import com.ottnavi.provider.service.OttServiceQueryService;
-import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -38,11 +38,10 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ExclusiveTitleCalculator {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-
     private final AvailabilityRepository availabilityRepository;
     private final TitleRepository titleRepository;
     private final OttServiceQueryService ottServiceQueryService;
+    private final Clock clock; // KST 기준 오늘(ClockConfig). 테스트에서 고정할 수 있다
 
     /** 7개 서비스 모두의 독점 목록을 한 번에 계산한다. 키는 서비스 ID이고 서비스 7곳이 모두 들어 있다 */
     public Map<Long, ExclusiveTitleList> calculateAll() {
@@ -86,7 +85,10 @@ public class ExclusiveTitleCalculator {
         return result;
     }
 
-    /** 묶음을 화면용 작품 줄로 바꾸고 인기도 높은 순(동률은 작품 ID 순, 인기도 없는 작품은 뒤)으로 정렬한다 */
+    /**
+     * 묶음을 화면용 작품 줄로 바꾸고 정렬한다. 개봉일이 최근 6개월 안인 작품이 먼저, 그다음 오래된 작품, 개봉일이 미래이거나 모르는 작품이 맨 뒤다.
+     * 각 그룹 안은 인기도 높은 순(동률은 작품 ID 순, 인기도 없는 작품은 뒤)이다.
+     */
     private List<ExclusiveTitleItem> toItems(List<ExclusiveTitleGroup> groups, Map<Long, Title> titlesById) {
         // 1. 작품 정보가 있는 묶음만 남긴다(판정 뒤 작품이 지워졌으면 뺀다)
         List<ExclusiveTitleGroup> sorted = new ArrayList<>();
@@ -96,23 +98,21 @@ public class ExclusiveTitleCalculator {
             }
         }
 
-        // 2. 인기도 높은 순으로 정렬한다
+        // 2. 최근 개봉 그룹 → 오래된 과거 → 미래·모름 순으로, 각 그룹 안은 인기도 높은 순으로 정렬한다
+        LocalDate today = LocalDate.now(clock);
         Collections.sort(sorted, new Comparator<ExclusiveTitleGroup>() {
             @Override
             public int compare(ExclusiveTitleGroup a, ExclusiveTitleGroup b) {
-                BigDecimal popularityA = titlesById.get(a.titleId()).getPopularity();
-                BigDecimal popularityB = titlesById.get(b.titleId()).getPopularity();
-                if (popularityA == null && popularityB != null) {
-                    return 1;
+                Title titleA = titlesById.get(a.titleId());
+                Title titleB = titlesById.get(b.titleId());
+                int groupA = RecentReleaseRules.group(titleA.getReleaseDate(), today, RecentReleaseRules.EXCLUSIVE_WINDOW);
+                int groupB = RecentReleaseRules.group(titleB.getReleaseDate(), today, RecentReleaseRules.EXCLUSIVE_WINDOW);
+                if (groupA != groupB) {
+                    return Integer.compare(groupA, groupB);
                 }
-                if (popularityA != null && popularityB == null) {
-                    return -1;
-                }
-                if (popularityA != null) {
-                    int byPopularity = popularityB.compareTo(popularityA);
-                    if (byPopularity != 0) {
-                        return byPopularity;
-                    }
+                int byPopularity = RecentReleaseRules.comparePopularityDesc(titleA.getPopularity(), titleB.getPopularity());
+                if (byPopularity != 0) {
+                    return byPopularity;
                 }
                 return Long.compare(a.titleId(), b.titleId());
             }
@@ -144,6 +144,6 @@ public class ExclusiveTitleCalculator {
         if (oldest != null) {
             checkedAts.add(oldest);
         }
-        return AvailabilityAggregation.dataAsOf(checkedAts, null, LocalDate.now(KST));
+        return AvailabilityAggregation.dataAsOf(checkedAts, null, LocalDate.now(clock));
     }
 }

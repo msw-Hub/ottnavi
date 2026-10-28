@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { BellIcon, InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
+// import { Link, ... } — 이전: 아래 회원 탈퇴 링크용. 링크를 푸터로 옮겨 Link를 쓰지 않는다
 import { Link, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
@@ -35,6 +36,10 @@ const FIELD_LABELS: Record<string, string> = {
   isLowestPriceMode: '계산할 요금제',
 }
 
+// 4번 "계산할 요금제" 구역의 id. 요금 확인 화면(pricing/PricingScreen)의 링크가 주소 #뒤에 같은 값을 붙인다.
+// 기능 폴더끼리 import하지 않는 규칙이라 상수를 공유하지 않고 양쪽에 같은 글자를 쓴다(바꾸면 둘 다 바꾼다)
+const PRICE_MODE_SECTION_ID = 'price-mode'
+
 // 이름표 표에서 찾는다. hasOwn으로 확인하는 이유: 서버가 "constructor" 같은 이름을 보내도 객체 기본 속성이 딸려 나오지 않게 하기 위함이다
 function getFieldLabel(field: string): string {
   return Object.hasOwn(FIELD_LABELS, field) ? FIELD_LABELS[field] : field
@@ -46,12 +51,18 @@ interface SectionCardProps {
   description: string // 구역 안내(왜 묻는지)
   children: ReactNode // 구역의 입력 칸들
   notice?: ReactNode // 구역 안내 아래, 입력 칸 위에 놓는 보충 설명(선택지의 뜻 등)
+  id?: string // 다른 화면에서 이 구역으로 바로 이동할 때 쓰는 이름(주소의 #뒤 값). 예: 요금 확인 화면의 "#price-mode"
 }
 
 // 입력 구역 하나를 카드로 묶는다. 번호는 장식이 아니라 순서 안내라 글자로 "1." 대신 원 안 숫자로 보인다
-function SectionCard({ stepNumber, title, description, children, notice }: SectionCardProps) {
+function SectionCard({ stepNumber, title, description, children, notice, id }: SectionCardProps) {
   return (
-    <section aria-labelledby={`settings-section-${stepNumber}`} className="grid gap-3">
+    // scroll-mt-4: 이 구역으로 스크롤해 올 때 카드 윗선이 화면 맨 위에 딱 붙지 않게 16px 띄운다
+    <section
+      id={id}
+      aria-labelledby={`settings-section-${stepNumber}`}
+      className="grid scroll-mt-4 gap-3"
+    >
       <Card className="bg-card ring-1 ring-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -65,8 +76,11 @@ function SectionCard({ stepNumber, title, description, children, notice }: Secti
               {title}
             </h2>
           </CardTitle>
-          <CardDescription>{description}</CardDescription>
-          {notice}
+          {/* 설명·보충 설명을 제목 글자와 같은 왼쪽 시작선에 맞춘다. 제목 앞에 번호 원(24px, size-6)과 간격(8px, gap-2)이 있어
+              제목 글자가 32px 안쪽에서 시작하므로, 설명도 같은 32px(pl-8)만큼 들여 쓴다(운영 피드백: 설명만 왼쪽으로 튀어나와 보였다).
+              바꿀 때는 위 번호 원 크기·간격과 함께 바꾼다. 이전: <CardDescription>{description}</CardDescription> {notice} (들여쓰기 없음) */}
+          <CardDescription className="pl-8">{description}</CardDescription>
+          {notice && <div className="pl-8">{notice}</div>}
         </CardHeader>
         <CardContent className="grid gap-0 divide-y divide-border">{children}</CardContent>
       </Card>
@@ -102,6 +116,25 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
     shouldFocusError: false, // 기본 포커스는 쓰지 않고 아래 focusFirstInvalidField가 화면 순서로 직접 옮긴다
   })
   const monthlyBudget = useWatch({ control, name: 'monthlyBudget' })
+
+  // 주소가 #price-mode로 끝나면(요금 확인 화면의 "설정에서 … 요금제로 바꾸기" 링크) 4번 "계산할 요금제" 구역으로 내려가 체크박스에 포커스를 준다.
+  // 왜 여기(폼)에서 하나: 설정 화면은 내 설정·서비스 목록을 다 불러온 뒤에야 이 폼을 그린다(SettingsScreen). 그 전에는 구역이 화면에 없어
+  // 찾을 수 없으므로, 폼이 처음 그려진 뒤(useEffect)가 곧 "불러오기가 끝난 뒤"다. 브라우저 기본 #이동은 그 시점에 구역이 없어 동작하지 않는다.
+  // 같은 화면에서 hash만 바뀌어도 다시 이동하도록 location.hash를 의존성으로 둔다
+  useEffect(() => {
+    if (location.hash !== `#${PRICE_MODE_SECTION_ID}`) return
+    // 1. 이동할 구역과 포커스를 줄 체크박스를 찾는다
+    const section = document.getElementById(PRICE_MODE_SECTION_ID)
+    const checkbox = document.getElementById('isLowestPriceMode')
+    if (!section || !checkbox) return
+    // 2. 포커스를 먼저 옮기되 브라우저의 즉시 스크롤은 막는다(preventScroll). 아래 부드러운 스크롤과 겹쳐 화면이 튀지 않게 하려는 것.
+    //    focusVisible: 링크를 마우스로 눌러 왔어도 포커스 테두리(줄의 has-[:focus-visible] 링)를 보여 "여기가 바꿀 곳"임을 드러낸다
+    //    (MDN HTMLElement.focus 옵션. 모르는 브라우저는 무시하고 포커스만 옮긴다)
+    checkbox.focus({ preventScroll: true, focusVisible: true })
+    // 3. 구역 윗선이 보이게 스크롤한다. 동작 줄이기 설정이면 부드럽게 움직이지 않고 바로 옮긴다
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    section.scrollIntoView?.({ block: 'start', behavior: prefersReducedMotion ? 'auto' : 'smooth' })
+  }, [location.hash])
 
   // 저장 성공 뒤 이동할 곳: 로그인 전에 보던 화면(from)이 이 사이트 안의 경로면 거기로, 없으면 첫 화면(/)으로 간다.
   // from은 주소로 올 수 있는 값이라 getSafeRedirectPath로 검사한다(오픈 리다이렉트 방지). 없을 때는 목업 확인용 주소 파라미터(?mock…)를 이어 준다
@@ -227,6 +260,7 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
           체크박스는 브라우저 기본 <input type="checkbox">를 쓴다(shadcn checkbox가 설치돼 있지 않다. 관리자 번들 구성 칸과 같은 방식).
           줄 전체를 <label>로 감싸 글자를 눌러도 켜지고, 높이 44px(min-h-11)로 손가락 터치 크기를 맞췄다 */}
       <SectionCard
+        id={PRICE_MODE_SECTION_ID}
         stepNumber={4}
         title="계산할 요금제"
         description="한 서비스에 요금제가 여럿이면 어떤 요금제로 계산할지 정해요."
@@ -283,9 +317,8 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
           </Alert>
         )}
         <Button type="submit" size="lg" className="h-11 w-full text-base" disabled={save.isPending}>
-          {save.isPending && (
-            <LoaderCircleIcon aria-hidden="true" className="motion-safe:animate-spin" />
-          )}
+          {/* loading-spin: 평소 회전, 동작 줄이기면 밝기만 오르내림(styles/tokens.css). 이전: motion-safe:animate-spin */}
+          {save.isPending && <LoaderCircleIcon aria-hidden="true" className="loading-spin" />}
           {save.isPending ? '저장하는 중' : '저장하기'}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
@@ -293,27 +326,17 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
         </p>
       </section>
 
-      {/* 회원 탈퇴 링크(SCR-13, Task 081). 눈에 덜 띄도록 폼 맨 아래 오른쪽 구석에 작은 빨간 글자로만 둔다(사용자 확정).
-          첫 방문(온보딩)에는 아직 가입을 마치기 전이라 보이지 않는다. 빨간색만으로 뜻을 전하지 않고 "회원 탈퇴" 글자가 있다.
-          높이 44px(min-h-11)는 글자는 작아도 누르는 영역은 터치 크기를 맞추려는 것이다 */}
-      {/* 알림 설정 링크(SCR-12, Task 071): 같은 "계정 관리" 줄의 왼쪽에 둔다. 알림은 설정 행이 있어야 저장되므로(ONBOARDING_REQUIRED)
-          온보딩을 마친 뒤에만 보인다. 이전: 탈퇴 링크만 단독으로 있었다 */}
+      {/* 알림 설정 링크(SCR-12, Task 071): 알림은 설정 행이 있어야 저장되므로(ONBOARDING_REQUIRED) 온보딩을 마친 뒤에만 보인다.
+          회원 탈퇴 링크는 푸터(app/RootLayout.tsx)로 옮겨져 이 줄에는 알림 설정 링크만 남는다(develop 병합 때 합침, 정렬은 ui-designer 확인 필요).
+          이전: 같은 "계정 관리" 줄의 오른쪽에 회원 탈퇴 링크(SCR-13, Task 081)가 있었다. 옮긴 이유: 저장 버튼 바로 아래 빨간 글자가 내 설정과 상관없어 보여 뜬금없다는 운영 피드백이 있었고 사용자 확정으로 푸터(로그인한 사용자에게만, 회색 글자)로 옮겼다. 이동 경로(/settings/withdraw)는 같다 */}
       {settings.isOnboardingDone && (
-        <div className="flex flex-wrap items-center justify-between gap-x-4">
-          <Link
-            to="/settings/notifications"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <BellIcon aria-hidden="true" className="size-4" />
-            알림 설정
-          </Link>
-          <Link
-            to="/settings/withdraw"
-            className="inline-flex min-h-11 items-center rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            회원 탈퇴
-          </Link>
-        </div>
+        <Link
+          to="/settings/notifications"
+          className="inline-flex min-h-11 items-center gap-1.5 justify-self-start rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          <BellIcon aria-hidden="true" className="size-4" />
+          알림 설정
+        </Link>
       )}
     </form>
   )
