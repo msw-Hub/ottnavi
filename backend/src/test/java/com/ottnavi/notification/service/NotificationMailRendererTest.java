@@ -3,9 +3,13 @@ package com.ottnavi.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.ottnavi.notification.domain.enums.NotificationType;
+import com.ottnavi.notification.service.model.NotificationProductItem;
+import com.ottnavi.notification.service.model.NotificationTitleItem;
 import com.ottnavi.notification.service.model.RenderedMail;
+import com.ottnavi.notification.service.model.SubscribeGuidePayload;
 import com.ottnavi.support.IntegrationTestSupport;
 import java.time.Clock;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -87,7 +91,7 @@ class NotificationMailRendererTest extends IntegrationTestSupport {
         String change = renderer.render(NotificationType.PLAN_CHANGE, CHANGE_PAYLOAD).htmlBody();
 
         // then
-        assertThat(guide).contains("이번 달 가입할 서비스", "이번 달에 볼 작품", "넷플릭스 스탠다드", "13,500", "카지노", "시즌 1",
+        assertThat(guide).contains("이번 달 구독할 서비스", "이번 달에 볼 작품", "넷플릭스 스탠다드", "13,500", "카지노", "시즌 1",
                 "[해지 예약 권장]", "웨이브 스탠다드", "10,900", "내 플랜 자세히 보기");
         assertThat(change).contains("[변경] 배정된 서비스에서 빠진 작품", "넷플릭스", "에서 제공 종료", "바뀐 이유", "바뀐 플랜 확인하기");
     }
@@ -100,7 +104,7 @@ class NotificationMailRendererTest extends IntegrationTestSupport {
         String change = renderer.render(NotificationType.PLAN_CHANGE, "{\"changeReasons\":[]}").htmlBody();
 
         // then
-        assertThat(guide).doesNotContain("이번 달 가입할 서비스", "해지 예약 권장", "이번 달 비용");
+        assertThat(guide).doesNotContain("이번 달 구독할 서비스", "해지 예약 권장", "이번 달 비용");
         assertThat(monthly).doesNotContain("이번 달에 볼 작품", "지난 플랜과 달라진 이유", "이미 구독 중이라");
         assertThat(change).doesNotContain("[변경]", "바뀐 이유", "바뀐 플랜의 이번 달 구독");
     }
@@ -136,5 +140,21 @@ class NotificationMailRendererTest extends IntegrationTestSupport {
 
         // then
         assertThat(mail.htmlBody()).contains("회원");
+    }
+
+    @Test
+    void payload_record를_넘기면_JSON으로_바꿔_같은_메일을_만든다() {
+        // given
+        SubscribeGuidePayload payload = new SubscribeGuidePayload(SubscribeGuidePayload.CURRENT_VERSION, "홍길동",
+                "2026-11-03", "2026-11", "11월에는 넷플릭스 스탠다드에 가입해 작품 1개를 볼 수 있어요.",
+                List.of(new NotificationProductItem("넷플릭스 스탠다드", List.of("넷플릭스"), 13_500)), List.of(),
+                List.of(new NotificationTitleItem("카지노", 1, "넷플릭스")), 13_500);
+
+        // when
+        RenderedMail mail = renderer.render(NotificationType.SUBSCRIBE_GUIDE, payload);
+
+        // then
+        assertThat(mail.subject()).isEqualTo("[OTT내비] 저장한 구독 플랜 안내");
+        assertThat(mail.htmlBody()).contains("홍길동", "넷플릭스 스탠다드", "카지노", "2026-11-03");
     }
 }

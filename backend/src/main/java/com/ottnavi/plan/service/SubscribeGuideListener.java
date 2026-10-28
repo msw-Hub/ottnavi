@@ -15,7 +15,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 플랜 저장이 커밋된 뒤 가입 안내(SUBSCRIBE_GUIDE) 알림을 만들고 바로 보낸다(Task 073, TECH 5절).
+ * 플랜 저장이 커밋된 뒤 구독 안내(SUBSCRIBE_GUIDE) 알림을 만들고 바로 보낸다(Task 073, TECH 5절).
  * 저장 응답을 늦추지 않도록 별도 스레드(@Async)에서 돌고, 실패해도 이미 커밋된 저장에는 영향이 없다.
  * 이 메서드에는 @Transactional을 달지 않는다: 커밋이 끝난 뒤라 이 스레드에는 트랜잭션이 없고,
  * 행 생성(REQUIRES_NEW)과 점유·결과 기록(각각 REQUIRES_NEW)이 서비스 쪽에서 따로 커밋된다. 메일 발송은 트랜잭션 밖이다.
@@ -49,7 +49,7 @@ public class SubscribeGuideListener {
 			// 2. 저장된 플랜으로 메일 재료를 조립한다. 이번 달 가입할 상품이 없으면 만들지 않는다
 			Optional<SubscribeGuidePayload> payload = composer.composeSubscribeGuide(event.userId(), event.planId());
 			if (payload.isEmpty()) {
-				log.info("가입 안내를 만들지 않는다(이번 달 가입할 상품 없음): userId={}, planId={}", event.userId(), event.planId());
+				log.info("구독 안내를 만들지 않는다(이번 달 가입할 상품 없음): userId={}, planId={}", event.userId(), event.planId());
 				return;
 			}
 
@@ -64,7 +64,7 @@ public class SubscribeGuideListener {
 			}
 		} catch (Exception e) {
 			// 저장은 이미 커밋됐다. 알림 실패가 사용자에게 가지 않도록 로그만 남긴다
-			log.error("가입 안내 알림 처리 중 예외가 났다: userId={}, planId={}", event.userId(), event.planId(), e);
+			log.error("구독 안내 알림 처리 중 예외가 났다: userId={}, planId={}", event.userId(), event.planId(), e);
 		}
 	}
 }

@@ -28,7 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * 가입 안내의 즉시 발송(dispatchNow)을 실제 PostgreSQL과 가짜 SMTP 서버(GreenMail)로 확인한다(Task 073).
+ * 구독 안내의 즉시 발송(dispatchNow)을 실제 PostgreSQL과 가짜 SMTP 서버(GreenMail)로 확인한다(Task 073).
  * 막으려는 사고: 즉시 발송이 메일을 보내고 SENT로 기록하지 못하는 일, 스케줄러가 이미 점유한 행을 즉시 발송이 또 보내
  * 같은 메일이 두 통 나가는 일, 새 payload 필드가 템플릿에 나오지 않는 일.
  */

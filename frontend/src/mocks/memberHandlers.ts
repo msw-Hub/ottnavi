@@ -10,6 +10,7 @@ import type {
   CommonResponseCurrentPlan,
   CommonResponsePlanChangeHistoryList,
   CommonResponsePlanDraftList,
+  CommonResponsePlanMailPreview,
   CommonResponseSavedPlan,
   CreatePlanRequest,
   PlanDraft,
@@ -25,6 +26,7 @@ import type {
 import {
   denyDemo,
   denyGuest,
+  denyNonDemo,
   hasMockScenario,
   mockWishlist,
   type MockWishlistEntry,
@@ -33,6 +35,7 @@ import {
   resetMockWishlist,
   writeMockJson,
 } from '@/mocks/handlerUtils'
+import { MOCK_MONTHLY_MAIL, MOCK_SUBSCRIBE_GUIDE_MAIL } from '@/mocks/fixtures/mailPreview'
 import { MOCK_PLAN_CHANGES } from '@/mocks/fixtures/planChanges'
 import { buildPlanDrafts, type PlanPriceInfo, type PlanScenario } from '@/mocks/fixtures/plan'
 import {
@@ -74,6 +77,7 @@ import {
  *              POST /api/me/plans                    ({ planId }로 저장, 201 + SavedPlan. 404 판정이 409보다 먼저. 저장하면 나머지 초안은 삭제)
  *              GET  /api/me/plans/current            (저장한 현재 플랜. 없으면 404가 아니라 200 { plan: null })
  *              GET  /api/me/plan-changes             (플랜 변경 내역 최신순. empty 시나리오는 빈 목록, error는 500)
+ *              GET  /api/me/plans/current/mail-preview (Task 110, 데모 계정 전용 알림 메일 예시. mail-* 시나리오는 핸들러 주석 참고)
  *
  * 시나리오(주소의 ?mockScenario= 값을 목업 모드가 X-Mock-Scenario 요청 헤더로 보낸다):
  * - stale:      플랜 저장의 첫 요청만 409 PLAN_DRAFT_STALE를 돌려주고 두 번째부터 성공한다(자동 재계산 흐름 확인)
@@ -833,5 +837,54 @@ export const memberHandlers: RequestHandler[] = [
       data: { planId: draft.planId, planType: draft.planType, status: 'ACTIVE', activatedAt },
     }
     return HttpResponse.json(body, { status: 201 })
+  }),
+
+  // 알림 메일 예시 조회(계약 getCurrentPlanMailPreview, Task 110): 데모 계정 전용. 비로그인 401, 데모가 아니면 403이다.
+  // 시나리오: mail-monthly-only(월초 1통 + NO_SUBSCRIBE_GUIDE) / mail-none(0통 + NO_CURRENT_PLAN) / mail-forbidden(데모여도 403) /
+  //          mail-error(500) / mail-slow(3초 뒤 기본 응답). 저장한 현재 플랜이 없으면 시나리오 없이도 mail-none과 같다
+  http.get('/api/me/plans/current/mail-preview', async ({ request }) => {
+    // 1. 느린 응답 시나리오는 로딩 상태를 눈으로 보도록 3초 기다린다
+    await wait(hasMockScenario(request, 'mail-slow') ? 3000 : undefined)
+
+    // 2. 인증·역할 검사(서버 순서: 401 → 403)
+    const guest = denyGuest(request)
+    if (guest) return guest
+    const notDemo = denyNonDemo(request)
+    if (notDemo) return notDemo
+    if (hasMockScenario(request, 'mail-forbidden')) {
+      return problemResponse(request, 403, 'Forbidden', 'FORBIDDEN', '접근 권한이 없습니다.')
+    }
+
+    // 3. 오류 시나리오
+    if (hasMockScenario(request, 'mail-error')) {
+      return problemResponse(
+        request,
+        500,
+        'Internal Server Error',
+        'INTERNAL_ERROR',
+        '일시적인 오류가 발생했습니다.',
+      )
+    }
+
+    // 4. 저장한 플랜이 없거나 mail-none이면 메일 0통
+    if (activePlan === null || hasMockScenario(request, 'mail-none')) {
+      const empty: CommonResponsePlanMailPreview = {
+        success: true,
+        data: { mails: [], noMailReasons: ['NO_CURRENT_PLAN'] },
+      }
+      return HttpResponse.json(empty)
+    }
+
+    // 5. 월초 메일만 있는 경우 / 기본(구독 안내 + 월초)
+    const body: CommonResponsePlanMailPreview = hasMockScenario(request, 'mail-monthly-only')
+      ? {
+          success: true,
+          data: { mails: [MOCK_MONTHLY_MAIL], noMailReasons: ['NO_SUBSCRIBE_GUIDE'] },
+        }
+      : {
+          success: true,
+          data: { mails: [MOCK_SUBSCRIBE_GUIDE_MAIL, MOCK_MONTHLY_MAIL], noMailReasons: [] },
+        }
+    return HttpResponse.json(body)
   }),
 ]

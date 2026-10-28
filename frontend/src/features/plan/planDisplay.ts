@@ -11,7 +11,13 @@ import {
   WalletIcon,
   type LucideIcon,
 } from 'lucide-react'
-import type { PlanAssignment, PlanDraft, PlanType, UnscheduledReason } from '@/api/generated/model'
+import type {
+  PlanAssignment,
+  PlanDraft,
+  PlanMailPreviewType,
+  PlanType,
+  UnscheduledReason,
+} from '@/api/generated/model'
 
 // 플랜 유형 이름(PRD 11절 35번)
 export const PLAN_TYPE_LABELS: Record<PlanType, string> = {
@@ -135,4 +141,10 @@ export function comparePriority(
   b: { priority: PlanAssignment['priority'] },
 ) {
   return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
+}
+
+// 알림 메일 예시 팝업(Task 110)의 탭 이름. 실제 회원이 메일을 받는 때를 이름으로 삼아 "어떤 메일인지"가 바로 읽힌다
+export const MAIL_PREVIEW_TYPE_LABELS: Record<PlanMailPreviewType, string> = {
+  SUBSCRIBE_GUIDE: '저장하면 오는 메일',
+  MONTHLY: '매월 1일에 오는 메일',
 }

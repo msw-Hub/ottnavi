@@ -64,9 +64,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * 플랜 저장·재계산에서 알림 행이 만들어지는 흐름(Task 073)을 실제 DB·Redis·가짜 SMTP(GreenMail)로 확인한다.
- * 가입 안내는 저장 커밋 뒤 비동기로 만들어지고 즉시 발송까지 켜 둔다(app.notification.immediate-send-enabled=true).
+ * 구독 안내는 저장 커밋 뒤 비동기로 만들어지고 즉시 발송까지 켜 둔다(app.notification.immediate-send-enabled=true).
  * 시나리오: 상품 A(서비스 0, 10,000원)·B(서비스 1, 20,000원), 월 예산 20,000원, 영화 3편(꼭: 서비스 0, 보고싶음: 서비스 1, 여유될 때: 없음).
- * 막으려는 사고: 저장했는데 가입 안내가 없거나 두 번 만들어지는 일, 알림을 끈 사용자에게 행이 생기는 일,
+ * 막으려는 사고: 저장했는데 구독 안내가 없거나 두 번 만들어지는 일, 알림을 끈 사용자에게 행이 생기는 일,
  * 월 중간 재계산에서 월초 안내가 나가는 일, 같은 달을 두 번 재계산해 월초 안내가 두 통 나가는 일,
  * 다음 달 작품이 빠졌는데 변경 알림이 나가는 일(또는 이번 달 작품이 빠졌는데 안 나가는 일).
  */
@@ -145,7 +145,7 @@ class PlanNotificationIntegrationTest extends IntegrationTestSupport {
 		jdbc.update("DELETE FROM title WHERE tmdb_id BETWEEN " + BASE_TMDB_ID + " AND " + MAX_TMDB_ID);
 	}
 
-	// 가입 안내
+	// 구독 안내
 
 	@Test
 	void 저장하면_가입_안내_행이_1개_만들어지고_즉시_발송으로_메일_1통이_가며_같은_달에_다시_저장해도_늘지_않는다() throws Exception {
@@ -161,7 +161,7 @@ class PlanNotificationIntegrationTest extends IntegrationTestSupport {
 		assertThat(greenMail.waitForIncomingEmail(AWAIT_MILLIS, 1)).isTrue();
 		awaitRows("SELECT COUNT(*) FROM notification_outbox WHERE dedupe_key = ? AND status = 'SENT'", dedupeKey, 1);
 		String body = (String) greenMail.getReceivedMessages()[0].getContent();
-		assertThat(body).contains("이번 달 가입할 서비스").contains("작품");
+		assertThat(body).contains("이번 달 구독할 서비스").contains("작품");
 		assertThat(planId).isPositive();
 
 		// when: 같은 달에 다시 계산해서 저장한다
@@ -387,7 +387,7 @@ class PlanNotificationIntegrationTest extends IntegrationTestSupport {
 				Integer.class, planId, unitsByTmdbId.get(tmdbId).getId());
 	}
 
-	/** 비동기로 만들어지는 가입 안내 행이 생기고 즉시 발송이 끝날 때까지 기다린다(뒤 단계가 같은 사용자의 플랜을 바꾸기 전에 비동기 처리를 끝내려는 것) */
+	/** 비동기로 만들어지는 구독 안내 행이 생기고 즉시 발송이 끝날 때까지 기다린다(뒤 단계가 같은 사용자의 플랜을 바꾸기 전에 비동기 처리를 끝내려는 것) */
 	private void awaitGuide(User user) throws InterruptedException {
 		awaitRows("SELECT COUNT(*) FROM notification_outbox WHERE user_id = ? AND type = 'SUBSCRIBE_GUIDE' "
 				+ "AND status = 'SENT'", user.getId(), 1);
