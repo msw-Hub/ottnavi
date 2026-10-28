@@ -87,6 +87,16 @@ export const routes: RouteObject[] = [
             lazy: { Component: () => import('@/pages/AboutPage').then((m) => m.AboutPage) },
           },
           {
+            // 개인정보처리방침 (화면 번호 없음). Google 로그인 동의 화면 게시에 필요한 공개 주소라 로그인 없이 연다
+            path: 'privacy',
+            lazy: { Component: () => import('@/pages/PrivacyPage').then((m) => m.PrivacyPage) },
+          },
+          {
+            // 이용약관 (화면 번호 없음). 로그인 없이 연다
+            path: 'terms',
+            lazy: { Component: () => import('@/pages/TermsPage').then((m) => m.TermsPage) },
+          },
+          {
             path: 'accuracy', // SCR-05 정확도 안내 (3단계, 준비 중)
             lazy: { Component: () => import('@/pages/AccuracyPage').then((m) => m.AccuracyPage) },
           },

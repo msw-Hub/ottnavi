@@ -13,12 +13,14 @@ const MAX_RANK_DISPLAY = 999
 
 interface ExclusiveTitleCardProps {
   title: ExclusiveTitle // 보여 줄 독점 작품
-  rank: number // 인기순 순위(1부터). 지금까지 불러온 목록에서의 위치라 다음 쪽이 붙어도 25, 26…으로 이어진다
+  rank: number // 목록 안 순서(1부터, 최근 공개작 먼저 → 인기도순). 지금까지 불러온 목록에서의 위치라 다음 쪽이 붙어도 25, 26…으로 이어진다
   // serviceName: string // 지금 고른 서비스 이름. 카드의 "있음" 배지 줄을 다시 넣을 때 함께 되살린다
 }
 
 /**
- * 독점 목록의 작품 카드다(세로 구조: 포스터(왼쪽 위에 인기 순위) → 제목 → "영화/드라마 · 연도 · 시즌").
+ * 독점 목록의 작품 카드다(세로 구조: 포스터(왼쪽 위에 인기 순위) → 제목 한 줄(길면 말줄임) → "독점 시즌 · 영화/드라마 · 연도" 한 줄).
+ * H-3: 제목·정보 줄 규칙을 홈 카드와 맞췄다. OTT 로고는 넣지 않는다(사용자 결정: 한 서비스의 목록이라 표시가 필요 없다).
+ * 이전 구조: 포스터 → 제목(최대 두 줄) → "영화/드라마 · 연도 · 시즌"
  *
  * 홈 카드(features/home의 HomeTitleCard)와 뼈대가 같지만 찜 버튼이 없고, 대신 포스터 왼쪽 위에 인기 순위 숫자가 있다.
  * 1. 이 서비스의 "있음" 배지는 넣지 않았다. 탭과 목록 요약 줄이 서비스를 이미 말해, 모든 카드에 같은 배지가 반복될 뿐이다.
@@ -41,25 +43,36 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
       <RankNotch rank={rank} />
 
       <div className="grid min-w-0 content-start gap-1">
-        <h3 className="line-clamp-2 text-sm leading-snug font-semibold">
+        {/* H-3(사용자 확정 B안, 홈 카드와 같은 규칙): 제목은 항상 한 줄이고 길면 끝을 말줄임(…)으로 줄인다(truncate).
+            말줄임은 보이는 모양만 자른다. DOM 글자는 전체 제목이라 낭독기는 "N번째 + 전체 제목"을 읽고, 마우스 사용자는 링크 title로 전체를 본다.
+            이전: <h3 className="line-clamp-2 text-sm leading-snug font-semibold"> (제목 줄 수에 따라 카드마다 정보 줄 높이가 달랐다) */}
+        <h3 className="truncate text-sm leading-snug font-semibold">
           <Link
             to={detailPath}
             data-card-link=""
             title={title.title}
             className="text-inherit no-underline after:absolute after:inset-0 after:content-[''] group-hover:underline focus-visible:outline-none"
           >
-            {/* 낭독기용 순위. 화면의 큰 숫자는 aria-hidden이라, 링크 이름이 "인기 1위 오징어 게임"처럼 읽히게 여기서 글자로 준다 */}
-            {/* 띄어쓰기를 span 밖에 둔 이유: span 안 끝 공백은 이름 계산에서 잘려 "인기 1위심야 정비소"처럼 붙어 읽힌다 */}
-            <span className="sr-only">인기 {rank}위</span> {title.title}
+            {/* 낭독기용 순위. 화면의 큰 숫자는 aria-hidden이라, 링크 이름이 "1번째 오징어 게임"처럼 읽히게 여기서 글자로 준다 */}
+            {/* 띄어쓰기를 span 밖에 둔 이유: span 안 끝 공백은 이름 계산에서 잘려 "1번째심야 정비소"처럼 붙어 읽힌다 */}
+            {/* 정렬이 "최근 6개월 안 공개작 먼저 → 같은 묶음 안 인기도순"으로 바뀌어 숫자가 인기 순위가 아니라 목록 안 위치가 됐다.
+                그래서 "N번째"로 읽힌다. 이전: <span className="sr-only">인기 {rank}위</span> */}
+            <span className="sr-only">{rank}번째</span> {title.title}
           </Link>
         </h3>
+        {/* H-3: 제목 아래 정보를 홈 카드와 같은 한 줄 순서([부가정보] · 영화/드라마 · 연도)로 맞춘다.
+            독점 카드의 부가정보는 "독점으로 확인된 시즌"이다(드라마만, 일부 시즌만 독점일 수 있다). 이 카드를 보는 이유가 되는 정보라
+            맨 앞에 굵게 둬 좁은 카드에서 말줄임이 생겨도 남게 한다(홈 카드가 "찜 214명"을 맨 앞에 두는 것과 같은 이유).
+            시즌은 "시즌 1·2"처럼 가운뎃점으로 잇는다. 쉼표보다 좁은 카드에서 덜 끊긴다.
+            길면 truncate로 한 줄 말줄임하고, 전체 문장은 title(마우스)과 DOM 글자(낭독기)로 전한다.
+            이전: 영화/드라마 · 연도 · 시즌 1·2 순서로 쓰고 줄바꿈을 허용했다
         <p className="text-xs text-muted-foreground tabular-nums">
           {MEDIA_TYPE_TEXT[title.mediaType]} · {title.releaseYear ?? '연도 미상'}
-          {/* 시즌은 "시즌 1·2"처럼 가운뎃점으로 잇는다. 쉼표보다 좁은 카드에서 덜 끊긴다 */}
           {title.exclusiveSeasonNumbers && title.exclusiveSeasonNumbers.length > 0 && (
             <> · 시즌 {title.exclusiveSeasonNumbers.join('·')}</>
           )}
-        </p>
+        </p> */}
+        <ExclusiveInfoLine title={title} />
 
         {/* 이전: 카드마다 "{서비스} [✓ 있음]" 배지를 보였다. 탭과 목록 요약 줄이 이미 서비스를 말하고 모든 카드가 같은 글자라
             정보 없이 줄만 늘어 뺐다(1차안 판단). 다시 넣으려면 아래 주석을 푼다
@@ -87,6 +100,32 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
   )
 }
 
+// 제목 아래 한 줄: [독점 시즌] · [영화/드라마 · 연도]. 넘치면 한 줄 말줄임(truncate). 영화나 시즌 정보가 없으면 "영화 · 2024"만 보인다
+function ExclusiveInfoLine({ title }: { title: ExclusiveTitle }) {
+  // 1. 독점으로 확인된 시즌 글자(드라마에서 시즌 번호가 있을 때만)
+  const seasonText =
+    title.exclusiveSeasonNumbers && title.exclusiveSeasonNumbers.length > 0
+      ? `시즌 ${title.exclusiveSeasonNumbers.join('·')}`
+      : null
+  // 2. 작품 구분과 연도
+  const typeYearText = `${MEDIA_TYPE_TEXT[title.mediaType]} · ${title.releaseYear ?? '연도 미상'}`
+  // 3. 마우스를 올리면 잘린 부분까지 보이게 전체 문장을 title로 준다
+  const fullText = [seasonText, typeYearText].filter(Boolean).join(' · ')
+
+  return (
+    <p title={fullText} className="truncate text-xs text-muted-foreground tabular-nums">
+      {seasonText && (
+        <>
+          {/* 홈 카드의 부가정보와 같은 강조(굵은 foreground 글자). 색이 아니라 글자 자체가 정보다 */}
+          <span className="font-semibold text-foreground">{seasonText}</span>
+          {' · '}
+        </>
+      )}
+      <span>{typeYearText}</span>
+    </p>
+  )
+}
+
 /**
  * 포스터 왼쪽 위 모서리의 인기 순위 숫자다(넷플릭스 "TOP 10"의 큰 숫자 느낌을 이 화면 크기에 맞게 옮겼다).
  *
@@ -97,7 +136,7 @@ export function ExclusiveTitleCard({ title, rank }: ExclusiveTitleCardProps) {
  *   칸이 바탕과 같은 색이라 "포스터 위 배지"보다 "포스터가 한 모서리 잘린 모양"으로 보여, 순위가 포스터 정보가 아니라 목록 정보라는 것이 드러난다.
  * - 가리는 넓이: 한두 자리 숫자 기준 모바일 약 32×30px(포스터 128×192px의 4% 안팎). 포스터 제목 글자는 대개 아래쪽이라 식별을 해치지 않는다.
  * 자릿수: 1~99는 큰 글자, 100~999는 한 단계 작은 글자로 같은 칸 높이를 지킨다. 1000 이상은 "999+"로 줄인다.
- * 낭독기: 숫자는 장식(aria-hidden)이고, 같은 뜻을 제목 링크 안 sr-only "인기 N위"가 읽힌다.
+ * 낭독기: 숫자는 장식(aria-hidden)이고, 같은 뜻을 제목 링크 안 sr-only "N번째"가 읽힌다.
  * pointer-events-none: 숫자 칸을 눌러도 카드 전체 링크(제목 링크의 ::after)가 눌리게 한다.
  */
 function RankNotch({ rank }: { rank: number }) {

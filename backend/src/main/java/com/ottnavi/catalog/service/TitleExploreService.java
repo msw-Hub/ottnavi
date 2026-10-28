@@ -4,10 +4,13 @@ import com.ottnavi.catalog.domain.entity.Genre;
 import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.repository.GenreRepository;
 import com.ottnavi.catalog.domain.repository.TitleRepository;
+import com.ottnavi.catalog.domain.rule.RecentReleaseRules;
 import com.ottnavi.catalog.service.model.GenreInfo;
 import com.ottnavi.catalog.service.model.TitleCards;
 import com.ottnavi.catalog.service.model.TitleSearchResult;
 import com.ottnavi.global.error.FieldValidationException;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 탐색(Task 107, FR-23): 장르·출연자 이름으로 우리 DB에 저장된 작품만 찾는다. TMDB를 호출하지 않는다.
- * 결과는 "7개 서비스에서 확인된 범위"이며 인기도 높은 순이다. 출연진은 작품당 상위 10명만 저장돼 있다.
+ * 결과는 "7개 서비스에서 확인된 범위"이며 최근 2년 개봉작이 먼저, 각 그룹 안은 인기도 높은 순이다. 출연진은 작품당 상위 10명만 저장돼 있다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -28,6 +31,7 @@ public class TitleExploreService {
     private final GenreRepository genreRepository;
     private final TitleRepository titleRepository;
     private final TitleCardAssembler titleCardAssembler;
+    private final Clock clock; // KST 기준 오늘(ClockConfig)
 
     /** 작품이 하나 이상 연결된 장르를 이름 가나다순으로 돌려준다 */
     public List<GenreInfo> listGenres() {
@@ -40,7 +44,9 @@ public class TitleExploreService {
 
     /** 장르에 속한 작품을 인기도 순으로 한 페이지 돌려준다. 없는 장르는 오류가 아니라 빈 결과다 */
     public TitleSearchResult listTitlesByGenre(int genreId, int page, int size) {
-        Page<Title> titles = titleRepository.findPageByGenreId(genreId, PageRequest.of(page, size));
+        LocalDate today = LocalDate.now(clock);
+        Page<Title> titles = titleRepository.findPageByGenreId(genreId,
+                today.minus(RecentReleaseRules.SEARCH_WINDOW), today, PageRequest.of(page, size));
         return toResult(titles, page, size);
     }
 
@@ -59,7 +65,9 @@ public class TitleExploreService {
         }
 
         // 2. 이름이 같은 출연자의 작품 조회
-        Page<Title> titles = titleRepository.findPageByCastName(trimmed, PageRequest.of(page, size));
+        LocalDate today = LocalDate.now(clock);
+        Page<Title> titles = titleRepository.findPageByCastName(trimmed,
+                today.minus(RecentReleaseRules.SEARCH_WINDOW), today, PageRequest.of(page, size));
         return toResult(titles, page, size);
     }
 

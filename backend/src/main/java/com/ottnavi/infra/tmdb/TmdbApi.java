@@ -45,7 +45,7 @@ public interface TmdbApi {
             @RequestParam("page") int page
     );
 
-    // 2-1. 영화 인기순 목록 (서비스별 인기 순위 스냅샷용. 후보 수집과 같은 경로에 sort_by만 더한다)
+    // 2-1. 영화 인기순 목록 (서비스별 인기 순위 스냅샷용. 후보 수집과 같은 경로에 sort_by와 한국 제작·최근 개봉 필터를 더한다)
     @GetMapping("/discover/movie")
     TmdbPage<TmdbMovieSummary> discoverPopularMovies(
             @RequestParam("with_watch_providers") String withWatchProviders,
@@ -53,10 +53,12 @@ public interface TmdbApi {
             @RequestParam("with_watch_monetization_types") String monetizationTypes,
             @RequestParam("language") String language,
             @RequestParam("sort_by") String sortBy,
+            @RequestParam("with_origin_country") String originCountry,
+            @RequestParam("primary_release_date.gte") String releasedFrom,
             @RequestParam("page") int page
     );
 
-    // 2-2. 드라마 인기순 목록
+    // 2-2. 드라마 인기순 목록 (첫 방영일 필터는 first_air_date.gte)
     @GetMapping("/discover/tv")
     TmdbPage<TmdbTvSummary> discoverPopularTvs(
             @RequestParam("with_watch_providers") String withWatchProviders,
@@ -64,6 +66,8 @@ public interface TmdbApi {
             @RequestParam("with_watch_monetization_types") String monetizationTypes,
             @RequestParam("language") String language,
             @RequestParam("sort_by") String sortBy,
+            @RequestParam("with_origin_country") String originCountry,
+            @RequestParam("first_air_date.gte") String releasedFrom,
             @RequestParam("page") int page
     );
 

@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 서비스별 인기 순위 수집(Task 107): 서비스 7곳 × 영화·드라마별로 TMDB discover(인기순) 한 쪽을 받아 오늘 날짜로 저장한다.
+ * 서비스별 인기 순위 수집(Task 107): 서비스 7곳 × 영화·드라마별로 TMDB discover(한국 제작, 최근 2년 안에 공개된 작품, 인기순) 한 쪽을 받아 오늘 날짜로 저장한다.
  * 저장한 것을 스냅샷(그날 받은 인기 순위 원본의 날짜별 기록)이라 부른다. TMDB는 오늘의 인기도만 주고 지난 값은 주지 않으므로,
  * 최근 7일 평균 순위를 만들려면 매일 받아 DB에 쌓아 두어야 한다. 순위 완성본을 미리 만들어 두는 것이 아니라,
  * 조회할 때(PopularityRankingService) 이 기록을 읽어 평균을 계산한다(기록은 최대 7일 × 14자리 × 20건 = 1,960행이라 가볍다).
@@ -46,6 +46,7 @@ public class PopularityCollectService {
 	public PopularityCollectSummary collect() {
 		// 1. 준비: 저장할 날짜(오늘), 서비스 7곳의 정보, 서비스마다 TMDB에 물을 때 쓸 제공처 번호 묶음을 모은다
 		LocalDate snapshotDate = LocalDate.now(clock);
+		LocalDate releasedFrom = snapshotDate.minusYears(properties.recentYears()); // 이 날짜 이후 공개된 작품만 순위에 넣는다
 		Map<OttServiceCode, OttService> servicesByCode = new HashMap<>();
 		for (OttService service : ottServiceQueryService.listOttServices()) {
 			servicesByCode.put(service.getCode(), service);
@@ -67,7 +68,11 @@ public class PopularityCollectService {
 			for (MediaType mediaType : MediaType.values()) {
 				slots++;
 				try {
-					List<PopularityItem> items = fetchTop(target.withWatchProviders(), mediaType);
+					List<PopularityItem> items = fetchTop(target.withWatchProviders(), mediaType, releasedFrom);
+					if (items.isEmpty()) {
+						// 한국 제작·최근 2년 필터 때문에 비는 조합이 있을 수 있다(정상). 같은 날 이전 행은 비우고 다른 날짜 스냅샷은 건드리지 않는다
+						log.info("조건에 맞는 인기 작품이 없어 저장할 행이 없다: serviceCode={}, mediaType={}", target.serviceCode(), mediaType);
+					}
 					savedRows += snapshotService.replace(snapshotDate, service, mediaType, items);
 				} catch (TmdbException e) {
 					// 4. TMDB 호출 실패는 그 자리만 건너뛴다(예상 가능한 실패)
@@ -90,10 +95,12 @@ public class PopularityCollectService {
 	}
 
 	/** TMDB에서 인기순 한 쪽을 받아 상위 topN개를 인기 작품 목록으로 바꾼다(트랜잭션 밖 호출) */
-	private List<PopularityItem> fetchTop(String withWatchProviders, MediaType mediaType) {
+	private List<PopularityItem> fetchTop(String withWatchProviders, MediaType mediaType, LocalDate releasedFrom) {
 		if (mediaType == MediaType.MOVIE) {
-			return PopularityItemMapper.fromMovies(tmdbClient.discoverPopularMovies(withWatchProviders, 1), properties.topN());
+			return PopularityItemMapper.fromMovies(tmdbClient.discoverPopularMovies(withWatchProviders, releasedFrom, 1),
+					properties.topN());
 		}
-		return PopularityItemMapper.fromTvs(tmdbClient.discoverPopularTvs(withWatchProviders, 1), properties.topN());
+		return PopularityItemMapper.fromTvs(tmdbClient.discoverPopularTvs(withWatchProviders, releasedFrom, 1),
+				properties.topN());
 	}
 }

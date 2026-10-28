@@ -22,7 +22,7 @@ const EXCLUSIVE_STALE_TIME_MS = 60 * 1000
 
 // 지금까지 받은 쪽들을 한 목록으로 합친 모양(select가 만든다)
 export interface ExclusiveTitleList {
-  items: ExclusiveTitle[] // 지금까지 받은 작품(인기순)
+  items: ExclusiveTitle[] // 지금까지 받은 작품(서버 순서: 최근 6개월 안 공개작 먼저, 같은 묶음 안은 인기도순)
   totalElements: number // 이 서비스 독점으로 확인된 작품 전체 수
   isJudged: boolean // 독점을 판정했는지. false면 데이터 부족 서비스라 화면이 목록 대신 안내를 보인다
   dataAsOf: string // 독점을 계산한 데이터의 기준일(마지막으로 받은 쪽의 값)

@@ -9,7 +9,7 @@ import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.stereotype.Component;
 
 /**
- * 수집 Job이 끝나면 서비스별 독점 목록 캐시(exclusiveTitles)를 갱신한다(Task 078).
+ * 수집 Job이 끝나면 서비스별 독점 목록 캐시(exclusiveTitlesV2)를 갱신한다(Task 078).
  * 성공(COMPLETED)이면 7개 서비스의 독점 목록을 미리 계산해 채우고, 실패·중단이면 비우기만 한다(다음 조회가 그 자리에서 계산한다).
  * 실패한 실행도 실패 시점까지는 제공 상태가 작품 단위로 반영되어 있으므로 옛 목록을 남기지 않으려고 비운다.
  * 계산이나 Redis 쓰기가 실패해도 이미 끝난 수집 결과를 바꾸지 않도록 예외를 올리지 않고 경고만 남긴다.

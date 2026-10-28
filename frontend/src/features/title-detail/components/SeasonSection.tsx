@@ -66,9 +66,12 @@ export function SeasonSection({
   const isAnyRuntimeEstimated = seasons.some((season) => season.isRuntimeEstimated)
 
   return (
-    <section className="grid gap-3">
+    // 구간 제목 h2 text-xl bold, 제목 줄과 내용 사이 16px(gap-section-inner)로 맞췄다(styles/tokens.css R3·R4).
+    // 제목 옆 합계 줄과 "모든 시즌의 제공처가 같습니다" 안내, 시즌 카드가 모두 이 section의 직접 자식이라 이 값 하나로 띄운다.
+    // 이전: <section className="grid gap-3"> … <h2 className="text-lg font-semibold">
+    <section className="grid gap-section-inner">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-lg font-semibold">시즌별 제공처와 시청 시간</h2>
+        <h2 className="text-xl font-bold">시즌별 제공처와 시청 시간</h2>
         {seasons.length > 0 && (
           <p className="text-sm text-muted-foreground tabular-nums">
             시즌 {seasons.length}개 · 총 {formatMinutes(totalRuntimeMin)}
@@ -157,8 +160,14 @@ function SeasonItem({
 
   return (
     <div className="grid gap-1.5 rounded-lg border border-border bg-card p-3 sm:p-4">
+      {/* 이름 줄과 찜 버튼(높이 44px)의 세로 가운데를 맞춘다(운영 피드백: 시즌 이름과 찜 버튼 정렬이 틀어져 보임).
+          원인: pt-2.5(10px)는 줄 높이 24px를 가정한 값인데 h3가 본문 줄 높이 1.6(25.6px)을 물려받아 글자 줄 가운데가 22.8px로
+          버튼 가운데(22px)보다 아래였고, 글자 크기(16px)가 버튼 글자(14px)보다 커 바닥선은 약 1.5px 더 내려가 보였다.
+          지금: 줄 높이를 leading-6(24px)로 고정하고 위아래 10px(py-2.5)를 줘 첫 줄 가운데가 10 + 12 = 22px, 버튼 가운데와 같다.
+          items-start는 그대로 둔다: 이름이 길어 두 줄로 꺾여도 버튼이 첫 줄 옆(카드 오른쪽 위)에 머문다(items-center면 두 줄 사이로 내려간다).
+          이전: <h3 className="min-w-0 pt-2.5 font-semibold"> */}
       <div className="grid grid-cols-[1fr_auto] items-start gap-x-2">
-        <h3 className="min-w-0 pt-2.5 font-semibold">{seasonName}</h3>
+        <h3 className="min-w-0 py-2.5 text-base leading-6 font-semibold">{seasonName}</h3>
         <WishlistControl
           mediaType="tv"
           tmdbId={tmdbId}

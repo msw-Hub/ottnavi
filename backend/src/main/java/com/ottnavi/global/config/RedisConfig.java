@@ -35,7 +35,9 @@ public class RedisConfig {
     // 캐시 이름 (@Cacheable(cacheNames = ...)에서 이 상수를 쓴다)
     public static final String TITLE_DETAIL = "titleDetail";         // 작품 상세(Task 050·051)
     public static final String PLAN_CALC = "planCalc";               // 계산 결과, 키는 input_hash(TECH 1절)
-    public static final String EXCLUSIVE_TITLES = "exclusiveTitles"; // 서비스별 독점 목록, 키는 서비스 ID(Task 078)
+    // 서비스별 독점 목록, 키는 서비스 ID(Task 078). 정렬 규칙(최근 6개월 개봉작 먼저)을 바꾼 배포 직후 옛 순서의 캐시가 TTL(24h) 동안 남지 않도록
+    // 이름을 exclusiveTitles에서 V2로 바꿨다. 옛 키는 TTL로 저절로 사라지고, 첫 조회가 미스가 되어 새 순서로 채워진다
+    public static final String EXCLUSIVE_TITLES = "exclusiveTitlesV2";
 
     // 홈·탐색 공개 응답 캐시(Task 107). 모두 로그인 정보 없이 모두에게 같은 목록이다
     public static final String HOME_POPULARITY = "homePopularity";     // 인기 순위, 키는 기간:서비스:개수

@@ -1,5 +1,6 @@
 import type { PlanDraft } from '@/api/generated/model'
 import { DataAsOf } from '@/components/common/DataAsOf'
+import { PageSection } from '@/components/common/PageSection'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { PlanMonthCard } from '@/features/plan/components/PlanMonthCard'
 import { PlanSummary } from '@/features/plan/components/PlanSummary'
@@ -15,6 +16,7 @@ interface PlanDetailProps {
 /**
  * 플랜 한 개의 내용(요약 → 달별 카드 → 남은 작품 → 기준일·출처 안내)이다.
  * 초안 결과(PlanResult)와 "내 현재 플랜"이 같은 모양이라 한 컴포넌트로 뽑아 재사용한다(두 곳이 따로 놀아 출처·기준일 표기가 빠지는 일을 막는다).
+ * 감싸는 요소 없이 조각(<>)으로 내보내므로, 구간 사이 간격은 부르는 쪽 부모의 gap-section 하나가 정한다(styles/tokens.css R2).
  */
 export function PlanDetail({ draft, typeNames, serviceNames }: PlanDetailProps) {
   // 3개월 중 연도가 바뀌는 달이 있으면 달 이름에 연도를 붙인다(예: 2026년 12월 → 2027년 1월)
@@ -29,10 +31,10 @@ export function PlanDetail({ draft, typeNames, serviceNames }: PlanDetailProps) 
         withYear={withYear}
       />
 
-      <section aria-labelledby="plan-months-heading" className="grid gap-3">
-        <h2 id="plan-months-heading" className="text-lg font-semibold">
-          달별 구독과 볼 작품
-        </h2>
+      {/* 구간 제목·간격은 공통 PageSection이 맡는다(styles/tokens.css R3·R4). 달 카드 사이 16px는 그대로다.
+          이전: <section aria-labelledby="plan-months-heading" className="grid gap-3">
+                  <h2 id="plan-months-heading" className="text-lg font-semibold">달별 구독과 볼 작품</h2> */}
+      <PageSection headingId="plan-months-heading" title="달별 구독과 볼 작품">
         <div className="grid gap-4 lg:grid-cols-3">
           {draft.months.map((month) => (
             <PlanMonthCard
@@ -43,7 +45,7 @@ export function PlanDetail({ draft, typeNames, serviceNames }: PlanDetailProps) 
             />
           ))}
         </div>
-      </section>
+      </PageSection>
 
       <UnscheduledList items={draft.unscheduled} />
 

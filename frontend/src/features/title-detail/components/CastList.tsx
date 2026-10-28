@@ -10,8 +10,10 @@ interface CastListProps {
  */
 export function CastList({ cast }: CastListProps) {
   return (
-    <section className="grid gap-3">
-      <h2 className="text-lg font-semibold">주요 출연진</h2>
+    // 구간 제목 h2 text-xl bold, 제목과 내용 사이 16px(gap-section-inner)로 맞췄다(styles/tokens.css R3·R4).
+    // 이전: <section className="grid gap-3"><h2 className="text-lg font-semibold">
+    <section className="grid gap-section-inner">
+      <h2 className="text-xl font-bold">주요 출연진</h2>
       {cast.length === 0 ? (
         <p className="text-sm text-muted-foreground">출연진 정보가 없습니다.</p>
       ) : (

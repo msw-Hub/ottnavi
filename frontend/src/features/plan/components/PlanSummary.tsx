@@ -1,4 +1,5 @@
 import { PiggyBankIcon, SplitIcon } from 'lucide-react'
+import { PageSection } from '@/components/common/PageSection'
 import {
   collectSplitSeasons,
   formatAssignmentTitle,
@@ -28,11 +29,11 @@ export function PlanSummary({ draft, typeNames, serviceNames, withYear }: PlanSu
   const hasSaving = draft.savedAmount > 0
 
   return (
-    <section aria-labelledby="plan-summary-heading" className="grid gap-4">
-      <h2 id="plan-summary-heading" className="text-lg font-semibold">
-        {typeNames} 플랜 요약
-      </h2>
-
+    // 구간 제목·간격은 공통 PageSection이 맡는다(제목 h2 text-xl bold, 제목과 내용 사이 16px. styles/tokens.css R3·R4).
+    // 내용(요약 카드 → 안내 문장 → 나눠 보는 시즌) 사이는 이전과 같은 16px이다.
+    // 이전: <section aria-labelledby="plan-summary-heading" className="grid gap-4">
+    //         <h2 id="plan-summary-heading" className="text-lg font-semibold">{typeNames} 플랜 요약</h2>
+    <PageSection headingId="plan-summary-heading" title={`${typeNames} 플랜 요약`}>
       <dl className="grid gap-3 sm:grid-cols-3">
         <div className="grid content-start gap-0.5 rounded-xl border border-border bg-card p-4">
           <dt className="text-sm text-muted-foreground">3개월 총비용</dt>
@@ -93,6 +94,6 @@ export function PlanSummary({ draft, typeNames, serviceNames, withYear }: PlanSu
           <p className="text-sm">긴 시즌은 {MIN_SEGMENT_NOTICE} 나눠 배정해요.</p>
         </section>
       )}
-    </section>
+    </PageSection>
   )
 }
