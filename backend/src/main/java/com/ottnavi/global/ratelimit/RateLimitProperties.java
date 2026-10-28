@@ -8,7 +8,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record RateLimitProperties(
 		boolean enabled,        // 요청 제한 사용 여부. 테스트에서만 끈다
 		Limit general,          // 공개 API 전체에 IP별로 거는 일반 한도
-		Limit singleFetch) {    // 단건 수집(DB에 없어 TMDB를 부르는 검색)에만 거는 더 낮은 한도
+		Limit singleFetch,      // 단건 수집(DB에 없어 TMDB를 부르는 검색)에만 거는 더 낮은 한도
+		Limit demoLogin) {      // 데모 로그인 시도에만 거는 한도(IP당 15분 5회)
 
 	/** 토큰 통 설정. 요청 한 번에 토큰 한 개를 쓰고, 통은 refillPeriod마다 refillTokens개씩 고르게 다시 찬다 */
 	public record Limit(

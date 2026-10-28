@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -83,6 +84,16 @@ public class SecurityConfig {
 				// 위에서부터 먼저 맞는 규칙이 적용된다
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/public/**", "/api/auth/**", "/api/oauth2/**", "/api/login/**").permitAll()
+						// 데모 계정(DEMO): 탈퇴·알림 설정 변경은 막는다(공용 계정이라 한 사람이 지우거나 메일을 켜면 안 된다)
+						.requestMatchers(HttpMethod.DELETE, "/api/me").hasAnyRole("USER", "ADMIN")
+						.requestMatchers(HttpMethod.PUT, "/api/me/notification-setting").hasAnyRole("USER", "ADMIN")
+						// 데모 계정은 관리자 화면을 조회(GET)만 한다. 배치 토큰의 GET은 기존대로 배치 경로에서만 통과한다.
+						// HEAD·OPTIONS는 GET 매처에 걸리지 않아 아래 기존 ADMIN 규칙으로 간다
+						.requestMatchers(HttpMethod.GET, "/api/admin/collect/**", "/api/admin/plans/monthly/**",
+								"/api/admin/retention/**", "/api/admin/popularity/**")
+								.hasAnyRole("ADMIN", "BATCH", "DEMO")
+						.requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "DEMO")
+						// 이 아래는 쓰기·실행(POST·PATCH·DELETE 등)이라 데모 계정은 403이다
 						.requestMatchers("/api/admin/collect/**", "/api/admin/plans/monthly/**",
 								"/api/admin/retention/**", "/api/admin/popularity/**")
 								.hasAnyRole("ADMIN", "BATCH")
