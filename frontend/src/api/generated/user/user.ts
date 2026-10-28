@@ -31,6 +31,7 @@ import type {
 import type {
   BadRequestResponse,
   CommonResponseUserSettings,
+  ForbiddenResponse,
   InternalErrorResponse,
   UnauthorizedResponse,
   UpdateMySettingsRequest
@@ -64,7 +65,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * 찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
  * 서버는 그 사용자의 Refresh Token 계열을 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
  * 요청 본문은 없다. Access Token은 만료(30분) 전이라도 탈퇴한 계정으로는 쓸 수 없다: 같은 토큰으로 다시 탈퇴하거나 설정 저장·찜 추가 같은 쓰기를 하면 사용자를 찾을 수 없어 `UNAUTHORIZED`이고, 내 설정 조회는 온보딩 전 상태(200)로 보인다.
- * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * 데모 계정(`role: DEMO`)은 여러 사람이 함께 쓰는 공용 계정이라 탈퇴할 수 없다(403 `FORBIDDEN`).
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `INTERNAL_ERROR`(500).
  * @summary 회원 탈퇴
  */
 export const withdrawMe = (
@@ -84,7 +86,7 @@ export const withdrawMe = (
 
 export const getWithdrawMeMutationKey = () => ['withdrawMe'] as const;
 
-export const getWithdrawMeMutationOptions = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+export const getWithdrawMeMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext> => {
 
@@ -113,13 +115,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type WithdrawMeMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawMe>>>
 
-    export type WithdrawMeMutationError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+    export type WithdrawMeMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
 
 
     /**
  * @summary 회원 탈퇴
  */
-export const useWithdrawMe = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+export const useWithdrawMe = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof withdrawMe>>,

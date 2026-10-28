@@ -1,4 +1,4 @@
-import { LoaderCircleIcon, MailIcon, TriangleAlertIcon } from 'lucide-react'
+import { LoaderCircleIcon, LockIcon, MailIcon, TriangleAlertIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import { isApiError } from '@/api/http'
 import { ErrorState } from '@/components/common/ErrorState'
@@ -10,6 +10,10 @@ import {
   useNotificationSetting,
   useUpdateNotificationSetting,
 } from '@/features/notification/hooks/useNotificationSetting'
+import { useIsDemo } from '@/hooks/useIsDemo'
+
+// 데모 계정에게 알림을 꺼 둔 이유 문장의 id(스위치가 aria-describedby로 가리킨다)
+const DEMO_NOTE_ID = 'notification-demo-note'
 
 /**
  * 알림 켜기/끄기 스위치와 수신 이메일을 보여 주는 카드다(SCR-12, FR-16).
@@ -25,6 +29,7 @@ import {
 export function NotificationSettingCard() {
   const setting = useNotificationSetting()
   const update = useUpdateNotificationSetting()
+  const isDemo = useIsDemo() // 데모 계정이면 스위치를 잠그고 이유를 안내한다(Task 109)
 
   // 1. 불러오는 중 / 실패는 카드 자리에서 상태 화면으로 보인다
   if (setting.isPending) return <LoadingState message="알림 설정을 불러오고 있어요" />
@@ -53,19 +58,39 @@ export function NotificationSettingCard() {
             {update.isPending && (
               <LoaderCircleIcon aria-hidden="true" className="size-4 motion-safe:animate-spin" />
             )}
-            {update.isPending ? '저장하는 중' : isOn ? '지금 켜져 있어요' : '지금 꺼져 있어요'}
+            {isDemo
+              ? '지금 꺼져 있어요 · 데모 계정은 바꿀 수 없어요'
+              : update.isPending
+                ? '저장하는 중'
+                : isOn
+                  ? '지금 켜져 있어요'
+                  : '지금 꺼져 있어요'}
           </p>
         </div>
+        {/* 데모 계정이면 스위치를 꺼 둔다(서버 값도 늘 꺼짐, 변경은 서버가 403). 이유는 아래 안내 문장이 설명한다(aria-describedby) */}
         <Switch
           id="notification-switch"
           checked={isOn}
-          disabled={update.isPending}
+          disabled={update.isPending || isDemo}
+          aria-describedby={isDemo ? DEMO_NOTE_ID : undefined}
           onCheckedChange={(next) => update.mutate(next)}
           // ring-offset: 켜짐 상태의 스위치 바탕(--primary)과 포커스 테두리(--ring)가 같은 하늘색이라 붙어 있으면 테두리가 안 보인다.
           // 카드 바탕색으로 2px 틈을 두어 켜짐·꺼짐 모두에서 키보드 포커스가 보이게 한다(WCAG 2.4.7)
           className="mt-1 origin-right scale-150 focus-visible:ring-offset-2 focus-visible:ring-offset-card"
         />
       </div>
+
+      {/* 데모 계정 안내(Task 109). 공용 계정이라 알림을 꺼 둔 이유를 스위치 바로 아래(경계선 위)에 둔다 */}
+      {isDemo && (
+        <p
+          id={DEMO_NOTE_ID}
+          className="flex items-start gap-1.5 text-sm break-keep text-muted-foreground"
+        >
+          <LockIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          데모 계정은 알림 메일을 받지 않아요. 공용 계정이라 메일이 엉뚱한 사람에게 가거나 쌓이지
+          않도록 알림을 꺼 두었어요.
+        </p>
+      )}
 
       <div className="grid gap-1 border-t border-border pt-3">
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">

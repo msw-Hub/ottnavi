@@ -61,6 +61,16 @@ export function denyGuest(request: Request) {
   return problemResponse(request, 401, 'Unauthorized', 'UNAUTHORIZED', '로그인이 필요합니다.')
 }
 
+/**
+ * 데모 계정(DEMO)이면 403 FORBIDDEN 응답을, 아니면 undefined를 돌려준다(Task 109).
+ * 서버는 데모 계정의 관리자 쓰기·회원 탈퇴·알림 설정 변경을 403으로 막는다(openapi.yaml, error-codes.md FORBIDDEN 행).
+ * 목업도 같은 응답을 돌려줘야 화면이 버튼을 막지 못했을 때 어떻게 보이는지 확인할 수 있다.
+ */
+export function denyDemo(request: Request) {
+  if (getMockRole() !== 'DEMO') return undefined
+  return problemResponse(request, 403, 'Forbidden', 'FORBIDDEN', '접근 권한이 없습니다.')
+}
+
 // 목업 서버가 메모리에 들고 있는 찜 한 건. 추가 요청 내용에 "다 봤음" 시각이 붙는다
 export type MockWishlistEntry = AddWishlistItemRequest & { watchedAt: string | null }
 

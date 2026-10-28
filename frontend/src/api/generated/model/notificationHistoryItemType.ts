@@ -11,7 +11,7 @@
  */
 
 /**
- * 가입 안내 / 월초 안내 / 플랜 변경 알림
+ * 구독 안내 / 월초 안내 / 플랜 변경 알림
  */
 export type NotificationHistoryItemType = typeof NotificationHistoryItemType[keyof typeof NotificationHistoryItemType];
 

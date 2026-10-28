@@ -1,7 +1,9 @@
 import { useRef } from 'react'
 import { Link, Outlet, ScrollRestoration } from 'react-router'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
+import { useIsDemo } from '@/hooks/useIsDemo'
 import { useSession } from '@/hooks/useSession'
+import { DemoBanner } from '@/app/DemoBanner'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
 import { HeaderPrimaryNav } from '@/app/HeaderPrimaryNav'
 import { TitleSearchForm } from '@/components/common/TitleSearchForm'
@@ -30,6 +32,7 @@ export function RootLayout() {
   useMeasuredHeaderHeight(headerRef)
   // 푸터의 회원 탈퇴 링크를 보일지 정한다. 머리글 계정 영역(HeaderAccountNav)과 같은 훅이라 목업·실제 환경에서 같은 판단을 한다
   const isAuthenticated = useSession().status === 'authenticated'
+  const isDemo = useIsDemo()
   return (
     <div className="flex min-h-svh flex-col">
       {/* 키보드 사용자가 헤더 링크를 매번 거치지 않고 본문으로 바로 가도록 하는 링크. 포커스를 받을 때만 보인다 */}
@@ -79,6 +82,8 @@ export function RootLayout() {
             <Link to="/search" aria-label="작품 검색" className="-my-2 ml-auto inline-flex size-10 ..."><SearchIcon /></Link>
           */}
         </div>
+        {/* 데모 계정 안내 띠(Task 109). 머리글 안에 두어 머리글 높이 측정(useMeasuredHeaderHeight)에 함께 잡히고, 토스트가 띠를 덮지 않는다 */}
+        <DemoBanner />
       </header>
 
       {/* tabIndex={-1}: 건너뛰기 링크로 이동했을 때 main이 포커스를 받을 수 있게 한다(Tab 순서에는 들어가지 않음) */}
@@ -119,7 +124,8 @@ export function RootLayout() {
               여기서 누르면 바로 지워지는 것이 아니라 설명과 동의 단계가 있는 화면으로 갈 뿐이라, 위험 색으로 겁을 줄 이유가 없다.
             - 맨 끝에 둔 이유: 자주 쓰는 링크가 아니라 눈에 덜 띄는 자리가 맞다. 모바일에서 줄이 넘치면 마지막 줄로 내려간다.
           */}
-          {isAuthenticated && (
+          {/* 데모 계정에는 숨긴다(사용자 결정 Q4): 공용 계정이라 탈퇴할 수 없다. 주소로 직접 들어가면 탈퇴 화면이 막힌 이유를 안내한다 */}
+          {isAuthenticated && !isDemo && (
             <Link to="/settings/withdraw" className={FOOTER_LINK_CLASS}>
               회원 탈퇴
             </Link>

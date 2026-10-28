@@ -93,6 +93,7 @@ function GroupLabel({ children }: { children: ReactNode }) {
 
 interface HeaderAccountMenuProps {
   isAdmin: boolean // ADMIN이면 "관리자" 묶음을 보인다. 표시만 바꾸는 것이고 실제 권한 검사는 백엔드와 라우트 가드가 한다
+  isDemo: boolean // 데모 계정(DEMO)이면 맨 위에 "데모 계정" 표시를 두고, 관리자 묶음을 "조회만" 표시와 함께 보인다(Task 109)
   wishlistCount: number // 계산 대상 찜 개수. 머리글 하트 배지와 같은 값을 받아 쓴다(HeaderAccountNav가 한 번만 요청해서 내려준다)
   search: string // 모든 이동 링크에 이어 붙일 목업 확인용 주소 파라미터("?mockScenario=…" 꼴 또는 빈 문자열)
 }
@@ -112,7 +113,12 @@ interface HeaderAccountMenuProps {
  * 머리글 높이를 키우지 않게 버튼에 -my-2 min-h-10을 쓴다(HeaderAccountNav의 다른 링크와 같은 이유, 토스트 위치 --header-height).
  * 모바일(375px)은 아이콘 + 화살표(폭 48px), sm(640px) 이상은 "내 메뉴" 글자도 보인다. 글자는 시각용이고 이름은 aria-label이 정한다.
  */
-export function HeaderAccountMenu({ isAdmin, wishlistCount, search }: HeaderAccountMenuProps) {
+export function HeaderAccountMenu({
+  isAdmin,
+  isDemo,
+  wishlistCount,
+  search,
+}: HeaderAccountMenuProps) {
   const { pathname } = useLocation()
   // 로그아웃: 서버에 폐기를 요청하고, 메모리의 토큰·쿼리 캐시를 비운 뒤 첫 화면으로 보낸다(hooks/useLogout)
   const logout = useLogout()
@@ -150,6 +156,24 @@ export function HeaderAccountMenu({ isAdmin, wishlistCount, search }: HeaderAcco
         align="end"
         className="w-60 max-w-[calc(100vw-2rem)] focus-visible:ring-foreground/10! focus-visible:outline-none"
       >
+        {/*
+          데모 계정 표시(Task 109). 누르는 항목이 아니라 지금 어떤 계정인지 알리는 머리말이다(DropdownMenuLabel은 키보드 이동에서 건너뛴다).
+          알약 모양 테두리 + 글자라 색만으로 알리지 않는다
+        */}
+        {isDemo && (
+          <>
+            <DropdownMenuLabel className="grid gap-1 px-2.5 pt-2 pb-1.5">
+              <span className="w-fit rounded-full border border-info bg-info-bg px-2 text-xs font-semibold text-info">
+                데모 계정
+              </span>
+              <span className="text-xs font-normal text-muted-foreground">
+                공용 계정으로 로그인했어요
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
         <DropdownMenuGroup aria-label="플랜">
           <GroupLabel>플랜</GroupLabel>
           <MenuLink
@@ -230,7 +254,8 @@ export function HeaderAccountMenu({ isAdmin, wishlistCount, search }: HeaderAcco
           </MenuLink>
         </DropdownMenuGroup>
 
-        {isAdmin && (
+        {/* 데모 계정도 관리자 화면을 조회할 수 있어 같은 묶음을 보이고, 쓰기가 막혀 있음을 "조회만" 표시로 알린다 */}
+        {(isAdmin || isDemo) && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuGroup aria-label="관리자">
@@ -240,6 +265,17 @@ export function HeaderAccountMenu({ isAdmin, wishlistCount, search }: HeaderAcco
                 search={search}
                 currentPath={pathname}
                 icon={<ShieldIcon className="size-4" />}
+                accessibleName={isDemo ? '관리 화면, 조회만 가능' : undefined}
+                end={
+                  isDemo ? (
+                    <span
+                      aria-hidden="true"
+                      className="ml-auto inline-flex h-5 items-center rounded-full border border-dashed border-input px-1.5 text-[0.6875rem] font-medium text-muted-foreground"
+                    >
+                      조회만
+                    </span>
+                  ) : undefined
+                }
               >
                 관리 화면
               </MenuLink>

@@ -33,6 +33,7 @@ import type {
   CommonResponseNotificationHistoryPage,
   CommonResponseNotificationSetting,
   ConflictResponse,
+  ForbiddenResponse,
   InternalErrorResponse,
   ListMyNotificationsParams,
   UnauthorizedResponse,
@@ -160,7 +161,8 @@ export function useGetMyNotificationSetting<TData = Awaited<ReturnType<typeof ge
 /**
  * 알림 수신 여부를 켜거나 끈다. 끄면 이후 알림이 생성되지 않는다(이미 대기 중인 알림은 발송된다). 켜는 것 자체로는 메일이 나가지 않는다.
  * 내 설정(온보딩)을 한 번도 저장하지 않았으면 저장할 설정 행이 없어 `ONBOARDING_REQUIRED`(409)다.
- * 오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
+ * 데모 계정(`role: DEMO`)은 알림 설정을 바꿀 수 없다(403 `FORBIDDEN`). 데모 계정에는 알림이 만들어지지 않으며 조회(`getMyNotificationSetting`)는 항상 꺼짐이다.
+ * 오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
  * @summary 알림 설정 저장
  */
 export const updateMyNotificationSetting = (
@@ -182,7 +184,7 @@ export const updateMyNotificationSetting = (
 
 export const getUpdateMyNotificationSettingMutationKey = () => ['updateMyNotificationSetting'] as const;
 
-export const getUpdateMyNotificationSettingMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>,
+export const getUpdateMyNotificationSettingMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext> => {
 
@@ -211,13 +213,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateMyNotificationSettingMutationResult = NonNullable<Awaited<ReturnType<typeof updateMyNotificationSetting>>>
     export type UpdateMyNotificationSettingMutationBody = BodyType<UpdateMyNotificationSettingRequest>
-    export type UpdateMyNotificationSettingMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>
+    export type UpdateMyNotificationSettingMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
     export type UpdateMyNotificationSettingMutationVariables = {data: BodyType<UpdateMyNotificationSettingRequest>}
 
     /**
  * @summary 알림 설정 저장
  */
-export const useUpdateMyNotificationSetting = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ConflictResponse | InternalErrorResponse>,
+export const useUpdateMyNotificationSetting = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateMyNotificationSetting>>, TError,UpdateMyNotificationSettingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof updateMyNotificationSetting>>,

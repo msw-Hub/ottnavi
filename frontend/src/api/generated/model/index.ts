@@ -75,6 +75,7 @@ export * from './createAdminProductRequest';
 export * from './createCollectExecutionRequest';
 export * from './createPlanRequest';
 export * from './currentPlan';
+export * from './demoLoginRequest';
 export * from './exclusiveTitle';
 export * from './exclusiveTitlePage';
 export * from './fieldError';

@@ -11,6 +11,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CloseLabeledDialogContent } from '@/components/common/CloseLabeledDialogContent'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -50,6 +52,10 @@ interface ProductFormDialogProps {
   onCreated: (productId: number) => void // 등록에 성공했을 때. 새 OTT 구독상품을 바로 골라 이력을 보여 준다
   openerRef: RefObject<HTMLElement | null> // 대화상자를 연 버튼. 닫히면 포커스를 여기로 돌려준다
 }
+
+// 데모 계정에게 등록·저장이 막힌 이유 문장의 id(대화상자는 한 번에 하나만 열린다)
+const CREATE_LOCK_NOTE_ID = 'product-create-demo-note'
+const EDIT_LOCK_NOTE_ID = 'product-edit-demo-note'
 
 // "저가형" 체크 칸 모양. 등록·수정 대화상자가 같이 쓴다. 줄 전체가 label이라 글자를 눌러도 켜지고, 높이 44px(min-h-11)는 터치 크기 기준이다
 const LOW_COST_LABEL_CLASS =
@@ -363,13 +369,21 @@ function CreateForm({
         </div>
       </div>
 
+      {/* 데모 계정이면 [등록]이 막히고(Enter 제출 포함) 버튼 위에 이유를 둔다(Task 109). 입력은 해 볼 수 있다 */}
+      <DemoReadOnlyHint variant="inline" id={CREATE_LOCK_NOTE_ID} className="justify-end">
+        데모 계정은 저장할 수 없어요
+      </DemoReadOnlyHint>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={create.isPending}>
           취소
         </Button>
-        <Button type="submit" disabled={create.isPending}>
+        <DemoLockedButton
+          type="submit"
+          disabled={create.isPending}
+          lockedDescriptionId={CREATE_LOCK_NOTE_ID}
+        >
           {create.isPending ? '등록하는 중…' : '등록'}
-        </Button>
+        </DemoLockedButton>
       </DialogFooter>
     </form>
   )
@@ -528,13 +542,21 @@ function EditForm({
         )}
       </fieldset>
 
+      {/* 데모 계정이면 [저장]이 막힌다(Task 109, 등록 폼과 같은 방식) */}
+      <DemoReadOnlyHint variant="inline" id={EDIT_LOCK_NOTE_ID} className="justify-end">
+        데모 계정은 저장할 수 없어요
+      </DemoReadOnlyHint>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={update.isPending}>
           취소
         </Button>
-        <Button type="submit" disabled={update.isPending}>
+        <DemoLockedButton
+          type="submit"
+          disabled={update.isPending}
+          lockedDescriptionId={EDIT_LOCK_NOTE_ID}
+        >
           {update.isPending ? '저장하는 중…' : '저장'}
-        </Button>
+        </DemoLockedButton>
       </DialogFooter>
     </form>
   )

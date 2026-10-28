@@ -17,7 +17,7 @@ import type { NotificationHistoryItemType } from './notificationHistoryItemType'
  */
 export interface NotificationHistoryItem {
   notificationId: number;
-  /** 가입 안내 / 월초 안내 / 플랜 변경 알림 */
+  /** 구독 안내 / 월초 안내 / 플랜 변경 알림 */
   type: NotificationHistoryItemType;
   /** 대기 / 발송 / 실패(재시도 5회를 넘김) */
   status: NotificationHistoryItemStatus;

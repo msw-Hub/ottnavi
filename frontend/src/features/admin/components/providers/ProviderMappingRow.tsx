@@ -3,7 +3,8 @@ import { TriangleAlertIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { toast } from 'sonner'
 import { isApiError } from '@/api/http'
-import { Button } from '@/components/ui/button'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DEMO_READONLY_NOTE_ID } from '@/components/common/DemoReadOnlyHint'
 import { Label } from '@/components/ui/label'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { MappingStateBadge } from '@/features/admin/components/MappingStateBadge'
@@ -125,17 +126,20 @@ export function ProviderMappingRow({ provider, services, variant }: ProviderMapp
     </span>
   )
 
+  // 데모 계정이면 값을 바꿔 [저장]이 켜져도 눌러서 저장되지 않는다(Task 109). 이유는 화면 위 조회 전용 안내가 설명한다.
+  // 바꾼 값이 없을 때는 데모 여부와 상관없이 원래처럼 꺼져 있다(disabled)
   const saveButton = (
-    <Button
+    <DemoLockedButton
       type="button"
       size="sm"
       disabled={!isChanged || save.isPending}
       onClick={handleSave}
+      lockedDescriptionId={DEMO_READONLY_NOTE_ID}
       className={variant === 'card' ? 'w-full' : undefined}
     >
       {save.isPending ? '저장 중…' : '저장'}
       <span className="sr-only"> ({provider.tmdbName})</span>
-    </Button>
+    </DemoLockedButton>
   )
 
   const unsavedNote = isChanged && (

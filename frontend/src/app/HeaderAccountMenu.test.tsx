@@ -24,13 +24,15 @@ afterEach(() => {
 })
 
 // 메뉴만 단독으로 그린다. 첫 화면('/')은 로그아웃 뒤 이동 확인용 자리표시다
-function renderMenu(path: string, isAdmin = false) {
+function renderMenu(path: string, isAdmin = false, isDemo = false) {
   const router = createMemoryRouter(
     [
       { path: '/', element: <h1>첫 화면</h1> },
       {
         path: '*',
-        element: <HeaderAccountMenu isAdmin={isAdmin} wishlistCount={12} search="" />,
+        element: (
+          <HeaderAccountMenu isAdmin={isAdmin} isDemo={isDemo} wishlistCount={12} search="" />
+        ),
       },
     ],
     { initialEntries: [path] },
@@ -68,6 +70,21 @@ describe('HeaderAccountMenu', () => {
     await user.click(screen.getByRole('button', { name: '내 메뉴' }))
 
     expect(screen.getByRole('menuitem', { name: '관리 화면' })).toHaveAttribute(
+      'href',
+      '/admin/collect',
+    )
+  })
+
+  // 데모 계정(Task 109): 지금 공용 계정이라는 표시와, 조회만 되는 관리 화면 항목이 보인다
+  it('데모 계정이면 맨 위에 "데모 계정" 표시가 있고 관리 화면이 "조회만"으로 보인다', async () => {
+    const user = userEvent.setup()
+    renderMenu('/somewhere', false, true)
+
+    await user.click(screen.getByRole('button', { name: '내 메뉴' }))
+
+    expect(screen.getByText('데모 계정')).toBeInTheDocument()
+    expect(screen.getByText('공용 계정으로 로그인했어요')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: '관리 화면, 조회만 가능' })).toHaveAttribute(
       'href',
       '/admin/collect',
     )

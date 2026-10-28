@@ -17,6 +17,6 @@ import type { AccessTokenRole } from './accessTokenRole';
 export interface AccessToken {
   /** Access Token(JWT, 수명 30분). 프론트는 메모리에만 둔다 */
   accessToken: string;
-  /** 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다 */
+  /** 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다. `DEMO`는 데모 계정으로, 회원 기능은 쓰고 관리자 화면은 조회만 하며 탈퇴·알림 설정 변경은 할 수 없다(서버가 403으로 막는다) */
   role: AccessTokenRole;
 }

@@ -19,7 +19,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DEMO_READONLY_NOTE_ID, DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { Button } from '@/components/ui/button'
+import { useIsDemo } from '@/hooks/useIsDemo'
 import { AdminStatusPill } from '@/features/admin/components/AdminStatusPill'
 import { PriceForm } from '@/features/admin/components/products/PriceForm'
 import { StaleVerifiedTag } from '@/features/admin/components/StaleVerifiedTag'
@@ -51,6 +54,9 @@ const KIND_PILL: Record<PriceRowKind, Parameters<typeof AdminStatusPill>[0]> = {
   PAST: { icon: HistoryIcon, label: '지난 요금', tone: 'neutral', size: 'sm' },
 }
 
+// 데모 계정에게 삭제 확정이 막힌 이유 문장의 id
+const DELETE_LOCK_NOTE_ID = 'price-delete-demo-note'
+
 // 오류를 토스트로 알린다(행 동작은 줄 자리에 오류를 둘 곳이 마땅치 않다)
 function toastError(error: unknown) {
   toast.error(isApiError(error) ? error.userMessage : getErrorMessage(null))
@@ -72,6 +78,7 @@ function toastError(error: unknown) {
 export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryPanelProps) {
   const verify = useVerifyProductPrice()
   const remove = useDeleteProductPrice()
+  const isDemo = useIsDemo() // 데모 계정이면 삭제 확인 대화상자의 확정 버튼을 막는다(Task 109)
 
   const [isAdding, setIsAdding] = useState(false)
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null)
@@ -197,12 +204,15 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                {/* 데모 계정이면 [요금 확인함]이 막힌다(Task 109). 이유는 화면 위 조회 전용 안내가 설명한다 */}
                 {kind === 'CURRENT' && (
-                  <Button
+                  <DemoLockedButton
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={verify.isPending}
+                    icon={<CheckIcon aria-hidden="true" />}
+                    lockedDescriptionId={DEMO_READONLY_NOTE_ID}
                     onClick={() =>
                       verify.mutate(
                         { productId: product.productId, priceId: row.priceId },
@@ -213,10 +223,9 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
                       )
                     }
                   >
-                    <CheckIcon aria-hidden="true" />
                     요금 확인함
                     <span className="sr-only"> ({formatWon(row.monthlyPrice)})</span>
-                  </Button>
+                  </DemoLockedButton>
                 )}
                 {isLatest && (
                   <Button
@@ -271,22 +280,31 @@ export function PriceHistoryPanel({ product, serviceName, today }: PriceHistoryP
                 : ''}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* 데모 계정에게만 보이는 막힌 이유(Task 109) */}
+          <DemoReadOnlyHint variant="inline" id={DELETE_LOCK_NOTE_ID}>
+            데모 계정은 삭제할 수 없어요
+          </DemoReadOnlyHint>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (!deleteTarget) return
-                remove.mutate(
-                  { productId: product.productId, priceId: deleteTarget.priceId },
-                  {
-                    onSuccess: () => toast.success('월 구독요금을 삭제했어요'),
-                    onError: toastError,
-                  },
-                )
-              }}
-            >
-              삭제
-            </AlertDialogAction>
+            {/* 데모 계정이면 Action(누르면 바로 닫힘) 대신 막힌 버튼을 둬, 닫히지 않고 이유를 알린다(RecoverRunDialog와 같은 방식) */}
+            {isDemo ? (
+              <DemoLockedButton lockedDescriptionId={DELETE_LOCK_NOTE_ID}>삭제</DemoLockedButton>
+            ) : (
+              <AlertDialogAction
+                onClick={() => {
+                  if (!deleteTarget) return
+                  remove.mutate(
+                    { productId: product.productId, priceId: deleteTarget.priceId },
+                    {
+                      onSuccess: () => toast.success('월 구독요금을 삭제했어요'),
+                      onError: toastError,
+                    },
+                  )
+                }}
+              >
+                삭제
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

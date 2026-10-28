@@ -9,9 +9,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
 import type { CollectExecution } from '@/api/generated/model'
+import { useIsDemo } from '@/hooks/useIsDemo'
 import { formatIsoDate } from '@/lib/format'
+
+// 데모 계정에게 [복구]가 막힌 이유 문장의 id
+const RECOVER_LOCK_NOTE_ID = 'recover-run-demo-note'
 
 interface RecoverRunDialogProps {
   execution: CollectExecution | null // 복구할 중단됨 실행. null이면 닫힘
@@ -40,6 +46,7 @@ export function RecoverRunDialog({
   onCancel,
   onConfirm,
 }: RecoverRunDialogProps) {
+  const isDemo = useIsDemo()
   return (
     <AlertDialog
       open={execution !== null}
@@ -61,15 +68,27 @@ export function RecoverRunDialog({
               : ''}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {/* 데모 계정에게만 보이는 막힌 이유(Task 109) */}
+        <DemoReadOnlyHint variant="inline" id={RECOVER_LOCK_NOTE_ID}>
+          데모 계정은 실행할 수 없어요
+        </DemoReadOnlyHint>
         <AlertDialogFooter>
           <AlertDialogCancel>취소</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => {
-              if (execution) onConfirm(execution)
-            }}
-          >
-            복구
-          </AlertDialogAction>
+          {/*
+            데모 계정이면 AlertDialogAction 대신 막힌 버튼을 둔다. Action은 누르는 즉시 대화상자를 닫는 버튼이라,
+            막힌 상태에서 누르면 아무 일 없이 닫혀 "왜 안 됐는지"를 알 수 없다. 막힌 버튼은 닫지 않고 이유만 토스트로 알린다.
+          */}
+          {isDemo ? (
+            <DemoLockedButton lockedDescriptionId={RECOVER_LOCK_NOTE_ID}>복구</DemoLockedButton>
+          ) : (
+            <AlertDialogAction
+              onClick={() => {
+                if (execution) onConfirm(execution)
+              }}
+            >
+              복구
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

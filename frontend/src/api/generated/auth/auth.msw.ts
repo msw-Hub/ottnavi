@@ -24,6 +24,8 @@ import type {
 
 export const getRefreshAccessTokenResponseMock = (): CommonResponseAccessToken => ({"success":true,"data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.example-signature","role":"USER"}})
 
+export const getLoginDemoResponseMock = (): CommonResponseAccessToken => ({"success":true,"data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.example-signature","role":"USER"}})
+
 
 export const getRefreshAccessTokenMockHandler = (overrideResponse?: CommonResponseAccessToken | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseAccessToken> | CommonResponseAccessToken), options?: RequestHandlerOptions) => {
   return http.post('/api/auth/refresh', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
@@ -46,7 +48,20 @@ export const getLogoutMockHandler = (overrideResponse?: void | ((info: Parameter
       })
   }, options)
 }
+
+export const getLoginDemoMockHandler = (overrideResponse?: CommonResponseAccessToken | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseAccessToken> | CommonResponseAccessToken), options?: RequestHandlerOptions) => {
+  return http.post('/api/auth/demo-login', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getLoginDemoResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getAuthMock = () => [
   getRefreshAccessTokenMockHandler(),
-  getLogoutMockHandler()
+  getLogoutMockHandler(),
+  getLoginDemoMockHandler()
 ]

@@ -126,6 +126,7 @@ export function HeaderAccountNav() {
           */}
           <HeaderAccountMenu
             isAdmin={session.role === 'ADMIN'}
+            isDemo={session.role === 'DEMO'}
             wishlistCount={wishlistCount}
             search={wishlistSearch}
           />

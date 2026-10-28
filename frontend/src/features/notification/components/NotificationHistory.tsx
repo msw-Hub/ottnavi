@@ -7,6 +7,7 @@ import { NotificationStatusBadge } from '@/features/notification/components/Noti
 import { useNotificationHistory } from '@/features/notification/hooks/useNotificationHistory'
 import { NOTIFICATION_TYPE_LABELS } from '@/features/notification/notificationDisplay'
 import type { NotificationHistoryItem } from '@/api/generated/model'
+import { useIsDemo } from '@/hooks/useIsDemo'
 import { formatDateTimeKorean } from '@/lib/format'
 
 /**
@@ -18,6 +19,7 @@ import { formatDateTimeKorean } from '@/lib/format'
  */
 export function NotificationHistory() {
   const history = useNotificationHistory()
+  const isDemo = useIsDemo()
 
   if (history.isPending) return <LoadingState message="발송 이력을 불러오고 있어요" />
   // 첫 조회 실패만 전체 오류 화면으로 보인다. "더 보기" 실패도 isError가 되지만 이때는 data가 남아 있어 아래 목록을 지키려고 data로 가른다
@@ -31,6 +33,15 @@ export function NotificationHistory() {
     )
   }
   if (!history.data || history.data.items.length === 0) {
+    // 데모 계정에는 알림이 만들어지지 않아 늘 비어 있다. "아직"이 아니라 "받지 않는다"고 알리고, 실제 회원이면 무엇이 쌓이는지 설명한다(Task 109)
+    if (isDemo) {
+      return (
+        <EmptyState
+          title="데모 계정은 알림을 받지 않아요"
+          description="실제 회원은 알림을 켜면 월초 안내·플랜 변경 알림이 여기에 기록돼요."
+        />
+      )
+    }
     return (
       <EmptyState
         title="아직 받은 알림이 없어요"
