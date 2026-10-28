@@ -1309,7 +1309,7 @@ export const useCreateRetentionExecution = <TError = ErrorType<UnauthorizedRespo
     }
     /**
  * 인기 순위 수집 Job을 비동기로 시작하고 202와 새 `executionId`를 돌려준다. 하루 1회 GitHub Actions cron이 호출하고 관리자가 수동으로도 쓴다. 요청 본문은 없다.
- * 하는 일: 서비스 7곳 × 영화·드라마별로 TMDB `discover`(한국, 서비스 제공처 필터, 인기순) 첫 쪽(상위 20개)을 받아 오늘(KST) 날짜의 인기 스냅샷으로 저장한다(약 14번 호출). 같은 날 다시 실행하면 그 날짜의 스냅샷을 덮어쓰고(중복 행이 쌓이지 않는다), 14일이 지난 스냅샷은 지운다. 한 서비스·매체의 호출이 실패하면 그 조각만 건너뛰고 나머지는 저장한다(건너뛴 조각의 이전 스냅샷은 그대로 남는다).
+ * 하는 일: 서비스 7곳 × 영화·드라마별로 TMDB `discover`(한국 제공처, 서비스 제공처 필터, 한국 제작 `with_origin_country=KR`, 영화 `primary_release_date.gte`·드라마 `first_air_date.gte`가 오늘(KST)에서 2년 전, 인기순) 첫 쪽(상위 20개)을 받아 오늘(KST) 날짜의 인기 스냅샷으로 저장한다(약 14번 호출). 같은 날 다시 실행하면 그 날짜의 스냅샷을 덮어쓰고(중복 행이 쌓이지 않는다), 14일이 지난 스냅샷은 지운다. 필터 결과가 0건인 서비스·매체는 정상으로 보고 저장할 행이 없다. 한 서비스·매체의 호출이 실패하면 그 조각만 건너뛰고 나머지는 저장한다(건너뛴 조각의 이전 스냅샷은 그대로 남는다).
  * 수집·재계산·정리·인기 수집 중 하나라도 이미 실행 중이면 `BATCH_ALREADY_RUNNING`(409)이다(반대로 인기 수집 실행 중에는 수집·재계산·정리 시작도 409). 관리자(ADMIN) Access Token 또는 관리자 배치 토큰으로 호출한다.
  * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `BATCH_ALREADY_RUNNING`(409), `INTERNAL_ERROR`(500).
  * @summary 인기 순위 수집 실행 요청

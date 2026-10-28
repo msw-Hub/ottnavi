@@ -16,6 +16,7 @@ import com.ottnavi.infra.tmdb.dto.TmdbTvDetail;
 import com.ottnavi.infra.tmdb.dto.TmdbTvSeasonDetail;
 import com.ottnavi.infra.tmdb.dto.TmdbTvSummary;
 import com.ottnavi.infra.tmdb.dto.TmdbWatchProvidersResponse;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -63,15 +64,19 @@ class TmdbClientTest extends TmdbTestSupport {
                 .withQueryParam("with_watch_monetization_types", equalTo("flatrate"))
                 .withQueryParam("language", equalTo("ko-KR"))
                 .withQueryParam("sort_by", equalTo("popularity.desc"))
+                .withQueryParam("with_origin_country", equalTo("KR"))
+                .withQueryParam("primary_release_date.gte", equalTo("2024-10-27"))
                 .withQueryParam("page", equalTo("1"))
                 .willReturn(okJson("discover-movie.json")));
         wireMock.stubFor(get(urlPathEqualTo("/3/discover/tv"))
                 .withQueryParam("with_watch_providers", equalTo("8|1796"))
                 .withQueryParam("sort_by", equalTo("popularity.desc"))
+                .withQueryParam("with_origin_country", equalTo("KR"))
+                .withQueryParam("first_air_date.gte", equalTo("2024-10-27"))
                 .willReturn(okJson("discover-tv.json")));
 
-        TmdbPage<TmdbMovieSummary> movies = tmdbClient.discoverPopularMovies("8|1796", 1);
-        TmdbPage<TmdbTvSummary> tvs = tmdbClient.discoverPopularTvs("8|1796", 1);
+        TmdbPage<TmdbMovieSummary> movies = tmdbClient.discoverPopularMovies("8|1796", LocalDate.of(2024, 10, 27), 1);
+        TmdbPage<TmdbTvSummary> tvs = tmdbClient.discoverPopularTvs("8|1796", LocalDate.of(2024, 10, 27), 1);
 
         assertThat(movies.results().get(0).popularity()).isEqualTo(87.5);
         assertThat(tvs.results().get(0).name()).isEqualTo("테스트 드라마 1");

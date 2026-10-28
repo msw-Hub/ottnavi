@@ -69,67 +69,74 @@ export function RankingScreen() {
   }
 
   return (
-    <section aria-labelledby="ranking-title" className="flex flex-col gap-6">
-      <div className="grid gap-1">
-        <h1 id="ranking-title" className="text-2xl font-bold">
-          랭킹
-        </h1>
-        <p className="text-muted-foreground">
-          서비스마다 볼 수 있는 작품의 인기 순위와 OTT내비 사용자가 많이 찜한 작품을 모았어요.
-        </p>
-      </div>
-
-      {/* 순위 기준 고르기. 두 선택지라 탭 대신 눌림 상태(aria-pressed) 버튼 묶음으로 둔다. 고른 버튼은 채움 + 체크 아이콘(색만으로 구분하지 않음) */}
-      <div role="group" aria-label="순위 기준" className="flex flex-wrap gap-2">
-        {SORT_OPTIONS.map((option) => {
-          const isSelected = option.value === sort
-          return (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => updateParam('sort', option.value)}
-              className={cn(
-                'inline-flex h-11 items-center gap-1 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                isSelected
-                  ? 'border-foreground bg-foreground text-background'
-                  : 'border-input text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {isSelected && <CheckIcon aria-hidden="true" strokeWidth={3} className="size-4" />}
-              {option.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {servicesQuery.isPending ? (
-        <RailSkeleton heading="랭킹" />
-      ) : servicesQuery.isError ? (
-        <ErrorState
-          title="랭킹을 불러오지 못했습니다"
-          error={servicesQuery.error}
-          onRetry={() => void servicesQuery.refetch()}
-        />
-      ) : sort === 'popular' ? (
-        <div className="grid grid-cols-1 gap-3">
-          {/* 기간 전환(오늘 / 최근 7일): 서비스 탭과 다른 모양으로 서비스 탭 위에 둔다 */}
-          <PeriodToggle
-            value={period}
-            onChange={(next: PopularityPeriod) => updateParam('period', toPeriodParam(next))}
-          />
-          <ServiceTabs
-            label="인기 순위 서비스 선택"
-            value={tab}
-            onValueChange={(value) => updateParam('service', value)}
-            options={buildServiceTabOptions(services, true)}
-          >
-            <PopularSection service={service} services={services} period={period} />
-          </ServiceTabs>
+    // 본문(제목 → 순위 기준 → 목록)과 출처 묶음 사이를 gap-section(40/48px)으로 띄운다(styles/tokens.css R1·R2).
+    // 본문 안은 고르는 버튼과 그 결과가 한 덩어리라 이전과 같은 24px(gap-6)로 붙인다(크게 띄우면 버튼과 목록이 떨어져 보인다).
+    // 이전: <section … className="flex flex-col gap-6"> (출처 묶음까지 모두 24px)
+    <section aria-labelledby="ranking-title" className="flex flex-col gap-section">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-1">
+          <h1 id="ranking-title" className="text-2xl font-bold">
+            랭킹
+          </h1>
+          <p className="text-muted-foreground">
+            {/* 이전: "서비스마다 볼 수 있는 작품의 인기 순위와 …". 순위가 최근 2년 안 한국 작품만 세게 바뀌어 범위를 밝혔다 */}
+            서비스마다 볼 수 있는 최근 한국 작품의 인기 순위와 OTT내비 사용자가 많이 찜한 작품을
+            모았어요.
+          </p>
         </div>
-      ) : (
-        <WishlistedSection services={services} />
-      )}
+
+        {/* 순위 기준 고르기. 두 선택지라 탭 대신 눌림 상태(aria-pressed) 버튼 묶음으로 둔다. 고른 버튼은 채움 + 체크 아이콘(색만으로 구분하지 않음) */}
+        <div role="group" aria-label="순위 기준" className="flex flex-wrap gap-2">
+          {SORT_OPTIONS.map((option) => {
+            const isSelected = option.value === sort
+            return (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => updateParam('sort', option.value)}
+                className={cn(
+                  'inline-flex h-11 items-center gap-1 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  isSelected
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'border-input text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {isSelected && <CheckIcon aria-hidden="true" strokeWidth={3} className="size-4" />}
+                {option.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {servicesQuery.isPending ? (
+          <RailSkeleton heading="랭킹" />
+        ) : servicesQuery.isError ? (
+          <ErrorState
+            title="랭킹을 불러오지 못했습니다"
+            error={servicesQuery.error}
+            onRetry={() => void servicesQuery.refetch()}
+          />
+        ) : sort === 'popular' ? (
+          <div className="grid grid-cols-1 gap-3">
+            {/* 기간 전환(오늘 / 최근 7일): 서비스 탭과 다른 모양으로 서비스 탭 위에 둔다 */}
+            <PeriodToggle
+              value={period}
+              onChange={(next: PopularityPeriod) => updateParam('period', toPeriodParam(next))}
+            />
+            <ServiceTabs
+              label="인기 순위 서비스 선택"
+              value={tab}
+              onValueChange={(value) => updateParam('service', value)}
+              options={buildServiceTabOptions(services, true)}
+            >
+              <PopularSection service={service} services={services} period={period} />
+            </ServiceTabs>
+          </div>
+        ) : (
+          <WishlistedSection services={services} />
+        )}
+      </div>
 
       <div className="grid gap-1.5 border-t border-border pt-4">
         <SourceAttribution />

@@ -13,6 +13,7 @@ interface ServiceTabsProps {
   onValueChange: (value: string) => void // 탭을 바꿨을 때
   options: ServiceTabOption[] // 탭 목록. 순서가 화면 순서다
   children: ReactNode // 고른 탭의 내용(목록). 고른 탭 하나의 내용만 넘긴다
+  leading?: ReactNode // 탭 줄 맨 앞(같은 줄)에 둘 다른 고르기(예: 인기 순위의 기간 전환). 없으면 탭만 있다
 }
 
 /**
@@ -26,30 +27,31 @@ interface ServiceTabsProps {
  * 탭 높이 h-11(44px)은 손가락 터치 크기 기준이다. 탭이 8개라 375px에서는 한 줄이 넘쳐 탭 줄만 옆으로 밀어 본다(overflow-x-auto).
  * 고른 탭의 내용만 Tabs.Content 하나로 그린다. 고르지 않은 탭의 내용은 만들지 않아 목록 8개를 한꺼번에 그리지 않는다.
  */
-export function ServiceTabs({ label, value, onValueChange, options, children }: ServiceTabsProps) {
+export function ServiceTabs({
+  label,
+  value,
+  onValueChange,
+  options,
+  children,
+  leading,
+}: ServiceTabsProps) {
   return (
     <Tabs.Root value={value} onValueChange={onValueChange} className="grid grid-cols-1 gap-4">
       {/* -mx-4 px-4: 모바일에서 탭 줄을 화면 끝까지 늘여 넘쳐 있는 탭이 잘린 모양으로 보이게 한다. py-2는 포커스 링이 잘리지 않게 하는 여백이다.
           min-h-15(60px = 탭 44px + 위아래 8px): 가로 스크롤 영역이 그리드 칸 안에 있으면 크롬이 높이를 내용보다 약 10px 작게 잡아 탭 아래쪽이 잘렸다
           (Playwright 실측: py-1이면 6px, py-2여도 2px 잘림. 숨긴 가로 스크롤바 높이만큼 빠지는 것으로 보인다). 최소 높이를 못 박아 막는다 */}
       <div className="-mx-4 min-h-15 overflow-x-auto px-4 py-2 [scrollbar-width:none]">
-        <Tabs.List aria-label={label} className="flex w-max gap-2">
-          {options.map((option) => (
-            <Tabs.Trigger
-              key={option.value}
-              value={option.value}
-              className="group inline-flex h-11 shrink-0 items-center gap-1 rounded-full border border-input px-4 text-sm font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              {/* 고른 탭에만 보이는 체크. 글자와 같은 뜻의 보조 표시라 낭독기에서는 숨긴다(고른 상태는 aria-selected가 알린다) */}
-              <CheckIcon
-                aria-hidden="true"
-                strokeWidth={3}
-                className="hidden size-4 group-data-[state=active]:block"
-              />
-              {option.label}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
+        {/* leading(기간 전환 등)이 있으면 탭과 한 줄에 둔다(홈 B안: 줄 하나를 아껴 첫 화면에 포스터가 더 들어온다).
+            세로 막대는 "다른 고르기"라는 경계를 보이는 장식이라 낭독기에서 숨긴다. 이동 순서는 그대로 leading → 탭이다 */}
+        {leading ? (
+          <div className="flex w-max items-center gap-3">
+            {leading}
+            <span aria-hidden="true" className="h-8 w-px shrink-0 bg-border" />
+            <ServiceTabList label={label} options={options} />
+          </div>
+        ) : (
+          <ServiceTabList label={label} options={options} />
+        )}
       </div>
       {/* Radix의 탭 내용 칸은 Tab 키로 한 번 머무른다(tabIndex=0). 그때 어디에 있는지 보이게 포커스 링을 남긴다 */}
       <Tabs.Content
@@ -59,5 +61,28 @@ export function ServiceTabs({ label, value, onValueChange, options, children }: 
         {children}
       </Tabs.Content>
     </Tabs.Root>
+  )
+}
+
+// 알약 모양 탭 목록(위 ServiceTabs가 leading 유무에 따라 같은 목록을 두 곳 중 하나에 그린다)
+function ServiceTabList({ label, options }: Pick<ServiceTabsProps, 'label' | 'options'>) {
+  return (
+    <Tabs.List aria-label={label} className="flex w-max gap-2">
+      {options.map((option) => (
+        <Tabs.Trigger
+          key={option.value}
+          value={option.value}
+          className="group inline-flex h-11 shrink-0 items-center gap-1 rounded-full border border-input px-4 text-sm font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+        >
+          {/* 고른 탭에만 보이는 체크. 글자와 같은 뜻의 보조 표시라 낭독기에서는 숨긴다(고른 상태는 aria-selected가 알린다) */}
+          <CheckIcon
+            aria-hidden="true"
+            strokeWidth={3}
+            className="hidden size-4 group-data-[state=active]:block"
+          />
+          {option.label}
+        </Tabs.Trigger>
+      ))}
+    </Tabs.List>
   )
 }

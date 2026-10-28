@@ -64,7 +64,8 @@ export function PlanHistoryScreen() {
         <p className="text-sm text-muted-foreground tabular-nums">
           변경 {entries.length}건 · 최신순
         </p>
-        <ol className="grid gap-3">
+        {/* 기록 카드 사이 16px. 카드 안 소구간 사이(24px)보다 좁지만 카드 테두리가 경계를 맡는다. 이전: gap-3(12px)이라 펼친 카드 아래 접힌 카드가 붙어 보였다 */}
+        <ol className="grid gap-4">
           {/* 가장 최신 1건(목록 첫 항목)만 펼쳐 둔다: 화면을 연 사람이 가장 궁금한 "이번에 무엇이 왜 바뀌었나"를 한 번 누르지 않고 바로 읽게 하고,
               지난 기록은 접어 두어 목록이 길어지지 않게 한다(2026-10-17 사용자 결정). 서버가 최신순으로 준다는 전제다 */}
           {entries.map((entry, index) => (

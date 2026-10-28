@@ -164,9 +164,12 @@ function PriceEditor({ price, isLocked, collapsible }: PriceEditorProps) {
 }
 
 // 적용 금액(계산에 쓰는 금액). 내가 고친 금액이면 "내가 고친 금액"을 덧붙인다(기본 요금일 때는 아무것도 붙이지 않는다)
+// 넓은 화면(md 이상)에서는 금액을 칸 오른쪽 끝에 맞춘다(md:justify-items-end md:text-right). tabular-nums(숫자 폭 같음)와 함께 쓰면
+// "13,500원"과 "9,900원"의 일·십·백 자리와 "원"이 위아래 카드끼리 같은 세로선에 놓여 금액을 비교하기 쉽다(운영 피드백: 금액 정렬이 안 맞음).
+// 좁은 화면은 위아래로 쌓여 줄마다 금액이 하나뿐이라 왼쪽 정렬 그대로 둔다. 이전: className="grid gap-0.5" (왼쪽 정렬)
 function AppliedPrice({ price, large }: { price: ServicePrice; large: boolean }) {
   return (
-    <div className="grid gap-0.5">
+    <div className="grid gap-0.5 md:justify-items-end md:text-right">
       <span
         className={`${large ? 'text-xl font-extrabold' : 'text-base font-semibold text-muted-foreground'} tabular-nums`}
       >
@@ -196,8 +199,11 @@ interface PricingRowProps {
  * 서비스 카드(PricingGroupCard) 안에서 쓰이며, 줄마다 반복하던 확인일·안내 문장은 목록 위 한 줄과 카드 경고로 모았다.
  */
 export function PricingRow({ price, title, head, isLocked, isPrimary }: PricingRowProps) {
+  // 입력 칸 열을 고정 폭(15.75rem = 252px)으로 둔다. 이전에는 auto라, 내 금액을 고친 줄에만 생기는 "되돌리기" 버튼(44px + 간격 8px) 때문에
+  // 그 줄만 입력 열이 넓어지고 금액 열이 왼쪽으로 52px 밀려 카드끼리 금액 위치가 어긋났다.
+  // 252px = 입력 112 + 간격 8 + "원" + 간격 8 + 적용 58 + 간격 8 + 되돌리기 44(가장 넓을 때). 이전: md:grid-cols-[minmax(0,1.5fr)_8rem_auto]
   return (
-    <div className="grid gap-2 md:grid-cols-[minmax(0,1.5fr)_8rem_auto] md:items-center md:gap-4">
+    <div className="grid gap-2 md:grid-cols-[minmax(0,1.5fr)_8rem_15.75rem] md:items-center md:gap-4">
       <div className="grid gap-0.5">
         {head}
         <p

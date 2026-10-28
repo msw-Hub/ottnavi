@@ -119,6 +119,37 @@ class TitleApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 검색은_최근_2년_개봉작을_먼저_과거작을_그_다음_미래와_개봉일_모름을_맨_뒤로_두고_그룹_안은_인기도_순이다() throws Exception {
+		// given: 오늘(KST) 기준으로 개봉일이 다른 작품 5개. 인기도는 옛 작품과 미래·모름 쪽이 더 높다
+		LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+		insertTitleWithRelease(910001, "정렬검사 옛 고전", "900", LocalDate.of(1993, 1, 1));
+		insertTitleWithRelease(910002, "정렬검사 최근 낮은 인기", "5", today.minusYears(1));
+		insertTitleWithRelease(910003, "정렬검사 최근 높은 인기", "50", today.minusMonths(6));
+		insertTitleWithRelease(910004, "정렬검사 미래 개봉", "999", today.plusDays(30));
+		insertTitleWithRelease(910005, "정렬검사 개봉일 모름", "800", null);
+
+		// when: 전체 순서
+		var all = mockMvc.perform(get(SEARCH_URL).param("q", "정렬검사"));
+
+		// then: 최근 그룹(인기도 순) → 과거 → 미래(999) → 모름(800)
+		all.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.totalElements").value(5))
+				.andExpect(jsonPath("$.data.content[0].tmdbId").value(910003))
+				.andExpect(jsonPath("$.data.content[1].tmdbId").value(910002))
+				.andExpect(jsonPath("$.data.content[2].tmdbId").value(910001))
+				.andExpect(jsonPath("$.data.content[3].tmdbId").value(910004))
+				.andExpect(jsonPath("$.data.content[4].tmdbId").value(910005));
+
+		// when, then: 두 번째 쪽(크기 2)도 같은 순서로 이어지고 개수 쿼리가 깨지지 않는다
+		mockMvc.perform(get(SEARCH_URL).param("q", "정렬검사").param("page", "1").param("size", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.totalElements").value(5))
+				.andExpect(jsonPath("$.data.totalPages").value(3))
+				.andExpect(jsonPath("$.data.content[0].tmdbId").value(910001))
+				.andExpect(jsonPath("$.data.content[1].tmdbId").value(910004));
+	}
+
+	@Test
 	void 제목이_아닌_원제로도_찾고_페이지네이션이_동작한다() throws Exception {
 		// given: 원제에만 Parasite가 있는 작품 3개
 		saveMovie(900001, "작품 A", "Parasite A", "30");
@@ -320,6 +351,12 @@ class TitleApiTest extends IntegrationTestSupport {
 		entity.updateDetail(title, originalTitle, "줄거리", "ko", LocalDate.of(2019, 5, 30), "/poster.jpg",
 				"/backdrop.jpg", "ko", null, new BigDecimal(popularity), new BigDecimal("8.5"), CHECKED_AT);
 		return titleRepository.save(entity);
+	}
+
+	/** 개봉일(null 가능)과 인기도만 정해 영화 한 행을 직접 넣는다. 정렬 그룹 테스트용이다 */
+	private void insertTitleWithRelease(int tmdbId, String name, String popularity, LocalDate releaseDate) {
+		jdbcTemplate.update("INSERT INTO title (media_type, tmdb_id, title, popularity, release_date, fetched_at) "
+				+ "VALUES ('MOVIE', ?, ?, ?::numeric, ?, now())", tmdbId, name, popularity, releaseDate);
 	}
 
 	private Title saveTv(int tmdbId, String title, String originalTitle, String popularity) {

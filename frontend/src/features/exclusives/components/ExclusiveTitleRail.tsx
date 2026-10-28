@@ -133,10 +133,19 @@ export function ExclusiveTitleRail({
   function scrollByPage(direction: -1 | 1) {
     const list = listRef.current
     if (!list) return
+    // 1. 동작 줄이기 설정인지 본다(Windows "애니메이션 효과" 끔도 브라우저에서는 이 설정으로 잡힌다)
+    const isReduced = prefersReducedMotion()
+    // 2. 평소에는 부드럽게 미끄러지고(smooth), 동작 줄이기면 미끄러지는 움직임 없이 바로 넘긴다(auto)
     list.scrollBy({
       left: direction * list.clientWidth * 0.8,
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      behavior: isReduced ? 'auto' : 'smooth',
     })
+    // 3. 동작 줄이기에서 바로 넘기면 카드가 "뚝" 바뀌어 넘어간 것을 알아채기 어렵다. 홈 줄(home/components/ScrollRail)과 같은 규칙으로
+    //    위치는 그대로 두고 줄 전체의 밝기만 35% → 100%로 0.28초 동안 되살린다. 기능 폴더끼리 import 금지라 코드를 나눠 쓰지 않고 같은 값을 둔다.
+    //    animate가 없는 환경(테스트용 jsdom)에서는 건너뛴다
+    if (isReduced && typeof list.animate === 'function') {
+      list.animate([{ opacity: 0.35 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' })
+    }
   }
 
   // 마우스 드래그 상태. 렌더에 쓰이지 않는 값이라 state가 아닌 ref에 둔다(움직일 때마다 다시 그리지 않으려는 것).
@@ -400,7 +409,8 @@ interface RailArrowButtonProps {
   onClick: () => void
 }
 
-// 줄 양 끝의 원형 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데쯤(top-1/3)에 떠 있다(홈 줄과 같은 모양)
+// 줄 양 끝의 세로로 긴 사각 화살표 버튼(640px 이상에서만). 포스터 높이의 가운데에 떠 있다(홈 줄 ScrollRail과 같은 모양, H-2 사용자 확정).
+// 이전: 원형 버튼(size-10 rounded-full)이 카드 전체의 1/3 지점(top-1/3)에 있었다
 function RailArrowButton({
   direction,
   label,
@@ -417,12 +427,21 @@ function RailArrowButton({
       disabled={isDisabled}
       onClick={onClick}
       className={cn(
-        // size-10(40px) 원형. 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다
-        'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex',
-        direction === 'prev' ? '-left-3' : '-right-3',
+        // w-9(36px) × 포스터 높이의 약 절반, 모서리 rounded-md. 카드 위에 떠 있어 테두리(border-input, 카드 위 3:1 이상)와 card 바탕으로 경계를 만든다.
+        // 세로 위치 = 줄 위 여백 py-2(8px) + 포스터 높이 ÷ 2. 카드 폭(RAIL_ITEM_WIDTH) 144px(640px~)·160px(1024px~)의 2:3 포스터 216·240px 기준이라
+        // 가운데 116px(top-29)·128px(top-32), 길이 112·120px이다(홈 보통 카드 줄과 같은 값). 카드 폭을 바꾸면 이 값도 같이 고친다.
+        // 줄의 스크롤 영역 끝(-left-4/-right-4, 줄의 -mx-4와 같은 거리)에 붙여 카드 가장자리를 약 20px만 덮는다
+        // 이전: 'absolute top-1/3 z-20 hidden size-10 -translate-y-1/2 items-center justify-center rounded-full ...', direction === 'prev' ? '-left-3' : '-right-3'
+        // 이전(불투명 버튼): 'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input bg-card text-foreground shadow-md hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 sm:inline-flex lg:top-32 lg:h-30'
+        // 반투명 버튼(홈 줄 ScrollRail과 같은 값): 평소 card 60%·테두리 input 40%·뒤 흐림으로 포스터가 비쳐 보이고,
+        // 마우스를 올리거나 키보드 포커스가 오면 accent 95%·테두리 input 100%로 거의 불투명해진다.
+        // 바탕 하한 60%는 흰 포스터 위에서도 화살표(foreground) 대비 약 4:1(3:1 이상)을 지키는 값이다. 전환은 motion-safe에서만 0.2초
+        'absolute top-29 z-20 hidden h-28 w-9 -translate-y-1/2 items-center justify-center rounded-md border border-input/40 bg-card/60 text-foreground shadow-sm backdrop-blur-sm hover:border-input hover:bg-accent/95 hover:shadow-md focus-visible:border-input focus-visible:bg-accent/95 focus-visible:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-0 motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-200 sm:inline-flex lg:top-32 lg:h-30',
+        direction === 'prev' ? '-left-4' : '-right-4',
       )}
     >
-      <Icon aria-hidden="true" className="size-5" />
+      {/* 이전: className="size-5" (밝은 포스터 위 윤곽을 지키려 어두운 그림자를 더했다) */}
+      <Icon aria-hidden="true" className="size-5 drop-shadow-sm drop-shadow-background" />
     </button>
   )
 }

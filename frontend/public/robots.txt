@@ -10,5 +10,5 @@ Disallow: /pricing
 Disallow: /auth
 Disallow: /login
 
-# ottnavi.shop은 도메인 구매 전의 예정 주소다(ROADMAP Task 005·094). 달라지면 함께 고친다.
+# ottnavi.shop은 구매·연결을 마친 운영 도메인이다(2026-10-21 Vercel 연결, ROADMAP Task 092). 달라지면 함께 고친다.
 Sitemap: https://ottnavi.shop/sitemap.xml

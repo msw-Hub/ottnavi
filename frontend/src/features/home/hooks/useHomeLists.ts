@@ -37,6 +37,10 @@ import { getMockRequestParams } from '@/lib/mockScenario'
 
 // 홈 목록을 다시 받지 않고 쓰는 시간(60초)
 const HOME_LIST_STALE_TIME_MS = 60 * 1000
+
+// 홈 인기 순위 줄에 보일 개수(TOP 10). 홈 맨 위 배너가 같은 요청(오늘·전체·이 개수)을 써서 요청 한 번을 나눠 쓴다.
+// 줄과 배너가 이 값을 따로 쓰면 요청 조건이 달라져 같은 목록을 두 번 받는다
+export const POPULAR_RANKING_LIMIT = 10
 // 장르 목록은 하루에 한 번 바뀔까 말까 해서 한 시간 동안 다시 받지 않는다(서버 캐시 24시간)
 const GENRES_STALE_TIME_MS = 60 * 60 * 1000
 
