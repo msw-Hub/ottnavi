@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - operation은 49개이고 모두 구현됐다(Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -811,6 +811,91 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  # ===== notification: 알림 설정·발송 이력 (Task 071·073) =====
+  /me/notification-setting:
+    get:
+      tags:
+        - notification
+      operationId: getMyNotificationSetting
+      security:
+        - bearerAuth: []
+      summary: 알림 설정 조회
+      description: |
+        알림 수신 여부와 수신 이메일(계정 이메일)을 조회한다(SCR-12, FR-16). 알림은 기본 꺼짐이며(동의 없이 메일을 보내지 않는다), 온보딩 전이어도 200이고 `isNotificationEnabled: false`다.
+        수신 이메일은 따로 입력받지 않고 로그인한 계정의 이메일이다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 알림 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - notification
+      operationId: updateMyNotificationSetting
+      security:
+        - bearerAuth: []
+      summary: 알림 설정 저장
+      description: |
+        알림 수신 여부를 켜거나 끈다. 끄면 이후 알림이 생성되지 않는다(이미 대기 중인 알림은 발송된다). 켜는 것 자체로는 메일이 나가지 않는다.
+        내 설정(온보딩)을 한 번도 저장하지 않았으면 저장할 설정 행이 없어 `ONBOARDING_REQUIRED`(409)다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyNotificationSettingRequest'
+      responses:
+        '200':
+          description: 저장된 알림 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationSetting'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/notifications:
+    get:
+      tags:
+        - notification
+      operationId: listMyNotifications
+      security:
+        - bearerAuth: []
+      summary: 알림 발송 이력 조회
+      description: |
+        내 알림 이력을 최신순으로 돌려준다(SCR-12, FR-16). 유형(`type`)과 상태(`status`: 대기 `PENDING`, 발송 `SENT`, 실패 `FAILED`), 만든 시각, 발송 시각만 담고 메일 본문 재료나 실패 사유는 담지 않는다.
+        페이지네이션(`page`, `size`) 응답이다. 이력이 없으면 200이고 `content`가 빈 배열이다.
+        오류: `VALIDATION_FAILED`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 알림 이력 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationHistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   # ===== admin: OTT 구독상품·월 구독요금 =====
   /admin/products:
     get:
@@ -1376,6 +1461,31 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/notifications/summary:
+    get:
+      tags:
+        - admin
+      operationId: getAdminNotificationSummary
+      security:
+        - bearerAuth: []
+      summary: 알림 발송 상태 요약 조회
+      description: |
+        관리자 수집 화면(SCR-16)의 알림 발송 상태 요약이다. 최근 7일 동안 만들어진 알림의 상태별 건수와 마지막 발송 시각을 돌려준다. 사용자 이메일이나 본문은 담지 않는다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 알림 발송 상태 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminNotificationSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -3545,6 +3655,171 @@ components:
                     month: '2026-11'
                     ottServiceId: 5
               dataAsOf: '2026-11-01'
+
+    # ----- notification: 알림 설정·발송 이력 -----
+    NotificationSetting:
+      type: object
+      description: 알림 설정. 수신 이메일은 로그인한 계정의 이메일이다
+      required:
+        - isNotificationEnabled
+        - email
+      properties:
+        isNotificationEnabled:
+          type: boolean
+          description: 알림 수신 여부(기본 꺼짐)
+        email:
+          type: string
+          description: 알림을 받을 이메일(계정 이메일, 수정 불가)
+    CommonResponseNotificationSetting:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NotificationSetting'
+      example:
+        success: true
+        data:
+          isNotificationEnabled: false
+          email: user@example.com
+    UpdateMyNotificationSettingRequest:
+      type: object
+      required:
+        - isNotificationEnabled
+      properties:
+        isNotificationEnabled:
+          type: boolean
+          description: 알림 수신 여부
+      example:
+        isNotificationEnabled: true
+    NotificationHistoryItem:
+      type: object
+      description: 알림 이력 한 건. 본문 재료와 실패 사유는 담지 않는다
+      required:
+        - notificationId
+        - type
+        - status
+        - createdAt
+        - sentAt
+      properties:
+        notificationId:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [SUBSCRIBE_GUIDE, MONTHLY, PLAN_CHANGE]
+          description: 가입 안내 / 월초 안내 / 플랜 변경 알림
+        status:
+          type: string
+          enum: [PENDING, SENT, FAILED]
+          description: 대기 / 발송 / 실패(재시도 5회를 넘김)
+        createdAt:
+          type: string
+          format: date-time
+          description: 알림이 만들어진 시각
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 발송 성공 시각. 발송 전이거나 실패면 `null`
+    NotificationHistoryPage:
+      description: 알림 이력 한 페이지(페이지네이션 고정 형태, 최신순)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 알림들(없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/NotificationHistoryItem'
+    CommonResponseNotificationHistoryPage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NotificationHistoryPage'
+      example:
+        success: true
+        data:
+          content:
+            - notificationId: 31
+              type: MONTHLY
+              status: SENT
+              createdAt: '2026-11-01T03:50:00+09:00'
+              sentAt: '2026-11-01T03:51:12+09:00'
+            - notificationId: 30
+              type: PLAN_CHANGE
+              status: PENDING
+              createdAt: '2026-10-28T04:10:00+09:00'
+              sentAt: null
+            - notificationId: 27
+              type: SUBSCRIBE_GUIDE
+              status: FAILED
+              createdAt: '2026-10-21T21:30:00+09:00'
+              sentAt: null
+          page: 0
+          size: 20
+          totalElements: 3
+          totalPages: 1
+    AdminNotificationSummary:
+      type: object
+      description: 최근 7일 알림 발송 상태 요약
+      required:
+        - windowDays
+        - pendingCount
+        - sentCount
+        - failedCount
+        - latestSentAt
+      properties:
+        windowDays:
+          type: integer
+          format: int32
+          description: 집계 기간(일). 지금은 7
+        pendingCount:
+          type: integer
+          format: int64
+          description: 대기 중(발송 전이거나 재시도 대기) 건수
+        sentCount:
+          type: integer
+          format: int64
+          description: 발송한 건수
+        failedCount:
+          type: integer
+          format: int64
+          description: 재시도 5회를 넘겨 포기한 건수
+        latestSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 최근 7일 안에 발송에 성공한 알림 중 가장 늦은 발송 시각(`sentAt` 기준). 기간 안에 발송이 없으면 `null`
+    CommonResponseAdminNotificationSummary:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminNotificationSummary'
+      example:
+        success: true
+        data:
+          windowDays: 7
+          pendingCount: 2
+          sentCount: 148
+          failedCount: 1
+          latestSentAt: '2026-11-01T03:51:12+09:00'
 
     # ----- admin: OTT 구독상품·월 구독요금 -----
     AdminProductPrice:

@@ -63,4 +63,9 @@ public class UserSetting extends BaseTimeEntity {
 		this.watchPreset = watchPreset;
 		this.lowestPriceMode = lowestPriceMode;
 	}
+
+	/** 알림 수신 여부를 바꾼다(더티 체킹으로 저장) */
+	public void changeNotificationEnabled(boolean notificationEnabled) {
+		this.notificationEnabled = notificationEnabled;
+	}
 }

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<!--/* 알림 메일 공통 레이아웃(Task 072, 디자인 반영). 유형별 템플릿이 layout(title, content, accent)를 불러 본문 자리를 채운다.
+     accent: 위쪽 색 띠 색(가입·월초는 하늘색, 변경은 주황). 템플릿에 적힌 고정 값만 넘기고 payload 값은 넘기지 않는다.
+     메일 클라이언트 호환을 위해 표(table) 레이아웃과 태그 안 인라인 style만 쓴다 */-->
+<html xmlns:th="http://www.thymeleaf.org" th:fragment="layout(title, content, accent)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:replace="${title}">OTT내비</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f5f8;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f5f8;">
+<tr><td align="center" style="padding:24px 12px;">
+    <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;font-family:'Malgun Gothic',sans-serif;color:#1f2937;">
+        <!--/* 머리말 */-->
+        <tr><td style="background:#0b1220;padding:20px 28px;">
+            <span style="font-size:20px;font-weight:bold;color:#ffffff;">OTT내비</span>
+            <span style="font-size:12px;color:#8fb8ff;margin-left:8px;">어느 달에 어디를 구독할지</span>
+        </td></tr>
+        <tr><td th:style="'height:4px;background:' + ${accent} + ';font-size:0;line-height:0;'">&nbsp;</td></tr>
+        <!--/* 본문: 인사말 + 유형별 본문 자리 */-->
+        <tr><td style="padding:28px;">
+            <p style="margin:0 0 6px;font-size:14px;color:#6b7280;">안녕하세요, <span th:text="${userName}">회원</span>님.</p>
+            <div th:replace="${content}">본문</div>
+        </td></tr>
+        <!--/* 꼬리말: 화면 표시 규칙(확인된 범위 고지, 출처, 기준일)과 알림 끄는 방법 */-->
+        <tr><td style="padding:18px 28px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#6b7280;">
+            이 안내는 확인된 범위의 정보입니다. 실제 제공 여부와 요금은 달라질 수 있으니 결제 전에 각 서비스에서 한 번 더 확인해 주세요.<br>
+            제공처 정보 출처: TMDB(JustWatch 제공 데이터) · 데이터 기준일: <span th:text="${dataDate}">2026-01-01</span><br>
+            이 알림은 OTT내비의 <a th:href="${settingsUrl}" href="#" style="color:#0369a1;">알림 설정</a> 화면에서 언제든 끌 수 있어요.
+        </td></tr>
+    </table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -1,9 +1,9 @@
 import { useEffect, type ReactNode } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { InfoIcon, LoaderCircleIcon } from 'lucide-react'
+import { BellIcon, InfoIcon, LoaderCircleIcon } from 'lucide-react'
 import { useForm, useWatch } from 'react-hook-form'
 // import { Link, ... } — 이전: 아래 회원 탈퇴 링크용. 링크를 푸터로 옮겨 Link를 쓰지 않는다
-import { useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import type { OttService } from '@/api/generated/model'
 import { isApiError } from '@/api/http'
@@ -326,19 +326,18 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
         </p>
       </section>
 
-      {/*
-        이전: 회원 탈퇴 링크(SCR-13, Task 081)가 여기(폼 맨 아래 오른쪽 구석, 작은 빨간 글자)에 있었다.
-        옮긴 이유: 저장 버튼 바로 아래 빨간 글자가 내 설정과 상관없어 보여 뜬금없다는 운영 피드백이 있었고,
-        사용자 확정으로 푸터(app/RootLayout.tsx, 로그인한 사용자에게만, 회색 글자)로 옮겼다. 이동 경로(/settings/withdraw)는 같다.
-        {settings.isOnboardingDone && (
-          <Link
-            to="/settings/withdraw"
-            className="inline-flex min-h-11 items-center justify-self-end rounded-md px-2 text-xs text-destructive underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            회원 탈퇴
-          </Link>
-        )}
-      */}
+      {/* 알림 설정 링크(SCR-12, Task 071): 알림은 설정 행이 있어야 저장되므로(ONBOARDING_REQUIRED) 온보딩을 마친 뒤에만 보인다.
+          회원 탈퇴 링크는 푸터(app/RootLayout.tsx)로 옮겨져 이 줄에는 알림 설정 링크만 남는다(develop 병합 때 합침, 정렬은 ui-designer 확인 필요).
+          이전: 같은 "계정 관리" 줄의 오른쪽에 회원 탈퇴 링크(SCR-13, Task 081)가 있었다. 옮긴 이유: 저장 버튼 바로 아래 빨간 글자가 내 설정과 상관없어 보여 뜬금없다는 운영 피드백이 있었고 사용자 확정으로 푸터(로그인한 사용자에게만, 회색 글자)로 옮겼다. 이동 경로(/settings/withdraw)는 같다 */}
+      {settings.isOnboardingDone && (
+        <Link
+          to="/settings/notifications"
+          className="inline-flex min-h-11 items-center gap-1.5 justify-self-start rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          <BellIcon aria-hidden="true" className="size-4" />
+          알림 설정
+        </Link>
+      )}
     </form>
   )
 }

@@ -1,8 +1,14 @@
 package com.ottnavi.plan.service;
 
+import com.ottnavi.notification.domain.enums.NotificationType;
+import com.ottnavi.notification.service.NotificationCreateService;
+import com.ottnavi.notification.service.model.MonthlyPayload;
+import com.ottnavi.notification.service.model.PlanChangePayload;
 import com.ottnavi.plan.domain.entity.Plan;
 import com.ottnavi.plan.domain.enums.PlanStatus;
 import com.ottnavi.plan.domain.repository.PlanRepository;
+import com.ottnavi.plan.domain.rule.PlanChangeAlertRule;
+import com.ottnavi.plan.domain.rule.PlanChangeAlertRule.LeftTitle;
 import com.ottnavi.plan.domain.rule.PlanChangeDetector;
 import com.ottnavi.plan.domain.rule.PlanChangeEvidence;
 import com.ottnavi.plan.domain.rule.PlanChangeSummary;
@@ -12,6 +18,7 @@ import com.ottnavi.plan.service.model.PlanInputBundle;
 import com.ottnavi.plan.service.model.PlanRecalcOutcome;
 import com.ottnavi.user.service.UserQueryService;
 import java.time.Clock;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 재계산 결과를 저장한다(Task 069, TECH 2절). 쓰기 트랜잭션 한 번에 사용자 행 잠금, 이전 ACTIVE 보관(명시 flush),
- * 새 ACTIVE 저장, 변경 요약 기록, 오래된 ARCHIVED 정리를 묶는다. DRAFT는 건드리지 않는다.
+ * 새 ACTIVE 저장, 변경 요약 기록, 알림 행 생성(Task 073), 오래된 ARCHIVED 정리를 묶는다. DRAFT는 건드리지 않는다.
  * 계산(엔진)은 이 클래스 밖에서 끝난 상태로 들어온다.
  */
 @Slf4j
@@ -43,6 +50,8 @@ public class PlanRecalcWriter {
 	private final PlanSnapshotLoader planSnapshotLoader;
 	private final PlanChangeEvidenceAssembler planChangeEvidenceAssembler;
 	private final PlanChangeSummaryCodec planChangeSummaryCodec;
+	private final PlanNotificationComposer notificationComposer;
+	private final NotificationCreateService notificationCreateService;
 	private final Clock clock;
 
 	/**
@@ -89,12 +98,51 @@ public class PlanRecalcWriter {
 		}
 		Long nextId = next.getId();
 
-		// 6. 오래된 ARCHIVED를 정리한다. 이 벌크 삭제가 영속성 컨텍스트를 비우므로 가장 마지막에 한다
+		// 6. 알림 행을 같은 트랜잭션에서 만든다(이 재계산이 되돌아가면 알림도 함께 되돌아간다). 네이티브 삽입 전에 flush한다
+		planRepository.flush();
+		createNotifications(userId, previous, next, previousSnapshot, nextSnapshot, evidence, summary, bundle);
+
+		// 7. 오래된 ARCHIVED를 정리한다. 이 벌크 삭제가 영속성 컨텍스트를 비우므로 가장 마지막에 한다
 		int deleted = deleteOldArchived(userId, previousPlanId);
 
 		log.info("재계산 완료: userId={}, 이전 planId={}, 새 planId={}, 변경 요약={}, 정리한 ARCHIVED={}건",
 				userId, previousPlanId, nextId, summary.isPresent(), deleted);
 		return PlanRecalcOutcome.UPDATED;
+	}
+
+	/**
+	 * 재계산 결과로 알림 행을 만든다(Task 073). 알림이 꺼진 사용자·이미 만든 키는 생성 관문이 걸러 행이 늘지 않는다.
+	 *
+	 * <pre>
+	 * 월이 바뀐 재계산(이전 첫 달 &lt; 새 첫 달)               → MONTHLY (MONTHLY:{userId}:{YYYY-MM}, 달마다 1회)
+	 * 월이 그대로이고 변경 요약이 있고 이번 달 작품이 빠짐   → PLAN_CHANGE (PLAN_CHANGE:{userId}:{새 planId})
+	 * 그 밖(월 중간 재계산에서 변화 없음·다음 달 작품만 빠짐)  → 만들지 않음
+	 * </pre>
+	 */
+	private void createNotifications(Long userId, Plan previous, Plan next, PlanSnapshot previousSnapshot,
+			PlanSnapshot nextSnapshot, PlanChangeEvidence evidence, Optional<PlanChangeSummary> summary,
+			PlanInputBundle bundle) {
+		// 1. 월이 바뀐 재계산이면 월초 안내를 만든다. 변경 요약이 있으면 이유 문장도 함께 담는다
+		if (previous.getStartMonth().isBefore(bundle.startMonth())) {
+			MonthlyPayload payload = notificationComposer.composeMonthly(userId, next, summary);
+			String dedupeKey = "MONTHLY:" + userId + ":" + YearMonth.from(bundle.startMonth());
+			notificationCreateService.create(userId, NotificationType.MONTHLY, dedupeKey, payload);
+			return;
+		}
+
+		// 2. 월 중간 재계산은 변경 요약이 있을 때만 알림 후보가 된다
+		if (summary.isEmpty()) {
+			return;
+		}
+
+		// 3. 이번 달 확정 달에 배정됐던 작품이 그 서비스에서 빠졌을 때만 변경 알림을 만든다
+		List<LeftTitle> left = PlanChangeAlertRule.findLeftTitles(previousSnapshot, bundle.startMonth(), evidence);
+		if (left.isEmpty()) {
+			return;
+		}
+		PlanChangePayload payload = notificationComposer.composePlanChange(userId, next, summary.get(), left);
+		String dedupeKey = "PLAN_CHANGE:" + userId + ":" + next.getId();
+		notificationCreateService.create(userId, NotificationType.PLAN_CHANGE, dedupeKey, payload);
 	}
 
 	/**
