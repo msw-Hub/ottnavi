@@ -24,7 +24,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { PlanDetail } from '@/features/plan/components/PlanDetail'
 import { PlanMailPreviewDialog } from '@/features/plan/components/PlanMailPreviewDialog'
+import { NotificationNudge } from '@/features/plan/components/NotificationNudge'
 import { PlanTypeSelector } from '@/features/plan/components/PlanTypeSelector'
+import { useNotificationNudge } from '@/features/plan/hooks/useNotificationNudge'
 import {
   getPlanMailPreviewFetchOptions,
   resetPlanMailPreview,
@@ -235,19 +237,31 @@ function CurrentPlanView({
   // 서비스 화면의 다른 날짜("2026년 10월 9일")와 같은 말투로 맞춘 저장 시각(관리자용 숫자 형식 formatDateTime은 쓰지 않는다)
   const savedAt = formatDateTimeKorean(plan.activatedAt)
 
+  // 알림 켜기 안내를 보일지: 저장 직후 && 일반 회원 && 알림 설정을 읽었고 꺼짐일 때만 true(불러오는 중·실패는 false). 조건은 훅이 정한다
+  const isNudgeAvailable = useNotificationNudge(isJustSaved)
+  // 이 화면에서 X로 닫았는지. 화면 상태로만 두고 서버·저장소에는 남기지 않는다(다음에 플랜을 저장하면 다시 보이는 것이 의도)
+  const [isNudgeDismissed, setIsNudgeDismissed] = useState(false)
+
   return (
     // 저장 완료 안내 → 제목 줄 → 플랜 내용 → 이동 버튼. 제목 줄은 아래 플랜 내용의 머리라 24px(gap-6)로 붙여 둔다.
     // 플랜 내용 안의 구간(요약·달별·남은 작품·출처) 사이는 아래 감싸는 div의 gap-section(40/48px)이 정한다(styles/tokens.css R1·R2)
     <div className="flex flex-col gap-6">
       {isJustSaved && (
-        // 저장 완료는 오류가 아니라 안내라 role="status"로 덮어쓴다. shadcn Alert의 기본값 role="alert"는 낭독기가 하던 말을 끊고 급하게 읽는다
-        <Alert role="status" className="border-primary">
-          <CircleCheckIcon aria-hidden="true" />
-          <AlertTitle className="text-base font-bold">{typeName} 플랜을 저장했어요</AlertTitle>
-          <AlertDescription>
-            저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.
-          </AlertDescription>
-        </Alert>
+        // 저장 완료 안내와 알림 켜기 띠를 8px(gap-2)로 붙여 한 묶음으로 읽히게 한다(띠는 저장 완료에 딸린 덧붙임이다)
+        <div className="grid gap-2">
+          {/* 저장 완료는 오류가 아니라 안내라 role="status"로 덮어쓴다. shadcn Alert의 기본값 role="alert"는 낭독기가 하던 말을 끊고 급하게 읽는다 */}
+          <Alert role="status" className="border-primary">
+            <CircleCheckIcon aria-hidden="true" />
+            <AlertTitle className="text-base font-bold">{typeName} 플랜을 저장했어요</AlertTitle>
+            <AlertDescription>
+              저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.
+            </AlertDescription>
+          </Alert>
+          {/* 알림 켜기 안내(띠형). 이전: 카드형 안이 있었으나 사용자가 띠형을 골라 지웠다 */}
+          {isNudgeAvailable && !isNudgeDismissed && (
+            <NotificationNudge onDismiss={() => setIsNudgeDismissed(true)} />
+          )}
+        </div>
       )}
 
       {/* 변경 내역(SCR-11) 진입점은 저장한 플랜이 있을 때만 의미가 있어(매월 재계산은 저장한 플랜을 기준으로 한다) 이 화면에만 둔다.

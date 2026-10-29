@@ -1,13 +1,11 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "ottnavi\\.vercel\\.app" }],
-      "destination": "https://ottnavi.shop/:path*",
-      "permanent": true
-    }
-  ],
   "routes": [
+    {
+      "src": "^/(.*)$",
+      "has": [{ "type": "host", "value": "ottnavi\\.vercel\\.app" }],
+      "status": 308,
+      "headers": { "Location": "https://ottnavi.shop/$1" }
+    },
     {
       "src": "^/api/(.*)$",
       "dest": "https://port-0-ottnavi-17xco2nlst8pr67.sel5.cloudtype.app/api/$1",
