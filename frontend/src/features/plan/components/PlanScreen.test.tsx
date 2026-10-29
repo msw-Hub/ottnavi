@@ -22,13 +22,108 @@ import { resetMockSession, setMockOnboardingDone, setMockRole } from '@/mocks/mo
 
 const server = setupServer(...handlers)
 
-beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
+/*
+ * 진행 중 요청 추적과 실패 순간 진단 장치.
+ *
+ * 배경: CI에서만 간헐적으로 `ApiError: network 응답 없음`이 테스트 시작 직후(4~17ms)의 첫 준비 요청에서 난다.
+ * 가설(미확인): 앞 테스트가 끝날 때 아직 진행 중인 요청이 다음 테스트의 첫 요청에 영향을 준다.
+ * 그래서 1) 매 테스트가 끝날 때 진행 중 요청이 0이 될 때까지 기다리고, 2) 실패하면 직전 이벤트 기록을 남겨 원인 단서를 얻는다.
+ * 이 장치가 원인을 고쳤는지는 로컬에서 확인할 수 없다(CI에서만 재현됨).
+ *
+ * 요청의 시작은 `request:start`, 끝은 `request:end` 또는 `unhandledException`이다. msw 3 소스(lib/_chunks/interceptor-source.js)에서
+ * 응답을 보낸 직후·통과·미처리 때는 `request:end`가 오고, 핸들러 조회 중 예외가 나면 `unhandledException`만 온다.
+ * 핸들러가 영원히 끝나지 않거나 클라이언트가 중간에 취소(abort)하는 경우 끝 이벤트가 안 올 수 있어, 대기에는 상한을 둔다.
+ */
+const DRAIN_TIMEOUT_MS = 2000 // 진행 중 요청을 기다리는 최대 시간(끝 이벤트가 안 와도 테스트가 멈추지 않게 하는 상한)
+const RECENT_EVENT_LIMIT = 30 // 진단용으로 남기는 최근 이벤트 수
+const inflightRequests = new Map<string, string>() // requestId -> "메서드 경로"
+const recentEvents: string[] = [] // 링 버퍼(오래된 것부터 버린다)
+
+// 메서드와 경로만 남긴다(쿼리·본문·토큰·응답 본문은 기록하지 않는다)
+function describeRequest(request: Request) {
+  return `${request.method} ${new URL(request.url).pathname}`
+}
+
+function recordEvent(kind: string, request: Request) {
+  recentEvents.push(`${new Date().toISOString()} ${kind} ${describeRequest(request)}`)
+  if (recentEvents.length > RECENT_EVENT_LIMIT) recentEvents.shift()
+}
+
+// 평소엔 부르지 않는다. 실패·상한 초과·미처리 요청이 생겼을 때만 최근 이벤트와 진행 중 요청을 한 번에 출력한다
+function warnDiagnostics(reason: string) {
+  console.warn(
+    `[PlanScreen 진단] ${reason}\n진행 중 요청: ${JSON.stringify([...inflightRequests.values()])}\n최근 이벤트:\n${recentEvents.join('\n')}`,
+  )
+}
+
+interface TrackedEvent {
+  requestId: string
+  request: Request
+}
+type TrackerEntry = [
+  type: 'request:start' | 'request:end' | 'request:unhandled' | 'unhandledException',
+  listener: (event: TrackedEvent) => void,
+]
+const trackerListeners: TrackerEntry[] = [
+  [
+    'request:start',
+    ({ requestId, request }) => {
+      inflightRequests.set(requestId, describeRequest(request))
+      recordEvent('start', request)
+    },
+  ],
+  [
+    'request:end',
+    ({ requestId, request }) => {
+      inflightRequests.delete(requestId)
+      recordEvent('end', request)
+    },
+  ],
+  [
+    'request:unhandled',
+    ({ request }) => {
+      recordEvent('unhandled', request)
+      warnDiagnostics('처리기가 없는 요청(request:unhandled)')
+    },
+  ],
+  [
+    'unhandledException',
+    ({ requestId, request }) => {
+      inflightRequests.delete(requestId)
+      recordEvent('exception', request)
+      warnDiagnostics('핸들러 예외(unhandledException)')
+    },
+  ],
+]
+
+// 진행 중 요청이 0이 될 때까지 상한까지만 기다린다. 넘으면 멈추지 않고 경고만 남기고 넘어간다
+async function drainInflightRequests() {
+  const deadline = Date.now() + DRAIN_TIMEOUT_MS
+  while (inflightRequests.size > 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+  if (inflightRequests.size > 0) {
+    warnDiagnostics(`진행 중 요청이 ${DRAIN_TIMEOUT_MS}ms 안에 끝나지 않았다`)
+    inflightRequests.clear() // 다음 테스트로 남은 기록이 넘어가지 않게 비운다
+  }
+}
+
+beforeAll(() => {
+  server.listen({ onUnhandledFrame: 'error' })
+  // 서버가 시작된 뒤 한 번만 등록한다. 각 describe가 자기 리스너만 지우므로 이 추적은 파일 끝까지 남는다
+  for (const [type, listener] of trackerListeners) server.events.on(type, listener)
+})
 beforeEach(() => {
   vi.stubEnv('VITE_USE_MOCK', 'true')
   setMockRole('USER')
   setMockOnboardingDone(true)
 })
-afterEach(() => {
+afterEach(async () => {
+  // 1. 화면을 먼저 정리해 새 요청이 더 생기지 않게 한다
+  cleanup()
+  // 2. 진행 중인 요청이 끝날 때까지 기다린다(상한 있음)
+  await drainInflightRequests()
+  // 3. 그 뒤에 목업 상태를 되돌린다
   server.resetHandlers()
   vi.unstubAllEnvs()
   window.history.pushState({}, '', '/') // 시나리오 주소를 지운다
@@ -37,7 +132,10 @@ afterEach(() => {
   resetMockWishlist()
   resetMockNotificationState()
 })
-afterAll(() => server.close())
+afterAll(() => {
+  for (const [type, listener] of trackerListeners) server.events.removeListener(type, listener)
+  server.close()
+})
 
 // 결과 화면만 연다. 새로고침·재방문을 흉내 내려고 같은 서버 상태(목업)에서 새 화면(새 QueryClient)을 다시 그릴 때도 쓴다
 function renderPlanScreen() {
@@ -54,12 +152,18 @@ function renderPlanScreen() {
 // 시나리오를 고른 뒤, 찜 하나를 만들고 플랜을 한 번 계산해 둔 상태에서 결과 화면을 연다(계산 전이면 "아직 계산한 플랜이 없어요"만 보인다)
 async function renderPlanAfterCalculate(scenario: string | null) {
   window.history.pushState({}, '', scenario ? `/plan?mockScenario=${scenario}` : '/plan')
-  await customInstance({
-    url: '/me/wishlist-items',
-    method: 'POST',
-    data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
-  })
-  await customInstance({ url: '/me/plan-drafts', method: 'POST' })
+  try {
+    await customInstance({
+      url: '/me/wishlist-items',
+      method: 'POST',
+      data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
+    })
+    await customInstance({ url: '/me/plan-drafts', method: 'POST' })
+  } catch (error) {
+    // 준비 요청이 실패한 순간의 단서를 남기고 예외는 그대로 다시 던진다
+    warnDiagnostics('준비 요청 실패')
+    throw error
+  }
 
   renderPlanScreen()
   await screen.findByRole('heading', { level: 2, name: '플랜 유형 고르기' })
@@ -161,20 +265,22 @@ describe('플랜 결과 화면', () => {
 describe('알림 켜기 안내(저장 직후)', () => {
   // 알림 설정 조회 요청 수를 센다
   let settingRequestCount = 0
+  // removeAllListeners()는 파일 위쪽의 추적 리스너까지 지우므로, 이 describe가 등록한 리스너만 참조로 지운다
+  const countSettingRequest = ({ request }: TrackedEvent) => {
+    if (
+      request.method === 'GET' &&
+      new URL(request.url).pathname === '/api/me/notification-setting'
+    ) {
+      settingRequestCount++
+    }
+  }
   beforeEach(() => {
     settingRequestCount = 0
     window.scrollTo = vi.fn() // jsdom에는 scrollTo가 없어 호출만 흉내 낸다
-    server.events.on('request:start', ({ request }) => {
-      if (
-        request.method === 'GET' &&
-        new URL(request.url).pathname === '/api/me/notification-setting'
-      ) {
-        settingRequestCount++
-      }
-    })
+    server.events.on('request:start', countSettingRequest)
   })
   afterEach(() => {
-    server.events.removeAllListeners()
+    server.events.removeListener('request:start', countSettingRequest)
   })
 
   // 계산해 둔 뒤 저장 버튼을 눌러 "저장 완료" 화면까지 간다
@@ -280,15 +386,17 @@ describe('알림 켜기 안내(저장 직후)', () => {
 describe('알림 메일 예시 팝업(데모 계정)', () => {
   // 메일 예시 요청 수를 센다(MSW의 요청 이벤트로 본다)
   let mailRequestCount = 0
+  // 위 describe와 같은 이유로 자기 리스너만 참조로 지운다
+  const countMailRequest = ({ request }: TrackedEvent) => {
+    if (new URL(request.url).pathname === '/api/me/plans/current/mail-preview') mailRequestCount++
+  }
   beforeEach(() => {
     mailRequestCount = 0
     window.scrollTo = vi.fn() // jsdom에는 scrollTo가 없어 호출만 흉내 낸다
-    server.events.on('request:start', ({ request }) => {
-      if (new URL(request.url).pathname === '/api/me/plans/current/mail-preview') mailRequestCount++
-    })
+    server.events.on('request:start', countMailRequest)
   })
   afterEach(() => {
-    server.events.removeAllListeners()
+    server.events.removeListener('request:start', countMailRequest)
   })
 
   // 역할과 시나리오를 고르고 계산해 둔 뒤 결과 화면에서 저장 버튼을 누른다
