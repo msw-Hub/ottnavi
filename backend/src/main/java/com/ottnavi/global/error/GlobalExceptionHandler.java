@@ -245,10 +245,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 		return problem;
 	}
 
-	/** 4xx는 예상 가능한 실패라 warn(스택 없음), 5xx는 error(스택 포함)로 남긴다 */
+	/**
+	 * 401은 로그인하지 않은 방문자의 재발급 호출처럼 정상적인 소음이라 debug, 그 밖의 4xx는 예상 가능한 실패라 warn(스택 없음),
+	 * 5xx는 error(스택 포함)로 남긴다
+	 */
 	private void logByStatus(HttpStatusCode status, ErrorCode errorCode, String path, Exception ex) {
 		if (status.is5xxServerError()) {
 			log.error("요청 처리 중 서버 오류: errorCode={}, status={}, path={}", errorCode, status.value(), path, ex);
+		} else if (status.value() == HttpStatus.UNAUTHORIZED.value()) {
+			log.debug("요청 처리 실패: errorCode={}, status={}, path={}, exception={}",
+					errorCode, status.value(), path, ex.getClass().getSimpleName());
 		} else {
 			log.warn("요청 처리 실패: errorCode={}, status={}, path={}, exception={}",
 					errorCode, status.value(), path, ex.getClass().getSimpleName());

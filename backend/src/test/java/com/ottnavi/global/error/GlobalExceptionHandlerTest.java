@@ -1,5 +1,6 @@
 package com.ottnavi.global.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
@@ -25,6 +26,9 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -49,6 +53,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 예외 유형별 ProblemDetail 응답을 검증한다(V-B).
  * 테스트 전용 컨트롤러는 중첩 클래스로 두어 @SpringBootTest 컴포넌트 스캔(계약 대조)에 섞이지 않게 한다.
  */
+@ExtendWith(OutputCaptureExtension.class)
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ErrorTestController.class)
 @Import({SecurityConfig.class, ProblemDetailAuthenticationEntryPoint.class, ProblemDetailAccessDeniedHandler.class,
 		OAuth2LoginTestConfig.class,
@@ -258,6 +263,26 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	void 인증_실패_401은_WARN_로그를_남기지_않는다(CapturedOutput output) throws Exception {
+		// when
+		ResultActions result = mockMvc.perform(get(BASE + "/unauthorized"));
+
+		// then
+		expectProblem(result, 401, "UNAUTHORIZED");
+		assertThat(output.getAll()).doesNotContain("요청 처리 실패");
+	}
+
+	@Test
+	void 권한_부족_403은_WARN_로그를_남긴다(CapturedOutput output) throws Exception {
+		// when
+		ResultActions result = mockMvc.perform(get(BASE + "/forbidden"));
+
+		// then
+		expectProblem(result, 403, "FORBIDDEN");
+		assertThat(output.getAll()).contains("요청 처리 실패").contains("errorCode=FORBIDDEN");
+	}
+
+	@Test
 	void 요청_제한_초과는_429_RATE_LIMIT_EXCEEDED와_Retry_After_헤더를_준다() throws Exception {
 		expectProblem(mockMvc.perform(get(BASE + "/rate-limit")), 429, "RATE_LIMIT_EXCEEDED")
 				.andExpect(header().string("Retry-After", "7"))
@@ -374,6 +399,16 @@ class GlobalExceptionHandlerTest {
 		@GetMapping("/field-validation")
 		CommonResponse<TestResponse> fieldValidation() {
 			throw new FieldValidationException("targetDate", "미래 날짜는 쓸 수 없습니다.");
+		}
+
+		@GetMapping("/unauthorized")
+		CommonResponse<TestResponse> unauthorized() {
+			throw new UnauthorizedException("인증이 필요합니다.");
+		}
+
+		@GetMapping("/forbidden")
+		CommonResponse<TestResponse> forbidden() {
+			throw new ForbiddenException("권한이 없습니다.");
 		}
 
 		@GetMapping("/runtime")
