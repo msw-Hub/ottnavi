@@ -19,6 +19,7 @@ import { useAuthStore } from '@/stores/authStore'
  * | 빈 칸이면 요청이 나가지 않는다 | 빈 값으로 서버 요청 제한(15분 5회)을 헛되이 쓰는 것 |
  * | 401이면 오류 문장과 비밀번호 칸 포커스 | 무엇이 틀렸는지 모르고 다시 입력하기 어려운 것 |
  * | 429면 "약 14분" 안내와 제출 막힘, 다시 눌러도 요청 없음 | 막힌 동안 계속 눌러 대기 시간만 늘어나는 것 |
+ * | 로그인한 채 401을 받아도 재발급·재전송이 없다 | 재시도로 실패 횟수가 하나 더 쌓여 요청 제한이 빨리 소진되는 것 |
  * | 404면 폼 대신 사용 불가 안내 | 꺼진 기능에 계속 입력하게 하는 것 |
  * | /login?demo=1이면 펼쳐진 채 시작, 평소에는 접힘 | 일반 방문자가 회원가입 폼으로 오해하는 것 |
  */
@@ -27,16 +28,21 @@ const server = setupServer(...handlers)
 
 // 데모 로그인 요청이 나간 횟수(요청이 "안 나갔는지"를 보려고 센다)
 let demoLoginRequestCount = 0
+// 토큰 재발급 요청이 나간 횟수(로그인한 채 데모 로그인이 401을 받았을 때 재발급이 안 불리는지 보려고 센다)
+let refreshRequestCount = 0
 
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' })
   server.events.on('request:start', ({ request }) => {
-    if (new URL(request.url).pathname === '/api/auth/demo-login') demoLoginRequestCount += 1
+    const pathname = new URL(request.url).pathname
+    if (pathname === '/api/auth/demo-login') demoLoginRequestCount += 1
+    if (pathname === '/api/auth/refresh') refreshRequestCount += 1
   })
 })
 beforeEach(() => {
   vi.stubEnv('VITE_USE_MOCK', 'true')
   demoLoginRequestCount = 0
+  refreshRequestCount = 0
 })
 afterEach(() => {
   server.resetHandlers()
@@ -196,6 +202,22 @@ describe('데모 계정 로그인 화면', () => {
 
     await user.click(submit)
     expect(demoLoginRequestCount).toBe(1)
+  })
+
+  it('이미 로그인한 채 틀린 값을 보내 401을 받아도 토큰 재발급을 부르지 않고 요청도 다시 보내지 않는다', async () => {
+    // 재발급이 불리면 실패 횟수만 하나 더 쌓이고(서버는 실패도 요청 제한에 센다) 같은 요청이 두 번 나간다
+    useAuthStore.getState().setSession('old-token', 'USER')
+    const user = userEvent.setup()
+    renderLogin({ scenario: 'demo-login-failed' })
+
+    await submitDemoLogin(user)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '아이디 또는 비밀번호가 올바르지 않습니다.',
+    )
+    expect(refreshRequestCount).toBe(0)
+    expect(demoLoginRequestCount).toBe(1)
+    expect(useAuthStore.getState().accessToken).toBe('old-token') // 로그인 상태도 그대로다
   })
 
   it('404(데모 로그인 꺼짐)면 폼 대신 사용할 수 없다는 안내가 보인다', async () => {

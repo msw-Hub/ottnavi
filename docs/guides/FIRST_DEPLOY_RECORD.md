@@ -146,6 +146,7 @@
 
 - 수집 진행 SQL(읽기 전용, Supabase SQL Editor): `batch_step_execution`에서 `step_name`, `status`, `read_count`, `write_count`, `commit_count`, `last_updated`를 최신 `job_execution_id`로 조회한다. `last_updated`가 오래 멈춰 있으면 정체·중단을 의심한다. 전체 상태는 `batch_job_execution`(`STARTED`=진행 중)
 - 수집 중에도 SQL 조회는 영향이 없다(`SELECT`만)
+- 인기 수집 14곳 중 0행인 자리(애플TV+ 영화·드라마, 쿠팡플레이 영화)는 오류가 아니라 필터 결과다(2026-10-29 확인). 수집은 TMDB discover에 한국 제작(`with_origin_country=KR`)과 최근 2년 공개를 걸어 서비스별 인기 1쪽을 받으므로 한국 제작 작품이 적은 서비스는 비는 조합이 생긴다. 로컬 DB(원어 `ko`를 제작 국가 대신 쓴 근사치)에서 애플TV+는 한국어 원작 영화 0편, 드라마 1편(최근 2년 밖)이고 쿠팡플레이는 영화를 판정하지 못한다(알려진 제약). 코드는 이 경우 `info` 로그("조건에 맞는 인기 작품이 없어 저장할 행이 없다")만 남기고 그 자리를 비운다. 운영 DB·TMDB를 직접 조회한 것은 아니다 `[확인 못함: 운영 값]`
 
 ## 7. 남은 일
 
