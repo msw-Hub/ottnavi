@@ -89,6 +89,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.PUT, "/api/me/notification-setting").hasAnyRole("USER", "ADMIN")
 						// 알림 메일 예시는 데모 계정 전용이다. 아래 /api/** authenticated() 보다 앞에 둬야 USER·ADMIN이 403이 된다
 						.requestMatchers(HttpMethod.GET, "/api/me/plans/current/mail-preview").hasRole("DEMO")
+						// 시스템 지표는 서버 내부 구성이라 ADMIN만 본다. 아래 GET /api/admin/** (ADMIN·DEMO)보다 앞에 둬야 데모 계정이 403이 된다
+						.requestMatchers(HttpMethod.GET, "/api/admin/system-metrics").hasRole("ADMIN")
 						// 데모 계정은 관리자 화면을 조회(GET)만 한다. 배치 토큰의 GET은 기존대로 배치 경로에서만 통과한다.
 						// HEAD·OPTIONS는 GET 매처에 걸리지 않아 아래 기존 ADMIN 규칙으로 간다
 						.requestMatchers(HttpMethod.GET, "/api/admin/collect/**", "/api/admin/plans/monthly/**",
