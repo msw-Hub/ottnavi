@@ -209,7 +209,7 @@ export const routes: RouteObject[] = [
                     },
                   },
                   {
-                    path: 'admin/llm', // SCR-18 LLM 검토 (3단계, 준비 중)
+                    path: 'admin/llm', // SCR-18 LLM 줄거리 번역
                     lazy: {
                       Component: () => import('@/pages/AdminLlmPage').then((m) => m.AdminLlmPage),
                     },
