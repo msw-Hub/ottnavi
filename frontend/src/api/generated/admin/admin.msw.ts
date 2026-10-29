@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 51개이고 모두 구현됐다(Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -27,14 +27,22 @@ import type {
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
   CommonResponseAdminProviderList,
+  CommonResponseApplyOverviewDraftsResult,
+  CommonResponseBulkDraftRun,
   CommonResponseCollectExecution,
   CommonResponseCollectExecutionAccepted,
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecutionPage,
+  CommonResponseOverviewBulkRevertResult,
+  CommonResponseOverviewCandidatePage,
+  CommonResponseOverviewDraft,
+  CommonResponseOverviewDraftPage,
+  CommonResponseOverviewRevertResult,
   CommonResponsePlanBenchmark,
   CommonResponsePlanRecalcExecutionAccepted,
   CommonResponsePopularityExecutionAccepted,
-  CommonResponseRetentionExecutionAccepted
+  CommonResponseRetentionExecutionAccepted,
+  CommonResponseSystemMetrics
 } from '../model';
 
 
@@ -72,7 +80,25 @@ export const getCreatePopularityExecutionResponseMock = (): CommonResponsePopula
 
 export const getGetAdminNotificationSummaryResponseMock = (): CommonResponseAdminNotificationSummary => ({"success":true,"data":{"windowDays":7,"pendingCount":2,"sentCount":148,"failedCount":1,"latestSentAt":"2026-11-01T03:51:12+09:00"}})
 
+export const getGetSystemMetricsResponseMock = (): CommonResponseSystemMetrics => ({"success":true,"data":{"jvm":{"heap":{"used":120000000,"committed":200000000,"max":268435456},"nonHeap":{"used":90000000,"committed":100000000},"memoryPools":[{"name":"G1 Eden Space","area":"HEAP","used":50000000,"committed":80000000},{"name":"Metaspace","area":"NON_HEAP","used":60000000,"committed":62000000}],"buffers":[{"id":"direct","memoryUsed":1048576,"totalCapacity":1048576,"count":12}],"threads":{"live":45,"peak":60,"daemon":20},"classesLoaded":14200,"gc":{"collectionCount":34,"collectionTimeMillis":420},"uptimeSeconds":86400},"process":{"rssBytes":520000000,"peakRssBytes":560000000,"rssAnonBytes":480000000,"rssFileBytes":40000000},"container":{"memoryUsedBytes":700000000,"memoryLimitBytes":1073741824},"measuredAt":"2026-10-28T23:50:00+09:00"}})
+
 export const getCreatePlanBenchmarkResponseMock = (overrideResponse: Partial<Extract<CommonResponsePlanBenchmark, object>> = {}): CommonResponsePlanBenchmark => ({success: faker.datatype.boolean(), data: {"measuredRuns":3,"warmupRuns":1,"caseCount":1,"cases":[{"caseName":"case-07-greedy-trap","inputHash":"9f2c000000000000000000000000000000000000000000000000000000000000","candidateCount":27,"exact":{"calcRunId":101,"mustCompleted":1,"score":4,"totalCost":28000,"elapsedMicros":21,"elapsedMs":0,"matchesExpected":true},"greedy":{"calcRunId":102,"mustCompleted":1,"score":2,"totalCost":8000,"elapsedMicros":9,"elapsedMs":0,"matchesExpected":true},"mustDiff":0,"scoreDiff":-2,"costDiff":-20000}],"skippedCaseNames":[]}, ...overrideResponse})
+
+export const getListOverviewCandidatesResponseMock = (): CommonResponseOverviewCandidatePage => ({"success":true,"data":{"content":[{"titleId":1024,"mediaType":"movie","title":"기생충","overview":"All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.","wishlistCount":12,"hasDraft":false}],"page":0,"size":20,"totalElements":2512,"totalPages":126,"summary":{"pendingTotal":2512,"usedToday":37,"dailyLimit":400,"perMinuteLimit":12,"model":"gemini-3.5-flash-lite","isEnabled":true,"translatedCount":37,"oldestTranslatedAt":"2026-10-29T10:00:00+09:00"}}})
+
+export const getCreateOverviewDraftResponseMock = (): CommonResponseOverviewDraft => ({"success":true,"data":{"draftId":"3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60","titleId":1024,"mediaType":"movie","title":"기생충","original":"All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.","translated":"전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.","isGuardPassed":true,"guardFailures":[],"warnings":[],"model":"gemini-3.5-flash-lite","createdAt":"2026-10-29T10:15:00+09:00","attempts":1,"isEdited":false}})
+
+export const getListOverviewDraftsResponseMock = (): CommonResponseOverviewDraftPage => ({"success":true,"data":{"content":[{"draftId":"3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60","titleId":1024,"mediaType":"movie","title":"기생충","original":"All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.","translated":"전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.","isGuardPassed":true,"guardFailures":[],"warnings":[],"model":"gemini-3.5-flash-lite","createdAt":"2026-10-29T10:15:00+09:00","attempts":1,"isEdited":false}],"page":0,"size":20,"totalElements":1,"totalPages":1,"bulkRun":{"bulkRunId":"9a1c7d52-0b8e-4f3a-8d6c-2e5f7a9b1c3d","state":"COMPLETED","total":100,"doneCount":99,"failedCount":1,"guardFailedCount":3,"stopReason":null,"startedAt":"2026-10-29T10:00:00+09:00","finishedAt":"2026-10-29T10:11:00+09:00","warningCount":5}}})
+
+export const getCreateBulkOverviewDraftsResponseMock = (): CommonResponseBulkDraftRun => ({"success":true,"data":{"bulkRunId":"9a1c7d52-0b8e-4f3a-8d6c-2e5f7a9b1c3d","state":"RUNNING","total":100,"doneCount":0,"failedCount":0,"guardFailedCount":0,"stopReason":null,"startedAt":"2026-10-29T10:00:00+09:00","finishedAt":null,"warningCount":0}})
+
+export const getApplyOverviewDraftsResponseMock = (): CommonResponseApplyOverviewDraftsResult => ({"success":true,"data":{"appliedCount":1,"skippedCount":1,"results":[{"draftId":"3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60","titleId":1024,"outcome":"APPLIED","reason":null},{"draftId":"7c9e6679-7425-40de-944b-e07fc1f90ae7","titleId":2048,"outcome":"SKIPPED","reason":"ORIGINAL_CHANGED"}]}})
+
+export const getEditOverviewDraftResponseMock = (): CommonResponseOverviewDraft => ({"success":true,"data":{"draftId":"3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60","titleId":1024,"mediaType":"movie","title":"기생충","original":"All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.","translated":"전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.","isGuardPassed":true,"guardFailures":[],"warnings":[],"model":"gemini-3.5-flash-lite","createdAt":"2026-10-29T10:15:00+09:00","attempts":1,"isEdited":false}})
+
+export const getRevertTitleOverviewResponseMock = (): CommonResponseOverviewRevertResult => ({"success":true,"data":{"titleId":1024}})
+
+export const getRevertTranslatedOverviewsResponseMock = (): CommonResponseOverviewBulkRevertResult => ({"success":true,"data":{"revertedCount":37,"isPreview":false}})
 
 
 export const getListAdminProductsMockHandler = (overrideResponse?: CommonResponseAdminProductList | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseAdminProductList> | CommonResponseAdminProductList), options?: RequestHandlerOptions) => {
@@ -289,6 +315,18 @@ export const getGetAdminNotificationSummaryMockHandler = (overrideResponse?: Com
   }, options)
 }
 
+export const getGetSystemMetricsMockHandler = (overrideResponse?: CommonResponseSystemMetrics | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseSystemMetrics> | CommonResponseSystemMetrics), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/system-metrics', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetSystemMetricsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonResponsePlanBenchmark | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanBenchmark> | CommonResponsePlanBenchmark), options?: RequestHandlerOptions) => {
   return http.post('/api/admin/plan-benchmarks', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -297,6 +335,112 @@ export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonRespo
     ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
     : getCreatePlanBenchmarkResponseMock(),
       { status: 201
+      })
+  }, options)
+}
+
+export const getListOverviewCandidatesMockHandler = (overrideResponse?: CommonResponseOverviewCandidatePage | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseOverviewCandidatePage> | CommonResponseOverviewCandidatePage), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/llm/overview-candidates', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListOverviewCandidatesResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getCreateOverviewDraftMockHandler = (overrideResponse?: CommonResponseOverviewDraft | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseOverviewDraft> | CommonResponseOverviewDraft), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/llm/drafts', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getCreateOverviewDraftResponseMock(),
+      { status: 201
+      })
+  }, options)
+}
+
+export const getListOverviewDraftsMockHandler = (overrideResponse?: CommonResponseOverviewDraftPage | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseOverviewDraftPage> | CommonResponseOverviewDraftPage), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/llm/drafts', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getListOverviewDraftsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getCreateBulkOverviewDraftsMockHandler = (overrideResponse?: CommonResponseBulkDraftRun | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseBulkDraftRun> | CommonResponseBulkDraftRun), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/llm/bulk-drafts', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getCreateBulkOverviewDraftsResponseMock(),
+      { status: 202
+      })
+  }, options)
+}
+
+export const getApplyOverviewDraftsMockHandler = (overrideResponse?: CommonResponseApplyOverviewDraftsResult | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseApplyOverviewDraftsResult> | CommonResponseApplyOverviewDraftsResult), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/llm/drafts/apply', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getApplyOverviewDraftsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getEditOverviewDraftMockHandler = (overrideResponse?: CommonResponseOverviewDraft | ((info: Parameters<Parameters<typeof http.patch>[1]>[0]) => Promise<CommonResponseOverviewDraft> | CommonResponseOverviewDraft), options?: RequestHandlerOptions) => {
+  return http.patch('/api/admin/llm/drafts/:draftId', async (info: Parameters<Parameters<typeof http.patch>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getEditOverviewDraftResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getDeleteOverviewDraftMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.delete>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.delete('/api/admin/llm/drafts/:draftId', async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+
+    return new HttpResponse(null,
+      { status: 204
+      })
+  }, options)
+}
+
+export const getRevertTitleOverviewMockHandler = (overrideResponse?: CommonResponseOverviewRevertResult | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseOverviewRevertResult> | CommonResponseOverviewRevertResult), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/llm/titles/:titleId/overview-revert', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getRevertTitleOverviewResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getRevertTranslatedOverviewsMockHandler = (overrideResponse?: CommonResponseOverviewBulkRevertResult | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseOverviewBulkRevertResult> | CommonResponseOverviewBulkRevertResult), options?: RequestHandlerOptions) => {
+  return http.post('/api/admin/llm/overview-reverts', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getRevertTranslatedOverviewsResponseMock(),
+      { status: 200
       })
   }, options)
 }
@@ -319,5 +463,15 @@ export const getAdminMock = () => [
   getCreateRetentionExecutionMockHandler(),
   getCreatePopularityExecutionMockHandler(),
   getGetAdminNotificationSummaryMockHandler(),
-  getCreatePlanBenchmarkMockHandler()
+  getGetSystemMetricsMockHandler(),
+  getCreatePlanBenchmarkMockHandler(),
+  getListOverviewCandidatesMockHandler(),
+  getCreateOverviewDraftMockHandler(),
+  getListOverviewDraftsMockHandler(),
+  getCreateBulkOverviewDraftsMockHandler(),
+  getApplyOverviewDraftsMockHandler(),
+  getEditOverviewDraftMockHandler(),
+  getDeleteOverviewDraftMockHandler(),
+  getRevertTitleOverviewMockHandler(),
+  getRevertTranslatedOverviewsMockHandler()
 ]
