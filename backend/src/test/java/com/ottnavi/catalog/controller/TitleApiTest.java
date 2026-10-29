@@ -348,7 +348,7 @@ class TitleApiTest extends IntegrationTestSupport {
 		Title entity = Title.createFromSummary(MOVIE, tmdbId, title, originalTitle,
 				LocalDate.of(2019, 5, 30), "/poster.jpg", "/backdrop.jpg", "ko",
 				new BigDecimal(popularity), new BigDecimal("8.5"), CHECKED_AT);
-		entity.updateDetail(title, originalTitle, "줄거리", "ko", LocalDate.of(2019, 5, 30), "/poster.jpg",
+		entity.updateDetail(title, originalTitle, "줄거리", "ko", false, LocalDate.of(2019, 5, 30), "/poster.jpg",
 				"/backdrop.jpg", "ko", null, new BigDecimal(popularity), new BigDecimal("8.5"), CHECKED_AT);
 		return titleRepository.save(entity);
 	}

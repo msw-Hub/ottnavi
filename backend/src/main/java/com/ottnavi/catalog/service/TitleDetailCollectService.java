@@ -12,6 +12,8 @@ import com.ottnavi.catalog.domain.repository.TitleGenreRepository;
 import com.ottnavi.catalog.domain.repository.TitleRepository;
 import com.ottnavi.catalog.domain.repository.WatchUnitRepository;
 import com.ottnavi.catalog.domain.rule.CastCandidate;
+import com.ottnavi.catalog.domain.rule.OverviewMerge;
+import com.ottnavi.catalog.domain.rule.TitleDetailRules;
 import com.ottnavi.catalog.service.model.GenreInfo;
 import com.ottnavi.catalog.service.model.TitleDetail;
 import com.ottnavi.catalog.service.model.UnitDetail;
@@ -54,20 +56,17 @@ public class TitleDetailCollectService {
             Title title = found.get();
             // 2. 새 응답 값으로 title을 갱신한다(비어 있는 줄거리·제목은 기존 값을 유지한다)
             // 영속 상태의 엔티티라 값을 바꾸면 커밋 때 UPDATE가 나간다(더티 체킹). save를 부르지 않아도 된다
-            // 새 응답의 줄거리가 한국어·영어 모두 비어 null이면 기존 줄거리와 언어 표시를 지우지 않고 유지한다
-            boolean keepOverview = detail.overview() == null;
+            // 줄거리는 mergeOverview 규칙을 따른다: 새 응답이 null이면 기존을 유지하고,
+            // 관리자가 반영한 번역(overview_translated_at이 있음)만 수집이 가져온 영어(en) 대체본으로 덮어쓰지 않는다.
+            // TMDB가 원래 준 한국어는 보호하지 않고, 번역이 TMDB 한국어로 교체되면 번역 표시가 사라진다
             String newTitle = detail.title();
             if (newTitle == null) {
                 newTitle = title.getTitle(); // 새 응답에 제목이 없으면 기존 제목을 유지한다
             }
-            String overview = detail.overview();
-            String overviewLang = detail.overviewLang();
-            if (keepOverview) {
-                overview = title.getOverview();
-                overviewLang = title.getOverviewLang();
-            }
-            title.updateDetail(newTitle, detail.originalTitle(), overview, overviewLang,
-                    detail.releaseDate(), detail.posterPath(),
+            OverviewMerge overviewMerge = TitleDetailRules.mergeOverview(title.getOverview(), title.getOverviewLang(),
+                    title.isOverviewTranslated(), detail.overview(), detail.overviewLang());
+            title.updateDetail(newTitle, detail.originalTitle(), overviewMerge.overview(), overviewMerge.overviewLang(),
+                    overviewMerge.isTranslated(), detail.releaseDate(), detail.posterPath(),
                     detail.backdropPath(), detail.originalLanguage(), detail.tvStatus(), detail.popularity(),
                     detail.voteAverage(), fetchedAt);
             // 3. 장르·출연진·시청 단위를 작품 단위로 맞춘다

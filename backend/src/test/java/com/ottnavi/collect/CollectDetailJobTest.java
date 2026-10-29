@@ -204,6 +204,70 @@ class CollectDetailJobTest extends IntegrationTestSupport {
     }
 
     @Test
+    void 관리자가_반영한_번역은_다음_수집의_영어_줄거리로_덮이지_않고_번역_표시도_남는다() throws Exception {
+        // given: 첫 수집으로 작품을 만들고, 관리자가 한국어 번역을 반영한 상태(overview_translated_at이 있음)
+        stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 1, "title", 900001);
+        stubMovie(900001, "English source", 100, "[]", cast(0));
+        start(nextParameters());
+        jdbcTemplate.update("UPDATE title SET overview = '관리자 번역', overview_lang = 'ko', "
+                + "overview_translated_at = now() WHERE tmdb_id = 900001");
+
+        // when: 두 번째 수집에서 한국어 줄거리는 비고 영어 줄거리만 온다
+        stubMovie(900001, "", 100, "[]", cast(0));
+        wireMock.stubFor(get(urlPathEqualTo("/3/movie/900001")).withQueryParam("language", equalTo("en-US"))
+                .willReturn(json("{\"id\":900001,\"overview\":\"English overview\"}")));
+        start(nextParameters());
+
+        // then
+        assertThat(row("SELECT overview, overview_lang FROM title WHERE tmdb_id = 900001"))
+                .containsEntry("overview", "관리자 번역").containsEntry("overview_lang", "ko");
+        assertThat(row("SELECT overview_translated_at FROM title WHERE tmdb_id = 900001").get("overview_translated_at"))
+                .isNotNull();
+    }
+
+    @Test
+    void TMDB가_준_한국어_줄거리는_다음_수집의_영어_줄거리로_갱신된다() throws Exception {
+        // given: 첫 수집으로 TMDB 한국어 줄거리가 저장된 상태(번역 표시 없음)
+        stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 1, "title", 900001);
+        stubMovie(900001, "TMDB 한국어", 100, "[]", cast(0));
+        start(nextParameters());
+        assertThat(row("SELECT overview_translated_at FROM title WHERE tmdb_id = 900001").get("overview_translated_at"))
+                .isNull();
+
+        // when: 두 번째 수집에서 한국어 줄거리는 비고 영어 줄거리만 온다
+        stubMovie(900001, "", 100, "[]", cast(0));
+        wireMock.stubFor(get(urlPathEqualTo("/3/movie/900001")).withQueryParam("language", equalTo("en-US"))
+                .willReturn(json("{\"id\":900001,\"overview\":\"English overview\"}")));
+        start(nextParameters());
+
+        // then: 번역이 아니므로 보호하지 않고 영어로 바뀐다
+        assertThat(row("SELECT overview, overview_lang FROM title WHERE tmdb_id = 900001"))
+                .containsEntry("overview", "English overview").containsEntry("overview_lang", "en");
+        assertThat(row("SELECT overview_translated_at FROM title WHERE tmdb_id = 900001").get("overview_translated_at"))
+                .isNull();
+    }
+
+    @Test
+    void 관리자_번역은_TMDB가_한국어를_채우면_TMDB_한국어로_교체되고_번역_표시가_사라진다() throws Exception {
+        // given: 관리자가 번역을 반영한 상태
+        stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 1, "title", 900001);
+        stubMovie(900001, "English source", 100, "[]", cast(0));
+        start(nextParameters());
+        jdbcTemplate.update("UPDATE title SET overview = '관리자 번역', overview_lang = 'ko', "
+                + "overview_translated_at = now() WHERE tmdb_id = 900001");
+
+        // when: 두 번째 수집에서 TMDB가 한국어 줄거리를 채워 준다
+        stubMovie(900001, "TMDB 한국어", 100, "[]", cast(0));
+        start(nextParameters());
+
+        // then
+        assertThat(row("SELECT overview, overview_lang FROM title WHERE tmdb_id = 900001"))
+                .containsEntry("overview", "TMDB 한국어").containsEntry("overview_lang", "ko");
+        assertThat(row("SELECT overview_translated_at FROM title WHERE tmdb_id = 900001").get("overview_translated_at"))
+                .isNull();
+    }
+
+    @Test
     void runtime이_비어_있으면_기본값으로_추정하고_표시한다() throws Exception {
         stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 1, "title", 900001);
         stubMovie(900001, "줄거리", null, "[]", cast(0));

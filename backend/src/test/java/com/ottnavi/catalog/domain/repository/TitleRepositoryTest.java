@@ -32,7 +32,7 @@ class TitleRepositoryTest extends IntegrationTestSupport {
     @Test
     void 작품을_저장하고_읽으면_숫자_날짜_enum_값이_그대로_돌아온다() {
         Title title = Title.create(MediaType.TV, 1396, "브레이킹 배드", FETCHED_AT);
-        title.updateDetail("브레이킹 배드", "Breaking Bad", "줄거리", "ko", LocalDate.of(2008, 1, 20),
+        title.updateDetail("브레이킹 배드", "Breaking Bad", "줄거리", "ko", false, LocalDate.of(2008, 1, 20),
                 "/poster.jpg", "/backdrop.jpg", "en", "Ended", new BigDecimal("123.457"), new BigDecimal("8.92"),
                 FETCHED_AT);
         title.changeRefreshTier(RefreshTier.DAILY);
