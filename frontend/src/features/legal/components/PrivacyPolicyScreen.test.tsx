@@ -53,6 +53,9 @@ describe('개인정보처리방침 화면', () => {
     expect(screen.queryByText(/아직 알림 메일을 보내지 않습니다/)).not.toBeInTheDocument()
     // "알림 메일:"만 굵은 글자(span)로 나뉘어 있어 나머지 문장으로 찾는다
     expect(screen.getByText(/이용자가 알림 설정에서 직접 켠 경우에만/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/확정한 플랜의 작품이 배정된 서비스에서 빠졌을 때의 변경 안내/),
+    ).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: 'dalsw7@gmail.com' })[0]).toHaveAttribute(
       'href',
       'mailto:dalsw7@gmail.com',
