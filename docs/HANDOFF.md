@@ -54,6 +54,7 @@
   8. 공개: 비로그인 검색(결과 있음·없음) → 상세, 상태 배지가 DB 값과 같은지, 포스터·줄거리 null 작품, 시즌 많은 드라마
   9. 콘솔: 비로그인 방문자의 refresh 401 로그가 남는 것은 알려진 이월이다(4절)
 - Supabase Data API는 꺼 둔 상태다(2026-10-13 사용자 확인).
+- **검색 엔진 등록(2026-10-29 결정)**: 다음 `main` 배포에 확인 메타 태그와 `.vercel.app` → `ottnavi.shop` 리다이렉트를 함께 넣고 배포 뒤 Google부터 등록한다. 사용자가 할 일: 구글 계정으로 Search Console에서 속성 추가(URL 접두어 `https://ottnavi.shop`, 확인 방법 "HTML 태그")를 해 `content` 값을 복사해 알려 준다(HTML에 공개되는 값이라 대화에 써도 된다). 배포 전에는 "확인"을 누르지 않는다(실패해도 해는 없다). 배포 뒤 확인을 누르고 사이트 지도 `https://ottnavi.shop/sitemap.xml`을 제출한다. 모바일 시작 버튼(한 줄 두 칸)과 홈 제목(h1) 굵기(`font-extrabold`)는 **현재 유지로 결정**했다(실제 포스터·실기기에서 보고 거슬리면 다시 정한다).
 - **배포 뒤 운영 비교 측정 1회(Task 065, MVP 완료 기준 ③)**: 배포 뒤 운영에서 `POST /api/admin/plan-benchmarks`를 ADMIN 토큰으로 한 번 호출해 운영 DB `calc_run`에 EXACT·GREEDY 행을 남기고, Cloudtype 측정 시간을 ROADMAP Task 065 결과표에 추가한다(Task 100의 R11-30 참고값). 토큰 값은 이 문서에 적지 않는다.
 
 ## 4. 미결·이월 항목 (한곳에 모음)
