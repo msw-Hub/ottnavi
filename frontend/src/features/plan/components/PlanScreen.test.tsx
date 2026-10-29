@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,7 @@ import { Providers } from '@/app/providers'
 import { PlanScreen } from '@/features/plan/components/PlanScreen'
 import { handlers, resetMockWishlist } from '@/mocks/handlers'
 import { resetMockMemberState } from '@/mocks/memberHandlers'
+import { resetMockNotificationState } from '@/mocks/notificationHandlers'
 import { resetMockSession, setMockOnboardingDone, setMockRole } from '@/mocks/mockSession'
 
 /*
@@ -33,6 +35,7 @@ afterEach(() => {
   resetMockSession()
   resetMockMemberState()
   resetMockWishlist()
+  resetMockNotificationState()
 })
 afterAll(() => server.close())
 
@@ -148,6 +151,105 @@ describe('플랜 결과 화면', () => {
 
     expect(screen.getAllByRole('radio')).toHaveLength(3)
     expect(screen.queryByText('세 기준 모두 같은 결과')).not.toBeInTheDocument()
+  })
+})
+
+/*
+ * 알림 켜기 안내 띠. 플랜을 저장한 직후, 알림이 꺼진 일반 회원에게만 "알림 켜기"를 권한다.
+ * 알림 설정 값은 목업 핸들러(notificationHandlers)가 정한다(기본 꺼짐, PUT으로 켜면 켜짐, 데모 계정은 항상 꺼짐).
+ */
+describe('알림 켜기 안내(저장 직후)', () => {
+  // 알림 설정 조회 요청 수를 센다
+  let settingRequestCount = 0
+  beforeEach(() => {
+    settingRequestCount = 0
+    window.scrollTo = vi.fn() // jsdom에는 scrollTo가 없어 호출만 흉내 낸다
+    server.events.on('request:start', ({ request }) => {
+      if (
+        request.method === 'GET' &&
+        new URL(request.url).pathname === '/api/me/notification-setting'
+      ) {
+        settingRequestCount++
+      }
+    })
+  })
+  afterEach(() => {
+    server.events.removeAllListeners()
+  })
+
+  // 계산해 둔 뒤 저장 버튼을 눌러 "저장 완료" 화면까지 간다
+  async function saveAs(role: 'DEMO' | 'USER') {
+    const user = userEvent.setup()
+    setMockRole(role)
+    await renderPlanAfterCalculate(null)
+    await user.click(screen.getByRole('button', { name: /플랜으로 저장하기$/ }))
+    await screen.findByText('추천형 플랜을 저장했어요')
+    return user
+  }
+
+  it('알림이 꺼진 일반 회원이 저장하면 안내와 알림 설정으로 가는 "알림 켜기" 링크가 보인다', async () => {
+    await saveAs('USER')
+
+    const nudge = await screen.findByRole('group', { name: '알림 켜기 안내' })
+    expect(within(nudge).getByRole('link', { name: '알림 켜기' })).toHaveAttribute(
+      'href',
+      '/settings/notifications',
+    )
+  })
+
+  it('알림을 이미 켠 회원에게는 안내가 보이지 않는다', async () => {
+    setMockRole('USER')
+    await customInstance({
+      url: '/me/notification-setting',
+      method: 'PUT',
+      data: { isNotificationEnabled: true },
+    })
+    await saveAs('USER')
+
+    // 설정 조회가 끝날 때까지 기다린 뒤에도 안내가 없다
+    await waitFor(() => expect(settingRequestCount).toBe(1))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+  })
+
+  it('데모 계정에게는 안내가 보이지 않고 알림 설정 요청도 보내지 않는다', async () => {
+    await saveAs('DEMO')
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+    expect(settingRequestCount).toBe(0)
+  })
+
+  it('알림 설정을 불러오지 못하면 안내가 보이지 않고 저장 완료 안내는 그대로 보인다', async () => {
+    server.use(
+      http.get('/api/me/notification-setting', () =>
+        HttpResponse.json({ success: false }, { status: 500 }),
+      ),
+    )
+    await saveAs('USER')
+
+    await waitFor(() => expect(settingRequestCount).toBe(1))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+    expect(screen.getByText('추천형 플랜을 저장했어요')).toBeInTheDocument()
+  })
+
+  it('알림 설정을 불러오는 중에는 안내가 보이지 않는다', async () => {
+    // 응답이 오지 않는 상태(로딩 중)를 만든다
+    server.use(http.get('/api/me/notification-setting', () => new Promise(() => {})))
+    await saveAs('USER')
+
+    await waitFor(() => expect(settingRequestCount).toBe(1))
+    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+  })
+
+  it('닫기(X)를 누르면 안내가 사라진다', async () => {
+    const user = await saveAs('USER')
+    await screen.findByRole('group', { name: '알림 켜기 안내' })
+
+    await user.click(screen.getByRole('button', { name: '알림 안내 닫기' }))
+
+    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
   })
 })
 
