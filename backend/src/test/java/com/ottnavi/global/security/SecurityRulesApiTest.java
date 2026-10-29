@@ -147,6 +147,97 @@ class SecurityRulesApiTest extends IntegrationTestSupport {
 				.andExpect(status().isUnauthorized());
 	}
 
+	@Test
+	void 줄거리_번역_API는_ADMIN과_DEMO가_조회하고_쓰기는_ADMIN만_한다() throws Exception {
+		String admin = tokens().adminBearer();
+		String demo = tokens().demoBearer();
+
+		// 조회: ADMIN 200, DEMO 200
+		mockMvc.perform(get("/api/admin/llm/overview-candidates").header(HttpHeaders.AUTHORIZATION, admin))
+				.andExpect(status().isOk());
+		mockMvc.perform(get("/api/admin/llm/overview-candidates").header(HttpHeaders.AUTHORIZATION, demo))
+				.andExpect(status().isOk());
+		mockMvc.perform(get("/api/admin/llm/drafts").header(HttpHeaders.AUTHORIZATION, demo))
+				.andExpect(status().isOk());
+		// 쓰기·실행: DEMO 403 (본문이 비어 있어도 인가가 먼저라 400이 아니라 403이다)
+		mockMvc.perform(post("/api/admin/llm/drafts").header(HttpHeaders.AUTHORIZATION, demo)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"titleId\":1}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+		mockMvc.perform(post("/api/admin/llm/bulk-drafts").header(HttpHeaders.AUTHORIZATION, demo)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"count\":1}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/admin/llm/drafts/apply").header(HttpHeaders.AUTHORIZATION, demo)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"allPassed\":true}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(delete("/api/admin/llm/drafts/x").header(HttpHeaders.AUTHORIZATION, demo))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/admin/llm/titles/1/overview-revert").header(HttpHeaders.AUTHORIZATION, demo))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/admin/llm/overview-reverts").header(HttpHeaders.AUTHORIZATION, demo)
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void 줄거리_번역_API는_USER는_403이고_비로그인은_401이며_배치_토큰은_쓰지_못한다() throws Exception {
+		String user = tokens().userBearer();
+		String batch = "Bearer " + batchToken;
+
+		mockMvc.perform(get("/api/admin/llm/overview-candidates").header(HttpHeaders.AUTHORIZATION, user))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/admin/llm/drafts").header(HttpHeaders.AUTHORIZATION, user)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"titleId\":1}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/admin/llm/overview-candidates"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+		mockMvc.perform(post("/api/admin/llm/drafts")
+						.contentType(MediaType.APPLICATION_JSON).content("{\"titleId\":1}"))
+				.andExpect(status().isUnauthorized());
+		// 배치 토큰은 /api/admin/collect 등 정해진 경로에서만 유효하다
+		mockMvc.perform(get("/api/admin/llm/overview-candidates").header(HttpHeaders.AUTHORIZATION, batch))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(post("/api/admin/llm/drafts").header(HttpHeaders.AUTHORIZATION, batch)
+						.contentType(MediaType.APPLICATION_JSON).content("{\"titleId\":1}"))
+				.andExpect(status().isUnauthorized());
+		// 번역 대량 되돌리기도 같은 규칙이다(USER 403, 비로그인 401, 배치 토큰 401)
+		mockMvc.perform(post("/api/admin/llm/overview-reverts").header(HttpHeaders.AUTHORIZATION, user)
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/admin/llm/overview-reverts")
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(post("/api/admin/llm/overview-reverts").header(HttpHeaders.AUTHORIZATION, batch)
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void 시스템_지표_API는_ADMIN만_200이고_나머지는_막힌다() throws Exception {
+		// given
+		String path = "/api/admin/system-metrics";
+
+		// when & then: ADMIN 200, 응답은 CommonResponse 래퍼
+		mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, tokens().adminBearer()))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.success").value(true))
+				.andExpect(jsonPath("$.data.jvm.heap.used").isNumber())
+				.andExpect(jsonPath("$.data.measuredAt").isString());
+		// DEMO·USER 403
+		mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, tokens().demoBearer()))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.errorCode").value("FORBIDDEN"));
+		mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, tokens().userBearer()))
+				.andExpect(status().isForbidden());
+		// 무토큰 401, 배치 토큰은 이 경로에서 인증되지 않아 401
+		mockMvc.perform(get(path))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+		mockMvc.perform(get(path).header(HttpHeaders.AUTHORIZATION, "Bearer " + batchToken))
+				.andExpect(status().isUnauthorized());
+	}
+
 	private TestTokens tokens() {
 		return new TestTokens(jwtTokenProvider);
 	}

@@ -2,7 +2,7 @@
 
 > 백엔드 폴더가 무엇을 하는 곳인지 한눈에 보는 지도다. 근거 문서가 아니고, 코드와 어긋나면 코드가 기준이다.
 > **갱신 규칙:** 패키지(폴더)를 만들거나 옮기거나 지우거나 역할이 바뀌는 PR은 이 문서를 같은 PR에서 고친다.
-> 마지막 갱신: 2026-10-21 (Task 072 반영 기준)
+> 마지막 갱신: 2026-10-28 (Task 072 + 영어 줄거리 번역 llmdraft 반영 기준)
 
 ## 지도 (`backend/src/main/java/com/ottnavi`)
 
@@ -21,8 +21,10 @@ com.ottnavi
 │   ├── tmdb/              TmdbClient(호출 창구), 재시도·속도 제한
 │   │   ├── dto/             TMDB가 주는 JSON 틀 (안에서만 쓰고 밖으로 내보내지 않음)
 │   │   └── exception/
-│   └── mail/              메일 발송 창구(Task 072): MailClient(포트), SmtpMailClient(app.mail.provider=smtp, 타임아웃은 spring.mail.*), LogMailClient(provider=log, local 기본: 제목만 로그), OutgoingMail(보낼 메일 값), AppMailProperties(app.mail.*)·MailConfig
-│       └── exception/       MailSendException (발송 실패, 재시도 여부는 notification이 정함)
+│   ├── mail/              메일 발송 창구(Task 072): MailClient(포트), SmtpMailClient(app.mail.provider=smtp, 타임아웃은 spring.mail.*), LogMailClient(provider=log, local 기본: 제목만 로그), OutgoingMail(보낼 메일 값), AppMailProperties(app.mail.*)·MailConfig
+│   │   └── exception/       MailSendException (발송 실패, 재시도 여부는 notification이 정함)
+│   └── llm/               Gemini 호출 창구(관리자 줄거리 번역, Spring AI): GeminiClient(번역 호출, 호출 제한 시간 `app.llm.timeout-seconds`, `llm.call` 지표, 키가 없으면 LlmDisabledException, 키 유무 `isEnabled`), LlmPromptService(프롬프트 조립), LlmProperties(app.llm.*)·LlmConfig(키가 있을 때만 Spring AI Gemini 자동 구성을 켠다)
+│       └── exception/       LlmException(부모, BusinessException 상속), LlmDisabledException(503), LlmRateLimitedException(429), LlmCallFailedException(502), LlmUpstreamBusyException(502, 구글 서버 혼잡)
 ├── catalog/             작품·시즌·제공 상태 (핵심 데이터)
 │   ├── controller/        TitleController (작품 검색·상세, 공개 API /api/public/titles), ExclusiveTitleController (서비스별 독점 목록, GET /api/public/ott-services/{ottServiceId}/exclusive-titles, Task 078)
 │   ├── dto/
@@ -33,7 +35,7 @@ com.ottnavi
 │   │   ├── enums/
 │   │   ├── repository/      DB 조회·저장 인터페이스
 │   │   └── rule/            판단 규칙 계산기 (AvailabilityJudge, RuntimeCalculator, AvailabilityAggregation, ExclusiveRules(서비스별 독점 판정) …)
-│   └── service/           흐름 조율: TitleCollectService, TitleRefreshTierService(찜 현황에 맞춰 작품 refresh_tier를 벌크로 재맞춤, 수집 시작 Step이 부름, Task 077), TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleCardAssembler(작품 목록 → 서비스별 제공 상태 카드, 검색·탐색·홈이 공용, Task 107), TitleExploreService(장르 목록·장르별·출연자 이름별 작품, Task 107), NewlyAvailableQueryService(새로 볼 수 있게 된 작품: 입고·공개 후보 조회 → NewArrivalPicker로 대표 선택, Task 107), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083), ExclusiveTitleCalculator(독점 목록 계산)·ExclusiveTitleCacheService(Redis `exclusiveTitlesV2` 읽기·채우기·비우기, 캐시 미스 폴백)·ExclusiveTitleQueryService(페이지 조회, 없는 서비스 404) (Task 078)
+│   └── service/           흐름 조율: TitleCollectService, TitleRefreshTierService(찜 현황에 맞춰 작품 refresh_tier를 벌크로 재맞춤, 수집 시작 Step이 부름, Task 077), TitleDetailCollectService, AvailabilityCollectService, AvailabilityChangeQueryService(실행별 변경 조회), TitleSearchService(검색), TitleCardAssembler(작품 목록 → 서비스별 제공 상태 카드, 검색·탐색·홈이 공용, Task 107), TitleExploreService(장르 목록·장르별·출연자 이름별 작품, Task 107), NewlyAvailableQueryService(새로 볼 수 있게 된 작품: 입고·공개 후보 조회 → NewArrivalPicker로 대표 선택, Task 107), TitleDetailQueryService(상세, 캐시), TitleAvailabilityLoader(판정 일괄 조회), WatchUnitQueryService(시청 단위 ID 찾기·요약 일괄 조회, 찜이 사용), StaleTitleQueryService(마지막 수집이 오래된 작품 수·목록, Task 083), TitlePurgeService(사라진 작품과 하위 행 삭제, Task 083), ExclusiveTitleCalculator(독점 목록 계산)·ExclusiveTitleCacheService(Redis `exclusiveTitlesV2` 읽기·채우기·비우기, 캐시 미스 폴백)·ExclusiveTitleQueryService(페이지 조회, 없는 서비스 404) (Task 078), TitleOverviewService(관리자 줄거리 번역용: 영어 줄거리 후보 조회(찜 수·인기순), 조건부 반영, 관리자 번역 줄거리 비우기(번역 반영 시각 `overview_translated_at`이 있는 것만, 단건·묶음), 번역 통계, 작품 상세 캐시 1개 삭제. llmdraft가 호출)
 │       └── model/           서비스끼리 주고받는 값 묶음 (CandidateTitle, TitleDetail, UnitDetail, ExecutionChange, TitleDetailView …)
 ├── provider/            OTT 서비스·TMDB 제공처
 │   ├── controller/        OttServiceController (서비스 목록, 공개 API)
@@ -84,12 +86,12 @@ com.ottnavi
 │   ├── service/           NotificationSettingService (알림 설정 조회·저장: user 서비스 위임, 트랜잭션 없음), NotificationQueryService (본인 이력 페이지·관리자 최근 7일 요약, 읽기 전용), NotificationCreateService (생성 관문: 알림 설정 확인 → payload JSON → `INSERT … ON CONFLICT (dedupe_key) DO NOTHING`. `create`는 호출한 트랜잭션에 합류, `createInNewTransaction`은 REQUIRES_NEW), NotificationClaimService (1단계: 짧은 트랜잭션으로 발송할 행 점유, SKIP LOCKED. `claimOne`은 즉시 발송용 한 건 점유, REQUIRES_NEW), NotificationDispatcher (트랜잭션 없음: 행·수신 주소 재확인 → 템플릿 → 발송. `dispatchNow`는 한 건 즉시 발송), NotificationResultRecorder (3단계: 결과 기록, 재시도 간격·FAILED 전이, REQUIRES_NEW), NotificationMailRenderer (유형별 Thymeleaf 템플릿·제목, templates/mail/), NotificationMetrics (notification.send 지표), NotificationProperties·NotificationConfig (app.notification.*) + model/ (NotificationSettingView, NotificationHistoryItem, NotificationSummaryView, ClaimedNotification, RenderedMail, 메일 재료 payload record SubscribeGuidePayload·MonthlyPayload·PlanChangePayload와 공용 NotificationProductItem·NotificationTitleItem)
 │   └── domain/            entity(NotificationOutbox: 사용자는 ID만 보관, 삭제는 DB FK CASCADE) · enums(NotificationType, NotificationStatus) · repository(NotificationOutboxRepository: findDueForUpdate, findOneDueForUpdate, insertIfAbsent(네이티브 ON CONFLICT), findIdByDedupeKey, findByUserIdOrderByCreatedAtDescIdDesc, countByStatusAndCreatedAtGreaterThanEqual, findLatestSentAtSince)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
-│   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출), AdminNotificationController (GET /api/admin/notifications/summary, 서비스는 notification/service/NotificationQueryService 호출, Task 073)
-│   ├── service/           CollectExecutionService(시작·재시작·복구, 재계산이나 데이터 정리가 실행 중이면 409: retention/job의 RetentionExecutionQuery 사용), CollectExecutionQueryService(이력·변경 조회)
-│   │   └── model/           CollectViewContext(요청 한 번의 판정 맥락)
+│   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출), AdminNotificationController (GET /api/admin/notifications/summary, 서비스는 notification/service/NotificationQueryService 호출, Task 073), AdminSystemMetricsController (GET /api/admin/system-metrics, 운영 메모리 구성 조회, ADMIN 전용: SecurityConfig에서 ADMIN·DEMO 조회 규칙보다 앞에 둠)
+│   ├── service/           CollectExecutionService(시작·재시작·복구, 재계산이나 데이터 정리가 실행 중이면 409: retention/job의 RetentionExecutionQuery 사용), CollectExecutionQueryService(이력·변경 조회), SystemMetricsService (JVM은 JMX, 프로세스는 /proc/self/status, 컨테이너는 cgroup 파일에서 읽는 읽기 전용 측정. 파일 경로는 생성자로 바꿀 수 있음), SystemMetricsParser (/proc·cgroup 글자를 바이트로 바꾸는 순수 함수)
+│   │   └── model/           CollectViewContext(요청 한 번의 판정 맥락), SystemMetricsView(시스템 지표 값 묶음)
 │   ├── dto/
 │   │   ├── request/         CreateCollectExecutionRequest, UpdateAdminProviderRequest
-│   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse, AdminProviderResponse, AdminProviderListResponse, AdminNotificationSummaryResponse
+│   │   └── response/        CollectExecutionResponse, CollectExecutionAcceptedResponse, CollectExecutionChangeResponse, AdminProviderResponse, AdminProviderListResponse, AdminNotificationSummaryResponse, SystemMetricsResponse
 │   └── exception/         409 예외 4종(BatchAlreadyRunning·BatchAlreadyCompleted·BatchRecoveryRequired·BatchNotStopped)
 ├── collect/             TMDB에서 데이터를 모으는 배치(수집 Job)
 │   ├── job/               Job 조립(CollectJobConfig), 실행 파라미터, 설정값(CollectProperties), 비동기 operator 조립(CollectLaunchConfig), 시작·재시작·복구 창구(CollectJobLauncher), 이력 조회(CollectExecutionQuery), 상태·버튼 판정 규칙(CollectExecutionRules), 서버 기동 시각(ServerBootTime), tier로 흐름 분기(CollectTierDecider: DAILY면 제공처 목록·후보 발견을 건너뜀, Task 077), 완료 시 작품 상세 캐시 비우기(TitleCacheEvictListener), 종료 시 독점 목록 캐시 갱신(ExclusiveTitlesRefreshListener: COMPLETED면 새로 계산해 채우고 아니면 비움, Task 078), COMPLETED일 때만 완료 이벤트 발행(CollectCompletionListener → CollectCompletedEvent, plan/batch의 재계산 시작이 받는다, Task 069)
@@ -114,6 +116,16 @@ com.ottnavi
 │   ├── service/           PopularityCollectService(서비스×매체별 TMDB discover → 스냅샷 저장, 트랜잭션 없음), PopularitySnapshotService(날짜·서비스·매체 단위 교체·삭제), PopularityItemMapper(TMDB 응답 → 값 묶음), PopularityRankingService(TODAY·WEEK 순위 조회), HomeQueryService(찜 많은 작품·새로 볼 수 있게 된 작품·탐색을 각 도메인 서비스에서 받아 돌려줌), HomeProperties(app.home.*: 최소 찜 인원·입고 일수·공개 일수) + model/ (PopularityItem, PopularityCollectSummary, PopularityRankingView, WishlistedTitleListView)
 │   ├── step/              PopularityCollectTasklet, PopularityPurgeTasklet
 │   └── domain/            entity(PopularitySnapshot) · enums(PopularityPeriod) · repository(PopularitySnapshotRepository) · rule(PopularityRankingRules: 날짜별 인기도 → 평균 순위. 없던 날 0 · DailyPopularity, RankedPopularity)
+├── llmdraft/            영어 줄거리 한국어 번역 관리자 기능(관리자가 수동으로 시작, 자동 번역 없음, 데모는 조회만): 번역 초안 생성·일괄·검수·반영·되돌리기. 초안은 DB 표 없이 Redis에 7일 보관한다. 작품 줄거리는 catalog 서비스(TitleOverviewService)로 읽고 바꾼다
+│   ├── config/            LlmDraftProperties(app.llm.limits·draft·bulk·guard), LlmDraftConfig(설정 등록, 자동 검사 규칙 DraftTextGuard 빈)
+│   ├── controller/        AdminLlmController (/api/admin/llm/**: 후보 목록·초안 생성·일괄 시작·초안 목록·반영·삭제·영어로 되돌리기 7개. GET은 ADMIN·DEMO, 쓰기는 ADMIN만)
+│   ├── dto/
+│   │   ├── request/         CreateDraftRequest, CreateBulkOverviewDraftsRequest(titleIds 또는 count), ApplyDraftsRequest(draftIds 또는 allPassed)
+│   │   └── response/        OverviewCandidatePageResponse·OverviewCandidateResponse·LlmSummaryResponse, OverviewDraftResponse·OverviewDraftPageResponse, BulkDraftRunResponse·OverviewLatestBulkRunResponse(목록 안의 일괄 상태, nullable 표시가 섞이지 않게 따로 둠), ApplyOverviewDraftsResponse·ApplyOverviewDraftItemResponse, OverviewRevertResponse
+│   ├── exception/         LlmDraftException (LLM_* 오류 코드를 생성자로 받음)
+│   ├── repository/        Redis 저장소(DB 아님): DraftRepository(초안 llm:draft:*·작품 연결·목록 색인), LlmQuotaStore(분당·하루 호출 카운터 Lua, 태평양 날짜 기준, 작품 쿨다운), QuotaDecision, BulkRunStatusRepository(최근 일괄 진행 상황)
+│   ├── service/           DraftService(초안 한 건: 작품 확인 → 키·쿨다운·초안 총량·상한 확인 → Gemini 호출 → 자동 검사. `translate`는 저장 없이 초안 기록만 돌려주고 `createDraft`(단건, 재시도 없음)가 그 뒤 저장한다, 트랜잭션 없음), DraftBulkService(일괄: 전용 스레드 하나, 호출 간 대기, 중단 사유 판정, 실패·주의 자동 재시도 후 최선 결과 한 번 저장), DraftQueryService(초안 목록·표본), DraftEditService(관리자가 번역문을 고침: 자동 검사 재판정, isEdited 표시, TTL 갱신. 고친 초안은 일괄 번역이 덮어쓰지 않음), DraftApplyService(반영·삭제·단건 및 대량 되돌리기(관리자 번역만 대상, 500건씩 묶음, isPreview이면 대상 수만 셈), 수집 등 실행 중이면 거절), OverviewCandidateService(후보 목록 + 요약), ConflictingJobChecker(수집·재계산·정리·인기 수집 실행 중 확인) + model/ (DraftRecord, DraftGrade(성공·주의·실패 등급), BulkRunStatus·BulkRunState·BulkStopReason, QuotaUsage, ApplyItemResult·ApplyOutcome·ApplySkipReason, DraftPageView, CandidatePageView·CandidateItemView, DraftStatusFilter)
+│   └── domain/rule/       DraftTextGuard(번역 초안 자동 검사: 실패 규칙(한글 비율·길이 비율·최대 글자 수·URL·마크다운·머리말·숫자 보존)과 경고 규칙(문장 수·한다체·깨진 띄어쓰기·길이 비율 한계 근접), 순수 Java), GuardLimits(기준 수치), GuardResult, GuardFailure(걸린 이유), GuardWarning(의심 신호, 실패 없이 경고만 있으면 "주의")
 └── engine/              플랜 계산 엔진 (순수 Java, 프레임워크 없음)
     ├── model/             입력·출력 값 틀
     ├── rule/              평가·비교 규칙

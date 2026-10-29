@@ -21,9 +21,8 @@ import java.util.List;
 public record UpdateMySettingsRequest(
 		@NotNull(message = "서비스별 이용 상태는 필수입니다.")
 		@Size(min = 1, max = 7, message = "서비스별 이용 상태는 1~7개여야 합니다.")
-		@Valid
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-		List<@NotNull(message = "이용 상태 항목은 비울 수 없습니다.") UserSubscriptionRequest> subscriptions,
+		List<@NotNull(message = "이용 상태 항목은 비울 수 없습니다.") @Valid UserSubscriptionRequest> subscriptions, // 요소 검증은 타입 인자의 @Valid로 건다(컨테이너에 붙이면 HV000271 경고)
 		@NotNull(message = "월 예산은 필수입니다.")
 		@Min(value = 0, message = "월 예산은 0 이상이어야 합니다.")
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "20000") Integer monthlyBudget,

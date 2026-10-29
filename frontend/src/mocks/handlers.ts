@@ -22,6 +22,7 @@ import {
 import { adminHandlers } from '@/mocks/adminHandlers'
 import { authHandlers } from '@/mocks/authHandlers'
 import { homeHandlers } from '@/mocks/homeHandlers'
+import { llmHandlers } from '@/mocks/llmHandlers'
 import { memberHandlers } from '@/mocks/memberHandlers'
 import { notificationHandlers } from '@/mocks/notificationHandlers'
 import { getMockRole } from '@/mocks/mockSession'
@@ -416,5 +417,6 @@ export const handlers: RequestHandler[] = [
   ...memberHandlers,
   ...notificationHandlers, // 알림 설정·이력, 관리자 알림 요약(Task 071)
   ...adminHandlers, // 관리자 화면(Task 029). 역할을 검사하지 않는다(adminHandlers 주석)
+  ...llmHandlers, // 관리자 LLM 줄거리 번역(/admin/llm). 쓰기는 데모 계정 403
   ...getProductMock(),
 ]

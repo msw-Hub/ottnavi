@@ -52,6 +52,21 @@ const TECH_ERROR_MESSAGES = {
   OTT_SERVICE_NOT_FOUND: '서비스를 찾을 수 없습니다.',
   // Task 109: 데모 계정 로그인의 아이디·비밀번호가 틀림(어느 쪽인지는 알리지 않는다). 로그인 화면은 이 문장 뒤에 확인 안내를 덧붙여 보인다
   DEMO_LOGIN_FAILED: '아이디 또는 비밀번호가 올바르지 않습니다.',
+  // 영어 줄거리 한국어 번역 관리자 API(error-codes.md의 LLM_* 12개와 문구를 맞춘다)
+  LLM_DISABLED: '번역 기능이 꺼져 있습니다. 서버에 Gemini 키가 설정되지 않았습니다.',
+  LLM_RATE_LIMITED: '번역 호출이 분당 상한을 넘었습니다. 잠시 뒤 다시 시도해 주세요.',
+  LLM_TITLE_COOLDOWN: '같은 작품은 잠시 뒤에 다시 번역할 수 있습니다.',
+  LLM_DAILY_LIMIT_EXCEEDED: '오늘 번역 호출 상한을 모두 사용했습니다.',
+  LLM_CALL_FAILED: '번역 호출에 실패했습니다.',
+  LLM_UPSTREAM_BUSY: '구글 서버가 혼잡해 번역하지 못했습니다. 잠시 뒤 다시 시도해 주세요.',
+  LLM_DRAFT_NOT_FOUND:
+    '번역 초안을 찾을 수 없습니다. 보관 기간이 지났거나 이미 반영·삭제됐을 수 있습니다.',
+  LLM_BULK_RUNNING: '일괄 번역이 이미 실행 중입니다.',
+  LLM_NOT_TRANSLATABLE: '영어 줄거리가 있는 작품만 번역할 수 있습니다.',
+  LLM_DRAFT_LIMIT_EXCEEDED:
+    '대기 중인 초안이 가득 찼습니다. 반영하거나 삭제한 뒤 다시 시도해 주세요.',
+  LLM_APPLY_CONFLICT: '수집·재계산·정리가 실행 중이라 줄거리를 바꿀 수 없습니다.',
+  LLM_NOT_REVERTIBLE: '관리자가 반영한 번역 줄거리만 영어로 되돌릴 수 있습니다.',
 } as const
 
 // 두 표를 합친 전체 매핑. 화면 코드는 이 값이 아니라 getErrorMessage를 쓴다

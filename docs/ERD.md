@@ -144,6 +144,7 @@ erDiagram
 | original_title | VARCHAR(300) | | NULL 허용. 영화 original_title / 드라마 original_name |
 | overview | TEXT | | NULL 허용. 줄거리 |
 | overview_lang | VARCHAR(5) | | NULL 허용. ko / en. 영어로 대체했는지 표시 |
+| overview_translated_at | TIMESTAMPTZ | | NULL 허용(V11). 관리자가 반영한 한국어 번역 줄거리의 반영 시각. NULL이면 번역이 아니다(TMDB가 준 줄거리이거나 줄거리 없음). `overview_lang='ko'`만으로는 번역과 TMDB가 원래 준 한국어를 구분할 수 없어 둔다. 수집은 번역일 때만 새 영어 줄거리로 덮어쓰지 않고(TMDB 한국어가 오면 번역 표시를 NULL로 비우고 교체), 영어로 되돌리기(단건·대량)는 이 값이 있는 작품만 대상으로 줄거리·언어·이 컬럼을 모두 NULL로 만든다. 번역이 소량이라 인덱스는 두지 않았다 |
 | release_date | DATE | | NULL 허용. 영화 개봉일 / 드라마 첫 방영일 |
 | poster_path, backdrop_path | VARCHAR(200) | | NULL 허용. 이미지 상대 경로 |
 | original_language | VARCHAR(10) | | NULL 허용 |

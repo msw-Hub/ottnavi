@@ -52,6 +52,9 @@ public class Title extends BaseTimeEntity {
     @Column(length = 5)
     private String overviewLang; // ko / en, 영어로 대체했는지 표시
 
+    @JdbcTypeCode(SqlTypes.TIMESTAMP_WITH_TIMEZONE)
+    private Instant overviewTranslatedAt; // 관리자가 반영한 번역의 반영 시각. null이면 번역이 아니다(TMDB가 준 줄거리이거나 없음)
+
     private LocalDate releaseDate; // 영화 개봉일 / 드라마 첫 방영일
 
     @Column(length = 200)
@@ -91,14 +94,21 @@ public class Title extends BaseTimeEntity {
         return entity;
     }
 
-    /** TMDB 상세 응답으로 선택 필드를 채우거나 갱신한다. 수집 시각도 함께 바꾼다 */
+    /**
+     * TMDB 상세 응답으로 선택 필드를 채우거나 갱신한다. 수집 시각도 함께 바꾼다.
+     * isOverviewTranslated가 true면 관리자 번역을 그대로 둔다는 뜻이라 번역 시각을 유지하고(줄거리도 기존 번역이 넘어온다),
+     * false면 줄거리가 TMDB 값이 되므로 번역 시각을 비운다.
+     */
     public void updateDetail(String title, String originalTitle, String overview, String overviewLang,
-                             LocalDate releaseDate, String posterPath, String backdropPath, String originalLanguage,
+                             boolean isOverviewTranslated, LocalDate releaseDate, String posterPath, String backdropPath, String originalLanguage,
                              String tvStatus, BigDecimal popularity, BigDecimal voteAverage, Instant fetchedAt) {
         this.title = title;
         this.originalTitle = originalTitle;
         this.overview = overview;
         this.overviewLang = overviewLang;
+        if (!isOverviewTranslated) {
+            this.overviewTranslatedAt = null;
+        }
         this.releaseDate = releaseDate;
         this.posterPath = posterPath;
         this.backdropPath = backdropPath;
@@ -107,6 +117,11 @@ public class Title extends BaseTimeEntity {
         this.popularity = popularity;
         this.voteAverage = voteAverage;
         this.fetchedAt = fetchedAt;
+    }
+
+    /** 줄거리가 관리자가 반영한 번역인지 */
+    public boolean isOverviewTranslated() {
+        return overviewTranslatedAt != null;
     }
 
     /** 갱신 주기를 바꾼다(찜에 들어오면 DAILY, 빠지면 WEEKLY) */

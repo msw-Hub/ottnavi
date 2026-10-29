@@ -46,6 +46,66 @@ class TitleDetailRulesTest {
     }
 
     @Test
+    void 기존이_번역이고_새_응답이_영어면_기존_번역과_번역_표시를_유지한다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("관리자 번역", "ko", true, "English overview", "en");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("관리자 번역", "ko", true));
+    }
+
+    @Test
+    void 기존이_번역이고_새_응답이_한국어면_새_한국어로_교체하고_번역_표시를_비운다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("관리자 번역", "ko", true, "TMDB 한국어", "ko");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("TMDB 한국어", "ko", false));
+    }
+
+    @Test
+    void 기존이_TMDB_한국어이고_새_응답이_영어면_새_영어로_교체한다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("TMDB 한국어", "ko", false, "English overview", "en");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("English overview", "en", false));
+    }
+
+    @Test
+    void 기존이_TMDB_한국어이고_새_응답도_한국어면_새_값으로_교체한다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("옛 한국어", "ko", false, "새 한국어", "ko");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("새 한국어", "ko", false));
+    }
+
+    @Test
+    void 기존이_영어이고_새_응답도_영어면_새_값으로_교체한다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("Old", "en", false, "New", "en");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("New", "en", false));
+    }
+
+    @Test
+    void 기존이_영어이고_새_응답이_한국어면_새_한국어로_교체한다() {
+        OverviewMerge merge = TitleDetailRules.mergeOverview("Old", "en", false, "새 한국어", "ko");
+
+        assertThat(merge).isEqualTo(new OverviewMerge("새 한국어", "ko", false));
+    }
+
+    @Test
+    void 새_줄거리가_null이면_기존_줄거리와_언어와_번역_표시를_유지한다() {
+        assertThat(TitleDetailRules.mergeOverview("번역", "ko", true, null, null))
+                .isEqualTo(new OverviewMerge("번역", "ko", true));
+        assertThat(TitleDetailRules.mergeOverview("TMDB 한국어", "ko", false, null, null))
+                .isEqualTo(new OverviewMerge("TMDB 한국어", "ko", false));
+        assertThat(TitleDetailRules.mergeOverview("Old", "en", false, null, null))
+                .isEqualTo(new OverviewMerge("Old", "en", false));
+    }
+
+    @Test
+    void 기존_줄거리가_없으면_새_값을_쓴다() {
+        assertThat(TitleDetailRules.mergeOverview(null, null, false, "English", "en"))
+                .isEqualTo(new OverviewMerge("English", "en", false));
+        assertThat(TitleDetailRules.mergeOverview(null, null, false, "한국어", "ko"))
+                .isEqualTo(new OverviewMerge("한국어", "ko", false));
+    }
+
+    @Test
     void 출연진은_상위_10명만_남긴다() {
         List<CastCandidate> cast = new ArrayList<>();
         for (int i = 0; i < 15; i++) {

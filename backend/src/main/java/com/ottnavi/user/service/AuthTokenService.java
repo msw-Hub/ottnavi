@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthTokenService {
 
+	private static final int MAX_LOGGED_ORIGIN_LENGTH = 100; // 로그에 남기는 Origin 최대 길이
+
 	private final RefreshTokenStore refreshTokenStore;
 	private final UserLoginService userLoginService;
 	private final JwtTokenProvider jwtTokenProvider;
@@ -42,8 +44,30 @@ public class AuthTokenService {
 	/** Origin 헤더가 허용 주소와 정확히 같지 않으면 403이다(CSRF 방지). 교체·폐기 전에 호출한다 */
 	public void verifyOrigin(String origin) {
 		if (origin == null || !origin.equals(allowedOrigin)) {
+			// 원인 파악용으로 받은 값만 남긴다. 허용 주소(APP_FRONTEND_ORIGIN)는 남기지 않는다
+			log.warn("요청 출처가 허용 주소와 다릅니다: origin={}", sanitizeOriginForLog(origin));
 			throw new ForbiddenException("허용되지 않은 요청 출처입니다.");
 		}
+	}
+
+	/**
+	 * 로그에 남길 Origin 값을 정리한다. 로그 주입을 막으려고 줄바꿈·제어문자를 지우고 100자로 자른다.
+	 * 예: null → "없음", "https://evil.example\nFAKE" → "https://evil.exampleFAKE"
+	 */
+	static String sanitizeOriginForLog(String origin) {
+		// 1. 헤더가 없으면 "없음"
+		if (origin == null) {
+			return "없음";
+		}
+		// 2. 제어문자(줄바꿈 포함)를 건너뛰며 100자까지만 모은다
+		StringBuilder cleaned = new StringBuilder();
+		for (int i = 0; i < origin.length() && cleaned.length() < MAX_LOGGED_ORIGIN_LENGTH; i++) {
+			char c = origin.charAt(i);
+			if (!Character.isISOControl(c)) {
+				cleaned.append(c);
+			}
+		}
+		return cleaned.toString();
 	}
 
 	/** Refresh Token을 교체하고 새 Access Token을 발급한다. 무효이면 401이다 */

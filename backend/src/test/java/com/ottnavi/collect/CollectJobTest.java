@@ -269,7 +269,7 @@ class CollectJobTest extends IntegrationTestSupport {
     void 이미_있는_작품은_포스터_배경_인기도_평점만_갱신하고_나머지는_그대로_둔다() throws Exception {
         Instant old = Instant.parse("2026-01-01T00:00:00Z");
         Title existing = Title.create(MediaType.MOVIE, 900001, "원래 제목", old);
-        existing.updateDetail("원래 제목", "Original", "상세 줄거리", "ko", LocalDate.of(2020, 1, 1), "/old-p.jpg",
+        existing.updateDetail("원래 제목", "Original", "상세 줄거리", "ko", false, LocalDate.of(2020, 1, 1), "/old-p.jpg",
                 "/old-b.jpg", "ko", null, new BigDecimal("1.000"), new BigDecimal("1.00"), old);
         titleRepository.saveAndFlush(existing);
         stubDiscoverItems(DISCOVER_MOVIE, "8|1796", 1, 1, """

@@ -200,6 +200,23 @@ class UserSettingApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 목록_요소의_결제일이_범위를_벗어나면_요소_경로로_400이다() throws Exception {
+		// given
+		String body = """
+				{"subscriptions":[{"ottServiceId":%d,"status":"SUBSCRIBED","planName":"스탠다드","billingDay":32}],
+				 "monthlyBudget":0,"monthlyWatchMinutes":120,"watchPreset":"LIGHT","isLowestPriceMode":false}
+				""".formatted(serviceIds().get(0));
+
+		// when & then
+		mockMvc.perform(put(PATH).header(HttpHeaders.AUTHORIZATION, bearerOfNewUser())
+						.contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("subscriptions[0].billingDay"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("결제일은 31 이하여야 합니다."));
+	}
+
+	@Test
 	void 구독_중인데_요금제_이름이_없으면_400이다() throws Exception {
 		// given
 		String body = """

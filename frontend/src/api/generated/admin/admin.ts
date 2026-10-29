@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 51개이고 모두 구현됐다(Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -30,28 +30,46 @@ import type {
 
 import type {
   AdminProductPriceRequest,
+  ApplyOverviewDraftsRequest,
   BadRequestResponse,
   CommonResponseAdminNotificationSummary,
   CommonResponseAdminProduct,
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
   CommonResponseAdminProviderList,
+  CommonResponseApplyOverviewDraftsResult,
+  CommonResponseBulkDraftRun,
   CommonResponseCollectExecution,
   CommonResponseCollectExecutionAccepted,
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecutionPage,
+  CommonResponseOverviewBulkRevertResult,
+  CommonResponseOverviewCandidatePage,
+  CommonResponseOverviewDraft,
+  CommonResponseOverviewDraftPage,
+  CommonResponseOverviewRevertResult,
   CommonResponsePlanBenchmark,
   CommonResponsePlanRecalcExecutionAccepted,
   CommonResponsePopularityExecutionAccepted,
   CommonResponseRetentionExecutionAccepted,
+  CommonResponseSystemMetrics,
   ConflictResponse,
   CreateAdminProductRequest,
+  CreateBulkOverviewDraftsRequest,
   CreateCollectExecutionRequest,
+  CreateOverviewDraftRequest,
+  EditOverviewDraftRequest,
   ForbiddenResponse,
   InternalErrorResponse,
   ListCollectExecutionChangesParams,
   ListCollectExecutionsParams,
+  ListOverviewCandidatesParams,
+  ListOverviewDraftsParams,
+  LlmBadGatewayResponse,
+  LlmTooManyRequestsResponse,
+  LlmUnavailableResponse,
   NotFoundResponse,
+  OverviewBulkRevertRequest,
   UnauthorizedResponse,
   UpdateAdminProductRequest,
   UpdateAdminProviderRequest
@@ -1471,6 +1489,102 @@ export function useGetAdminNotificationSummary<TData = Awaited<ReturnType<typeof
 
 
 /**
+ * 서버의 JVM·프로세스·컨테이너 메모리 구성을 지금 시점으로 측정해 돌려준다. 운영 컨테이너에 `jcmd`가 없고 브라우저에서 `/actuator`를 부를 수 없어 둔 읽기 전용 API다. 비밀 값은 담지 않는다.
+ * 숫자는 모두 바이트 단위(스레드·클래스·GC 횟수 등 개수와 시간은 제외)다. 읽을 수 없는 값은 `null`이다. `process`는 Linux의 `/proc/self/status`, `container`는 cgroup 메모리 파일에서 읽으므로 Linux 컨테이너가 아니면(로컬 Windows 등) 안의 값이 모두 `null`이다. `container.memoryLimitBytes`는 한도가 `max`(제한 없음)여도 `null`이다.
+ * ADMIN만 호출할 수 있다. 데모 계정(`DEMO`)과 배치 토큰은 호출할 수 없다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 시스템 메모리 지표 조회
+ */
+export const getSystemMetrics = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseSystemMetrics>(
+      {url: `/admin/system-metrics`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetSystemMetricsQueryKey = () => {
+    return [
+    `/admin/system-metrics`
+    ] as const;
+    }
+
+
+export const getGetSystemMetricsQueryOptions = <TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemMetricsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemMetrics>>> = ({ signal }) => getSystemMetrics(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetSystemMetricsQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemMetrics>>>
+export type GetSystemMetricsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemMetrics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getSystemMetrics>>,
+          TError,
+          Awaited<ReturnType<typeof getSystemMetrics>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 시스템 메모리 지표 조회
+ */
+
+export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemMetrics>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSystemMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetSystemMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
  * 정답 세트(입력과 기대 결과) 전체를 완전탐색·그리디 두 알고리즘으로 워밍업 1회 뒤 3회씩 측정해 `calc_run`에 케이스 × 알고리즘마다 1행(중앙값)을 남긴다. 한 번 호출에 21케이스 × 2 = 42행이다.
  * 요청 본문은 없다. 같은 입력으로 다시 호출하면 행이 더 쌓이고, 같은 `inputHash`에 EXACT·GREEDY 두 행이 함께 있다. 기록의 `plan_id`는 NULL, 플랜 유형은 추천형이다.
  * ADMIN만 호출할 수 있고 배치 토큰은 허용하지 않는다. 수 초 걸리는 CPU 작업이라 응답이 느리다.
@@ -1539,4 +1653,694 @@ export const useCreatePlanBenchmark = <TError = ErrorType<UnauthorizedResponse |
         TContext
       > => {
       return useMutation(getCreatePlanBenchmarkMutationOptions(options), queryClient);
+    }
+    /**
+ * 영어 줄거리(`overview_lang='en'`이고 줄거리가 비어 있지 않은 작품)를 번역 후보로 돌려준다. 정렬은 찜한 사용자 수 많은 순 → 인기도 순(동률은 작품 ID 순)이다.
+ * 각 항목에 영어 줄거리 전문과 이미 만든 초안이 있는지(`hasDraft`)가 들어 있다. 응답의 `summary`에 번역 대기 총수, 오늘 사용량과 하루·분당 상한, 모델 이름, 번역 기능 사용 가능 여부(`isEnabled`, 서버에 Gemini 키가 있는지), 관리자가 반영한 번역 작품 수(`translatedCount`)와 가장 오래된 번역의 반영 시각(`oldestTranslatedAt`, 없으면 `null`)이 들어 있다. 키가 없어도 이 조회는 동작한다.
+ * 페이지네이션 응답이다. 하루 사용량은 태평양 시간(America/Los_Angeles) 날짜 기준이다(구글 무료 일일 한도 리셋 기준).
+ * 관리자(ADMIN) 또는 데모(DEMO) Access Token으로 호출한다.
+ * 오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 번역 후보 목록 조회
+ */
+export const listOverviewCandidates = (
+    params?: ListOverviewCandidatesParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewCandidatePage>(
+      {url: `/admin/llm/overview-candidates`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListOverviewCandidatesQueryKey = (params?: ListOverviewCandidatesParams,) => {
+    return [
+    `/admin/llm/overview-candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOverviewCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof listOverviewCandidates>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(params?: ListOverviewCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOverviewCandidatesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOverviewCandidates>>> = ({ signal }) => listOverviewCandidates(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOverviewCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof listOverviewCandidates>>>
+export type ListOverviewCandidatesQueryError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useListOverviewCandidates<TData = Awaited<ReturnType<typeof listOverviewCandidates>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params: undefined |  ListOverviewCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOverviewCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof listOverviewCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOverviewCandidates<TData = Awaited<ReturnType<typeof listOverviewCandidates>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOverviewCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof listOverviewCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOverviewCandidates<TData = Awaited<ReturnType<typeof listOverviewCandidates>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 번역 후보 목록 조회
+ */
+
+export function useListOverviewCandidates<TData = Awaited<ReturnType<typeof listOverviewCandidates>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOverviewCandidatesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 작품 한 건의 영어 줄거리를 Gemini로 한국어 초안으로 번역해 저장하고 201로 돌려준다. 초안은 Redis에 7일 보관하며 작품당 1개다(새로 만들면 교체한다). DB의 줄거리는 바뀌지 않는다. 반영은 `applyOverviewDrafts`로 한다.
+ * 번역문은 서버 코드가 자동 검사한다. 검사 결과는 세 등급이다: **실패**(한글 비율, 길이 비율, 최대 1000자, URL·마크다운·머리말 포함, 원문 숫자 보존 중 하나라도 걸림, `isGuardPassed=false`와 `guardFailures` 이유 코드), **주의**(실패는 없지만 문장 수·문체·띄어쓰기·길이 비율 한계 근접 같은 의심 신호가 있음, `isGuardPassed=true`이고 `warnings`가 비어 있지 않음), **성공**(실패도 경고도 없음). 검사에서 걸려도 초안은 저장된다. 단건 번역은 한 번만 시도하고 자동으로 다시 번역하지 않는다(`attempts`는 항상 1). 다시 번역은 관리자가 이 API를 다시 부른다. 이 호출은 Gemini를 부르므로 응답에 수 초~수십 초 걸릴 수 있다(호출 제한 시간 90초).
+ * Gemini 호출 직전에 분당(12)·하루(400, 태평양 시간 날짜) 카운터를 올린다. 키가 없어 막힌 요청은 올리지 않고, 호출이 실패해도 올린 채 둔다. 같은 작품은 60초 쿨다운이 있다.
+ * ADMIN만 호출할 수 있다.
+ * 오류: `VALIDATION_FAILED`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 작품), `LLM_NOT_TRANSLATABLE`(409, 영어 줄거리가 아님), `LLM_DRAFT_LIMIT_EXCEEDED`(409, 대기 초안 500개 가득 참), `LLM_TITLE_COOLDOWN`(429, 같은 작품 60초 쿨다운), `LLM_RATE_LIMITED`(429, 분당 상한 또는 구글 429), `LLM_DAILY_LIMIT_EXCEEDED`(429, 하루 상한), `LLM_CALL_FAILED`(502, Gemini 호출 실패·시간 초과·빈 응답), `LLM_UPSTREAM_BUSY`(502, 구글 서버 혼잡 503, 요청 안에서 재시도하지 않으니 잠시 뒤 다시 누른다), `LLM_DISABLED`(503, 서버에 Gemini 키 없음), `INTERNAL_ERROR`(500).
+ * @summary 번역 초안 생성
+ */
+export const createOverviewDraft = (
+    createOverviewDraftRequest: BodyType<CreateOverviewDraftRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewDraft>(
+      {url: `/admin/llm/drafts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createOverviewDraftRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateOverviewDraftMutationKey = () => ['createOverviewDraft'] as const;
+
+export const getCreateOverviewDraftMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | LlmTooManyRequestsResponse | InternalErrorResponse | LlmBadGatewayResponse | LlmUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOverviewDraft>>, TError,CreateOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createOverviewDraft>>, TError,CreateOverviewDraftMutationVariables, TContext> => {
+
+const mutationKey = getCreateOverviewDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createOverviewDraft>>, CreateOverviewDraftMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createOverviewDraft(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateOverviewDraftMutationResult = NonNullable<Awaited<ReturnType<typeof createOverviewDraft>>>
+    export type CreateOverviewDraftMutationBody = BodyType<CreateOverviewDraftRequest>
+    export type CreateOverviewDraftMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | LlmTooManyRequestsResponse | InternalErrorResponse | LlmBadGatewayResponse | LlmUnavailableResponse>
+    export type CreateOverviewDraftMutationVariables = {data: BodyType<CreateOverviewDraftRequest>}
+
+    /**
+ * @summary 번역 초안 생성
+ */
+export const useCreateOverviewDraft = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | LlmTooManyRequestsResponse | InternalErrorResponse | LlmBadGatewayResponse | LlmUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createOverviewDraft>>, TError,CreateOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createOverviewDraft>>,
+        TError,
+        CreateOverviewDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateOverviewDraftMutationOptions(options), queryClient);
+    }
+    /**
+ * Redis에 보관 중인 번역 초안을 만든 시각 최신순으로 돌려준다. `status`로 자동 검사 등급을 거른다(`PASSED` 성공: 실패도 경고도 없음 / `WARNING` 주의: 실패는 없고 경고만 있음 / `FAILED` 실패). `sample=N`이면 성공(`PASSED`) 초안 중 무작위 N개를 돌려준다(표본 확인용, `page`·`size`는 무시하고 `status=FAILED`·`status=WARNING`과는 함께 쓸 수 없다).
+ * 각 항목에 영어 원문, 번역문, 자동 검사 결과(실패 여부와 걸린 이유 코드, 경고 코드), 모델, 만든 시각, 총 시도 횟수가 들어 있다. 운영 Redis는 persistence가 없고 메모리가 부족하면 오래된 키부터 지우므로, 사라진 초안은 목록에서 조용히 빠진다(오류가 아니다).
+ * 응답의 `bulkRun`에 최근 일괄 번역의 진행 상황이 들어 있다(일괄을 돌린 적이 없으면 `null`).
+ * 페이지네이션 응답이다. 관리자(ADMIN) 또는 데모(DEMO) Access Token으로 호출한다.
+ * 오류: `VALIDATION_FAILED`(400, page/size/sample 범위 밖·`status=FAILED` 또는 `status=WARNING`과 `sample` 동시 사용), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 번역 초안 목록 조회
+ */
+export const listOverviewDrafts = (
+    params?: ListOverviewDraftsParams,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewDraftPage>(
+      {url: `/admin/llm/drafts`, method: 'GET',
+        params, signal
+    },
+      options);
+    }
+
+
+
+
+export const getListOverviewDraftsQueryKey = (params?: ListOverviewDraftsParams,) => {
+    return [
+    `/admin/llm/drafts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListOverviewDraftsQueryOptions = <TData = Awaited<ReturnType<typeof listOverviewDrafts>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(params?: ListOverviewDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListOverviewDraftsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listOverviewDrafts>>> = ({ signal }) => listOverviewDrafts(params, requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type ListOverviewDraftsQueryResult = NonNullable<Awaited<ReturnType<typeof listOverviewDrafts>>>
+export type ListOverviewDraftsQueryError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useListOverviewDrafts<TData = Awaited<ReturnType<typeof listOverviewDrafts>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params: undefined |  ListOverviewDraftsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOverviewDrafts>>,
+          TError,
+          Awaited<ReturnType<typeof listOverviewDrafts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOverviewDrafts<TData = Awaited<ReturnType<typeof listOverviewDrafts>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listOverviewDrafts>>,
+          TError,
+          Awaited<ReturnType<typeof listOverviewDrafts>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useListOverviewDrafts<TData = Awaited<ReturnType<typeof listOverviewDrafts>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 번역 초안 목록 조회
+ */
+
+export function useListOverviewDrafts<TData = Awaited<ReturnType<typeof listOverviewDrafts>>, TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+ params?: ListOverviewDraftsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof listOverviewDrafts>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getListOverviewDraftsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 여러 작품의 번역을 서버 안에서 차례로 시작하고 202와 진행 상황을 돌려준다. 요청은 `titleIds`(1~100개, 이미 초안이 있어도 다시 번역해 교체)와 `count`(1~100, 후보 정렬 상위 N개, 이미 초안이 있는 작품은 건너뛰고 그다음을 채운다) 중 정확히 하나만 보낸다.
+ * 서버의 일괄 전용 스레드가 호출 사이 2초씩 쉬며 처리한다. 구글 서버 혼잡(503)으로 실패한 작품은 30초 뒤 한 번만 다시 부르고(`LLM_UPSTREAM_BUSY`), 다시 실패하면 그 작품을 실패로 센다. 자동 검사 결과가 실패인 작품은 최대 2번, 주의인 작품은 최대 1번 자동으로 다시 번역하고(첫 시도 제외, 설정 `app.llm.bulk.fail-retry-max`·`warning-retry-max`), 시도들 중 가장 좋은 결과(성공 > 주의 > 실패, 같은 등급이면 마지막 시도) 하나만 저장한다. 총 시도 횟수는 초안의 `attempts`에 남고, 재시도도 분당·하루 호출 카운터를 올린다. 재시도 중 한도·키 문제가 나면 그때까지의 최선 결과를 저장하고 일괄을 멈춘다. 진행 상황은 `listOverviewDrafts` 응답의 `bulkRun`로 본다. 한 번에 실행 중인 일괄은 1개다. 한도 초과(분당·하루·구글 429)·키 없음·대기 초안 가득 참이면 즉시 멈추고, 호출 실패가 3번 연속이어도 멈춘다. 멈춘 이유는 `bulkRun.stopReason`에 남는다. 서버가 다시 시작되면 실행 중이던 일괄은 `STOPPED`(`SERVER_RESTARTED`)로 보인다.
+ * 키가 없으면 시작하지 않고 `LLM_DISABLED`(503)다. 후보가 하나도 없으면 바로 `COMPLETED`(`total=0`)로 돌려준다. ADMIN만 호출할 수 있다.
+ * 오류: `VALIDATION_FAILED`(400, `titleIds`와 `count` 둘 다 보내거나 둘 다 없음·범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_BULK_RUNNING`(409, 이미 일괄 실행 중), `LLM_DISABLED`(503), `INTERNAL_ERROR`(500).
+ * @summary 일괄 번역 시작
+ */
+export const createBulkOverviewDrafts = (
+    createBulkOverviewDraftsRequest: BodyType<CreateBulkOverviewDraftsRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseBulkDraftRun>(
+      {url: `/admin/llm/bulk-drafts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: createBulkOverviewDraftsRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getCreateBulkOverviewDraftsMutationKey = () => ['createBulkOverviewDrafts'] as const;
+
+export const getCreateBulkOverviewDraftsMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse | LlmUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBulkOverviewDrafts>>, TError,CreateBulkOverviewDraftsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof createBulkOverviewDrafts>>, TError,CreateBulkOverviewDraftsMutationVariables, TContext> => {
+
+const mutationKey = getCreateBulkOverviewDraftsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createBulkOverviewDrafts>>, CreateBulkOverviewDraftsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createBulkOverviewDrafts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateBulkOverviewDraftsMutationResult = NonNullable<Awaited<ReturnType<typeof createBulkOverviewDrafts>>>
+    export type CreateBulkOverviewDraftsMutationBody = BodyType<CreateBulkOverviewDraftsRequest>
+    export type CreateBulkOverviewDraftsMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse | LlmUnavailableResponse>
+    export type CreateBulkOverviewDraftsMutationVariables = {data: BodyType<CreateBulkOverviewDraftsRequest>}
+
+    /**
+ * @summary 일괄 번역 시작
+ */
+export const useCreateBulkOverviewDrafts = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse | LlmUnavailableResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createBulkOverviewDrafts>>, TError,CreateBulkOverviewDraftsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof createBulkOverviewDrafts>>,
+        TError,
+        CreateBulkOverviewDraftsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateBulkOverviewDraftsMutationOptions(options), queryClient);
+    }
+    /**
+ * 초안을 작품 줄거리에 반영한다. 요청은 `draftIds`(그 초안만)와 `allPassed: true`(**성공** 초안 전부) 중 정확히 하나만 보낸다. `allPassed: true`는 성공(실패도 경고도 없는) 초안만 대상으로 하고, **주의** 초안은 대상에서 빠진다(결과에도 나오지 않는다). 주의 초안은 사람이 확인한 뒤 `draftIds`로 지정해 반영한다(승인 경로). 실패 초안은 `draftIds`로 지정해도 건너뛴다. 건별 결과를 돌려주고, 한 건이 건너뛰어져도 나머지는 계속한다.
+ * 반영은 DB 조건부 갱신이다. 작품 줄거리가 아직 영어(`en`)이고 번역한 원문과 똑같을 때만 `overview`를 번역문으로, `overview_lang`을 `ko`로 바꾼다. 바뀌면 그 작품의 상세 캐시 1개를 지우고 반영한 초안을 Redis에서 지운다. 건너뛴 이유(`reason`): `DRAFT_NOT_FOUND`(초안이 없음), `GUARD_FAILED`(자동 검사에서 실패한 초안은 반영하지 않음), `ORIGINAL_CHANGED`(번역한 뒤 줄거리가 바뀌었거나 이미 한국어).
+ * 수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 시작하지 않고 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다.
+ * 오류: `VALIDATION_FAILED`(400, `draftIds`와 `allPassed` 둘 다 보내거나 둘 다 없음), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+ * @summary 번역 초안 반영
+ */
+export const applyOverviewDrafts = (
+    applyOverviewDraftsRequest: BodyType<ApplyOverviewDraftsRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseApplyOverviewDraftsResult>(
+      {url: `/admin/llm/drafts/apply`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: applyOverviewDraftsRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getApplyOverviewDraftsMutationKey = () => ['applyOverviewDrafts'] as const;
+
+export const getApplyOverviewDraftsMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyOverviewDrafts>>, TError,ApplyOverviewDraftsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof applyOverviewDrafts>>, TError,ApplyOverviewDraftsMutationVariables, TContext> => {
+
+const mutationKey = getApplyOverviewDraftsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyOverviewDrafts>>, ApplyOverviewDraftsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  applyOverviewDrafts(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ApplyOverviewDraftsMutationResult = NonNullable<Awaited<ReturnType<typeof applyOverviewDrafts>>>
+    export type ApplyOverviewDraftsMutationBody = BodyType<ApplyOverviewDraftsRequest>
+    export type ApplyOverviewDraftsMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
+    export type ApplyOverviewDraftsMutationVariables = {data: BodyType<ApplyOverviewDraftsRequest>}
+
+    /**
+ * @summary 번역 초안 반영
+ */
+export const useApplyOverviewDrafts = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyOverviewDrafts>>, TError,ApplyOverviewDraftsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof applyOverviewDrafts>>,
+        TError,
+        ApplyOverviewDraftsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getApplyOverviewDraftsMutationOptions(options), queryClient);
+    }
+    /**
+ * 초안의 번역문(`translated`)을 관리자가 직접 고친다. 서버가 자동 검사를 다시 돌려 `isGuardPassed`·`guardFailures`·`warnings`(성공/주의/실패)를 새로 판정하고, `isEdited`를 `true`로 바꾸며, 보관 기간(7일)을 저장한 시각부터 다시 센다. 원문(`original`)·작품·만든 시각은 그대로다. DB의 줄거리는 바뀌지 않는다(반영은 `applyOverviewDrafts`).
+ * 검사에서 실패가 남아도 저장은 되고 응답의 `isGuardPassed`가 `false`다. 실패 초안은 반영할 수 없다(`applyOverviewDrafts`에서 `GUARD_FAILED`). 고친 초안은 일괄 번역(`createBulkOverviewDrafts`)이 같은 작품을 다시 번역해 덮어쓰지 않고 건너뛴다. 단건 번역(`createOverviewDraft`)을 다시 누르면 관리자의 명시적 요청이라 새 초안으로 교체된다(`isEdited`는 `false`로 돌아간다).
+ * `translatedText`는 공백만으로 보낼 수 없고 1000자까지다(자동 검사의 최대 글자 수와 같다). ADMIN만 호출할 수 있다(DEMO는 403).
+ * 오류: `VALIDATION_FAILED`(400, 번역문이 비었거나 1000자 초과), `INVALID_REQUEST`(400, 깨진 본문), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_DRAFT_NOT_FOUND`(404, 초안이 없음. 보관 기간이 지났거나 이미 반영·삭제됨), `INTERNAL_ERROR`(500).
+ * @summary 번역 초안 수정
+ */
+export const editOverviewDraft = (
+    draftId: string,
+    editOverviewDraftRequest: BodyType<EditOverviewDraftRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewDraft>(
+      {url: `/admin/llm/drafts/${draftId}`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: editOverviewDraftRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getEditOverviewDraftMutationKey = () => ['editOverviewDraft'] as const;
+
+export const getEditOverviewDraftMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editOverviewDraft>>, TError,EditOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof editOverviewDraft>>, TError,EditOverviewDraftMutationVariables, TContext> => {
+
+const mutationKey = getEditOverviewDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editOverviewDraft>>, EditOverviewDraftMutationVariables> = (props) => {
+          const {draftId,data} = props ?? {};
+
+          return  editOverviewDraft(draftId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditOverviewDraftMutationResult = NonNullable<Awaited<ReturnType<typeof editOverviewDraft>>>
+    export type EditOverviewDraftMutationBody = BodyType<EditOverviewDraftRequest>
+    export type EditOverviewDraftMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>
+    export type EditOverviewDraftMutationVariables = {draftId: string;data: BodyType<EditOverviewDraftRequest>}
+
+    /**
+ * @summary 번역 초안 수정
+ */
+export const useEditOverviewDraft = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editOverviewDraft>>, TError,EditOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof editOverviewDraft>>,
+        TError,
+        EditOverviewDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEditOverviewDraftMutationOptions(options), queryClient);
+    }
+    /**
+ * 초안 한 건을 Redis에서 지운다. DB의 줄거리는 바뀌지 않는다. 성공하면 204(본문 없음)다. ADMIN만 호출할 수 있다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_DRAFT_NOT_FOUND`(404, 초안이 없음. 보관 기간이 지났거나 이미 반영·삭제됨), `INTERNAL_ERROR`(500).
+ * @summary 번역 초안 삭제
+ */
+export const deleteOverviewDraft = (
+    draftId: string,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<void>(
+      {url: `/admin/llm/drafts/${draftId}`, method: 'DELETE', signal
+    },
+      options);
+    }
+
+
+
+
+export const getDeleteOverviewDraftMutationKey = () => ['deleteOverviewDraft'] as const;
+
+export const getDeleteOverviewDraftMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOverviewDraft>>, TError,DeleteOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteOverviewDraft>>, TError,DeleteOverviewDraftMutationVariables, TContext> => {
+
+const mutationKey = getDeleteOverviewDraftMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteOverviewDraft>>, DeleteOverviewDraftMutationVariables> = (props) => {
+          const {draftId} = props ?? {};
+
+          return  deleteOverviewDraft(draftId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteOverviewDraftMutationResult = NonNullable<Awaited<ReturnType<typeof deleteOverviewDraft>>>
+
+    export type DeleteOverviewDraftMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>
+    export type DeleteOverviewDraftMutationVariables = {draftId: string}
+
+    /**
+ * @summary 번역 초안 삭제
+ */
+export const useDeleteOverviewDraft = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOverviewDraft>>, TError,DeleteOverviewDraftMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteOverviewDraft>>,
+        TError,
+        DeleteOverviewDraftMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteOverviewDraftMutationOptions(options), queryClient);
+    }
+    /**
+ * 관리자가 반영한 번역 줄거리(`overview_translated_at`이 있는 작품)의 `overview`·`overview_lang`·`overview_translated_at`을 모두 `null`로 비우고 그 작품의 상세 캐시를 지운다. 요청 본문은 없다. 비워진 줄거리는 다음 수집(찜한 작품은 매일, 그 외는 매주)이 TMDB 영어 줄거리로 다시 채운다. **그동안 최대 일주일 줄거리가 비어 있을 수 있다.** TMDB가 처음부터 한국어로 준 줄거리(번역 아님)는 되돌릴 수 없고 `LLM_NOT_REVERTIBLE`(409)이다.
+ * 수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 작품), `LLM_NOT_REVERTIBLE`(409, 줄거리가 관리자가 반영한 번역이 아님), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+ * @summary 줄거리를 영어로 되돌리기
+ */
+export const revertTitleOverview = (
+    titleId: number,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewRevertResult>(
+      {url: `/admin/llm/titles/${titleId}/overview-revert`, method: 'POST', signal
+    },
+      options);
+    }
+
+
+
+
+export const getRevertTitleOverviewMutationKey = () => ['revertTitleOverview'] as const;
+
+export const getRevertTitleOverviewMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revertTitleOverview>>, TError,RevertTitleOverviewMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof revertTitleOverview>>, TError,RevertTitleOverviewMutationVariables, TContext> => {
+
+const mutationKey = getRevertTitleOverviewMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revertTitleOverview>>, RevertTitleOverviewMutationVariables> = (props) => {
+          const {titleId} = props ?? {};
+
+          return  revertTitleOverview(titleId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevertTitleOverviewMutationResult = NonNullable<Awaited<ReturnType<typeof revertTitleOverview>>>
+
+    export type RevertTitleOverviewMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>
+    export type RevertTitleOverviewMutationVariables = {titleId: number}
+
+    /**
+ * @summary 줄거리를 영어로 되돌리기
+ */
+export const useRevertTitleOverview = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | NotFoundResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revertTitleOverview>>, TError,RevertTitleOverviewMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof revertTitleOverview>>,
+        TError,
+        RevertTitleOverviewMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevertTitleOverviewMutationOptions(options), queryClient);
+    }
+    /**
+ * 관리자가 반영한 번역 줄거리(`overview_translated_at`이 있는 작품)를 한꺼번에 영어 줄거리로 되돌린다. 요청 본문은 필수이며 빈 객체 `{}`면 번역 **전부**를, `translatedBefore`가 있으면 그 시각보다 **먼저** 반영한 번역만 대상으로 한다. 대상 작품의 `overview`·`overview_lang`·`overview_translated_at`을 모두 `null`로 비우고 그 작품들의 상세 캐시를 지운다(캐시 삭제가 실패해도 경고만 남기고 상세 캐시는 TTL 24시간 뒤 새 값이 된다). TMDB가 처음부터 한국어로 준 줄거리와 영어 줄거리는 건드리지 않는다. 대상이 없으면 `revertedCount`가 0이다.
+ * 사용 목적: TMDB가 번역 줄거리 표시를 허용하지 않을 때 번역 전부를 회수하거나, 번역문도 6개월 보관 제한 대상이라고 할 때 오래된 번역(예: `translatedBefore`를 6개월 전으로)만 회수한다. 가장 오래된 번역 시각은 `listOverviewCandidates` 응답 `summary`의 `translatedCount`·`oldestTranslatedAt`으로 볼 수 있다.
+ * 비워진 줄거리는 다음 수집(찜한 작품은 매일, 그 외는 매주)이 TMDB 영어 줄거리로 다시 채운다. **그동안 최대 일주일 줄거리가 비어 있을 수 있다.** 작품 수천 건도 서버가 500건씩 나눠 처리한다.
+ * `isPreview`을 `true`로 보내면 미리보기다: DB와 캐시를 바꾸지 않고 같은 조건으로 되돌려질 작품 수만 `revertedCount`에 돌려주고 응답의 `isPreview`도 `true`다. 실행 전에 몇 편이 영향을 받는지 확인하는 용도다(`isPreview`을 생략하거나 `false`면 실제로 되돌린다). 미리보기도 수집 등이 실행 중이면 같은 `LLM_APPLY_CONFLICT`(409)다.
+ * 수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 시작하지 않고 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다(DEMO는 403).
+ * 오류: `INVALID_REQUEST`(400, 본문 없음·`translatedBefore` 날짜 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+ * @summary 번역 줄거리 대량 되돌리기
+ */
+export const revertTranslatedOverviews = (
+    overviewBulkRevertRequest: BodyType<OverviewBulkRevertRequest>,
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseOverviewBulkRevertResult>(
+      {url: `/admin/llm/overview-reverts`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: overviewBulkRevertRequest, signal
+    },
+      options);
+    }
+
+
+
+
+export const getRevertTranslatedOverviewsMutationKey = () => ['revertTranslatedOverviews'] as const;
+
+export const getRevertTranslatedOverviewsMutationOptions = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revertTranslatedOverviews>>, TError,RevertTranslatedOverviewsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof revertTranslatedOverviews>>, TError,RevertTranslatedOverviewsMutationVariables, TContext> => {
+
+const mutationKey = getRevertTranslatedOverviewsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof revertTranslatedOverviews>>, RevertTranslatedOverviewsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  revertTranslatedOverviews(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RevertTranslatedOverviewsMutationResult = NonNullable<Awaited<ReturnType<typeof revertTranslatedOverviews>>>
+    export type RevertTranslatedOverviewsMutationBody = BodyType<OverviewBulkRevertRequest>
+    export type RevertTranslatedOverviewsMutationError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>
+    export type RevertTranslatedOverviewsMutationVariables = {data: BodyType<OverviewBulkRevertRequest>}
+
+    /**
+ * @summary 번역 줄거리 대량 되돌리기
+ */
+export const useRevertTranslatedOverviews = <TError = ErrorType<BadRequestResponse | UnauthorizedResponse | ForbiddenResponse | ConflictResponse | InternalErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof revertTranslatedOverviews>>, TError,RevertTranslatedOverviewsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof revertTranslatedOverviews>>,
+        TError,
+        RevertTranslatedOverviewsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRevertTranslatedOverviewsMutationOptions(options), queryClient);
     }
