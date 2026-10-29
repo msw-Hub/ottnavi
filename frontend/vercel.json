@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "ottnavi\\.vercel\\.app" }],
+      "destination": "https://ottnavi.shop/:path*",
+      "permanent": true
+    }
+  ],
   "routes": [
     {
       "src": "^/api/(.*)$",
