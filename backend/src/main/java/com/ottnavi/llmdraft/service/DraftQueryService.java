@@ -65,7 +65,8 @@ public class DraftQueryService {
         }
 
         // 4. 일반 목록은 페이지로 자른다
-        int from = Math.min(page * size, filtered.size());
+        // page가 매우 커도 int 곱셈이 넘치지 않게 long으로 계산한다(넘치면 from이 음수가 되어 500이 난다)
+        int from = (int) Math.min((long) page * size, filtered.size());
         int to = Math.min(from + size, filtered.size());
         int totalPages = (filtered.size() + size - 1) / size;
         return new DraftPageView(new ArrayList<>(filtered.subList(from, to)), page, size, filtered.size(), totalPages, bulkRun);

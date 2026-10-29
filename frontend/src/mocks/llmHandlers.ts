@@ -547,7 +547,7 @@ export const llmHandlers: RequestHandler[] = [
         request,
         404,
         'Not Found',
-        'TITLE_NOT_FOUND',
+        'RESOURCE_NOT_FOUND',
         '작품을 찾을 수 없습니다.',
       )
     }
@@ -568,7 +568,8 @@ export const llmHandlers: RequestHandler[] = [
     s.createdTitleIds.add(titleId)
     s.usedToday += 1
     const body: CommonResponseOverviewDraft = { success: true, data: draft }
-    return HttpResponse.json(body)
+    // 계약(createOverviewDraft)의 성공 상태 코드는 201(만든 초안)이다
+    return HttpResponse.json(body, { status: 201 })
   }),
 
   // 일괄 번역 시작(202)
@@ -732,7 +733,7 @@ export const llmHandlers: RequestHandler[] = [
         request,
         404,
         'Not Found',
-        'TITLE_NOT_FOUND',
+        'RESOURCE_NOT_FOUND',
         '작품을 찾을 수 없습니다.',
       )
     }

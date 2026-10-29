@@ -24,7 +24,7 @@ com.ottnavi
 │   ├── mail/              메일 발송 창구(Task 072): MailClient(포트), SmtpMailClient(app.mail.provider=smtp, 타임아웃은 spring.mail.*), LogMailClient(provider=log, local 기본: 제목만 로그), OutgoingMail(보낼 메일 값), AppMailProperties(app.mail.*)·MailConfig
 │   │   └── exception/       MailSendException (발송 실패, 재시도 여부는 notification이 정함)
 │   └── llm/               Gemini 호출 창구(관리자 줄거리 번역, Spring AI): GeminiClient(번역 호출, 호출 제한 시간 `app.llm.timeout-seconds`, `llm.call` 지표, 키가 없으면 LlmDisabledException, 키 유무 `isEnabled`), LlmPromptService(프롬프트 조립), LlmProperties(app.llm.*)·LlmConfig(키가 있을 때만 Spring AI Gemini 자동 구성을 켠다)
-│       └── exception/       LlmException(부모, BusinessException 상속), LlmDisabledException(503), LlmRateLimitedException(429), LlmCallFailedException(502)
+│       └── exception/       LlmException(부모, BusinessException 상속), LlmDisabledException(503), LlmRateLimitedException(429), LlmCallFailedException(502), LlmUpstreamBusyException(502, 구글 서버 혼잡)
 ├── catalog/             작품·시즌·제공 상태 (핵심 데이터)
 │   ├── controller/        TitleController (작품 검색·상세, 공개 API /api/public/titles), ExclusiveTitleController (서비스별 독점 목록, GET /api/public/ott-services/{ottServiceId}/exclusive-titles, Task 078)
 │   ├── dto/
