@@ -1,12 +1,12 @@
 import { PageTitle } from '@/components/common/PageTitle'
-import { ComingSoon } from '@/components/common/ComingSoon'
+import { OverviewTranslateScreen } from '@/features/admin/components/overview/OverviewTranslateScreen'
 
-/** SCR-18 관리자 LLM 검토(`/admin/llm`, 관리자). 3단계 화면이라 지금은 준비 중 자리표시만 보인다. */
+/** SCR-18 관리자 LLM 줄거리 번역(`/admin/llm`, 관리자). 영어 줄거리의 한국어 번역 초안을 만들고 검토·반영한다. */
 export function AdminLlmPage() {
   return (
     <>
-      <PageTitle name="[관리] LLM 검토" />
-      <ComingSoon title="LLM 검토" plannedPhase="3단계" />
+      <PageTitle name="[관리] LLM 줄거리 번역" />
+      <OverviewTranslateScreen />
     </>
   )
 }

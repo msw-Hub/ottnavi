@@ -40,7 +40,13 @@ import {
   withActionFlags,
 } from '@/features/admin/collectRules'
 import { getTodayDateString } from '@/lib/dateUtils'
-import { hasMockScenario, problemResponse, readMockJson, writeMockJson } from '@/mocks/handlerUtils'
+import {
+  denyDemo,
+  hasMockScenario,
+  problemResponse,
+  readMockJson,
+  writeMockJson,
+} from '@/mocks/handlerUtils'
 import {
   buildMockAdminProducts,
   buildMockAdminProviders,
@@ -607,6 +613,18 @@ function startDateProblem(request: Request, issue: PriceStartDateIssue | null) {
 }
 
 export const adminHandlers: RequestHandler[] = [
+  /*
+   * 데모 계정(목업 역할 DEMO, Task 109)의 관리자 쓰기 막기. 서버는 데모 계정에 /api/admin/** 의 조회(GET)만 허락하고
+   * 그 밖의 모든 요청(등록·수정·삭제·실행)을 403 FORBIDDEN으로 막는다(SecurityConfig). 목업도 같게 답한다.
+   * 배열 맨 앞에 두는 이유: MSW는 앞에서부터 주소가 맞는 핸들러를 찾고, 아무것도 돌려주지 않으면(undefined) 다음 핸들러로 넘어간다.
+   * 그래서 데모가 아니거나 GET이면 그냥 통과시켜 아래의 원래 핸들러가 답한다.
+   * 다른 역할(비로그인·회원)은 지금처럼 검사하지 않는다(위 "권한" 주석의 결정).
+   */
+  http.all('/api/admin/*', ({ request }) => {
+    if (request.method === 'GET') return
+    return denyDemo(request)
+  }),
+
   // OTT 구독상품 목록
   http.get('/api/admin/products', async ({ request }) => {
     await wait()

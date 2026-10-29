@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router'
+import { DEMO_READONLY_NOTE_ID, DemoReadOnlyHint } from '@/components/common/DemoReadOnlyHint'
 import { useAdminProviders } from '@/features/admin/hooks/useAdminProviders'
 import { countUnmapped } from '@/features/admin/providerMapping'
 import { AdminNav } from '@/features/admin/components/AdminNav'
@@ -37,6 +38,8 @@ export function AdminLayout() {
         <p className="text-sm font-medium text-muted-foreground">관리자</p>
         <AdminNav unmappedProviderCount={unmappedCount} />
       </div>
+      {/* 데모 계정에게만 보이는 조회 전용 안내(Task 109). 표 행 안의 막힌 버튼들이 이 안내의 id를 설명으로 가리킨다 */}
+      <DemoReadOnlyHint variant="banner" id={DEMO_READONLY_NOTE_ID} />
       <Outlet />
     </div>
   )

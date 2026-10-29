@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!--/* 월초 재계산 결과 안내(MONTHLY). payload: summary, joinProducts, keepProducts, cancelReserveProducts, titles, monthCost, changeReasons (MonthlyPayload) */-->
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{mail/layout :: layout(~{::title}, ~{::section}, '#38bdf8')}">
+<head>
+    <title>이번 달 구독 플랜</title>
+</head>
+<body>
+<section>
+    <h1 style="margin:0 0 12px;font-size:20px;line-height:1.4;">이번 달 구독 플랜을 다시 계산했어요</h1>
+    <p th:if="${payload['summary'] != null}" th:text="${payload['summary']}" style="margin:0 0 20px;font-size:14px;line-height:1.7;">요약</p>
+
+    <div th:if="${!#lists.isEmpty(payload['joinProducts'])}">
+        <div th:replace="~{mail/fragments :: heading('이번 달 구독할 서비스', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: productList(${payload['joinProducts']})}"></div>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(payload['keepProducts'])}">
+        <div th:replace="~{mail/fragments :: heading('이미 구독 중이라 이어서 쓰는 서비스', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: productList(${payload['keepProducts']})}"></div>
+    </div>
+
+    <div th:if="${!#lists.isEmpty(payload['titles'])}">
+        <div th:replace="~{mail/fragments :: heading('이번 달에 볼 작품', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: titleList(${payload['titles']}, '')}"></div>
+    </div>
+
+    <table th:if="${payload['monthCost'] != null}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border-radius:8px;margin-bottom:20px;">
+        <tr><td style="padding:14px 16px;font-size:14px;">이번 달 비용</td><td align="right" style="padding:14px 16px;font-size:18px;font-weight:bold;color:#0369a1;"><span th:text="${#numbers.formatInteger(payload['monthCost'], 0, 'COMMA')}">0</span>원</td></tr>
+    </table>
+
+    <div th:if="${!#lists.isEmpty(payload['changeReasons'])}">
+        <div th:replace="~{mail/fragments :: heading('지난 플랜과 달라진 이유', '#0369a1')}"></div>
+        <div th:replace="~{mail/fragments :: textList(${payload['changeReasons']})}"></div>
+    </div>
+
+    <div th:replace="~{mail/fragments :: cancelReserveBox(${payload['cancelReserveProducts']})}"></div>
+
+    <div th:replace="~{mail/fragments :: button('이번 달 플랜 보기', ${planUrl})}"></div>
+</section>
+</body>
+</html>

@@ -13,6 +13,7 @@ import com.ottnavi.user.domain.enums.WatchPreset;
 import com.ottnavi.user.domain.repository.UserRepository;
 import com.ottnavi.user.domain.repository.UserSettingRepository;
 import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
+import com.ottnavi.user.exception.OnboardingRequiredException;
 import com.ottnavi.user.service.model.SubscriptionState;
 import com.ottnavi.user.service.model.UserSettingsState;
 import java.util.ArrayList;
@@ -112,6 +113,29 @@ public class UserSettingService {
 		// 6. 저장된 모습 그대로 서비스 전부를 채워 응답
 		return new UserSettingsState(true, fillAllServices(servicesById, normalized),
 				monthlyBudget, monthlyWatchMinutes, watchPreset, lowestPriceMode);
+	}
+
+	/**
+	 * 알림 수신 여부를 바꾼다. 설정 행이 없으면(온보딩 전) 409 ONBOARDING_REQUIRED다.
+	 * 내 설정 저장과 같은 행을 바꾸므로 users 행을 잠가 동시 저장과 줄을 세운다
+	 * (Hibernate는 바뀐 열만이 아니라 행 전체를 UPDATE하므로, 잠그지 않으면 한쪽 변경이 덮일 수 있다).
+	 */
+	@Transactional
+	public void updateNotificationEnabled(Long userId, boolean notificationEnabled) {
+		// 1. 사용자 행을 잠가 같은 사용자의 설정 쓰기를 한 줄로 세운다
+		if (userRepository.findByIdForUpdate(userId).isEmpty()) {
+			throw new UnauthorizedException("사용자를 찾을 수 없습니다.");
+		}
+
+		// 2. 설정 행이 없으면 온보딩 전이므로 저장할 곳이 없다
+		Optional<UserSetting> found = userSettingRepository.findById(userId);
+		if (found.isEmpty()) {
+			throw new OnboardingRequiredException("내 설정을 먼저 저장해 주세요.");
+		}
+
+		// 3. 값을 바꾼다(영속 상태라 커밋 때 더티 체킹으로 UPDATE된다)
+		found.get().changeNotificationEnabled(notificationEnabled);
+		log.info("알림 설정 저장: userId={}, enabled={}", userId, notificationEnabled);
 	}
 
 	/**

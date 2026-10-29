@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 /**
  * 로그인 사용자(ERD users). 테이블 이름은 예약어(user)를 피하려고 복수형이다.
  * 권한은 생성 때 USER로 고정한다. 관리자 승격은 DB에서 직접 바꾼다(가입 경로로는 만들 수 없다).
+ * 예외로 데모 계정(DEMO)은 데모 로그인이 createDemo로 만든다.
  */
 @Getter
 @Entity
@@ -54,6 +55,17 @@ public class User extends BaseTimeEntity {
 		user.email = email;
 		user.role = UserRole.USER;
 		user.oauthProvider = oauthProvider;
+		user.oauthSubject = oauthSubject;
+		user.name = normalizeName(name, email);
+		return user;
+	}
+
+	/** 데모 계정 행을 만든다(role·로그인 방식 모두 DEMO). 첫 데모 로그인 때 서버가 한 번만 만든다 */
+	public static User createDemo(String email, String name, String oauthSubject) {
+		User user = new User();
+		user.email = email;
+		user.role = UserRole.DEMO;
+		user.oauthProvider = OAuthProvider.DEMO;
 		user.oauthSubject = oauthSubject;
 		user.name = normalizeName(name, email);
 		return user;

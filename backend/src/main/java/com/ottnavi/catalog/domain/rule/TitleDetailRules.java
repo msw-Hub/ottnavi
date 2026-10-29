@@ -33,6 +33,29 @@ public final class TitleDetailRules {
         return new OverviewPick(null, null);
     }
 
+    /**
+     * 기존 줄거리와 새로 받은 줄거리 중 저장할 쪽을 고른다. 관리자가 반영한 번역을 수집이 영어로 덮어쓰지 않게 한다.
+     * 번역인지는 언어(ko)가 아니라 번역 표시(isCurrentTranslated, overview_translated_at)로 안다. TMDB가 원래 준 한국어는 보호하지 않는다.
+     * 새 줄거리가 null → 기존 유지(번역 표시도 그대로)
+     * 기존이 번역 + 새 en → 기존 번역 유지(번역 표시 그대로)
+     * 기존이 번역 + 새 ko → 새 한국어로 교체하고 번역 표시를 비운다(이제 TMDB 원본)
+     * 기존이 TMDB 한국어(번역 아님) + 새 en → 새 영어로 교체(번역 표시는 계속 없음)
+     * 그 밖 → 새 값으로 교체하고 번역 표시는 없음
+     */
+    public static OverviewMerge mergeOverview(String currentOverview, String currentLang, boolean isCurrentTranslated,
+                                              String incomingOverview, String incomingLang) {
+        // 1. 새 줄거리가 비어 있으면 기존 줄거리·언어·번역 표시를 지우지 않고 유지한다
+        if (incomingOverview == null) {
+            return new OverviewMerge(currentOverview, currentLang, isCurrentTranslated);
+        }
+        // 2. 기존이 관리자 번역인데 새 응답이 영어 대체본이면 기존 번역을 유지한다
+        if (isCurrentTranslated && "en".equals(incomingLang)) {
+            return new OverviewMerge(currentOverview, currentLang, true);
+        }
+        // 3. 그 외에는 새 값으로 교체하고 번역 표시를 비운다
+        return new OverviewMerge(incomingOverview, incomingLang, false);
+    }
+
     /** 출연 순서(order)로 정렬해 상위 10명만 남긴다. order가 없는 사람은 뒤로 보낸다(원래 순서 유지) */
     public static List<CastCandidate> topCast(List<CastCandidate> cast) {
         if (cast == null) {

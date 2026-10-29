@@ -16,10 +16,14 @@ export const AXIOS_INSTANCE = Axios.create({
   baseURL: '/api',
 })
 
-// 재시도했던 요청인지 표시하는 필드. 한 요청은 재발급 후 "한 번만" 다시 보내고, 그래도 401이면 그대로 실패시킨다(무한 반복 방지).
+// 요청별 표시 필드(axios 요청 설정에 붙여 인터셉터가 읽는다).
 declare module 'axios' {
   interface AxiosRequestConfig {
+    // 재시도했던 요청인지 표시하는 필드. 한 요청은 재발급 후 "한 번만" 다시 보내고, 그래도 401이면 그대로 실패시킨다(무한 반복 방지).
     _authRetried?: boolean
+    // 이 요청의 429(요청 제한)에는 전역 토스트를 띄우지 않는다(Task 109). 화면이 대기 시간을 직접 안내하는 요청(데모 로그인)만 켠다.
+    // 토스트를 띄우지 않을 뿐 오류는 그대로 ApiError로 던져진다
+    _skipRateLimitToast?: boolean
   }
 }
 
@@ -66,6 +70,7 @@ interface ApiErrorInit {
   detail: string | null
   fieldErrors: FieldError[]
   userMessage: string
+  retryAfterSeconds?: number | null // 응답의 Retry-After 헤더(초). 없거나 읽을 수 없으면 null(생략하면 null)
 }
 
 /**
@@ -84,6 +89,9 @@ export class ApiError extends Error {
   readonly detail: string | null // ProblemDetail의 detail(서버가 쓴 설명). 화면 문구로 쓰지 말고 userMessage를 쓴다
   readonly fieldErrors: FieldError[] // VALIDATION_FAILED일 때 필드별 오류. 없으면 빈 배열이라 바로 map해도 된다
   readonly userMessage: string // 화면에 보일 한국어 문장(errorMessages.ts 표에서 찾은 값)
+  // 다시 시도해도 되는 때까지 남은 초(응답의 Retry-After 헤더, 서버는 429에 싣는다). 헤더가 없거나 응답이 없으면 null.
+  // 화면이 "약 N분 뒤에 다시 시도"처럼 남은 시간을 안내할 때 쓴다(Task 109 데모 로그인)
+  readonly retryAfterSeconds: number | null
   // 인터셉터가 이미 사용자에게 알렸는지(예: 429 토스트). true면 화면이 같은 내용을 또 띄우지 않는다.
   // 화면이 오류를 직접 안내한 뒤 true로 바꿀 수 있게 readonly로 두지 않았다
   hasNotifiedUser = false
@@ -99,6 +107,7 @@ export class ApiError extends Error {
     this.detail = init.detail
     this.fieldErrors = init.fieldErrors
     this.userMessage = init.userMessage
+    this.retryAfterSeconds = init.retryAfterSeconds ?? null
   }
 
   /** 요청 제한(429) 오류인지 확인한다. */
@@ -168,6 +177,16 @@ function readContentType(headers: unknown): string {
   return typeof value === 'string' ? value.toLowerCase() : ''
 }
 
+// 응답 헤더에서 Retry-After(초)를 읽는다. 서버는 429에 정수 초로 싣는다(error-codes.md RATE_LIMIT_EXCEEDED).
+// HTTP 날짜 형식이나 음수·소수처럼 초로 읽을 수 없는 값은 null로 두고, 화면은 기본 안내 문장을 쓴다
+function readRetryAfterSeconds(headers: unknown): number | null {
+  if (!isRecord(headers)) return null
+  const value = headers['retry-after'] ?? headers['Retry-After']
+  const text = typeof value === 'number' ? String(value) : value
+  if (typeof text !== 'string' || !/^\d+$/.test(text.trim())) return null
+  return Number(text.trim())
+}
+
 /**
  * 어떤 오류든 ApiError로 바꾼다. 응답 인터셉터가 쓰고, 테스트에서도 직접 호출한다.
  *
@@ -223,6 +242,8 @@ export function normalizeApiError(error: unknown): ApiError {
   const problem = readContentType(response.headers).includes(PROBLEM_JSON_CONTENT_TYPE)
     ? parseProblemDetail(response.data)
     : null
+  // Retry-After는 ProblemDetail 여부와 상관없이 헤더에서 읽는다(앞단 프록시의 429에도 붙을 수 있다)
+  const retryAfterSeconds = readRetryAfterSeconds(response.headers)
 
   if (problem) {
     return new ApiError({
@@ -234,6 +255,7 @@ export function normalizeApiError(error: unknown): ApiError {
       detail: problem.detail,
       fieldErrors: problem.fieldErrors,
       userMessage: getUserMessage(status, problem.errorCode),
+      retryAfterSeconds,
     })
   }
 
@@ -245,6 +267,7 @@ export function normalizeApiError(error: unknown): ApiError {
     detail: null,
     fieldErrors: [],
     userMessage: getUserMessage(status, null),
+    retryAfterSeconds,
   })
 }
 
@@ -278,9 +301,12 @@ export const RATE_LIMIT_TOAST_ID = 'api-rate-limit'
  * 운영 환경에서도 누구나 볼 수 있다. 오류 내용은 ApiError로 호출한 쪽에 넘기기만 하고 여기서 console에 찍지 않는다.
  */
 export function handleResponseError(error: unknown): Promise<never> {
+  // 요청 설정에 _skipRateLimitToast가 켜져 있는지는 정리하기 전의 AxiosError에서 읽는다(ApiError에는 요청 설정을 담지 않는다, 위 보안 주석)
+  const isToastSkipped = Axios.isAxiosError(error) && error.config?._skipRateLimitToast === true
   const apiError = normalizeApiError(error)
 
-  if (apiError.isRateLimited && !apiError.hasNotifiedUser) {
+  // 화면이 대기 시간을 직접 안내하는 요청(데모 로그인, Task 109)은 토스트를 띄우지 않는다. 그 화면이 알리므로 hasNotifiedUser는 false로 둔다
+  if (apiError.isRateLimited && !apiError.hasNotifiedUser && !isToastSkipped) {
     toast.error(getErrorMessage('RATE_LIMIT_EXCEEDED'), { id: RATE_LIMIT_TOAST_ID })
     apiError.hasNotifiedUser = true
   }

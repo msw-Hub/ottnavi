@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -21,6 +21,7 @@ import type {
   CommonResponseCurrentPlan,
   CommonResponsePlanChangeHistoryList,
   CommonResponsePlanDraftList,
+  CommonResponsePlanMailPreview,
   CommonResponseSavedPlan
 } from '../model';
 
@@ -30,6 +31,8 @@ export const getCreatePlanDraftsResponseMock = (): CommonResponsePlanDraftList =
 export const getListPlanDraftsResponseMock = (): CommonResponsePlanDraftList => ({"success":true,"data":{"drafts":[{"planId":301,"planType":"RECOMMENDED","startMonth":"2026-10","algorithm":"EXACT","monthlyBudget":20000,"monthlyWatchMinutes":900,"mustTotal":1,"mustCompleted":1,"scheduledCount":4,"totalCount":5,"score":5,"totalCost":13500,"allSubscribeCost":137400,"savedAmount":123900,"months":[{"monthIndex":0,"month":"2026-10","isConfirmed":true,"cost":0,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ALREADY_PAID"},{"productId":104,"productName":"티빙 스탠다드","ottServiceIds":[4],"appliedPrice":13500,"priceSource":"FREE"}],"assignments":[{"planItemId":401,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":1,"priority":"MUST","ottServiceId":1,"watchMin":500,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":402,"mediaType":"movie","tmdbId":496243,"title":"기생충","seasonNumber":null,"priority":"WANT","ottServiceId":4,"watchMin":133,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":403,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":267,"segmentIndex":1,"segmentCount":2,"isContinuation":false}]},{"monthIndex":1,"month":"2026-11","isConfirmed":false,"cost":13500,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ADMIN"}],"assignments":[{"planItemId":403,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":158,"segmentIndex":2,"segmentCount":2,"isContinuation":true},{"planItemId":404,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":3,"priority":"MAYBE","ottServiceId":1,"watchMin":270,"segmentIndex":1,"segmentCount":1,"isContinuation":false}]},{"monthIndex":2,"month":"2026-12","isConfirmed":false,"cost":0,"products":[],"assignments":[]}],"unscheduled":[{"planItemId":405,"mediaType":"tv","tmdbId":118243,"title":"안나","seasonNumber":1,"priority":"MAYBE","reason":"UNKNOWN"}],"dataAsOf":"2026-10-08"},{"planId":302,"planType":"SAVER","startMonth":"2026-10","algorithm":"EXACT","monthlyBudget":20000,"monthlyWatchMinutes":900,"mustTotal":1,"mustCompleted":1,"scheduledCount":4,"totalCount":5,"score":5,"totalCost":13500,"allSubscribeCost":137400,"savedAmount":123900,"months":[{"monthIndex":0,"month":"2026-10","isConfirmed":true,"cost":0,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ALREADY_PAID"},{"productId":104,"productName":"티빙 스탠다드","ottServiceIds":[4],"appliedPrice":13500,"priceSource":"FREE"}],"assignments":[{"planItemId":411,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":1,"priority":"MUST","ottServiceId":1,"watchMin":500,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":412,"mediaType":"movie","tmdbId":496243,"title":"기생충","seasonNumber":null,"priority":"WANT","ottServiceId":4,"watchMin":133,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":413,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":267,"segmentIndex":1,"segmentCount":2,"isContinuation":false}]},{"monthIndex":1,"month":"2026-11","isConfirmed":false,"cost":13500,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ADMIN"}],"assignments":[{"planItemId":413,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":158,"segmentIndex":2,"segmentCount":2,"isContinuation":true},{"planItemId":414,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":3,"priority":"MAYBE","ottServiceId":1,"watchMin":270,"segmentIndex":1,"segmentCount":1,"isContinuation":false}]},{"monthIndex":2,"month":"2026-12","isConfirmed":false,"cost":0,"products":[],"assignments":[]}],"unscheduled":[{"planItemId":415,"mediaType":"tv","tmdbId":118243,"title":"안나","seasonNumber":1,"priority":"MAYBE","reason":"UNKNOWN"}],"dataAsOf":"2026-10-08"},{"planId":303,"planType":"SIMPLE","startMonth":"2026-10","algorithm":"EXACT","monthlyBudget":20000,"monthlyWatchMinutes":900,"mustTotal":1,"mustCompleted":1,"scheduledCount":4,"totalCount":5,"score":5,"totalCost":13500,"allSubscribeCost":137400,"savedAmount":123900,"months":[{"monthIndex":0,"month":"2026-10","isConfirmed":true,"cost":0,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ALREADY_PAID"},{"productId":104,"productName":"티빙 스탠다드","ottServiceIds":[4],"appliedPrice":13500,"priceSource":"FREE"}],"assignments":[{"planItemId":421,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":1,"priority":"MUST","ottServiceId":1,"watchMin":500,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":422,"mediaType":"movie","tmdbId":496243,"title":"기생충","seasonNumber":null,"priority":"WANT","ottServiceId":4,"watchMin":133,"segmentIndex":1,"segmentCount":1,"isContinuation":false},{"planItemId":423,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":267,"segmentIndex":1,"segmentCount":2,"isContinuation":false}]},{"monthIndex":1,"month":"2026-11","isConfirmed":false,"cost":13500,"products":[{"productId":101,"productName":"넷플릭스 스탠다드","ottServiceIds":[1],"appliedPrice":13500,"priceSource":"ADMIN"}],"assignments":[{"planItemId":423,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":2,"priority":"WANT","ottServiceId":1,"watchMin":158,"segmentIndex":2,"segmentCount":2,"isContinuation":true},{"planItemId":424,"mediaType":"tv","tmdbId":93405,"title":"오징어 게임","seasonNumber":3,"priority":"MAYBE","ottServiceId":1,"watchMin":270,"segmentIndex":1,"segmentCount":1,"isContinuation":false}]},{"monthIndex":2,"month":"2026-12","isConfirmed":false,"cost":0,"products":[],"assignments":[]}],"unscheduled":[{"planItemId":425,"mediaType":"tv","tmdbId":118243,"title":"안나","seasonNumber":1,"priority":"MAYBE","reason":"UNKNOWN"}],"dataAsOf":"2026-10-08"}]}})
 
 export const getGetCurrentPlanResponseMock = (): CommonResponseCurrentPlan => ({"success":true,"data":{"plan":null}})
+
+export const getGetCurrentPlanMailPreviewResponseMock = (): CommonResponsePlanMailPreview => ({"success":true,"data":{"mails":[{"type":"SUBSCRIBE_GUIDE","subject":"[OTT내비] 저장한 구독 플랜 안내","html":"<html>...</html>"}],"noMailReasons":[]}})
 
 export const getCreatePlanResponseMock = (): CommonResponseSavedPlan => ({"success":true,"data":{"planId":301,"planType":"RECOMMENDED","status":"ACTIVE","activatedAt":"2026-10-12T21:05:00+09:00"}})
 
@@ -72,6 +75,18 @@ export const getGetCurrentPlanMockHandler = (overrideResponse?: CommonResponseCu
   }, options)
 }
 
+export const getGetCurrentPlanMailPreviewMockHandler = (overrideResponse?: CommonResponsePlanMailPreview | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponsePlanMailPreview> | CommonResponsePlanMailPreview), options?: RequestHandlerOptions) => {
+  return http.get('/api/me/plans/current/mail-preview', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetCurrentPlanMailPreviewResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getCreatePlanMockHandler = (overrideResponse?: CommonResponseSavedPlan | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponseSavedPlan> | CommonResponseSavedPlan), options?: RequestHandlerOptions) => {
   return http.post('/api/me/plans', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -99,6 +114,7 @@ export const getPlanMock = () => [
   getCreatePlanDraftsMockHandler(),
   getListPlanDraftsMockHandler(),
   getGetCurrentPlanMockHandler(),
+  getGetCurrentPlanMailPreviewMockHandler(),
   getCreatePlanMockHandler(),
   getListPlanChangesMockHandler()
 ]

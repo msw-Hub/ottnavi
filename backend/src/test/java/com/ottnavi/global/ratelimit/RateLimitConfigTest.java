@@ -27,15 +27,19 @@ class RateLimitConfigTest {
 					"app.rate-limit.general.refill-period=1m",
 					"app.rate-limit.single-fetch.capacity=3",
 					"app.rate-limit.single-fetch.refill-tokens=10",
-					"app.rate-limit.single-fetch.refill-period=1m");
+					"app.rate-limit.single-fetch.refill-period=1m",
+					"app.rate-limit.demo-login.capacity=5",
+					"app.rate-limit.demo-login.refill-tokens=5",
+					"app.rate-limit.demo-login.refill-period=15m");
 
 	@Test
-	void enabled가_true거나_없으면_필터와_두_검사기가_등록된다() {
+	void enabled가_true거나_없으면_필터와_세_검사기가_등록된다() {
 		// given & when & then
 		runner.run(context -> {
 			assertThat(context).hasSingleBean(PublicRateLimitFilter.class);
 			assertThat(context).hasSingleBean(PublicRateLimiter.class);
 			assertThat(context).hasSingleBean(SingleFetchRateLimiter.class);
+			assertThat(context).hasSingleBean(DemoLoginRateLimiter.class);
 		});
 	}
 
@@ -46,6 +50,7 @@ class RateLimitConfigTest {
 			assertThat(context).doesNotHaveBean(PublicRateLimitFilter.class);
 			assertThat(context).doesNotHaveBean(PublicRateLimiter.class);
 			assertThat(context).doesNotHaveBean(SingleFetchRateLimiter.class);
+			assertThat(context).doesNotHaveBean(DemoLoginRateLimiter.class);
 			assertThat(context).doesNotHaveBean(RedisRateLimitBucketProvider.class);
 		});
 	}

@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -527,12 +527,15 @@ paths:
         찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
         서버는 그 사용자의 Refresh Token 계열을 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
         요청 본문은 없다. Access Token은 만료(30분) 전이라도 탈퇴한 계정으로는 쓸 수 없다: 같은 토큰으로 다시 탈퇴하거나 설정 저장·찜 추가 같은 쓰기를 하면 사용자를 찾을 수 없어 `UNAUTHORIZED`이고, 내 설정 조회는 온보딩 전 상태(200)로 보인다.
-        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+        데모 계정(`role: DEMO`)은 여러 사람이 함께 쓰는 공용 계정이라 탈퇴할 수 없다(403 `FORBIDDEN`).
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `INTERNAL_ERROR`(500).
       responses:
         '204':
           description: 탈퇴됨(본문 없음)
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalError'
   /me/settings:
@@ -751,6 +754,35 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/InternalError'
+  /me/plans/current/mail-preview:
+    get:
+      tags:
+        - plan
+      operationId: getCurrentPlanMailPreview
+      security:
+        - bearerAuth: []
+      summary: 알림 메일 예시 조회(데모 계정 전용)
+      description: |
+        데모 계정(`role: DEMO`)이 저장한 현재 플랜(ACTIVE)으로 "플랜을 저장하면 이런 메일이 온다"를 보여 주는 예시 메일을 만든다.
+        운영 알림과 같은 코드로 제목과 HTML 본문만 만들고, 메일을 보내거나 발송 대기열(outbox)에 쌓지 않는다. 알림 설정도 바꾸지 않는다.
+        `mails`에는 구독 안내(`SUBSCRIBE_GUIDE`, 저장하면 오는 메일)와 월초 안내(`MONTHLY`, 매월 1일에 오는 메일) 순서로 만들 수 있는 것만 담긴다.
+        현재 플랜이 없으면 `mails`가 비고 `noMailReasons`에 `NO_CURRENT_PLAN`이 담긴다. 이번 달에 새로 가입할 상품이 없거나 플랜의 첫 달이 이번 달이 아니면 구독 안내는 만들 수 없어 `NO_SUBSCRIBE_GUIDE`가 담기고 월초 안내만 온다(모두 200).
+        `html`은 이메일용 완성 HTML이라 프론트는 `iframe srcDoc`에 `sandbox`(스크립트·same-origin 허용 없이)로만 보여 준다.
+        데모 계정이 아니면 403이다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정이 아님), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 예시 메일(만들 수 없는 메일은 사유와 함께 빠진다)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponsePlanMailPreview'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /me/plans:
     post:
       tags:
@@ -806,6 +838,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommonResponsePlanChangeHistoryList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== notification: 알림 설정·발송 이력 (Task 071·073) =====
+  /me/notification-setting:
+    get:
+      tags:
+        - notification
+      operationId: getMyNotificationSetting
+      security:
+        - bearerAuth: []
+      summary: 알림 설정 조회
+      description: |
+        알림 수신 여부와 수신 이메일(계정 이메일)을 조회한다(SCR-12, FR-16). 알림은 기본 꺼짐이며(동의 없이 메일을 보내지 않는다), 온보딩 전이어도 200이고 `isNotificationEnabled: false`다.
+        수신 이메일은 따로 입력받지 않고 로그인한 계정의 이메일이다.
+        오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 알림 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationSetting'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      tags:
+        - notification
+      operationId: updateMyNotificationSetting
+      security:
+        - bearerAuth: []
+      summary: 알림 설정 저장
+      description: |
+        알림 수신 여부를 켜거나 끈다. 끄면 이후 알림이 생성되지 않는다(이미 대기 중인 알림은 발송된다). 켜는 것 자체로는 메일이 나가지 않는다.
+        내 설정(온보딩)을 한 번도 저장하지 않았으면 저장할 설정 행이 없어 `ONBOARDING_REQUIRED`(409)다.
+        데모 계정(`role: DEMO`)은 알림 설정을 바꿀 수 없다(403 `FORBIDDEN`). 데모 계정에는 알림이 만들어지지 않으며 조회(`getMyNotificationSetting`)는 항상 꺼짐이다.
+        오류: `VALIDATION_FAILED`(400), `INVALID_REQUEST`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `ONBOARDING_REQUIRED`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyNotificationSettingRequest'
+      responses:
+        '200':
+          description: 저장된 알림 설정
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationSetting'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /me/notifications:
+    get:
+      tags:
+        - notification
+      operationId: listMyNotifications
+      security:
+        - bearerAuth: []
+      summary: 알림 발송 이력 조회
+      description: |
+        내 알림 이력을 최신순으로 돌려준다(SCR-12, FR-16). 유형(`type`)과 상태(`status`: 대기 `PENDING`, 발송 `SENT`, 실패 `FAILED`), 만든 시각, 발송 시각만 담고 메일 본문 재료나 실패 사유는 담지 않는다.
+        페이지네이션(`page`, `size`) 응답이다. 이력이 없으면 200이고 `content`가 빈 배열이다.
+        오류: `VALIDATION_FAILED`(400), `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 알림 이력 한 페이지
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseNotificationHistoryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -1379,6 +1499,58 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /admin/notifications/summary:
+    get:
+      tags:
+        - admin
+      operationId: getAdminNotificationSummary
+      security:
+        - bearerAuth: []
+      summary: 알림 발송 상태 요약 조회
+      description: |
+        관리자 수집 화면(SCR-16)의 알림 발송 상태 요약이다. 최근 7일 동안 만들어진 알림의 상태별 건수와 마지막 발송 시각을 돌려준다. 사용자 이메일이나 본문은 담지 않는다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 알림 발송 상태 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminNotificationSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/system-metrics:
+    get:
+      tags:
+        - admin
+      operationId: getSystemMetrics
+      security:
+        - bearerAuth: []
+      summary: 시스템 메모리 지표 조회
+      description: |
+        서버의 JVM·프로세스·컨테이너 메모리 구성을 지금 시점으로 측정해 돌려준다. 운영 컨테이너에 `jcmd`가 없고 브라우저에서 `/actuator`를 부를 수 없어 둔 읽기 전용 API다. 비밀 값은 담지 않는다.
+        숫자는 모두 바이트 단위(스레드·클래스·GC 횟수 등 개수와 시간은 제외)다. 읽을 수 없는 값은 `null`이다. `process`는 Linux의 `/proc/self/status`, `container`는 cgroup 메모리 파일에서 읽으므로 Linux 컨테이너가 아니면(로컬 Windows 등) 안의 값이 모두 `null`이다. `container.memoryLimitBytes`는 한도가 `max`(제한 없음)여도 `null`이다.
+        ADMIN만 호출할 수 있다. 데모 계정(`DEMO`)과 배치 토큰은 호출할 수 없다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 시스템 메모리 지표
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseSystemMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /admin/plan-benchmarks:
     post:
       tags:
@@ -1404,6 +1576,359 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ===== admin: 영어 줄거리 한국어 번역 (관리자 전용, 자동 실행 없음) =====
+  # 조회(GET)는 ADMIN·DEMO, 쓰기·실행(POST·DELETE)은 ADMIN만이다. 배치 토큰은 쓰지 못한다.
+  /admin/llm/overview-candidates:
+    get:
+      tags:
+        - admin
+      operationId: listOverviewCandidates
+      security:
+        - bearerAuth: []
+      summary: 번역 후보 목록 조회
+      description: |
+        영어 줄거리(`overview_lang='en'`이고 줄거리가 비어 있지 않은 작품)를 번역 후보로 돌려준다. 정렬은 찜한 사용자 수 많은 순 → 인기도 순(동률은 작품 ID 순)이다.
+        각 항목에 영어 줄거리 전문과 이미 만든 초안이 있는지(`hasDraft`)가 들어 있다. 응답의 `summary`에 번역 대기 총수, 오늘 사용량과 하루·분당 상한, 모델 이름, 번역 기능 사용 가능 여부(`isEnabled`, 서버에 Gemini 키가 있는지), 관리자가 반영한 번역 작품 수(`translatedCount`)와 가장 오래된 번역의 반영 시각(`oldestTranslatedAt`, 없으면 `null`)이 들어 있다. 키가 없어도 이 조회는 동작한다.
+        페이지네이션 응답이다. 하루 사용량은 태평양 시간(America/Los_Angeles) 날짜 기준이다(구글 무료 일일 한도 리셋 기준).
+        관리자(ADMIN) 또는 데모(DEMO) Access Token으로 호출한다.
+        오류: `VALIDATION_FAILED`(400, page/size 범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 번역 후보 한 페이지와 요약
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewCandidatePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/llm/drafts:
+    post:
+      tags:
+        - admin
+      operationId: createOverviewDraft
+      security:
+        - bearerAuth: []
+      summary: 번역 초안 생성
+      description: |
+        작품 한 건의 영어 줄거리를 Gemini로 한국어 초안으로 번역해 저장하고 201로 돌려준다. 초안은 Redis에 7일 보관하며 작품당 1개다(새로 만들면 교체한다). DB의 줄거리는 바뀌지 않는다. 반영은 `applyOverviewDrafts`로 한다.
+        번역문은 서버 코드가 자동 검사한다. 검사 결과는 세 등급이다: **실패**(한글 비율, 길이 비율, 최대 1000자, URL·마크다운·머리말 포함, 원문 숫자 보존 중 하나라도 걸림, `isGuardPassed=false`와 `guardFailures` 이유 코드), **주의**(실패는 없지만 문장 수·문체·띄어쓰기·길이 비율 한계 근접 같은 의심 신호가 있음, `isGuardPassed=true`이고 `warnings`가 비어 있지 않음), **성공**(실패도 경고도 없음). 검사에서 걸려도 초안은 저장된다. 단건 번역은 한 번만 시도하고 자동으로 다시 번역하지 않는다(`attempts`는 항상 1). 다시 번역은 관리자가 이 API를 다시 부른다. 이 호출은 Gemini를 부르므로 응답에 수 초~수십 초 걸릴 수 있다(호출 제한 시간 90초).
+        Gemini 호출 직전에 분당(12)·하루(400, 태평양 시간 날짜) 카운터를 올린다. 키가 없어 막힌 요청은 올리지 않고, 호출이 실패해도 올린 채 둔다. 같은 작품은 60초 쿨다운이 있다.
+        ADMIN만 호출할 수 있다.
+        오류: `VALIDATION_FAILED`(400), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 작품), `LLM_NOT_TRANSLATABLE`(409, 영어 줄거리가 아님), `LLM_DRAFT_LIMIT_EXCEEDED`(409, 대기 초안 500개 가득 참), `LLM_TITLE_COOLDOWN`(429, 같은 작품 60초 쿨다운), `LLM_RATE_LIMITED`(429, 분당 상한 또는 구글 429), `LLM_DAILY_LIMIT_EXCEEDED`(429, 하루 상한), `LLM_CALL_FAILED`(502, Gemini 호출 실패·시간 초과·빈 응답), `LLM_UPSTREAM_BUSY`(502, 구글 서버 혼잡 503, 요청 안에서 재시도하지 않으니 잠시 뒤 다시 누른다), `LLM_DISABLED`(503, 서버에 Gemini 키 없음), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOverviewDraftRequest'
+      responses:
+        '201':
+          description: 만든 초안
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewDraft'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/LlmTooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/LlmBadGateway'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+    get:
+      tags:
+        - admin
+      operationId: listOverviewDrafts
+      security:
+        - bearerAuth: []
+      summary: 번역 초안 목록 조회
+      description: |
+        Redis에 보관 중인 번역 초안을 만든 시각 최신순으로 돌려준다. `status`로 자동 검사 등급을 거른다(`PASSED` 성공: 실패도 경고도 없음 / `WARNING` 주의: 실패는 없고 경고만 있음 / `FAILED` 실패). `sample=N`이면 성공(`PASSED`) 초안 중 무작위 N개를 돌려준다(표본 확인용, `page`·`size`는 무시하고 `status=FAILED`·`status=WARNING`과는 함께 쓸 수 없다).
+        각 항목에 영어 원문, 번역문, 자동 검사 결과(실패 여부와 걸린 이유 코드, 경고 코드), 모델, 만든 시각, 총 시도 횟수가 들어 있다. 운영 Redis는 persistence가 없고 메모리가 부족하면 오래된 키부터 지우므로, 사라진 초안은 목록에서 조용히 빠진다(오류가 아니다).
+        응답의 `bulkRun`에 최근 일괄 번역의 진행 상황이 들어 있다(일괄을 돌린 적이 없으면 `null`).
+        페이지네이션 응답이다. 관리자(ADMIN) 또는 데모(DEMO) Access Token으로 호출한다.
+        오류: `VALIDATION_FAILED`(400, page/size/sample 범위 밖·`status=FAILED` 또는 `status=WARNING`과 `sample` 동시 사용), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: status
+          in: query
+          description: 자동 검사 등급으로 거른다(PASSED 성공만 / WARNING 주의만 / FAILED 실패만). 비우면 전부
+          required: false
+          schema:
+            $ref: '#/components/schemas/OverviewDraftStatus'
+        - name: sample
+          in: query
+          description: 성공(`PASSED`) 초안 중 무작위로 뽑을 개수(1~100). 주면 `page`·`size`는 무시한다
+          required: false
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 초안 한 페이지와 일괄 진행 상황
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewDraftPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/llm/bulk-drafts:
+    post:
+      tags:
+        - admin
+      operationId: createBulkOverviewDrafts
+      security:
+        - bearerAuth: []
+      summary: 일괄 번역 시작
+      description: |
+        여러 작품의 번역을 서버 안에서 차례로 시작하고 202와 진행 상황을 돌려준다. 요청은 `titleIds`(1~100개, 이미 초안이 있어도 다시 번역해 교체)와 `count`(1~100, 후보 정렬 상위 N개, 이미 초안이 있는 작품은 건너뛰고 그다음을 채운다) 중 정확히 하나만 보낸다.
+        서버의 일괄 전용 스레드가 호출 사이 2초씩 쉬며 처리한다. 구글 서버 혼잡(503)으로 실패한 작품은 30초 뒤 한 번만 다시 부르고(`LLM_UPSTREAM_BUSY`), 다시 실패하면 그 작품을 실패로 센다. 자동 검사 결과가 실패인 작품은 최대 2번, 주의인 작품은 최대 1번 자동으로 다시 번역하고(첫 시도 제외, 설정 `app.llm.bulk.fail-retry-max`·`warning-retry-max`), 시도들 중 가장 좋은 결과(성공 > 주의 > 실패, 같은 등급이면 마지막 시도) 하나만 저장한다. 총 시도 횟수는 초안의 `attempts`에 남고, 재시도도 분당·하루 호출 카운터를 올린다. 재시도 중 한도·키 문제가 나면 그때까지의 최선 결과를 저장하고 일괄을 멈춘다. 진행 상황은 `listOverviewDrafts` 응답의 `bulkRun`로 본다. 한 번에 실행 중인 일괄은 1개다. 한도 초과(분당·하루·구글 429)·키 없음·대기 초안 가득 참이면 즉시 멈추고, 호출 실패가 3번 연속이어도 멈춘다. 멈춘 이유는 `bulkRun.stopReason`에 남는다. 서버가 다시 시작되면 실행 중이던 일괄은 `STOPPED`(`SERVER_RESTARTED`)로 보인다.
+        키가 없으면 시작하지 않고 `LLM_DISABLED`(503)다. 후보가 하나도 없으면 바로 `COMPLETED`(`total=0`)로 돌려준다. ADMIN만 호출할 수 있다.
+        오류: `VALIDATION_FAILED`(400, `titleIds`와 `count` 둘 다 보내거나 둘 다 없음·범위 밖), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_BULK_RUNNING`(409, 이미 일괄 실행 중), `LLM_DISABLED`(503), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBulkOverviewDraftsRequest'
+      responses:
+        '202':
+          description: 일괄 접수됨(진행 상황)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseBulkDraftRun'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/LlmUnavailable'
+
+  /admin/llm/drafts/apply:
+    post:
+      tags:
+        - admin
+      operationId: applyOverviewDrafts
+      security:
+        - bearerAuth: []
+      summary: 번역 초안 반영
+      description: |
+        초안을 작품 줄거리에 반영한다. 요청은 `draftIds`(그 초안만)와 `allPassed: true`(**성공** 초안 전부) 중 정확히 하나만 보낸다. `allPassed: true`는 성공(실패도 경고도 없는) 초안만 대상으로 하고, **주의** 초안은 대상에서 빠진다(결과에도 나오지 않는다). 주의 초안은 사람이 확인한 뒤 `draftIds`로 지정해 반영한다(승인 경로). 실패 초안은 `draftIds`로 지정해도 건너뛴다. 건별 결과를 돌려주고, 한 건이 건너뛰어져도 나머지는 계속한다.
+        반영은 DB 조건부 갱신이다. 작품 줄거리가 아직 영어(`en`)이고 번역한 원문과 똑같을 때만 `overview`를 번역문으로, `overview_lang`을 `ko`로 바꾼다. 바뀌면 그 작품의 상세 캐시 1개를 지우고 반영한 초안을 Redis에서 지운다. 건너뛴 이유(`reason`): `DRAFT_NOT_FOUND`(초안이 없음), `GUARD_FAILED`(자동 검사에서 실패한 초안은 반영하지 않음), `ORIGINAL_CHANGED`(번역한 뒤 줄거리가 바뀌었거나 이미 한국어).
+        수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 시작하지 않고 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다.
+        오류: `VALIDATION_FAILED`(400, `draftIds`와 `allPassed` 둘 다 보내거나 둘 다 없음), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyOverviewDraftsRequest'
+      responses:
+        '200':
+          description: 건별 반영 결과
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseApplyOverviewDraftsResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/llm/drafts/{draftId}:
+    patch:
+      tags:
+        - admin
+      operationId: editOverviewDraft
+      security:
+        - bearerAuth: []
+      summary: 번역 초안 수정
+      description: |
+        초안의 번역문(`translated`)을 관리자가 직접 고친다. 서버가 자동 검사를 다시 돌려 `isGuardPassed`·`guardFailures`·`warnings`(성공/주의/실패)를 새로 판정하고, `isEdited`를 `true`로 바꾸며, 보관 기간(7일)을 저장한 시각부터 다시 센다. 원문(`original`)·작품·만든 시각은 그대로다. DB의 줄거리는 바뀌지 않는다(반영은 `applyOverviewDrafts`).
+        검사에서 실패가 남아도 저장은 되고 응답의 `isGuardPassed`가 `false`다. 실패 초안은 반영할 수 없다(`applyOverviewDrafts`에서 `GUARD_FAILED`). 고친 초안은 일괄 번역(`createBulkOverviewDrafts`)이 같은 작품을 다시 번역해 덮어쓰지 않고 건너뛴다. 단건 번역(`createOverviewDraft`)을 다시 누르면 관리자의 명시적 요청이라 새 초안으로 교체된다(`isEdited`는 `false`로 돌아간다).
+        `translatedText`는 공백만으로 보낼 수 없고 1000자까지다(자동 검사의 최대 글자 수와 같다). ADMIN만 호출할 수 있다(DEMO는 403).
+        오류: `VALIDATION_FAILED`(400, 번역문이 비었거나 1000자 초과), `INVALID_REQUEST`(400, 깨진 본문), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_DRAFT_NOT_FOUND`(404, 초안이 없음. 보관 기간이 지났거나 이미 반영·삭제됨), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: draftId
+          in: path
+          description: 초안 ID(UUID 문자열)
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditOverviewDraftRequest'
+      responses:
+        '200':
+          description: 수정된 초안
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewDraft'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+        - admin
+      operationId: deleteOverviewDraft
+      security:
+        - bearerAuth: []
+      summary: 번역 초안 삭제
+      description: |
+        초안 한 건을 Redis에서 지운다. DB의 줄거리는 바뀌지 않는다. 성공하면 204(본문 없음)다. ADMIN만 호출할 수 있다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_DRAFT_NOT_FOUND`(404, 초안이 없음. 보관 기간이 지났거나 이미 반영·삭제됨), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: draftId
+          in: path
+          description: 초안 ID(UUID 문자열)
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 삭제됨
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/llm/titles/{titleId}/overview-revert:
+    post:
+      tags:
+        - admin
+      operationId: revertTitleOverview
+      security:
+        - bearerAuth: []
+      summary: 줄거리를 영어로 되돌리기
+      description: |
+        관리자가 반영한 번역 줄거리(`overview_translated_at`이 있는 작품)의 `overview`·`overview_lang`·`overview_translated_at`을 모두 `null`로 비우고 그 작품의 상세 캐시를 지운다. 요청 본문은 없다. 비워진 줄거리는 다음 수집(찜한 작품은 매일, 그 외는 매주)이 TMDB 영어 줄거리로 다시 채운다. **그동안 최대 일주일 줄거리가 비어 있을 수 있다.** TMDB가 처음부터 한국어로 준 줄거리(번역 아님)는 되돌릴 수 없고 `LLM_NOT_REVERTIBLE`(409)이다.
+        수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `RESOURCE_NOT_FOUND`(404, 없는 작품), `LLM_NOT_REVERTIBLE`(409, 줄거리가 관리자가 반영한 번역이 아님), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+      parameters:
+        - name: titleId
+          in: path
+          description: 작품 내부 ID(번역 후보·초안 응답의 `titleId`)
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: 되돌린 작품
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewRevertResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/llm/overview-reverts:
+    post:
+      tags:
+        - admin
+      operationId: revertTranslatedOverviews
+      security:
+        - bearerAuth: []
+      summary: 번역 줄거리 대량 되돌리기
+      description: |
+        관리자가 반영한 번역 줄거리(`overview_translated_at`이 있는 작품)를 한꺼번에 영어 줄거리로 되돌린다. 요청 본문은 필수이며 빈 객체 `{}`면 번역 **전부**를, `translatedBefore`가 있으면 그 시각보다 **먼저** 반영한 번역만 대상으로 한다. 대상 작품의 `overview`·`overview_lang`·`overview_translated_at`을 모두 `null`로 비우고 그 작품들의 상세 캐시를 지운다(캐시 삭제가 실패해도 경고만 남기고 상세 캐시는 TTL 24시간 뒤 새 값이 된다). TMDB가 처음부터 한국어로 준 줄거리와 영어 줄거리는 건드리지 않는다. 대상이 없으면 `revertedCount`가 0이다.
+        사용 목적: TMDB가 번역 줄거리 표시를 허용하지 않을 때 번역 전부를 회수하거나, 번역문도 6개월 보관 제한 대상이라고 할 때 오래된 번역(예: `translatedBefore`를 6개월 전으로)만 회수한다. 가장 오래된 번역 시각은 `listOverviewCandidates` 응답 `summary`의 `translatedCount`·`oldestTranslatedAt`으로 볼 수 있다.
+        비워진 줄거리는 다음 수집(찜한 작품은 매일, 그 외는 매주)이 TMDB 영어 줄거리로 다시 채운다. **그동안 최대 일주일 줄거리가 비어 있을 수 있다.** 작품 수천 건도 서버가 500건씩 나눠 처리한다.
+        `isPreview`을 `true`로 보내면 미리보기다: DB와 캐시를 바꾸지 않고 같은 조건으로 되돌려질 작품 수만 `revertedCount`에 돌려주고 응답의 `isPreview`도 `true`다. 실행 전에 몇 편이 영향을 받는지 확인하는 용도다(`isPreview`을 생략하거나 `false`면 실제로 되돌린다). 미리보기도 수집 등이 실행 중이면 같은 `LLM_APPLY_CONFLICT`(409)다.
+        수집·재계산·데이터 정리·인기 수집 중 하나라도 실행 중이면 시작하지 않고 `LLM_APPLY_CONFLICT`(409)다. ADMIN만 호출할 수 있다(DEMO는 403).
+        오류: `INVALID_REQUEST`(400, 본문 없음·`translatedBefore` 날짜 형식 오류), `UNAUTHORIZED`(401), `FORBIDDEN`(403), `LLM_APPLY_CONFLICT`(409), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OverviewBulkRevertRequest'
+      responses:
+        '200':
+          description: 되돌린 작품 수
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseOverviewBulkRevertResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -1452,6 +1977,44 @@ paths:
           description: 로그아웃됨(본문 없음)
         '403':
           $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /auth/demo-login:
+    post:
+      tags:
+        - auth
+      operationId: loginDemo
+      security: []
+      summary: 데모 계정 로그인
+      description: |
+        서버 설정(`DEMO_LOGIN_ID`·`DEMO_LOGIN_PASSWORD`)에 둔 아이디·비밀번호 한 쌍으로 공용 데모 계정에 로그인한다. 일반 회원용 아이디·비밀번호 로그인이 아니며 계정은 하나뿐이다(TECH 4절).
+        성공하면 Refresh Token을 HttpOnly 쿠키 `rt`(`Path=/api/auth`, 재발급과 같은 속성)로 심고, 응답 본문에 Access Token과 `role: DEMO`를 바로 담는다(구글 로그인과 달리 `/auth/refresh`를 따로 부르지 않아도 된다). 이후 재발급·로그아웃은 회원과 같다.
+        데모 계정 행(`users`)은 첫 데모 로그인 때 서버가 만든다. 데모 계정은 회원 기능(`/me/**`)을 쓰고 관리자 화면은 조회(GET)만 하며, 관리자 쓰기·실행과 회원 탈퇴·알림 설정 변경은 403이다. 데모 계정에는 알림이 만들어지지 않는다.
+        확인 순서: 데모 로그인이 꺼져 있으면(서버에 아이디·비밀번호가 없으면) 경로가 없는 것처럼 404 → `Origin`이 프론트 주소와 다르면 403(로그인 CSRF 방지) → 같은 IP의 시도가 15분 5회를 넘으면 429(성공·실패 모두 센다, 계정 잠금은 없다) → 아이디나 비밀번호가 틀리면 401(어느 쪽이 틀렸는지는 알리지 않는다).
+        빈 값도 400이 아니라 401이다(꺼진 상태에서 경로가 드러나지 않게 본문 필드 검증을 하지 않는다). 인증 경로라 공개 API와 같은 일반 요청 제한도 함께 받는다.
+        데모 로그인을 끄면 남아 있는 데모 세션은 다음 재발급(`/auth/refresh`)에서 401로 끝난다.
+        오류: `DEMO_LOGIN_FAILED`(401), `FORBIDDEN`(403, Origin 불일치), `RESOURCE_NOT_FOUND`(404, 데모 로그인 꺼짐), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemoLoginRequest'
+      responses:
+        '200':
+          description: 로그인됨. 새 Access Token(권한 DEMO)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAccessToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -1598,6 +2161,24 @@ components:
             $ref: '#/components/schemas/ProblemDetail'
     BadGateway:
       description: 외부 API(TMDB 등) 호출 실패. `errorCode`는 `EXTERNAL_API_ERROR`
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    LlmTooManyRequests:
+      description: 번역 호출 상한 초과(관리자 번역 API). `errorCode`는 `LLM_RATE_LIMITED`(분당 상한 또는 구글 429)·`LLM_DAILY_LIMIT_EXCEEDED`(하루 상한)·`LLM_TITLE_COOLDOWN`(같은 작품 60초 쿨다운)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    LlmBadGateway:
+      description: Gemini 호출 실패·시간 초과·빈 응답 또는 구글 서버 혼잡. `errorCode`는 `LLM_CALL_FAILED` 또는 `LLM_UPSTREAM_BUSY`(구글 503)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    LlmUnavailable:
+      description: 서버에 Gemini 키(`GEMINI_API_KEY`)가 없어 번역 기능이 꺼져 있음. `errorCode`는 `LLM_DISABLED`. 외부 호출은 일어나지 않았고 호출 상한 카운터도 올리지 않았다
       content:
         application/problem+json:
           schema:
@@ -3308,6 +3889,70 @@ components:
         success: true
         data:
           plan: null
+    PlanMailPreviewType:
+      type: string
+      description: 예시 메일 종류. SUBSCRIBE_GUIDE 플랜을 저장하면 오는 구독 안내 / MONTHLY 매월 1일에 오는 월초 안내
+      enum:
+        - SUBSCRIBE_GUIDE
+        - MONTHLY
+    PlanMailPreviewMail:
+      type: object
+      description: 예시 메일 1통. 실제로 보내지 않고 화면에 보여 주기만 한다
+      required:
+        - type
+        - subject
+        - html
+      properties:
+        type:
+          $ref: '#/components/schemas/PlanMailPreviewType'
+        subject:
+          type: string
+          description: 메일 제목
+          example: '[OTT내비] 저장한 구독 플랜 안내'
+        html:
+          type: string
+          description: 메일 본문 HTML(이메일용 완성 문서). `iframe srcDoc`에 `sandbox`로만 보여 준다
+    PlanMailPreviewNoMailReason:
+      type: string
+      description: 만들 수 없는 메일의 사유. NO_CURRENT_PLAN 저장한 현재 플랜이 없음 / NO_SUBSCRIBE_GUIDE 이번 달 새로 가입할 상품이 없거나 플랜의 첫 달이 이번 달이 아님(구독 안내만 빠진다)
+      enum:
+        - NO_CURRENT_PLAN
+        - NO_SUBSCRIBE_GUIDE
+    PlanMailPreview:
+      type: object
+      description: 데모 계정용 예시 메일 모음
+      required:
+        - mails
+        - noMailReasons
+      properties:
+        mails:
+          type: array
+          description: 만들 수 있는 예시 메일. 구독 안내, 월초 안내 순서
+          items:
+            $ref: '#/components/schemas/PlanMailPreviewMail'
+        noMailReasons:
+          type: array
+          description: 만들 수 없는 메일의 사유. 모두 만들었으면 빈 배열
+          items:
+            $ref: '#/components/schemas/PlanMailPreviewNoMailReason'
+    CommonResponsePlanMailPreview:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/PlanMailPreview'
+      example:
+        success: true
+        data:
+          mails:
+            - type: SUBSCRIBE_GUIDE
+              subject: '[OTT내비] 저장한 구독 플랜 안내'
+              html: '<html>...</html>'
+          noMailReasons: []
     PlanChangeReasonType:
       type: string
       description: 플랜이 바뀐 이유의 종류. PRICE_CHANGED 구독 상품의 요금이 바뀜 / TITLE_LEFT_SERVICE 작품이 어느 서비스에서 빠짐 / TITLE_JOINED_SERVICE 작품이 어느 서비스에 새로 들어옴 / MARKED_WATCHED 사용자가 "다 봤음"으로 체크함(찜·예산 변경은 이유로 쓰지 않는다)
@@ -3545,6 +4190,460 @@ components:
                     month: '2026-11'
                     ottServiceId: 5
               dataAsOf: '2026-11-01'
+
+    # ----- notification: 알림 설정·발송 이력 -----
+    NotificationSetting:
+      type: object
+      description: 알림 설정. 수신 이메일은 로그인한 계정의 이메일이다
+      required:
+        - isNotificationEnabled
+        - email
+      properties:
+        isNotificationEnabled:
+          type: boolean
+          description: 알림 수신 여부(기본 꺼짐)
+        email:
+          type: string
+          description: 알림을 받을 이메일(계정 이메일, 수정 불가)
+    CommonResponseNotificationSetting:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NotificationSetting'
+      example:
+        success: true
+        data:
+          isNotificationEnabled: false
+          email: user@example.com
+    UpdateMyNotificationSettingRequest:
+      type: object
+      required:
+        - isNotificationEnabled
+      properties:
+        isNotificationEnabled:
+          type: boolean
+          description: 알림 수신 여부
+      example:
+        isNotificationEnabled: true
+    NotificationHistoryItem:
+      type: object
+      description: 알림 이력 한 건. 본문 재료와 실패 사유는 담지 않는다
+      required:
+        - notificationId
+        - type
+        - status
+        - createdAt
+        - sentAt
+      properties:
+        notificationId:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [SUBSCRIBE_GUIDE, MONTHLY, PLAN_CHANGE]
+          description: 구독 안내 / 월초 안내 / 플랜 변경 알림
+        status:
+          type: string
+          enum: [PENDING, SENT, FAILED]
+          description: 대기 / 발송 / 실패(재시도 5회를 넘김)
+        createdAt:
+          type: string
+          format: date-time
+          description: 알림이 만들어진 시각
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 발송 성공 시각. 발송 전이거나 실패면 `null`
+    NotificationHistoryPage:
+      description: 알림 이력 한 페이지(페이지네이션 고정 형태, 최신순)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 알림들(없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/NotificationHistoryItem'
+    CommonResponseNotificationHistoryPage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/NotificationHistoryPage'
+      example:
+        success: true
+        data:
+          content:
+            - notificationId: 31
+              type: MONTHLY
+              status: SENT
+              createdAt: '2026-11-01T03:50:00+09:00'
+              sentAt: '2026-11-01T03:51:12+09:00'
+            - notificationId: 30
+              type: PLAN_CHANGE
+              status: PENDING
+              createdAt: '2026-10-28T04:10:00+09:00'
+              sentAt: null
+            - notificationId: 27
+              type: SUBSCRIBE_GUIDE
+              status: FAILED
+              createdAt: '2026-10-21T21:30:00+09:00'
+              sentAt: null
+          page: 0
+          size: 20
+          totalElements: 3
+          totalPages: 1
+    AdminNotificationSummary:
+      type: object
+      description: 최근 7일 알림 발송 상태 요약
+      required:
+        - windowDays
+        - pendingCount
+        - sentCount
+        - failedCount
+        - latestSentAt
+      properties:
+        windowDays:
+          type: integer
+          format: int32
+          description: 집계 기간(일). 지금은 7
+        pendingCount:
+          type: integer
+          format: int64
+          description: 대기 중(발송 전이거나 재시도 대기) 건수
+        sentCount:
+          type: integer
+          format: int64
+          description: 발송한 건수
+        failedCount:
+          type: integer
+          format: int64
+          description: 재시도 5회를 넘겨 포기한 건수
+        latestSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 최근 7일 안에 발송에 성공한 알림 중 가장 늦은 발송 시각(`sentAt` 기준). 기간 안에 발송이 없으면 `null`
+    CommonResponseAdminNotificationSummary:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminNotificationSummary'
+      example:
+        success: true
+        data:
+          windowDays: 7
+          pendingCount: 2
+          sentCount: 148
+          failedCount: 1
+          latestSentAt: '2026-11-01T03:51:12+09:00'
+    SystemMetrics:
+      type: object
+      description: 서버의 메모리·스레드 상태 한 번 측정한 값(바이트 단위). 읽을 수 없는 값은 `null`
+      required:
+        - jvm
+        - process
+        - container
+        - measuredAt
+      properties:
+        jvm:
+          $ref: '#/components/schemas/JvmMetrics'
+        process:
+          $ref: '#/components/schemas/ProcessMetrics'
+        container:
+          $ref: '#/components/schemas/ContainerMetrics'
+        measuredAt:
+          type: string
+          format: date-time
+          description: 측정 시각(KST 오프셋)
+          example: '2026-10-28T23:50:00+09:00'
+    JvmMetrics:
+      type: object
+      description: JVM이 스스로 보고하는 값
+      required:
+        - heap
+        - nonHeap
+        - memoryPools
+        - buffers
+        - threads
+        - classesLoaded
+        - gc
+        - uptimeSeconds
+      properties:
+        heap:
+          $ref: '#/components/schemas/HeapUsage'
+        nonHeap:
+          $ref: '#/components/schemas/NonHeapUsage'
+        memoryPools:
+          type: array
+          description: 메모리 풀별 값(G1 Eden/Old/Survivor, Metaspace, CodeHeap, Compressed Class Space 등). Micrometer `jvm.memory.used`·`jvm.memory.committed`의 `id` 태그와 같은 이름
+          items:
+            $ref: '#/components/schemas/MemoryPoolUsage'
+        buffers:
+          type: array
+          description: 버퍼 풀(direct, mapped). 힙 밖 네이티브 메모리를 쓰는 NIO 버퍼
+          items:
+            $ref: '#/components/schemas/BufferPoolUsage'
+        threads:
+          $ref: '#/components/schemas/ThreadStats'
+        classesLoaded:
+          type: integer
+          format: int64
+          description: 지금 로드된 클래스 수
+          example: 14200
+        gc:
+          $ref: '#/components/schemas/GcStats'
+        uptimeSeconds:
+          type: integer
+          format: int64
+          description: JVM 가동 시간(초)
+          example: 86400
+    HeapUsage:
+      type: object
+      description: 힙 메모리(바이트)
+      required:
+        - used
+        - committed
+        - max
+      properties:
+        used:
+          type: integer
+          format: int64
+          example: 120000000
+        committed:
+          type: integer
+          format: int64
+          description: JVM이 OS에서 확보해 둔 크기
+          example: 200000000
+        max:
+          type: integer
+          format: int64
+          nullable: true
+          description: 힙 최대 크기. 한도를 알 수 없으면 `null`
+          example: 268435456
+    NonHeapUsage:
+      type: object
+      description: 힙 밖 메모리 합계(바이트). 메타스페이스·코드 캐시 등
+      required:
+        - used
+        - committed
+      properties:
+        used:
+          type: integer
+          format: int64
+          example: 90000000
+        committed:
+          type: integer
+          format: int64
+          example: 100000000
+    MemoryPoolUsage:
+      type: object
+      description: 메모리 풀 하나(바이트)
+      required:
+        - name
+        - area
+        - used
+        - committed
+      properties:
+        name:
+          type: string
+          example: G1 Eden Space
+        area:
+          type: string
+          enum:
+            - HEAP
+            - NON_HEAP
+        used:
+          type: integer
+          format: int64
+          example: 50000000
+        committed:
+          type: integer
+          format: int64
+          example: 80000000
+    BufferPoolUsage:
+      type: object
+      description: 버퍼 풀 하나(바이트). `id`는 `direct` 또는 `mapped`
+      required:
+        - id
+        - memoryUsed
+        - totalCapacity
+        - count
+      properties:
+        id:
+          type: string
+          example: direct
+        memoryUsed:
+          type: integer
+          format: int64
+          example: 1048576
+        totalCapacity:
+          type: integer
+          format: int64
+          example: 1048576
+        count:
+          type: integer
+          format: int64
+          description: 버퍼 개수
+          example: 12
+    ThreadStats:
+      type: object
+      description: 스레드 수(개)
+      required:
+        - live
+        - peak
+        - daemon
+      properties:
+        live:
+          type: integer
+          format: int64
+          example: 45
+        peak:
+          type: integer
+          format: int64
+          example: 60
+        daemon:
+          type: integer
+          format: int64
+          example: 20
+    GcStats:
+      type: object
+      description: 가비지 컬렉션 누적(모든 수집기 합계)
+      required:
+        - collectionCount
+        - collectionTimeMillis
+      properties:
+        collectionCount:
+          type: integer
+          format: int64
+          example: 34
+        collectionTimeMillis:
+          type: integer
+          format: int64
+          description: 누적 소요 시간(밀리초)
+          example: 420
+    ProcessMetrics:
+      type: object
+      description: 운영체제가 보는 프로세스 메모리(바이트). Linux의 `/proc/self/status`. Linux가 아니거나 읽지 못하면 값이 모두 `null`
+      required:
+        - rssBytes
+        - peakRssBytes
+        - rssAnonBytes
+        - rssFileBytes
+      properties:
+        rssBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 실제로 올라가 있는 물리 메모리(`VmRSS`)
+          example: 520000000
+        peakRssBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 실제 물리 메모리(`rssBytes`)의 최고치(`VmHWM`)
+          example: 560000000
+        rssAnonBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 힙·스택 같은 익명 메모리(`RssAnon`)
+          example: 480000000
+        rssFileBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 파일 매핑 메모리(`RssFile`)
+          example: 40000000
+    ContainerMetrics:
+      type: object
+      description: 컨테이너(cgroup) 메모리(바이트). cgroup v2 파일이 없으면 v1을 읽고, 둘 다 없으면 값이 모두 `null`
+      required:
+        - memoryUsedBytes
+        - memoryLimitBytes
+      properties:
+        memoryUsedBytes:
+          type: integer
+          format: int64
+          nullable: true
+          example: 700000000
+        memoryLimitBytes:
+          type: integer
+          format: int64
+          nullable: true
+          description: 메모리 한도. 제한 없음(`max`)이면 `null`
+          example: 1073741824
+    CommonResponseSystemMetrics:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/SystemMetrics'
+      example:
+        success: true
+        data:
+          jvm:
+            heap:
+              used: 120000000
+              committed: 200000000
+              max: 268435456
+            nonHeap:
+              used: 90000000
+              committed: 100000000
+            memoryPools:
+              - name: G1 Eden Space
+                area: HEAP
+                used: 50000000
+                committed: 80000000
+              - name: Metaspace
+                area: NON_HEAP
+                used: 60000000
+                committed: 62000000
+            buffers:
+              - id: direct
+                memoryUsed: 1048576
+                totalCapacity: 1048576
+                count: 12
+            threads:
+              live: 45
+              peak: 60
+              daemon: 20
+            classesLoaded: 14200
+            gc:
+              collectionCount: 34
+              collectionTimeMillis: 420
+            uptimeSeconds: 86400
+          process:
+            rssBytes: 520000000
+            peakRssBytes: 560000000
+            rssAnonBytes: 480000000
+            rssFileBytes: 40000000
+          container:
+            memoryUsedBytes: 700000000
+            memoryLimitBytes: 1073741824
+          measuredAt: '2026-10-28T23:50:00+09:00'
 
     # ----- admin: OTT 구독상품·월 구독요금 -----
     AdminProductPrice:
@@ -4733,7 +5832,21 @@ components:
           enum:
             - USER
             - ADMIN
-          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다
+            - DEMO
+          description: 사용자 권한. 재발급 때마다 DB에서 다시 읽은 값이라 화면의 관리자 메뉴 표시 여부를 정하는 데 쓴다. `DEMO`는 데모 계정으로, 회원 기능은 쓰고 관리자 화면은 조회만 하며 탈퇴·알림 설정 변경은 할 수 없다(서버가 403으로 막는다)
+    DemoLoginRequest:
+      type: object
+      description: 데모 계정 로그인 요청. 값이 비어도 400이 아니라 401(`DEMO_LOGIN_FAILED`)이다
+      required:
+        - loginId
+        - password
+      properties:
+        loginId:
+          type: string
+          description: 데모 아이디(제출 문서로 전달한 값)
+        password:
+          type: string
+          description: 데모 비밀번호. 화면은 입력 칸을 비밀번호 형식(가림)으로 둔다
     CommonResponseAccessToken:
       type: object
       required:
@@ -4749,3 +5862,659 @@ components:
         data:
           accessToken: eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwicm9sZSI6IlVTRVIifQ.example-signature
           role: USER
+    OverviewDraftStatus:
+      type: string
+      description: 번역 초안의 자동 검사 등급. PASSED 성공(실패도 경고도 없음) / WARNING 주의(실패는 없고 경고만 있음, 경고는 `warnings`) / FAILED 실패(걸린 이유는 `guardFailures`)
+      enum:
+        - PASSED
+        - WARNING
+        - FAILED
+    OverviewDraftWarning:
+      type: string
+      description: |
+        자동 검사의 경고(의심 신호) 코드. 경고는 반영을 막지 않고, 실패 없이 경고만 있는 초안은 "주의"로 사람이 승인해야 반영된다.
+        SENTENCE_COUNT_MISMATCH 원문과 번역문의 문장 수 차이가 2 이상 / STYLE_NOT_PLAIN "~다." 꼴 문장이 80% 미만 /
+        SUSPICIOUS_SPACING 한 글자 낱말 뒤에 어미처럼 보이는 낱말이 떨어져 있음(깨진 띄어쓰기 의심) / LENGTH_RATIO_NEAR_LIMIT 길이 비율이 실패 한계에 가까움
+      enum:
+        - SENTENCE_COUNT_MISMATCH
+        - STYLE_NOT_PLAIN
+        - SUSPICIOUS_SPACING
+        - LENGTH_RATIO_NEAR_LIMIT
+    CreateOverviewDraftRequest:
+      type: object
+      description: 번역 초안 한 건 생성 요청
+      required:
+        - titleId
+      properties:
+        titleId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 번역할 작품 ID(영어 줄거리가 있는 작품)
+      example:
+        titleId: 1024
+    CreateBulkOverviewDraftsRequest:
+      type: object
+      description: 일괄 번역 요청. `titleIds`와 `count` 중 정확히 하나만 보낸다
+      properties:
+        titleIds:
+          type: array
+          nullable: true
+          maxItems: 100
+          description: 번역할 작품 ID들(1~100개, 중복은 제거). 이미 초안이 있어도 다시 번역해 교체한다
+          items:
+            type: integer
+            format: int64
+        count:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 1
+          maximum: 100
+          description: 번역 후보 정렬(찜 많은 순 → 인기순) 상위 몇 개를 번역할지(1~100). 이미 초안이 있는 작품은 건너뛰고 그다음 작품으로 채운다
+      example:
+        count: 50
+    ApplyOverviewDraftsRequest:
+      type: object
+      description: 초안 반영 요청. `draftIds`와 `allPassed`(true) 중 정확히 하나만 보낸다
+      properties:
+        draftIds:
+          type: array
+          nullable: true
+          maxItems: 500
+          description: 반영할 초안 ID들(중복은 제거)
+          items:
+            type: string
+        allPassed:
+          type: boolean
+          nullable: true
+          description: true면 성공(실패도 경고도 없는) 초안 전부를 반영한다. 주의(경고만 있는) 초안은 제외된다
+      example:
+        allPassed: true
+    OverviewCandidate:
+      type: object
+      description: 번역 후보 작품 한 건(영어 줄거리가 남아 있는 작품)
+      required:
+        - titleId
+        - mediaType
+        - title
+        - overview
+        - wishlistCount
+        - hasDraft
+      properties:
+        titleId:
+          type: integer
+          format: int64
+          description: 작품 ID
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        title:
+          type: string
+          description: 작품 제목
+        overview:
+          type: string
+          description: 영어 줄거리 전문
+        wishlistCount:
+          type: integer
+          format: int64
+          description: 이 작품을 찜한 사용자 수(시즌별로 찜해도 한 사람은 1명)
+        hasDraft:
+          type: boolean
+          description: 이 작품에 번역 초안이 있는지
+      example:
+        titleId: 1024
+        mediaType: movie
+        title: 기생충
+        overview: All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.
+        wishlistCount: 12
+        hasDraft: false
+    OverviewTranslateSummary:
+      type: object
+      description: 번역 화면 상단 요약
+      required:
+        - pendingTotal
+        - usedToday
+        - dailyLimit
+        - perMinuteLimit
+        - model
+        - isEnabled
+        - translatedCount
+        - oldestTranslatedAt
+      properties:
+        pendingTotal:
+          type: integer
+          format: int64
+          description: 번역 대기 중인 영어 줄거리 작품의 총수
+        usedToday:
+          type: integer
+          format: int64
+          description: 오늘(태평양 시간 날짜 기준) Gemini를 호출한 수
+        dailyLimit:
+          type: integer
+          format: int32
+          description: 하루 호출 상한
+        perMinuteLimit:
+          type: integer
+          format: int32
+          description: 분당 호출 상한
+        model:
+          type: string
+          description: 사용 중인 모델 이름
+        isEnabled:
+          type: boolean
+          description: 번역 기능을 쓸 수 있는지(서버에 Gemini 키가 설정돼 있는지). false면 조회만 되고 생성·일괄은 `LLM_DISABLED`(503)다
+        translatedCount:
+          type: integer
+          format: int64
+          description: 관리자가 반영한 번역 줄거리 작품 수(`overview_translated_at`이 있는 작품). TMDB가 준 한국어는 세지 않는다
+        oldestTranslatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 가장 오래된 번역의 반영 시각(6개월 보관 경과 여부를 보는 용도). 번역이 하나도 없으면 `null`
+      example:
+        pendingTotal: 2512
+        usedToday: 37
+        dailyLimit: 400
+        perMinuteLimit: 12
+        model: gemini-3.5-flash-lite
+        isEnabled: true
+        translatedCount: 37
+        oldestTranslatedAt: '2026-10-29T10:00:00+09:00'
+    OverviewCandidatePage:
+      description: 번역 후보 한 페이지(페이지네이션 고정 형태 + 요약)
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - summary
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 번역 후보들(없으면 빈 배열)
+              items:
+                $ref: '#/components/schemas/OverviewCandidate'
+            summary:
+              $ref: '#/components/schemas/OverviewTranslateSummary'
+    CommonResponseOverviewCandidatePage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewCandidatePage'
+      example:
+        success: true
+        data:
+          content:
+            - titleId: 1024
+              mediaType: movie
+              title: 기생충
+              overview: All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.
+              wishlistCount: 12
+              hasDraft: false
+          page: 0
+          size: 20
+          totalElements: 2512
+          totalPages: 126
+          summary:
+            pendingTotal: 2512
+            usedToday: 37
+            dailyLimit: 400
+            perMinuteLimit: 12
+            model: gemini-3.5-flash-lite
+            isEnabled: true
+            translatedCount: 37
+            oldestTranslatedAt: '2026-10-29T10:00:00+09:00'
+    OverviewDraft:
+      type: object
+      description: 번역 초안 한 건(Redis 보관, 7일 뒤 또는 메모리 부족 때 사라질 수 있음)
+      required:
+        - draftId
+        - titleId
+        - mediaType
+        - title
+        - original
+        - translated
+        - isGuardPassed
+        - guardFailures
+        - warnings
+        - model
+        - createdAt
+        - attempts
+        - isEdited
+      properties:
+        draftId:
+          type: string
+          description: 초안 ID(UUID 문자열)
+        titleId:
+          type: integer
+          format: int64
+          description: 작품 ID
+        mediaType:
+          $ref: '#/components/schemas/MediaType'
+        title:
+          type: string
+          description: 작품 제목
+        original:
+          type: string
+          description: 번역한 영어 원문(번역 시점의 DB 줄거리). 반영할 때 DB의 현재 줄거리와 같은지 다시 확인한다
+        translated:
+          type: string
+          description: 번역문
+        isGuardPassed:
+          type: boolean
+          description: 자동 검사에서 실패가 없는지(경고만 있어도 true). false(실패)인 초안은 반영할 수 없다. 성공/주의 구분은 `warnings`가 비어 있는지로 한다
+        guardFailures:
+          type: array
+          description: |
+            자동 검사에서 걸린 이유 코드들(통과면 빈 배열). EMPTY 번역문이 비어 있음 / TOO_LONG 최대 1000자 초과 / LENGTH_RATIO_LOW 원문 대비 너무 짧음(0.3 미만) /
+            LENGTH_RATIO_HIGH 원문 대비 너무 김(2.0 초과) / HANGUL_RATIO_LOW 글자 중 한글 비율이 0.6 미만 / CONTAINS_URL 주소가 들어 있음 /
+            CONTAINS_MARKDOWN 마크다운 기호가 들어 있음 / CONTAINS_PREAMBLE "번역:"·"Here is" 같은 머리말이 들어 있음 / NUMBER_MISSING 원문의 숫자가 번역문에 없음
+          items:
+            type: string
+        warnings:
+          type: array
+          description: 자동 검사의 경고 코드들(없으면 빈 배열). 실패(`guardFailures`)가 없고 이 배열이 비어 있지 않으면 "주의" 초안이다
+          items:
+            $ref: '#/components/schemas/OverviewDraftWarning'
+        model:
+          type: string
+          description: 번역에 쓴 모델 이름
+        createdAt:
+          type: string
+          format: date-time
+          description: 만든 시각
+        attempts:
+          type: integer
+          format: int32
+          description: 이 초안을 얻기까지의 총 시도 횟수(단건 번역은 1, 일괄 번역은 자동 재시도를 포함)
+        isEdited:
+          type: boolean
+          description: 관리자가 번역문을 직접 고쳤는지(`editOverviewDraft`). `true`면 일괄 번역이 같은 작품을 다시 번역해 덮어쓰지 않는다
+      example:
+        draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+        titleId: 1024
+        mediaType: movie
+        title: 기생충
+        original: All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.
+        translated: 전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.
+        isGuardPassed: true
+        guardFailures: []
+        warnings: []
+        model: gemini-3.5-flash-lite
+        createdAt: '2026-10-29T10:15:00+09:00'
+        attempts: 1
+        isEdited: false
+    EditOverviewDraftRequest:
+      type: object
+      description: 번역 초안 수정 요청
+      required:
+        - translatedText
+      properties:
+        translatedText:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: 관리자가 고친 번역문. 공백만으로는 보낼 수 없고 1000자까지다(자동 검사의 최대 글자 수와 같다)
+      example:
+        translatedText: 전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.
+    CommonResponseOverviewDraft:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewDraft'
+      example:
+        success: true
+        data:
+          draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+          titleId: 1024
+          mediaType: movie
+          title: 기생충
+          original: All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.
+          translated: 전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.
+          isGuardPassed: true
+          guardFailures: []
+          warnings: []
+          model: gemini-3.5-flash-lite
+          createdAt: '2026-10-29T10:15:00+09:00'
+          attempts: 1
+          isEdited: false
+    BulkDraftRun:
+      type: object
+      description: 일괄 번역 진행 상황(최근 1건만 보관)
+      required:
+        - bulkRunId
+        - state
+        - total
+        - doneCount
+        - failedCount
+        - guardFailedCount
+        - stopReason
+        - startedAt
+        - finishedAt
+        - warningCount
+      properties:
+        bulkRunId:
+          type: string
+          description: 일괄 ID(UUID 문자열)
+        state:
+          type: string
+          description: RUNNING 실행 중 / COMPLETED 끝까지 처리 / STOPPED 도중에 멈춤(`stopReason` 참고)
+          enum:
+            - RUNNING
+            - COMPLETED
+            - STOPPED
+        total:
+          type: integer
+          format: int32
+          description: 처리할 작품 수
+        doneCount:
+          type: integer
+          format: int32
+          description: 초안을 만든 작품 수(자동 검사에서 실패한 것·주의인 것 포함)
+        failedCount:
+          type: integer
+          format: int32
+          description: 초안을 만들지 못한 작품 수(호출 실패, 영어 줄거리가 아님, 쿨다운 등)
+        guardFailedCount:
+          type: integer
+          format: int32
+          description: doneCount 중 자동 재시도까지 마친 최종 결과가 실패(FAILED)인 작품 수
+        stopReason:
+          type: string
+          nullable: true
+          description: |
+            멈춘 이유(`state`가 STOPPED일 때만, 그 밖에는 `null`). DISABLED Gemini 키 없음 / RATE_LIMITED 분당 상한 또는 구글 429 / DAILY_LIMIT 하루 상한 /
+            DRAFT_LIMIT 대기 초안 가득 참 / CALL_FAILED_REPEATED 호출 실패 3번 연속 / SERVER_RESTARTED 실행 중 서버가 다시 시작됨
+          enum:
+            - DISABLED
+            - RATE_LIMITED
+            - DAILY_LIMIT
+            - DRAFT_LIMIT
+            - CALL_FAILED_REPEATED
+            - SERVER_RESTARTED
+        startedAt:
+          type: string
+          format: date-time
+          description: 시작 시각
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 끝난 시각(실행 중이면 `null`)
+        warningCount:
+          type: integer
+          format: int32
+          description: doneCount 중 자동 재시도까지 마친 최종 결과가 주의(WARNING)인 작품 수
+      example:
+        bulkRunId: 9a1c7d52-0b8e-4f3a-8d6c-2e5f7a9b1c3d
+        state: RUNNING
+        total: 100
+        doneCount: 37
+        failedCount: 1
+        guardFailedCount: 3
+        stopReason: null
+        startedAt: '2026-10-29T10:00:00+09:00'
+        finishedAt: null
+        warningCount: 5
+    CommonResponseBulkDraftRun:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/BulkDraftRun'
+      example:
+        success: true
+        data:
+          bulkRunId: 9a1c7d52-0b8e-4f3a-8d6c-2e5f7a9b1c3d
+          state: RUNNING
+          total: 100
+          doneCount: 0
+          failedCount: 0
+          guardFailedCount: 0
+          stopReason: null
+          startedAt: '2026-10-29T10:00:00+09:00'
+          finishedAt: null
+          warningCount: 0
+    OverviewDraftPage:
+      description: 번역 초안 한 페이지(페이지네이션 고정 형태 + 일괄 진행 상황). 표본(`sample`)이면 `page`는 0, `size`는 요청한 표본 수, `totalElements`는 뽑힌 건수다
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required:
+            - content
+            - bulkRun
+          properties:
+            content:
+              type: array
+              description: 이 페이지의 초안들(없으면 빈 배열). Redis에서 사라진 초안은 조용히 빠진다
+              items:
+                $ref: '#/components/schemas/OverviewDraft'
+            bulkRun:
+              allOf:
+                - $ref: '#/components/schemas/BulkDraftRun'
+              nullable: true
+              description: 최근 일괄 번역의 진행 상황. 일괄을 돌린 적이 없으면 `null`
+    CommonResponseOverviewDraftPage:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewDraftPage'
+      example:
+        success: true
+        data:
+          content:
+            - draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+              titleId: 1024
+              mediaType: movie
+              title: 기생충
+              original: All unemployed, Ki-taek's family takes peculiar interest in the wealthy Park family.
+              translated: 전원 백수인 기택의 가족은 부유한 박 사장네 가족에게 남다른 관심을 갖게 된다.
+              isGuardPassed: true
+              guardFailures: []
+              warnings: []
+              model: gemini-3.5-flash-lite
+              createdAt: '2026-10-29T10:15:00+09:00'
+              attempts: 1
+              isEdited: false
+          page: 0
+          size: 20
+          totalElements: 1
+          totalPages: 1
+          bulkRun:
+            bulkRunId: 9a1c7d52-0b8e-4f3a-8d6c-2e5f7a9b1c3d
+            state: COMPLETED
+            total: 100
+            doneCount: 99
+            failedCount: 1
+            guardFailedCount: 3
+            stopReason: null
+            startedAt: '2026-10-29T10:00:00+09:00'
+            finishedAt: '2026-10-29T10:11:00+09:00'
+            warningCount: 5
+    ApplyOverviewDraftItem:
+      type: object
+      description: 초안 한 건의 반영 결과
+      required:
+        - draftId
+        - titleId
+        - outcome
+        - reason
+      properties:
+        draftId:
+          type: string
+          description: 초안 ID
+        titleId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 작품 ID. 초안이 없어 건너뛰었으면 `null`
+        outcome:
+          type: string
+          description: APPLIED 반영함 / SKIPPED 건너뜀
+          enum:
+            - APPLIED
+            - SKIPPED
+        reason:
+          type: string
+          nullable: true
+          description: 건너뛴 이유(SKIPPED일 때만, 그 밖에는 `null`). DRAFT_NOT_FOUND 초안이 없음 / GUARD_FAILED 자동 검사에서 걸림 / ORIGINAL_CHANGED 번역한 뒤 줄거리가 바뀌었거나 이미 한국어
+          enum:
+            - DRAFT_NOT_FOUND
+            - GUARD_FAILED
+            - ORIGINAL_CHANGED
+      example:
+        draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+        titleId: 1024
+        outcome: APPLIED
+        reason: null
+    ApplyOverviewDraftsResult:
+      type: object
+      description: 초안 반영 결과
+      required:
+        - appliedCount
+        - skippedCount
+        - results
+      properties:
+        appliedCount:
+          type: integer
+          format: int32
+          description: 줄거리를 바꾼 건수
+        skippedCount:
+          type: integer
+          format: int32
+          description: 건너뛴 건수
+        results:
+          type: array
+          description: 초안별 결과
+          items:
+            $ref: '#/components/schemas/ApplyOverviewDraftItem'
+      example:
+        appliedCount: 1
+        skippedCount: 1
+        results:
+          - draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+            titleId: 1024
+            outcome: APPLIED
+            reason: null
+          - draftId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+            titleId: 2048
+            outcome: SKIPPED
+            reason: ORIGINAL_CHANGED
+    CommonResponseApplyOverviewDraftsResult:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/ApplyOverviewDraftsResult'
+      example:
+        success: true
+        data:
+          appliedCount: 1
+          skippedCount: 1
+          results:
+            - draftId: 3f2b8c1e-5d4a-4c6b-9a7e-1b2c3d4e5f60
+              titleId: 1024
+              outcome: APPLIED
+              reason: null
+            - draftId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+              titleId: 2048
+              outcome: SKIPPED
+              reason: ORIGINAL_CHANGED
+    OverviewRevertResult:
+      type: object
+      description: 영어로 되돌린 결과
+      required:
+        - titleId
+      properties:
+        titleId:
+          type: integer
+          format: int64
+          description: 되돌린 작품 ID. 줄거리와 언어가 비워졌고 다음 수집이 TMDB 영어 줄거리를 다시 채운다
+      example:
+        titleId: 1024
+    OverviewBulkRevertRequest:
+      type: object
+      description: 번역 줄거리 대량 되돌리기 요청. 빈 객체 `{}`면 번역 전부가 대상이다
+      properties:
+        translatedBefore:
+          type: string
+          format: date-time
+          nullable: true
+          description: 이 시각보다 먼저 반영한 번역만 되돌린다. 없으면(생략·`null`) 번역 전부를 되돌린다
+        isPreview:
+          type: boolean
+          default: false
+          description: '`true`면 DB를 바꾸지 않고 되돌려질 작품 수만 센다(미리보기). 생략하면 `false`(실제로 되돌린다)'
+      example:
+        translatedBefore: '2026-04-29T00:00:00+09:00'
+        isPreview: false
+    OverviewBulkRevertResult:
+      type: object
+      description: 번역 줄거리 대량 되돌리기 결과
+      required:
+        - revertedCount
+        - isPreview
+      properties:
+        revertedCount:
+          type: integer
+          format: int64
+          description: 영어로 되돌린 작품 수. 대상이 없으면 0. 줄거리가 비워졌고 다음 수집이 TMDB 영어 줄거리를 다시 채운다. 미리보기(`isPreview`)면 되돌려질 작품 수이고 아무것도 바뀌지 않았다
+        isPreview:
+          type: boolean
+          description: 미리보기 요청이었는지. `true`면 DB를 바꾸지 않았다
+      example:
+        revertedCount: 37
+        isPreview: false
+    CommonResponseOverviewBulkRevertResult:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewBulkRevertResult'
+      example:
+        success: true
+        data:
+          revertedCount: 37
+          isPreview: false
+    CommonResponseOverviewRevertResult:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/OverviewRevertResult'
+      example:
+        success: true
+        data:
+          titleId: 1024

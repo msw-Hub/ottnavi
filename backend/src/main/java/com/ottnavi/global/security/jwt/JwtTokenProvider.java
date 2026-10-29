@@ -80,7 +80,7 @@ public class JwtTokenProvider {
 			log.debug("Access Token 검증 실패: {}", e.getClass().getSimpleName());
 			return null;
 		}
-		// 2. sub(숫자)와 role(USER·ADMIN)을 꺼낸다. 모양이 다르면 무효로 본다
+		// 2. sub(숫자)와 role(USER·ADMIN·DEMO)을 꺼낸다. 모양이 다르면 무효로 본다
 		try {
 			Long userId = Long.valueOf(claims.getSubject());
 			UserRole role = UserRole.valueOf(claims.get(ROLE_CLAIM, String.class));

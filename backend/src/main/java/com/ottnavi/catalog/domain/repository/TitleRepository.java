@@ -85,6 +85,78 @@ public interface TitleRepository extends JpaRepository<Title, Long> {
             nativeQuery = true)
     int demoteUnwishlistedToWeekly();
 
+    /**
+     * 번역 후보(영어 줄거리가 비어 있지 않은 작품)를 찜한 사용자 수 많은 순 → 인기도 순(동률은 id 순)으로 한 페이지 조회한다.
+     * 찜은 시청 단위(watch_unit)에 걸리므로 작품별로 사용자 수를 DISTINCT로 센다(드라마는 시즌별로 찜해도 한 명).
+     * 별칭은 따옴표로 감싸 PostgreSQL이 소문자로 바꾸지 못하게 한다(투영 getter 이름과 맞추려고).
+     */
+    @Query(value = "SELECT t.id AS \"id\", t.media_type AS \"mediaType\", t.title AS \"title\", t.overview AS \"overview\", "
+            + "COALESCE(w.cnt, 0) AS \"wishlistCount\" FROM title t "
+            + "LEFT JOIN (SELECT u.title_id AS title_id, COUNT(DISTINCT i.user_id) AS cnt FROM watch_unit u "
+            + "JOIN wishlist_item i ON i.watch_unit_id = u.id GROUP BY u.title_id) w ON w.title_id = t.id "
+            + "WHERE t.overview_lang = 'en' AND t.overview IS NOT NULL AND btrim(t.overview) <> '' "
+            + "ORDER BY COALESCE(w.cnt, 0) DESC, t.popularity DESC NULLS LAST, t.id ASC",
+            countQuery = "SELECT count(*) FROM title t "
+                    + "WHERE t.overview_lang = 'en' AND t.overview IS NOT NULL AND btrim(t.overview) <> ''",
+            nativeQuery = true)
+    Page<OverviewCandidateRow> findOverviewCandidates(Pageable pageable);
+
+    /**
+     * 영어 줄거리를 한국어 번역으로 바꾸고 번역 반영 시각(overview_translated_at)을 지금으로 적는다.
+     * 줄거리가 아직 영어이고 내용이 originalOverview와 같을 때만 바꾼다
+     * (그 사이 수집이 줄거리를 바꿨거나 다른 번역이 먼저 반영됐으면 0건). 바뀐 행 수를 돌려준다.
+     * <p>
+     * 왜 조건을 붙이나: 초안은 Redis에 최대 7일 있고, 그동안 매일 도는 TMDB 수집이 줄거리를 바꿀 수 있다.
+     * 번역문은 "번역할 때의 영어 원문"에 대한 것이므로, 줄거리가 그 원문이 아니게 됐다면 덮어쓰면 안 된다.
+     * 예) 월요일 영어 원문(en)으로 초안 생성 → 화요일 수집이 TMDB 한국어(ko)를 채움 → 수요일 반영하면
+     *     overview_lang이 'ko'라 WHERE에서 걸려 0건이 되고, TMDB가 준 한국어가 그대로 남는다.
+     * 확인과 변경을 SELECT 후 UPDATE로 나누지 않고 UPDATE 한 문장의 WHERE에 합친 이유: 그 사이에 수집이 끼어들 틈을 없애려는 것이다
+     * (DB가 확인과 변경을 한 번에 처리한다).
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE title SET overview = :translated, overview_lang = 'ko', overview_translated_at = now(), "
+            + "updated_at = now() "
+            + "WHERE id = :titleId AND overview_lang = 'en' AND overview = :originalOverview", nativeQuery = true)
+    int applyKoreanOverview(@Param("titleId") Long titleId, @Param("originalOverview") String originalOverview,
+            @Param("translated") String translated);
+
+    /**
+     * 관리자가 반영한 번역(overview_translated_at이 있음)만 비운다(overview, overview_lang, overview_translated_at을 null로).
+     * TMDB가 원래 준 한국어 줄거리는 건드리지 않는다. 다음 수집이 TMDB 줄거리를 다시 채운다. 바뀐 행 수를 돌려준다
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE title SET overview = NULL, overview_lang = NULL, overview_translated_at = NULL, "
+            + "updated_at = now() WHERE id = :titleId AND overview_translated_at IS NOT NULL", nativeQuery = true)
+    int clearKoreanOverview(@Param("titleId") Long titleId);
+
+    /**
+     * 번역(overview_translated_at이 있음) 중 반영 시각이 translatedBefore보다 오래된 작품의 키를 id 순으로 limit건 읽는다.
+     * 대량 되돌리기가 한 묶음씩 읽을 때 쓴다. 되돌린 행은 조건에서 빠지므로 같은 조건으로 다시 읽으면 다음 묶음이 나온다.
+     */
+    @Query(value = "SELECT t.id AS \"id\", t.media_type AS \"mediaType\", t.tmdb_id AS \"tmdbId\" FROM title t "
+            + "WHERE t.overview_translated_at IS NOT NULL AND t.overview_translated_at < :translatedBefore "
+            + "ORDER BY t.id ASC LIMIT :limit", nativeQuery = true)
+    List<TranslatedTitleRow> findTranslatedTitles(@Param("translatedBefore") Instant translatedBefore,
+            @Param("limit") int limit);
+
+    /** 번역(overview_translated_at이 있음) 중 반영 시각이 translatedBefore보다 오래된 작품 수. 대량 되돌리기의 미리보기가 쓴다 */
+    @Query(value = "SELECT count(*) FROM title t WHERE t.overview_translated_at IS NOT NULL "
+            + "AND t.overview_translated_at < :translatedBefore", nativeQuery = true)
+    long countTranslatedBefore(@Param("translatedBefore") Instant translatedBefore);
+
+    /** 주어진 작품들 중 번역인 것만 비운다(단건 되돌리기와 같은 효과). 그 사이 번역이 아니게 된 작품은 건너뛴다. 바뀐 행 수를 돌려준다 */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE title SET overview = NULL, overview_lang = NULL, overview_translated_at = NULL, "
+            + "updated_at = now() WHERE id IN (:titleIds) AND overview_translated_at IS NOT NULL", nativeQuery = true)
+    int clearTranslatedOverviews(@Param("titleIds") Collection<Long> titleIds);
+
+    /** 관리자가 반영한 번역 작품 수 */
+    long countByOverviewTranslatedAtIsNotNull();
+
+    /** 가장 오래된 번역의 반영 시각. 번역이 하나도 없으면 null */
+    @Query("select min(t.overviewTranslatedAt) from Title t")
+    Instant findOldestOverviewTranslatedAt();
+
     /** 작품 한 행을 벌크로 지운다. 하위 행(시청 단위·장르·출연진)은 호출 전에 먼저 지워야 한다(FK가 막는다) */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from Title t where t.id = :titleId")

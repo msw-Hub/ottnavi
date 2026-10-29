@@ -14,8 +14,8 @@
  * 테스트는 setMockRole('USER')로 회원 상태의 응답을 확인하고, 끝나면 resetMockSession()으로 되돌린다.
  */
 
-// 목업에서 구분하는 역할. GUEST=비로그인, USER=회원, ADMIN=관리자
-export type MockRole = 'GUEST' | 'USER' | 'ADMIN'
+// 목업에서 구분하는 역할. GUEST=비로그인, USER=회원, ADMIN=관리자, DEMO=데모 계정(여러 방문자가 함께 쓰는 공용 계정, Task 109)
+export type MockRole = 'GUEST' | 'USER' | 'ADMIN' | 'DEMO'
 
 // sessionStorage 키. 목업 전용 값이라 서비스 이름을 앞에 붙여 다른 값과 섞이지 않게 한다
 const ROLE_STORAGE_KEY = 'ottnavi:mock-role'
@@ -43,7 +43,7 @@ export function writeStored(key: string, value: string | null): void {
 // 저장된 역할을 되살린다. 알 수 없는 값이면 비로그인이다(손으로 바뀐 값이 화면을 깨지 않게 한다)
 function readStoredRole(): MockRole {
   const stored = readStored(ROLE_STORAGE_KEY)
-  return stored === 'USER' || stored === 'ADMIN' ? stored : 'GUEST'
+  return stored === 'USER' || stored === 'ADMIN' || stored === 'DEMO' ? stored : 'GUEST'
 }
 
 let currentRole: MockRole = readStoredRole()

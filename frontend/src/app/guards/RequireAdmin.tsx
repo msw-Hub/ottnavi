@@ -8,7 +8,8 @@ import { useSession } from '@/hooks/useSession'
  * RequireAuth와 같은 방식(경로 없는 부모 라우트)으로 관리자 화면 전체를 한 번에 막는다.
  * 로그인 확인(확인 중 로딩 → 비로그인이면 로그인 화면)은 RequireAuth에 맡기고, 통과한 사람에게만 역할(role)을 본다.
  *
- * 로그인했지만 ADMIN이 아니면: "접근 권한이 없습니다" 안내 화면을 보이고 홈으로 가는 링크를 둔다(Task 057 결정).
+ * 데모 계정(DEMO)은 조회만 하도록 통과시킨다(아래 AdminRoleGate 주석, Task 109).
+ * 로그인했지만 ADMIN(또는 DEMO)이 아니면: "접근 권한이 없습니다" 안내 화면을 보이고 홈으로 가는 링크를 둔다(Task 057 결정).
  * 홈으로 자동 이동하지 않는 이유: 주소를 잘못 눌렀거나 관리자 권한이 아직 반영되지 않은 사용자가 "왜 쫓겨났는지" 모른 채
  * 첫 화면에 도착하는 것보다, 권한이 없다는 사실을 알려 주는 편이 원인을 알기 쉽다. 백엔드 `/api/admin/**`의 403(FORBIDDEN, "접근 권한이 없습니다.")과
  * 같은 문구·기준이다.
@@ -27,11 +28,18 @@ export function RequireAdmin() {
   )
 }
 
-// RequireAuth를 통과한 뒤(로그인 확인 완료) 역할만 확인한다
+/*
+ * RequireAuth를 통과한 뒤(로그인 확인 완료) 역할만 확인한다.
+ *
+ * 데모 계정(DEMO, Task 109)도 통과시킨다: 관리자 화면을 "조회만" 할 수 있게 한 결정이다(서버도 /api/admin/**의 GET만 DEMO에게 허락한다).
+ * [보안] 화면을 보여 줘도 위험이 늘지 않는 이유: 쓰기·실행은 서버가 DEMO에게 403으로 막고, 화면도 확정 버튼을 막아(DemoLockedButton) 요청을 보내지 않는다.
+ * 이 가드는 여전히 편의 기능이고, 역할 값은 재발급 때마다 서버가 DB에서 다시 읽은 메모리 값이다.
+ */
 function AdminRoleGate() {
   const { role } = useSession()
 
-  if (role !== 'ADMIN') {
+  // 이전: if (role !== 'ADMIN') — 데모 계정이 생기기 전에는 ADMIN만 통과했다
+  if (role !== 'ADMIN' && role !== 'DEMO') {
     return (
       <section className="mx-auto flex w-full max-w-md flex-col gap-3">
         <h1 className="text-2xl font-semibold">접근 권한이 없습니다</h1>

@@ -37,7 +37,7 @@ const ROUTE_TABLE = [
   { pattern: '/admin/providers', url: '/admin/providers', heading: '제공처 매핑' }, // SCR-15
   { pattern: '/admin/collect', url: '/admin/collect', heading: '수집 실행·이력' }, // SCR-16
   { pattern: '/admin/monitoring', url: '/admin/monitoring', heading: '모니터링' }, // SCR-17
-  { pattern: '/admin/llm', url: '/admin/llm', heading: 'LLM 검토' }, // SCR-18
+  { pattern: '/admin/llm', url: '/admin/llm', heading: 'LLM 줄거리 번역' }, // SCR-18
   { pattern: '/*', url: '/no-such-page', heading: '페이지를 찾을 수 없음' }, // 404
 ]
 

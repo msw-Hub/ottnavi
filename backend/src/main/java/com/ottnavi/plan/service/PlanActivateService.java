@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ public class PlanActivateService {
 	private final PlanRepository planRepository;
 	private final CollectDataVersionService collectDataVersionService;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventPublisher;
 
 	/**
 	 * 초안을 현재 플랜으로 저장한다.
@@ -68,6 +70,9 @@ public class PlanActivateService {
 
 		// 7. 남은 DRAFT를 지운다(ACTIVE가 된 플랜은 status가 달라 대상이 아니다)
 		planRepository.deleteDraftsByUserId(userId);
+
+		// 8. 저장 사건을 알린다. 리스너(구독 안내 알림)는 이 트랜잭션이 커밋된 뒤에 별도 스레드에서 돌아, 저장 응답과 롤백에 영향을 주지 않는다
+		eventPublisher.publishEvent(new PlanActivatedEvent(userId, view.planId()));
 
 		log.info("플랜 저장: userId={}, planId={}, planType={}, previousPlanId={}", userId, view.planId(),
 				view.planType(), previousPlanId);

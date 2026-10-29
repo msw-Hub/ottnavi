@@ -1,10 +1,12 @@
 package com.ottnavi.user.service;
 
 import com.ottnavi.global.error.UnauthorizedException;
+import com.ottnavi.user.domain.entity.User;
 import com.ottnavi.user.domain.entity.UserSetting;
 import com.ottnavi.user.domain.entity.UserSubscription;
 import com.ottnavi.user.domain.enums.ServiceSubscriptionStatus;
 import com.ottnavi.user.domain.enums.SubscriptionStatus;
+import com.ottnavi.user.domain.enums.UserRole;
 import com.ottnavi.user.domain.repository.UserRepository;
 import com.ottnavi.user.domain.repository.UserSettingRepository;
 import com.ottnavi.user.domain.repository.UserSubscriptionRepository;
@@ -35,6 +37,42 @@ public class UserQueryService {
 			return false;
 		}
 		return found.get().isLowestPriceMode();
+	}
+
+	/**
+	 * 알림 수신 여부. 설정 행이 없으면(온보딩 전) 꺼짐(false)이다. 알림 행을 만들기 전에 확인한다.
+	 * 데모 계정은 설정 값과 상관없이 항상 꺼짐이다(공용 계정에 메일이 나가지 않게, 보안 규칙의 알림 설정 변경 403과 이중 차단).
+	 */
+	public boolean isNotificationEnabled(Long userId) {
+		// 1. 데모 계정이면 알림을 만들지 않는다
+		Optional<User> user = userRepository.findById(userId);
+		if (user.isPresent() && user.get().getRole() == UserRole.DEMO) {
+			return false;
+		}
+		// 2. 설정 행의 수신 여부를 따른다
+		Optional<UserSetting> found = userSettingRepository.findById(userId);
+		if (found.isEmpty()) {
+			return false;
+		}
+		return found.get().isNotificationEnabled();
+	}
+
+	/** 사용자의 이름을 돌려준다. 사용자가 없으면(탈퇴) 빈 값이다. 알림 메일 인사말에 쓴다 */
+	public Optional<String> findName(Long userId) {
+		Optional<User> found = userRepository.findById(userId);
+		if (found.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(found.get().getName());
+	}
+
+	/** 사용자의 이메일을 돌려준다. 사용자가 없으면(탈퇴) 빈 값이다. 알림 발송기가 발송 직전에 수신 주소를 다시 확인하는 용도다 */
+	public Optional<String> findEmail(Long userId) {
+		Optional<User> found = userRepository.findById(userId);
+		if (found.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(found.get().getEmail());
 	}
 
 	/**

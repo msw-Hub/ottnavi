@@ -1,6 +1,8 @@
 import { useId, useState } from 'react'
-import { ArrowLeftIcon, TriangleAlertIcon } from 'lucide-react'
+import { ArrowLeftIcon, InfoIcon, TriangleAlertIcon } from 'lucide-react'
 import { Link } from 'react-router'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -12,6 +14,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { useIsDemo } from '@/hooks/useIsDemo'
 
 /** 탈퇴하면 지워지는 데이터 목록(PRD FR-07·SCR-13). 대기 알림은 알림 기능이 공개 뒤라 넣지 않는다(사용자 확정) */
 const DELETED_DATA = [
@@ -20,6 +23,9 @@ const DELETED_DATA = [
   '직접 고친 요금',
   '저장한 플랜(계산 결과·변경 내역 포함)',
 ] as const
+
+// 데모 계정에게 탈퇴가 막힌 이유 안내의 id([탈퇴하기]가 aria-describedby로 가리킨다)
+const WITHDRAW_LOCK_NOTE_ID = 'withdraw-demo-note'
 
 interface WithdrawScreenProps {
   onWithdraw: () => void // 확인 대화상자에서 [탈퇴]를 확정했다. 실제 탈퇴 API·로그아웃·이동은 이 콜백을 넘기는 쪽이 맡는다
@@ -47,6 +53,7 @@ export function WithdrawScreen({
   const consentId = useId() // 동의 체크박스와 label을 잇는 id
   const [isAgreed, setIsAgreed] = useState(false) // 동의 체크 여부. 체크해야 [탈퇴하기]가 열린다
   const [isDialogOpen, setIsDialogOpen] = useState(false) // 확인 대화상자 열림 여부
+  const isDemo = useIsDemo() // 데모 계정이면 탈퇴를 막는다(서버도 403, Task 109)
 
   return (
     <section className="mx-auto flex w-full max-w-xl flex-col gap-5">
@@ -62,6 +69,25 @@ export function WithdrawScreen({
       </div>
 
       <div className="grid gap-4 rounded-xl border border-border bg-card p-5">
+        {/*
+          데모 계정 안내(Task 109). 푸터의 탈퇴 링크는 데모 계정에게 숨기지만, 주소로 직접 들어오면 이 화면이 보이므로 막힌 이유를 먼저 알린다.
+          경고 문장·삭제 목록은 그대로 두어 실제 회원에게 어떤 화면인지 둘러볼 수 있게 한다.
+          info 톤(테두리·바탕·글자 모두 info 토큰)이고 role="note"(보충 설명)다
+        */}
+        {isDemo && (
+          <Alert
+            role="note"
+            id={WITHDRAW_LOCK_NOTE_ID}
+            className="border-info bg-info-bg text-info"
+          >
+            <InfoIcon aria-hidden="true" />
+            <AlertTitle>데모 계정은 탈퇴할 수 없어요</AlertTitle>
+            <AlertDescription className="break-keep text-info">
+              여러 방문자가 함께 쓰는 공용 계정이라, 계정과 데이터가 지워지지 않도록 막아 두었어요.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* 핵심 경고. 아이콘(삼각 경고)과 굵은 문장으로 위험을 알리고 빨강은 아이콘에만 써서 색 없이도 읽힌다 */}
         <p className="flex items-start gap-2.5 text-base font-semibold break-keep">
           <TriangleAlertIcon
@@ -93,7 +119,8 @@ export function WithdrawScreen({
               id={consentId}
               type="checkbox"
               checked={isAgreed}
-              disabled={isPending}
+              // 데모 계정은 동의 자체를 할 수 없게 꺼 둔다(탈퇴가 막혀 있어 동의가 의미 없다)
+              disabled={isPending || isDemo}
               onChange={(event) => setIsAgreed(event.target.checked)}
               className="size-4.5 shrink-0 accent-destructive focus-visible:outline-none"
             />
@@ -114,53 +141,68 @@ export function WithdrawScreen({
             {/* 확인 대화상자. Radix AlertDialog는 열릴 때 포커스를 [취소](안전한 쪽)에 두고, Esc로 닫히며,
                 닫히면 포커스를 [탈퇴하기](Trigger)로 돌려준다. 바깥을 눌러서는 닫히지 않는다.
                 탈퇴 요청이 진행 중이면 닫지 못하게 막는다(요청 도중 화면만 닫혀 결과를 못 보는 일을 막는다) */}
-            <AlertDialog
-              open={isDialogOpen}
-              onOpenChange={(isOpen) => {
-                if (!isPending) setIsDialogOpen(isOpen)
-              }}
-            >
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="destructive"
-                  disabled={!isAgreed || isPending}
-                  className="h-11 px-5 text-base font-semibold"
-                >
-                  탈퇴하기
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-lg font-semibold">
-                    정말 탈퇴할까요?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="break-keep">
-                    찜·설정·플랜이 모두 바로 삭제되고 복구할 수 없어요. 탈퇴하면 로그아웃돼요.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                {errorMessage ? (
-                  <p role="alert" className="text-sm break-keep text-destructive">
-                    {errorMessage}
-                  </p>
-                ) : null}
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isPending} className="h-11">
-                    취소
-                  </AlertDialogCancel>
-                  {/* AlertDialogAction 대신 일반 버튼을 쓴 이유: Action은 누르는 즉시 대화상자를 닫아 버려
-                      요청 진행 중·실패 안내를 보여 줄 수 없다. 성공하면 넘기는 쪽이 로그아웃·이동하므로 화면째 사라진다 */}
+            {/*
+              데모 계정이면 [탈퇴하기]를 막힌 버튼으로 바꾼다. 확인 대화상자를 열지 않고(Trigger가 아니다) 누르면 이유를 토스트로 알린다.
+              동의 체크가 꺼져 있어 원래라면 disabled지만, disabled면 포커스를 못 받아 이유를 알 수 없어 aria-disabled 방식(DemoLockedButton)을 쓴다
+            */}
+            {isDemo ? (
+              <DemoLockedButton
+                variant="destructive"
+                lockedMessage="데모 계정은 탈퇴할 수 없어요"
+                lockedDescriptionId={WITHDRAW_LOCK_NOTE_ID}
+                className="h-11 px-5 text-base font-semibold"
+              >
+                탈퇴하기
+              </DemoLockedButton>
+            ) : (
+              <AlertDialog
+                open={isDialogOpen}
+                onOpenChange={(isOpen) => {
+                  if (!isPending) setIsDialogOpen(isOpen)
+                }}
+              >
+                <AlertDialogTrigger asChild>
                   <Button
                     variant="destructive"
-                    disabled={isPending}
-                    aria-busy={isPending}
-                    onClick={onWithdraw}
-                    className="h-11 font-semibold"
+                    disabled={!isAgreed || isPending}
+                    className="h-11 px-5 text-base font-semibold"
                   >
-                    {isPending ? '탈퇴하는 중…' : '탈퇴'}
+                    탈퇴하기
                   </Button>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-lg font-semibold">
+                      정말 탈퇴할까요?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="break-keep">
+                      찜·설정·플랜이 모두 바로 삭제되고 복구할 수 없어요. 탈퇴하면 로그아웃돼요.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {errorMessage ? (
+                    <p role="alert" className="text-sm break-keep text-destructive">
+                      {errorMessage}
+                    </p>
+                  ) : null}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isPending} className="h-11">
+                      취소
+                    </AlertDialogCancel>
+                    {/* AlertDialogAction 대신 일반 버튼을 쓴 이유: Action은 누르는 즉시 대화상자를 닫아 버려
+                      요청 진행 중·실패 안내를 보여 줄 수 없다. 성공하면 넘기는 쪽이 로그아웃·이동하므로 화면째 사라진다 */}
+                    <Button
+                      variant="destructive"
+                      disabled={isPending}
+                      aria-busy={isPending}
+                      onClick={onWithdraw}
+                      className="h-11 font-semibold"
+                    >
+                      {isPending ? '탈퇴하는 중…' : '탈퇴'}
+                    </Button>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
       </div>

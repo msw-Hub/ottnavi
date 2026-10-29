@@ -57,4 +57,31 @@ public class UserLoginService {
 		}
 		return Optional.of(user.get().getRole());
 	}
+
+	/**
+	 * 데모 계정 행을 찾고, 없으면(첫 데모 로그인) 만든다. 행은 (로그인 방식 DEMO, subject demo)로 하나뿐이다.
+	 * 두 요청이 동시에 처음 로그인하면 늦은 쪽이 유니크 위반(DataIntegrityViolationException)으로 실패하고 이 트랜잭션은 되돌아간다.
+	 * 호출하는 쪽(DemoLoginService)이 그 예외를 잡아 findDemo로 다시 읽는다(되돌아간 트랜잭션 안에서는 다시 읽을 수 없기 때문이다).
+	 */
+	@Transactional
+	public LoginUser findOrCreateDemo() {
+		// 1. 이미 있는 데모 행이면 그대로 쓴다
+		Optional<User> found = userRepository.findByOauthProviderAndOauthSubject(OAuthProvider.DEMO, DemoAccount.SUBJECT);
+		if (found.isPresent()) {
+			return new LoginUser(found.get().getId(), found.get().getRole());
+		}
+		// 2. 첫 데모 로그인이면 행을 만든다
+		User created = userRepository.save(User.createDemo(DemoAccount.EMAIL, DemoAccount.NAME, DemoAccount.SUBJECT));
+		log.info("데모 계정 행을 만들었습니다: userId={}", created.getId());
+		return new LoginUser(created.getId(), created.getRole());
+	}
+
+	/** 데모 계정 행을 읽는다. 동시 첫 로그인에서 유니크 위반이 난 뒤 다시 읽는 용도다. 없으면 비어 있다 */
+	public Optional<LoginUser> findDemo() {
+		Optional<User> found = userRepository.findByOauthProviderAndOauthSubject(OAuthProvider.DEMO, DemoAccount.SUBJECT);
+		if (found.isEmpty()) {
+			return Optional.empty();
+		}
+		return Optional.of(new LoginUser(found.get().getId(), found.get().getRole()));
+	}
 }

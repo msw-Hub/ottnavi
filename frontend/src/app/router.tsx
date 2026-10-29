@@ -143,7 +143,7 @@ export const routes: RouteObject[] = [
                 },
               },
               {
-                path: 'settings/notifications', // SCR-12 알림 설정 (2단계, 준비 중)
+                path: 'settings/notifications', // SCR-12 알림 설정 (Task 071 화면, Task 074 실제 API 연결)
                 lazy: {
                   Component: () =>
                     import('@/pages/NotificationSettingsPage').then(
@@ -209,7 +209,7 @@ export const routes: RouteObject[] = [
                     },
                   },
                   {
-                    path: 'admin/llm', // SCR-18 LLM 검토 (3단계, 준비 중)
+                    path: 'admin/llm', // SCR-18 LLM 줄거리 번역
                     lazy: {
                       Component: () => import('@/pages/AdminLlmPage').then((m) => m.AdminLlmPage),
                     },

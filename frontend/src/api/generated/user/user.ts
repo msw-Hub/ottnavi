@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 45개이고 모두 구현됐다(Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -31,6 +31,7 @@ import type {
 import type {
   BadRequestResponse,
   CommonResponseUserSettings,
+  ForbiddenResponse,
   InternalErrorResponse,
   UnauthorizedResponse,
   UpdateMySettingsRequest
@@ -64,7 +65,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * 찜, 서비스 구독 상태, 직접 고친 요금, 플랜(변경 내역 포함)이 함께 삭제된다. 계산 기록(`calc_run`)은 통계용으로 남고 플랜 연결(`plan_id`)만 비워진다.
  * 서버는 그 사용자의 Refresh Token 계열을 지우고 쿠키(`rt`, `Path=/api/auth`)를 만료시킨다. 프론트는 응답을 받으면 메모리의 Access Token과 쿼리 캐시를 비우고 첫 화면으로 이동한다(로그아웃과 같은 정리).
  * 요청 본문은 없다. Access Token은 만료(30분) 전이라도 탈퇴한 계정으로는 쓸 수 없다: 같은 토큰으로 다시 탈퇴하거나 설정 저장·찜 추가 같은 쓰기를 하면 사용자를 찾을 수 없어 `UNAUTHORIZED`이고, 내 설정 조회는 온보딩 전 상태(200)로 보인다.
- * 오류: `UNAUTHORIZED`(401), `INTERNAL_ERROR`(500).
+ * 데모 계정(`role: DEMO`)은 여러 사람이 함께 쓰는 공용 계정이라 탈퇴할 수 없다(403 `FORBIDDEN`).
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403, 데모 계정), `INTERNAL_ERROR`(500).
  * @summary 회원 탈퇴
  */
 export const withdrawMe = (
@@ -84,7 +86,7 @@ export const withdrawMe = (
 
 export const getWithdrawMeMutationKey = () => ['withdrawMe'] as const;
 
-export const getWithdrawMeMutationOptions = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+export const getWithdrawMeMutationOptions = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext> => {
 
@@ -113,13 +115,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type WithdrawMeMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawMe>>>
 
-    export type WithdrawMeMutationError = ErrorType<UnauthorizedResponse | InternalErrorResponse>
+    export type WithdrawMeMutationError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
 
 
     /**
  * @summary 회원 탈퇴
  */
-export const useWithdrawMe = <TError = ErrorType<UnauthorizedResponse | InternalErrorResponse>,
+export const useWithdrawMe = <TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawMe>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof withdrawMe>>,

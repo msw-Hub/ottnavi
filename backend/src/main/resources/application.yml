@@ -7,6 +7,14 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+  task:
+    execution:                    # @Async 실행기(구독 안내 알림 생성·즉시 발송, Task 073). Boot 자동 구성 실행기를 쓴다
+      thread-name-prefix: async-
+      pool:
+        core-size: 2              # 메일 한 통을 보내는 동안 다른 요청이 막히지 않을 만큼만. 큐는 기본(무제한)
+      shutdown:
+        await-termination: true         # 재배포(종료) 때 큐에 남은 구독 안내 알림 생성 작업이 버려지지 않게 끝날 때까지 기다린다
+        await-termination-period: 30s   # 무한정 기다리지 않도록 상한을 둔다
   jackson:
     deserialization:
       accept-float-as-int: false  # 정수 필드에 소수(9900.5)가 오면 버림으로 통과시키지 않고 400으로 거절한다
@@ -27,8 +35,33 @@ spring:
       enabled: false              # 기동 시 Job 자동 실행 금지, 관리자 API로만 실행
   data:
     redis:
-      timeout: 2s                 # 명령 응답 대기. Redis Cloud 첫 호출이 11.5초 걸린 관측이 있어(Task 020) 운영 값은 측정 후 조정
+      repositories:
+        enabled: false            # Redis는 템플릿·Lettuce만 쓰고 Spring Data 저장소 인터페이스는 없다. 켜 두면 기동 때 JPA 저장소마다 "store assignment" 안내가 약 25줄 나온다
+      timeout: 2s                # 명령 응답 대기. Redis Cloud 첫 호출이 11.5초 걸린 관측이 있어(Task 020) 운영 값은 측정 후 조정
       connect-timeout: 5s         # 연결 대기
+  mail:                         # Task 072. host·port·계정은 프로필 파일에서 정한다(prod는 기본값 없음). host가 있어야 JavaMailSender가 만들어진다
+    default-encoding: UTF-8
+    properties:
+      "[mail.smtp.auth]": true
+      "[mail.smtp.starttls.enable]": true      # 587은 평문으로 연결한 뒤 STARTTLS로 암호화한다
+      "[mail.smtp.starttls.required]": true    # STARTTLS를 못 하면 평문으로 보내지 않고 실패시킨다
+      "[mail.smtp.connectiontimeout]": 5000    # ms. 타임아웃이 없으면 응답 없는 서버에서 스레드가 무기한 대기한다(TECH 5절)
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
+  autoconfigure:
+    exclude:                      # Spring AI Gemini 자동 구성은 키가 비면 기동이 실패한다. 키가 있을 때만 LlmConfig가 가져온다
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
+  ai:
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:}   # 비우면 LLM 기능이 꺼진다(기동은 된다). 값은 환경 변수로만 넣는다
+        chat:
+          options:
+            model: ${GEMINI_MODEL:gemini-3.5-flash-lite}   # 무료 한도 RPM 15·RPD 500
+            # temperature는 지정하지 않는다(모델 기본값 1.0). 구글은 Gemini 3 계열에서 1.0 미만으로 낮추면 반복·성능 저하가 생길 수 있어 기본값을 유지하라고 권고한다(ai.google.dev Gemini 3 가이드). AI Studio 품질 시험도 기본값으로 했다
+            max-output-tokens: ${app.llm.max-output-tokens}   # 생각(thinking) 토큰이 출력 한도를 쓸 수 있어 번역문(최대 1000자)보다 넉넉히 둔다
+    retry:
+      max-attempts: 0             # Spring AI 기본은 10회 재시도다. 재시도마다 무료 한도(분당·하루)가 줄고 호출 시간 제한을 흐리므로 끈다. 재시도는 관리자가 다시 누른다
   cloud:
     openfeign:
       client:
@@ -37,6 +70,10 @@ spring:
             connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
             readTimeout: 5000     # ms
             loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
+management:
+  health:
+    mail:
+      enabled: false                    # 메일 서버 연결 확인을 헬스 체크에서 뺀다. 켜 두면 헬스 체크마다 SMTP에 접속하고, 메일 서버가 느리거나 막히면 서비스 전체가 DOWN(503)으로 보인다
 server:
   forward-headers-strategy: framework   # Cloudtype은 Boot가 아는 클라우드가 아니라 기본값이 NONE(TECH 4절)
 springdoc:
@@ -61,6 +98,13 @@ app:
       capacity: 3                       # 순간에 몰아 보낼 수 있는 최대 요청 수(한도의 약 1/3)
       refill-tokens: 10                 # refill-period마다 채워지는 토큰 수 (→ IP당 분당 10회)
       refill-period: 1m
+    demo-login:                         # 데모 로그인 시도에만 거는 한도(성공·실패 모두 센다). 계정 잠금은 없다. Redis 오류면 거부(fail-closed)
+      capacity: 5                       # 순간에 몰아 보낼 수 있는 최대 시도 수
+      refill-tokens: 5                  # refill-period마다 채워지는 토큰 수 (→ IP당 15분 5회)
+      refill-period: 15m
+  demo-login:                           # 데모 계정 로그인(TECH 4절). 둘 다 비우면 꺼지고(POST /api/auth/demo-login이 404), 하나만 있으면 기동이 실패한다
+    login-id: ${DEMO_LOGIN_ID:}         # 데모 아이디. 값은 환경 변수로만 넣는다
+    password: ${DEMO_LOGIN_PASSWORD:}   # 데모 비밀번호(16자 이상). 값은 환경 변수로만 넣는다
   tmdb:
     base-url: https://api.themoviedb.org/3
     api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
@@ -75,6 +119,34 @@ app:
       initial-backoff: 500ms   # 첫 재시도 전 대기. 이후 두 배씩
       max-backoff: 4s          # 지수 대기의 상한
       max-retry-after: 5s      # 서버가 이보다 오래 기다리라고 하면 기다리지 않고 포기한다
+  llm:                                  # 관리자 줄거리 번역(Gemini). 키는 spring.ai.google.genai.api-key
+    model: ${spring.ai.google.genai.chat.options.model}   # 화면·로그에 보여 줄 모델 이름(한 곳에서만 정한다)
+    timeout-seconds: 90                 # Gemini 한 번 호출을 기다리는 최대 시간(실측 9~27초, 구글 혼잡 때 더 길어진다). 넘으면 호출 실패(LLM_CALL_FAILED)로 본다
+    max-output-tokens: 4096             # 응답 최대 토큰. Gemini 3.x의 생각(thinking) 토큰이 이 한도를 쓸 수 있어 넉넉히 둔다
+    thinking-level: ${GEMINI_THINKING_LEVEL:}   # 생각(thinking) 수준(선택). 비우면 모델 기본값. MINIMAL·LOW·MEDIUM·HIGH 중 하나, 지원 값은 모델마다 다르다
+    limits:                             # 서버 상한. 구글 무료 한도(분당 15·하루 500)보다 낮게 둬 여유를 남긴다
+      requests-per-minute: 12           # 분당 호출 상한(고정 1분 창)
+      requests-per-day: 400             # 하루 호출 상한. 하루는 태평양 시간(America/Los_Angeles) 날짜 기준이다(구글 일일 한도 리셋 기준)
+      title-cooldown-seconds: 60        # 같은 작품을 다시 번역하기까지 기다리는 시간
+    draft:                              # 번역 초안(Redis 보관)
+      ttl: 7d                           # 초안 보관 기간. Redis에만 있어 서버·Redis 재시작이나 메모리 부족으로 먼저 사라질 수 있다
+      max-pending: 500                  # 대기 초안 총량 상한. 넘으면 새 초안을 만들지 않는다(운영 Redis 30MB 보호)
+    bulk:                               # 일괄 번역
+      max-size: 100                     # 한 번에 요청할 수 있는 작품 수
+      call-interval: 2s                 # 호출 사이 대기. 호출 한 번이 10초 이상 걸려 간격의 의미가 작고, 분당 12회 상한(limits)이 구글 분당 한도(15)를 이미 지킨다
+      busy-retry-wait: 30s              # 구글 서버 혼잡(503)이면 이만큼 기다린 뒤 같은 작품을 한 번만 다시 호출한다
+      max-consecutive-failures: 3       # 호출 실패가 이만큼 연속되면 일괄을 멈춘다
+      fail-retry-max: 2                 # 자동 검사 실패(FAILED)로 끝난 작품을 일괄이 자동으로 다시 번역하는 최대 횟수(첫 시도 제외). 단건 번역은 재시도하지 않는다
+      warning-retry-max: 1              # 주의(WARNING)로 끝난 작품을 자동으로 다시 번역하는 최대 횟수(첫 시도 제외)
+    guard:                              # 번역문 자동 검사 기준(DraftTextGuard)
+      min-hangul-ratio: 0.6             # 글자 중 한글 비율의 하한(공백·숫자·기호 제외한 글자 기준)
+      min-length-ratio: 0.3             # 번역문 길이 / 원문 길이의 하한
+      max-length-ratio: 2.0             # 번역문 길이 / 원문 길이의 상한
+      max-length: 1000                  # 번역문 최대 글자 수(프롬프트에서도 같은 값을 알린다)
+      sentence-count-tolerance: 1       # 원문과 번역문의 문장 수 차이가 이 값을 넘으면 주의(SENTENCE_COUNT_MISMATCH)
+      min-plain-style-ratio: 0.8        # "~다." 꼴 문장 비율이 이 값 미만이면 주의(STYLE_NOT_PLAIN)
+      length-ratio-low-margin: 0.1      # 길이 비율이 min-length-ratio ~ +이 값 구간이면 주의(LENGTH_RATIO_NEAR_LIMIT)
+      length-ratio-high-margin: 0.4     # 길이 비율이 max-length-ratio -이 값 ~ max 구간이면 주의(LENGTH_RATIO_NEAR_LIMIT)
   retention:
     stale-months: 5             # 마지막 수집이 이보다 오래된 작품을 TMDB에 다시 묻는다(TMDB 약관 6개월 보관 기한 대비, Task 083)
     history-retention-days: 180 # BATCH_* 이력과 플랜과 끊긴 calc_run을 이 일수가 지나면 지운다
@@ -97,8 +169,23 @@ app:
   exclusive:                  # 서비스별 독점 목록(Task 078, PRD FR-04)
     cache:                      # Redis `exclusiveTitlesV2` 캐시. 수집 Job이 성공하면 새로 계산해 채우고, 실패·정리 뒤에는 비운다
       ttl: 24h                    # 수집이 오래 없을 때의 안전장치. 캐시가 비면 조회 API가 즉석에서 계산해 채운다
+  mail:                                 # 메일 발송 방식(Task 072). SMTP 접속 정보는 spring.mail.*
+    provider: log                       # smtp면 실제 발송, log면 제목만 로그에 남긴다. 기본은 안전한 log이고 prod가 smtp로 바꾼다
+    from: ottnavi@localhost             # 발신 주소. prod는 ${MAIL_FROM}
+    from-name: OTT내비                  # 발신자 표시 이름
+  notification:                         # 알림 outbox 발송기(Task 072, TECH 5절)
+    # 값의 관계: scheduler lockAtMostFor(4분) < lease(5분). SMTP 타임아웃은 응답마다 5초 제한이라 한 통의 상한이 아니고,
+    # 정상 SMTP 기준 한 통은 수 초다. batch-size와 lockAtMostFor는 이 가정이 느슨하다는 점을 감안해 잡은 값이다
+    # 한 번의 실행이 락 시간 안에 끝나야 다른 서버가 같은 행을 중복 점유하지 않는다
+    scheduler-enabled: true             # 발송 스케줄러 사용 여부. 테스트는 IntegrationTestSupport에서 끈다
+    immediate-send-enabled: true        # 플랜 저장 직후 구독 안내를 바로 발송 시도할지. false면 행만 만들고 스케줄러가 보낸다. 테스트는 끈다
+    poll-interval-ms: 60000             # 스케줄러 실행 간격(이전 실행이 끝난 뒤부터 센다)
+    batch-size: 10                      # 한 번에 점유하는 행 수
+    lease: 5m                           # 점유한 행을 다시 집지 않는 시간(next_attempt_at = now + lease). 발송 중 앱이 죽어도 이 시간 뒤 다시 집힌다
+    max-attempts: 5                     # 점유 횟수 상한. 이 횟수째 실패하면 FAILED
+    retry-delays: 1m,5m,30m,2h          # n번째 실패 뒤 다음 시도까지의 간격(1회째 실패 → 1분, …). 개수는 max-attempts - 1 이상
   plan-recalc:
-    auto-start: true                    # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
+    auto-start: true                   # 수집이 COMPLETED로 끝나면 매월 재계산을 자동 시작한다(Task 069). 테스트는 IntegrationTestSupport에서 끈다
   collect:
     runtime-defaults:          # TMDB runtime이 비었을 때 쓰는 추정 기본값(분, PRD 11절 25번). 바인딩은 Task 043·044에서 한다
       movie-minutes: 100              # 영화(첫 전체 수집 실측 중앙값 98분, 2026-10-15 보정. 이전 120)

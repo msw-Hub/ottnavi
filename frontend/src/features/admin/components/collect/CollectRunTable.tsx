@@ -7,6 +7,8 @@ import {
   WrenchIcon,
 } from 'lucide-react'
 import { cn } from 'cn'
+import { DemoLockedButton } from '@/components/common/DemoLockedButton'
+import { DEMO_READONLY_NOTE_ID } from '@/components/common/DemoReadOnlyHint'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -162,8 +164,10 @@ export function CollectRunTable({
           <span className="sr-only"> (실행 {execution.executionId})</span>
         </Button>
       )}
+      {/* 데모 계정이면 [다시 실행]이 막힌다(Task 109). 행 안에는 안내 자리가 없어 화면 위 조회 전용 안내를 설명으로 가리킨다.
+          [복구]는 확인 대화상자를 여는 버튼이라 그대로 두고, 대화상자의 확정 버튼을 막는다(RecoverRunDialog) */}
       {execution.canRestart && (
-        <Button
+        <DemoLockedButton
           type="button"
           variant="outline"
           size="sm"
@@ -171,11 +175,12 @@ export function CollectRunTable({
           data-variant={variant}
           disabled={restartingExecutionId === execution.executionId}
           onClick={() => onRestart(execution)}
+          icon={<RotateCcwIcon aria-hidden="true" />}
+          lockedDescriptionId={DEMO_READONLY_NOTE_ID}
         >
-          <RotateCcwIcon aria-hidden="true" />
           다시 실행
           <span className="sr-only"> (실행 {execution.executionId})</span>
-        </Button>
+        </DemoLockedButton>
       )}
     </>
   )

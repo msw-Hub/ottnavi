@@ -22,7 +22,9 @@ import {
 import { adminHandlers } from '@/mocks/adminHandlers'
 import { authHandlers } from '@/mocks/authHandlers'
 import { homeHandlers } from '@/mocks/homeHandlers'
+import { llmHandlers } from '@/mocks/llmHandlers'
 import { memberHandlers } from '@/mocks/memberHandlers'
+import { notificationHandlers } from '@/mocks/notificationHandlers'
 import { getMockRole } from '@/mocks/mockSession'
 
 // MSW 요청 핸들러 모음. 목업 모드(VITE_USE_MOCK=true)에서 브라우저가 이 핸들러로 /api 요청을 가로챈다.
@@ -413,6 +415,8 @@ export const handlers: RequestHandler[] = [
   ...publicScreenHandlers,
   ...homeHandlers, // 홈·탐색 공개 조회(Task 108)
   ...memberHandlers,
+  ...notificationHandlers, // 알림 설정·이력, 관리자 알림 요약(Task 071)
   ...adminHandlers, // 관리자 화면(Task 029). 역할을 검사하지 않는다(adminHandlers 주석)
+  ...llmHandlers, // 관리자 LLM 줄거리 번역(/admin/llm). 쓰기는 데모 계정 403
   ...getProductMock(),
 ]

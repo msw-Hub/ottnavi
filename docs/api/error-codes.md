@@ -12,8 +12,8 @@
 | `VALIDATION_FAILED` | 400 | 요청 값 검증 실패(본문 필드 검증, 쿼리·경로 파라미터 제약 위반·형식 오류·누락). 응답의 `fieldErrors`에 필드별 오류 목록 포함 | 입력한 내용을 다시 확인해 주세요. |
 | `INVALID_REQUEST` | 400 (406·415 등 기타 4xx는 원래 상태 유지) | 필드를 특정할 수 없는 요청 오류(깨진 JSON 본문, 지원하지 않는 Content-Type 등). `fieldErrors` 없음 | 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요. |
 | `UNAUTHORIZED` | 401 | 인증 필요 또는 Access Token 만료·무효. `POST /api/auth/refresh`에서는 `rt` 쿠키 없음·형식 오류·만료·재사용 감지(계열 폐기) | 로그인이 필요합니다. |
-| `FORBIDDEN` | 403 | 권한 없음(관리자 전용 API 등), 또는 Vercel을 거치지 않은 직접 호출(오리진 비밀 헤더 불일치, Task 019), 또는 `POST /api/auth/refresh`·`/api/auth/logout`의 `Origin` 헤더가 `APP_FRONTEND_ORIGIN`과 다름(Task 054) | 접근 권한이 없습니다. |
-| `RESOURCE_NOT_FOUND` | 404 | 요청한 경로(API)가 없음. 특정 데이터가 없는 경우는 `TITLE_NOT_FOUND`처럼 도메인 코드를 쓴다. 예외로 관리자 API(`/api/admin/**`)의 없는 데이터(상품·요금 이력·제공처·수집 실행)는 이 코드를 쓴다(Task 031, 아래 설명) | 요청한 페이지를 찾을 수 없습니다. |
+| `FORBIDDEN` | 403 | 권한 없음(관리자 전용 API 등), 또는 Vercel을 거치지 않은 직접 호출(오리진 비밀 헤더 불일치, Task 019), 또는 `POST /api/auth/refresh`·`/api/auth/logout`·`/api/auth/demo-login`의 `Origin` 헤더가 `APP_FRONTEND_ORIGIN`과 다름(Task 054), 또는 데모 계정(`DEMO`)의 관리자 쓰기·실행(조회 GET 외 전부)·회원 탈퇴·알림 설정 변경(Task 109), 또는 데모 계정이 아닌 회원의 `GET /api/me/plans/current/mail-preview` 호출(Task 110) | 접근 권한이 없습니다. |
+| `RESOURCE_NOT_FOUND` | 404 | 요청한 경로(API)가 없음. 특정 데이터가 없는 경우는 `TITLE_NOT_FOUND`처럼 도메인 코드를 쓴다. 예외로 관리자 API(`/api/admin/**`)의 없는 데이터(상품·요금 이력·제공처·수집 실행)는 이 코드를 쓴다(Task 031, 아래 설명). 데모 로그인(`POST /api/auth/demo-login`)이 꺼져 있을 때(서버에 데모 아이디·비밀번호가 없을 때)도 경로가 없는 것처럼 이 코드다(Task 109) | 요청한 페이지를 찾을 수 없습니다. |
 | `METHOD_NOT_ALLOWED` | 405 | 경로는 있지만 HTTP 메서드를 지원하지 않음. `Allow` 헤더 포함 | 요청을 처리할 수 없습니다. 잠시 후 다시 시도해 주세요. |
 | `TITLE_NOT_FOUND` | 404 | 요청한 작품(TMDB ID)을 찾을 수 없음 | 작품을 찾을 수 없습니다. |
 | `RATE_LIMIT_EXCEEDED` | 429 | 비로그인 공개 API·인증 경로(`/api/auth/**`) 요청 제한 초과, 단건 수집 한도 초과·저장소 장애 시 단건 수집 거부. `Retry-After` 헤더(초) 포함 | 요청이 많습니다. 잠시 후 다시 시도해 주세요. |
@@ -52,6 +52,7 @@
 |---|---|---|---|---|
 | `PLAN_DRAFT_STALE` | 409 | 저장하려는 DRAFT의 데이터 기준일이 최신 수집 완료 시각보다 이름. 프론트가 받으면 자동으로 재계산을 요청한다 | 데이터가 갱신되어 플랜을 다시 계산하고 있습니다. | TECH 2절, PRD 5.4 |
 | `PLAN_DRAFT_NOT_FOUND` | 404 | 저장하려는 DRAFT가 없거나 본인 것이 아님. 이미 저장돼 DRAFT가 아니게 됐거나 다시 계산해 지워진 경우 포함 | 계산된 플랜을 찾을 수 없습니다. 요금 확인이나 찜 목록 화면에서 다시 계산해 주세요. | TECH 2절 |
+| `ONBOARDING_REQUIRED` | 409 | 내 설정(온보딩)을 한 번도 저장하지 않아 알림 설정을 저장할 설정 행이 없음(`updateMyNotificationSetting`, Task 071·073) | 내 설정을 먼저 저장해 주세요. | PRD FR-16, Task 071·073 |
 | `BATCH_ALREADY_RUNNING` | 409 | 같은 날짜 또는 다른 날짜의 수집이 실행 중(전체 동시 실행 금지, 관리자 API). 매월 재계산 수동 실행(`POST /api/admin/plans/monthly/executions`, Task 069)과 데이터 정리 실행(`POST /api/admin/retention/executions`, Task 083)도 재계산·수집·정리 중 하나가 이미 실행 중이면 같은 코드를 쓰고, 반대로 수집 시작·재시작 요청도 매월 재계산이나 데이터 정리가 실행 중이면 이 코드(상세 메시지: 재계산이 실행 중이라 수집을 시작할 수 없습니다. / 데이터 정리가 실행 중이라 수집을 시작할 수 없습니다.)다. 인기 순위 수집 실행(`POST /api/admin/popularity/executions`, Task 107)도 수집·재계산·정리·인기 수집 중 하나가 실행 중이면 이 코드를 쓰고, 반대로 수집·재계산·정리 시작도 인기 수집이 실행 중이면 이 코드다 | 수집이 이미 실행 중입니다. 끝난 뒤 다시 시도해 주세요. | TECH 3절 (도출) |
 | `BATCH_ALREADY_COMPLETED` | 409 | 같은 `targetDate`+`tier`(+`scope`)의 수집 Job이 이미 완료됨(관리자 API) | 해당 날짜의 수집은 이미 완료되었습니다. | TECH 3절 (도출) |
 | `BATCH_RECOVERY_REQUIRED` | 409 | 같은 `targetDate`+`tier`(+`scope`)에 중단된(`STOPPED`) 실행이 있어 새로 실행하거나 재시작할 수 없음. 먼저 복구해야 한다(수집 실행·재시작 API) | 중단된 실행이 있어 새로 실행할 수 없습니다. 이력에서 [복구]를 먼저 실행하세요. | TECH 3절 "중단 Job 복구", Task 029·031 |
@@ -65,6 +66,19 @@
 | `WISHLIST_LIMIT_EXCEEDED` | 409 | "다 봤음"이 아닌 찜이 이미 20개라 새로 추가하거나 "다 봤음"을 되돌릴 수 없음. 이미 찜한 작품(시즌)의 중복 추가는 이 오류가 아니라 200이다 | 찜은 20개까지 담을 수 있어요. 찜 목록에서 정리해 주세요. | PRD 11절 36번, FR-09, SCR-08 토스트 문구 |
 | `WISHLIST_ITEM_NOT_FOUND` | 404 | 바꾸려는 찜 항목이 없거나 본인 것이 아님(삭제는 없어도 204라 이 오류가 없다) | 찜 항목을 찾을 수 없습니다. | PRD FR-09 "다른 사용자의 찜은 조회되지 않는다", Task 031·056 |
 | `SERVICE_PRICE_NOT_FOUND` | 404 | 내 월 요금을 고치거나 되돌리려는 상품이 요금을 고칠 수 있는 상품이 아님(없는 상품이거나 판매 종료, 현재 적용 중인 요금이 없는 판매 중 상품도 포함하며 목록에서는 이런 상품이 빠진다) | 이 서비스의 요금 정보를 찾을 수 없습니다. | ERD `user_price_override`(상품 단위), Task 031·060 |
+| `DEMO_LOGIN_FAILED` | 401 | 데모 계정 로그인(`POST /api/auth/demo-login`)의 아이디 또는 비밀번호가 틀림(빈 값 포함). 어느 쪽이 틀렸는지는 알리지 않는다 | 아이디 또는 비밀번호가 올바르지 않습니다. | TECH 4절 데모 로그인, Task 109 |
 | `OTT_SERVICE_NOT_FOUND` | 404 | 독점 목록 조회(`GET /api/public/ott-services/{ottServiceId}/exclusive-titles`)의 서비스 ID가 7개 서비스에 없음. 데이터 부족 서비스(쿠팡플레이)도 404가 아니라 판정한 목록(드라마만)의 200이다 | 서비스를 찾을 수 없습니다. | Task 075 확정(2026-10-17), Task 078 |
+| `LLM_DISABLED` | 503 | 서버에 Gemini 키(`GEMINI_API_KEY`)가 없어 번역을 할 수 없음(번역 초안 생성·일괄 번역 시작). 외부 호출은 일어나지 않았고 호출 상한 카운터도 올리지 않는다. 일괄 번역 도중에 확인되면 일괄이 `DISABLED`로 멈춘다. 후보 조회는 키가 없어도 동작한다 | 번역 기능이 꺼져 있습니다. 서버에 Gemini 키가 설정되지 않았습니다. | 줄거리 번역(관리자), 503은 backend.md 목록에 없으나 "서비스 설정이 꺼진 상태"라 4xx·502로 매핑하지 않았다 |
+| `LLM_RATE_LIMITED` | 429 | 번역 호출이 서버 분당 상한(12)을 넘음, 또는 구글이 429(RESOURCE_EXHAUSTED)로 거절함. 잠시 뒤 다시 시도하면 된다 | 번역 호출이 분당 상한을 넘었습니다. 잠시 뒤 다시 시도해 주세요. | 줄거리 번역(관리자), 구글 무료 한도 분당 15 |
+| `LLM_TITLE_COOLDOWN` | 429 | 같은 작품을 60초 안에 다시 번역하려 함(Gemini 호출 비용 보호) | 같은 작품은 잠시 뒤에 다시 번역할 수 있습니다. | 줄거리 번역(관리자) |
+| `LLM_DAILY_LIMIT_EXCEEDED` | 429 | 오늘(태평양 시간 날짜 기준) 번역 호출이 서버 하루 상한(400)에 도달함 | 오늘 번역 호출 상한을 모두 사용했습니다. | 줄거리 번역(관리자), 구글 무료 한도 하루 500 |
+| `LLM_CALL_FAILED` | 502 | Gemini 호출이 한도 초과 외의 이유로 실패함(연결·인증·서버 오류, 호출 제한 시간 90초 초과, 빈 응답). 호출 상한 카운터는 올라간 채로 둔다 | 번역 호출에 실패했습니다. | 줄거리 번역(관리자) |
+| `LLM_UPSTREAM_BUSY` | 502 | 구글 서버가 혼잡해 Gemini가 503(high demand, UNAVAILABLE)으로 거절함. 한도 초과(429)와 달리 잠시 뒤 다시 누르면 될 수 있다. 단건 생성은 요청 안에서 재시도하지 않고 바로 돌려주며, 일괄 번역은 30초 뒤 같은 작품을 한 번만 다시 부른다. 호출 상한 카운터는 올라간 채로 둔다 | 구글 서버가 혼잡해 번역하지 못했습니다. 잠시 뒤 다시 시도해 주세요. | 줄거리 번역(관리자) |
+| `LLM_DRAFT_NOT_FOUND` | 404 | 삭제하거나 수정(`PATCH /api/admin/llm/drafts/{draftId}`)하려는 번역 초안이 없음(보관 기간 7일이 지났거나, Redis에서 먼저 지워졌거나, 이미 반영·삭제됨). 반영(`POST /api/admin/llm/drafts/apply`)에서 없는 초안은 오류가 아니라 건별 결과의 `DRAFT_NOT_FOUND`(건너뜀)다. 관리자 API의 없는 데이터는 `RESOURCE_NOT_FOUND`를 쓰는 원칙의 예외로 사용자(관리자)가 요청한 코드다 | 번역 초안을 찾을 수 없습니다. 보관 기간이 지났거나 이미 반영·삭제됐을 수 있습니다. | 줄거리 번역(관리자) |
+| `LLM_BULK_RUNNING` | 409 | 일괄 번역이 이미 실행 중(한 번에 1개) | 일괄 번역이 이미 실행 중입니다. | 줄거리 번역(관리자) |
+| `LLM_NOT_TRANSLATABLE` | 409 | 번역하려는 작품의 줄거리가 영어(`en`)가 아니거나 비어 있음(이미 한국어이거나 줄거리가 없음) | 영어 줄거리가 있는 작품만 번역할 수 있습니다. | 줄거리 번역(관리자) |
+| `LLM_DRAFT_LIMIT_EXCEEDED` | 409 | 대기 중인 초안이 상한(500)에 도달해 새 초안을 만들 수 없음(Redis 메모리 보호). 반영하거나 삭제하면 줄어든다. 같은 작품의 초안을 교체하는 것은 개수가 늘지 않아 허용된다 | 대기 중인 초안이 가득 찼습니다. 반영하거나 삭제한 뒤 다시 시도해 주세요. | 줄거리 번역(관리자) |
+| `LLM_APPLY_CONFLICT` | 409 | 수집·매월 재계산·데이터 정리·인기 수집 중 하나가 실행 중이라 줄거리를 반영하거나 영어로 되돌릴 수 없음(단건·대량 되돌리기 모두) | 수집·재계산·정리가 실행 중이라 줄거리를 바꿀 수 없습니다. | 줄거리 번역(관리자), `BATCH_ALREADY_RUNNING`과 같은 동시 실행 금지 확인 방식 |
+| `LLM_NOT_REVERTIBLE` | 409 | 영어로 되돌리려는 작품의 줄거리가 관리자가 반영한 번역이 아님(`overview_translated_at`이 없음). TMDB가 원래 준 한국어 줄거리와 영어 줄거리는 되돌릴 수 없다. 대량 되돌리기(`POST /api/admin/llm/overview-reverts`)는 번역이 아닌 작품을 건너뛰므로 이 오류를 내지 않는다 | 관리자가 반영한 번역 줄거리만 영어로 되돌릴 수 있습니다. | 줄거리 번역(관리자) |
 
-위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045), `WISHLIST_*` 2개(Task 056), `PRICE_*` 6개(Task 059), `SERVICE_PRICE_NOT_FOUND`(Task 060), `OTT_SERVICE_NOT_FOUND`(Task 078)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).
+위 표의 Task 031 행은 계약(`openapi.yaml`)의 operation 설명과 같은 이름·상태다. 백엔드 `ErrorCode` enum에는 `BATCH_*` 4개(Task 045), `WISHLIST_*` 2개(Task 056), `PRICE_*` 6개(Task 059), `SERVICE_PRICE_NOT_FOUND`(Task 060), `OTT_SERVICE_NOT_FOUND`(Task 078), `DEMO_LOGIN_FAILED`(Task 109), `LLM_*` 12개(영어 줄거리 한국어 번역 관리자 API)가 반영돼 있고, 나머지는 해당 기능 구현 Task가 추가한다. 프론트 `errorMessages.test.ts`는 이 파일의 모든 표 행을 읽어 `ERROR_MESSAGES`와 비교하므로, 이 표에 행을 추가한 PR에서 프론트 `TECH_ERROR_MESSAGES`에도 같은 코드·문구를 넣어야 한다(`PROPOSED_ERROR_MESSAGES` 8개는 옮기고, 새 코드 3개 `WISHLIST_LIMIT_EXCEEDED`·`WISHLIST_ITEM_NOT_FOUND`·`SERVICE_PRICE_NOT_FOUND`는 추가).

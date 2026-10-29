@@ -37,6 +37,13 @@ public class RateLimitConfig {
 		return new SingleFetchRateLimiter(bucketProvider, props.singleFetch(), meterRegistry);
 	}
 
+	/** 데모 로그인 IP별 시도 한도 검사기. DemoLoginService가 아이디·비밀번호를 비교하기 전에 check(clientIp)를 부른다 */
+	@Bean
+	DemoLoginRateLimiter demoLoginRateLimiter(RedisRateLimitBucketProvider bucketProvider, RateLimitProperties props,
+			MeterRegistry meterRegistry) {
+		return new DemoLoginRateLimiter(bucketProvider, props.demoLogin(), meterRegistry);
+	}
+
 	/** 요청 제한 서블릿 필터. 순서는 클래스의 @Order(HIGHEST_PRECEDENCE + 25)를 따른다 */
 	@Bean
 	PublicRateLimitFilter publicRateLimitFilter(PublicRateLimiter rateLimiter,

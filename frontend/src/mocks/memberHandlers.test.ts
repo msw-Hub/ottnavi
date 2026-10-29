@@ -523,3 +523,68 @@ describe('요금', () => {
     })
   })
 })
+
+describe('알림 메일 예시 조회(Task 110)', () => {
+  const MAIL_URL = '/me/plans/current/mail-preview'
+
+  // 데모 계정으로 플랜을 계산해 저장해 둔다(저장한 현재 플랜이 있어야 메일이 만들어진다)
+  async function saveDemoPlan() {
+    setMockRole('DEMO')
+    await request({ url: '/me/settings', method: 'PUT', data: SETTINGS_REQUEST })
+    await addWishlist()
+    const drafts = await request<CommonResponsePlanDraftList>({
+      url: '/me/plan-drafts',
+      method: 'POST',
+    })
+    await request({
+      url: '/me/plans',
+      method: 'POST',
+      data: { planId: drafts.data.drafts[0].planId },
+    })
+  }
+
+  // 시나리오는 요청 헤더(X-Mock-Scenario)로 받는다
+  function getMail(scenario?: string) {
+    return request<{ data: { mails: { type: string }[]; noMailReasons: string[] } }>({
+      url: MAIL_URL,
+      method: 'GET',
+      headers: scenario ? { 'X-Mock-Scenario': scenario } : {},
+    })
+  }
+
+  it('데모 계정이 저장한 플랜이 있으면 구독 안내와 월초 메일 2통이다', async () => {
+    await saveDemoPlan()
+    const res = await getMail()
+    expect(res.data.mails.map((mail) => mail.type)).toEqual(['SUBSCRIBE_GUIDE', 'MONTHLY'])
+    expect(res.data.noMailReasons).toEqual([])
+  })
+
+  it('mail-monthly-only는 월초 1통과 NO_SUBSCRIBE_GUIDE다', async () => {
+    await saveDemoPlan()
+    const res = await getMail('mail-monthly-only')
+    expect(res.data.mails.map((mail) => mail.type)).toEqual(['MONTHLY'])
+    expect(res.data.noMailReasons).toEqual(['NO_SUBSCRIBE_GUIDE'])
+  })
+
+  it('mail-none이거나 저장한 플랜이 없으면 0통과 NO_CURRENT_PLAN이다', async () => {
+    await saveDemoPlan()
+    const none = await getMail('mail-none')
+    expect(none.data).toEqual({ mails: [], noMailReasons: ['NO_CURRENT_PLAN'] })
+
+    resetMockMemberState()
+    const noPlan = await getMail()
+    expect(noPlan.data).toEqual({ mails: [], noMailReasons: ['NO_CURRENT_PLAN'] })
+  })
+
+  it('mail-forbidden은 데모여도 403, mail-error는 500이다', async () => {
+    await saveDemoPlan()
+    await expect(getMail('mail-forbidden')).rejects.toMatchObject({ status: 403 })
+    await expect(getMail('mail-error')).rejects.toMatchObject({ status: 500 })
+  })
+
+  it('일반 회원은 403, 비로그인은 401이다', async () => {
+    await expect(getMail()).rejects.toMatchObject({ status: 403, errorCode: 'FORBIDDEN' })
+    setMockRole('GUEST')
+    await expect(getMail()).rejects.toMatchObject({ status: 401 })
+  })
+})

@@ -6,10 +6,12 @@ import com.ottnavi.plan.dto.request.CreatePlanRequest;
 import com.ottnavi.plan.dto.response.CurrentPlanResponse;
 import com.ottnavi.plan.dto.response.PlanChangeHistoryListResponse;
 import com.ottnavi.plan.dto.response.PlanDraftListResponse;
+import com.ottnavi.plan.dto.response.PlanMailPreviewResponse;
 import com.ottnavi.plan.dto.response.SavedPlanResponse;
 import com.ottnavi.plan.service.PlanActivateService;
 import com.ottnavi.plan.service.PlanChangeHistoryService;
 import com.ottnavi.plan.service.PlanCalculateService;
+import com.ottnavi.plan.service.PlanMailPreviewService;
 import com.ottnavi.plan.service.PlanQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,6 +38,7 @@ public class PlanController {
 	private final PlanActivateService planActivateService;
 	private final PlanQueryService planQueryService;
 	private final PlanChangeHistoryService planChangeHistoryService;
+	private final PlanMailPreviewService planMailPreviewService;
 
 	/** 내 찜·설정·요금으로 3개월 플랜을 계산해 초안 3종(추천형·절약형·간편형)을 만든다. 기존 초안은 덮어쓴다 */
 	@Operation(operationId = "createPlanDrafts", summary = "플랜 계산(초안 3종 생성)")
@@ -60,6 +63,14 @@ public class PlanController {
 	public CommonResponse<CurrentPlanResponse> getCurrentPlan(
 			@Parameter(hidden = true) @AuthenticationPrincipal AuthUser authUser) {
 		return CommonResponse.success(CurrentPlanResponse.from(planQueryService.getCurrent(authUser.userId())));
+	}
+
+	/** 데모 계정 전용: 현재 플랜으로 알림 메일 예시(제목·HTML)를 만든다. 메일을 보내거나 outbox에 쌓지 않는다 */
+	@Operation(operationId = "getCurrentPlanMailPreview", summary = "알림 메일 예시 조회(데모 계정 전용)")
+	@GetMapping("/plans/current/mail-preview")
+	public CommonResponse<PlanMailPreviewResponse> getCurrentPlanMailPreview(
+			@Parameter(hidden = true) @AuthenticationPrincipal AuthUser authUser) {
+		return CommonResponse.success(PlanMailPreviewResponse.from(planMailPreviewService.preview(authUser.userId())));
 	}
 
 	/** 매월 재계산으로 플랜이 바뀐 변경 내역을 최신순 최대 6건 돌려준다. 없으면 200과 빈 배열이다 */
