@@ -235,12 +235,32 @@ describe('알림 켜기 안내(저장 직후)', () => {
   })
 
   it('알림 설정을 불러오는 중에는 안내가 보이지 않는다', async () => {
-    // 응답이 오지 않는 상태(로딩 중)를 만든다
-    server.use(http.get('/api/me/notification-setting', () => new Promise(() => {})))
+    // 응답을 바깥의 release()로만 풀 수 있게 막아 로딩 중 상태를 만든다.
+    // 영원히 끝나지 않는 Promise를 쓰면 테스트가 끝난 뒤에도 요청이 대기 상태로 남아 다음 테스트에 영향을 주므로(CI 간헐 실패 원인), 마지막에 반드시 풀어 준다
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    server.use(
+      http.get('/api/me/notification-setting', async () => {
+        await gate
+        return HttpResponse.json({
+          success: true,
+          data: { isNotificationEnabled: false, email: 'user@example.com' },
+        })
+      }),
+    )
     await saveAs('USER')
 
-    await waitFor(() => expect(settingRequestCount).toBe(1))
-    expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+    try {
+      await waitFor(() => expect(settingRequestCount).toBe(1))
+      expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+    } finally {
+      // 검사가 실패해도 대기 요청이 남지 않게 푼다
+      release()
+    }
+    // 풀린 응답이 화면에 반영(안내 표시)될 때까지 기다려, 테스트 종료 뒤 상태 갱신(act 경고)이 생기지 않게 한다
+    expect(await screen.findByRole('group', { name: '알림 켜기 안내' })).toBeInTheDocument()
   })
 
   it('닫기(X)를 누르면 안내가 사라진다', async () => {
