@@ -212,7 +212,9 @@ describe('데모 계정 로그인 화면', () => {
 
     await submitDemoLogin(user)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('아이디 또는 비밀번호가 올바르지 않습니다.')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '아이디 또는 비밀번호가 올바르지 않습니다.',
+    )
     expect(refreshRequestCount).toBe(0)
     expect(demoLoginRequestCount).toBe(1)
     expect(useAuthStore.getState().accessToken).toBe('old-token') // 로그인 상태도 그대로다
