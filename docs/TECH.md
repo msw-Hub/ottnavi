@@ -185,6 +185,7 @@ sequenceDiagram
   - 권한(`SecurityConfig`, 처음 맞는 규칙이 적용되므로 순서가 중요): `DELETE /api/me`·`PUT /api/me/notification-setting`은 `USER`·`ADMIN`만(데모 403), 관리자 경로는 **GET만** `ADMIN`·`DEMO`(배치 경로 GET은 `BATCH`도), 그 밖의 관리자 쓰기·실행(비교 측정 `POST /api/admin/plan-benchmarks` 포함)은 기존 규칙이라 데모 403. 회원 기능(`/api/me/**`의 설정·찜·요금·플랜 계산·저장)은 그대로 쓴다. 알림은 이중으로 막는다: 설정 변경 API 403 + `UserQueryService.isNotificationEnabled`가 DEMO면 항상 false(알림 생성 관문 `NotificationCreateService`와 가입 안내가 이 값을 본다).
   - 설정 검증(`DemoLoginProperties`): 둘 다 비면 꺼짐, 하나만 있거나 비밀번호가 16자 미만이면 기동 실패(메시지·`toString`에 값 없음). 요청 본문 `DemoLoginRequest`는 Bean Validation을 쓰지 않는다(꺼진 상태에서 400이 나가 경로가 드러나지 않게, 빈 값은 401). 단 본문이 아예 없거나 JSON이 깨지면 꺼진 상태에서도 400 `INVALID_REQUEST`다(본문 해석이 서비스보다 먼저라서, 수용). 입력값은 어떤 로그에도 남기지 않는다(실패 warn은 사유 문구만, 성공 info는 userId만).
   - 끄는 법: Cloudtype 환경 변수 두 개를 지우고 재배포한다. 남은 데모 세션은 다음 재발급에서 `AuthTokenService.refresh`가 계열을 모두 지우고 401로 끝낸다(남은 AT는 만료까지 최대 30분 유효). 공용 데이터 초기화 기능은 두지 않고(사용자 결정), 필요하면 `DELETE FROM users WHERE oauth_provider = 'DEMO'`로 지운다(하위 행은 `ON DELETE CASCADE`, 다음 로그인 때 새로 만들어진다).
+  - 기능 스위치 공통 원칙(데모 로그인·번역 도구 `GEMINI_API_KEY`·메일 발송): 켜짐/꺼짐은 환경 변수 유무(또는 스위치 값)로 정하고, 끄면 그 기능만 멈출 뿐 이미 저장된 데이터(데모 계정 행, 반영된 번역 줄거리, 알림 이력)는 지우지 않는다.
   - **알려진 한계**: 공용 계정이라 여러 사람이 같은 설정·찜·플랜을 함께 바꾼다. 관리자 GET 응답(수집 이력, 제공처 매핑, 상품·가격, 알림 요약)은 데모 사용자에게 그대로 보인다(운영 데이터지만 개인정보는 없다. 알림 요약은 상태별 건수와 마지막 발송 시각뿐이다).
 
 **IP 헤더 신뢰 문제.**
