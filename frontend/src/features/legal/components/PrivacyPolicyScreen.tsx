@@ -71,6 +71,10 @@ export function PrivacyPolicyScreen() {
             서버와 호스팅 제공사의 접속 기록에 IP 주소, 접속 시각, 요청한 주소가 남을 수 있습니다.
             이 기록은 서비스 운영과 오류 대응에만 씁니다.
           </li>
+          <li>
+            알림 기록: 알림을 켠 경우 보낼 메일의 종류, 메일 내용을 만드는 데 쓰는 값(표시 이름,
+            플랜 요약), 발송 상태와 시각, 실패 원인이 저장됩니다.
+          </li>
         </PolicyList>
       </PolicySection>
 
@@ -80,9 +84,12 @@ export function PrivacyPolicyScreen() {
           <li>찜한 작품, 월 예산, 월 시청 시간을 바탕으로 한 구독 플랜 계산과 계산 결과 저장</li>
           <li>서비스 운영, 과도한 요청 방지, 오류 확인과 대응</li>
         </PolicyList>
-        <p className="text-muted-foreground">
-          서비스는 아직 알림 메일을 보내지 않습니다. 알림 메일을 제공하게 되면 이 방침을 먼저 고친
-          뒤 알려 드립니다.
+        {/* 이전: "서비스는 아직 알림 메일을 보내지 않습니다. 알림 메일을 제공하게 되면 이 방침을 먼저 고친 뒤 알려 드립니다." — 알림 메일 제공(2026-10-30 시행)에 맞춰 바꿨다 */}
+        <p>
+          <span className="font-semibold">알림 메일:</span> 이용자가 알림 설정에서 직접 켠 경우에만
+          가입한 Google 계정의 이메일 주소로 구독 플랜 안내 메일(플랜을 저장했을 때의 구독 안내,
+          매월 안내)을 보냅니다. 알림은 기본적으로 꺼져 있고, 알림 설정에서 언제든 끌 수 있습니다.
+          알림을 켜는 것을 메일 수신에 동의하는 것으로 봅니다. 광고나 홍보 메일은 보내지 않습니다.
         </p>
       </PolicySection>
 
@@ -117,8 +124,8 @@ export function PrivacyPolicyScreen() {
         <PolicyList>
           <li>개인정보는 회원 탈퇴 전까지 보관합니다.</li>
           <li>
-            회원 탈퇴를 하면 계정과 그에 딸린 정보(내 설정, 찜 목록, 플랜, 직접 고친 요금)를 즉시
-            영구 삭제하고, 로그인 유지 정보도 지웁니다. 지운 정보는 되살릴 수 없습니다.
+            회원 탈퇴를 하면 계정과 그에 딸린 정보(내 설정, 찜 목록, 플랜, 직접 고친 요금, 알림
+            기록)를 즉시 영구 삭제하고, 로그인 유지 정보도 지웁니다. 지운 정보는 되살릴 수 없습니다.
           </li>
           <li>
             다만 아래 처리 위탁 업체의 백업에는 각 업체의 정책에 따라 일정 기간 남아 있을 수
@@ -134,7 +141,10 @@ export function PrivacyPolicyScreen() {
           <li>Redis Cloud: 로그인 유지 정보와 요청 제한 정보 보관</li>
           <li>Cloudtype: 서비스 서버 운영</li>
           <li>Vercel: 서비스 화면 호스팅</li>
-          <li>Google: 로그인(계정 인증)</li>
+          <li>
+            Google: 로그인(계정 인증), 알림 메일 발송(Gmail). 알림을 켠 이용자의 이메일 주소가
+            Gmail을 거쳐 전달됩니다.
+          </li>
         </PolicyList>
         <p>
           일부 서비스는 해외 서버를 거칠 수 있습니다. 작품과 제공처 정보는 TMDB(JustWatch 기반)에서
@@ -187,7 +197,11 @@ export function PrivacyPolicyScreen() {
       <PolicySection id="privacy-changes" title="10. 방침의 변경">
         <p>
           이 방침이 바뀌면 시행 7일 전부터 이 화면에 바뀐 내용과 새 시행일을 알립니다. 지금 방침의
-          시행일은 {effectiveDateText}입니다.
+          시행일은 <span className="whitespace-nowrap">{effectiveDateText}</span>입니다.
+        </p>
+        <p>
+          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 알림 메일 제공에 맞춰
+          알림 메일의 이용 목적과 기록, 처리 위탁 내용을 추가하고 고쳤습니다.
         </p>
         <p>
           서비스 이용에 관한 약속은{' '}
