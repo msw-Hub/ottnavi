@@ -1632,7 +1632,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [ ] (2026-10-20 추가) 검색 노출 마무리. 파비콘·탭 제목·description·Open Graph·`robots.txt`·`sitemap.xml`·`canonical`은 `feature/f-favicon-seo-basics` PR에서 **예정 주소 `https://ottnavi.shop`(Task 005)을 넣어** 먼저 처리했다(사용자 결정: 주소가 이미 정해져 있어 미루지 않는다). 아래는 **도메인을 실제로 구매·연결한 뒤 확인하고 고칠 것**
     - [ ] 구매한 주소가 `https://ottnavi.shop`과 같은지 확인(www 유무 포함). 다르면 `index.html`의 `canonical`·`og:url`·`og:image`, `public/robots.txt`의 `Sitemap:` 줄, `public/sitemap.xml`의 주소를 한꺼번에 바꾼다(`Grep "ottnavi.shop"`으로 찾는다). 만료되어 `*.vercel.app`으로 돌아갈 때도 같은 곳을 바꾼다(Task 005)
     - [ ] 연결 전에는 `ottnavi.shop`이 열리지 않으므로, 연결 전에 검색 엔진에 등록하지 않는다(`canonical`이 열리지 않는 주소를 가리키게 된다)
-    - [ ] `.vercel.app` 주소와 커스텀 도메인이 같은 사이트를 보여 주므로 커스텀 도메인으로 영구 리다이렉트하거나 `canonical`로 정리(Vercel 문서 "Avoiding duplicate-content SEO with vercel.app URLs")
+    - [ ] `.vercel.app` 주소와 커스텀 도메인이 같은 사이트를 보여 주므로 커스텀 도메인으로 영구 리다이렉트하거나 `canonical`로 정리(Vercel 문서 "Avoiding duplicate-content SEO with vercel.app URLs") **진행(2026-10-29, `feature/f8-vercel-app-redirect`)**: `frontend/vercel.json`에 `redirects`로 호스트 `ottnavi.vercel.app`만 `https://ottnavi.shop/:path*`로 보내는 영구(308) 리다이렉트를 추가했다(공식 문서 기준 `routes`와 함께 쓸 수 있다). PR 미리보기 주소(`*-git-*.vercel.app`)와 개별 배포 주소는 호스트가 달라 영향이 없다. `has`는 로컬(`vercel dev`)에서 동작하지 않고 미리보기 주소로도 시험할 수 없어 **`main` 배포 뒤 `curl -I https://ottnavi.vercel.app/ranking`이 308과 `Location: https://ottnavi.shop/ranking`을 주는지로 확인한다**. 같은 브랜치에 구글 소유 확인 메타 태그를 `frontend/index.html`에 넣었다(2026-10-29, 값은 공개되는 값이라 비밀이 아니다). 확인 버튼은 `main` 배포 뒤에 누른다.
     - [ ] 화면이 늘면 `sitemap.xml`의 공개 화면 목록을 갱신(로그인 필요 화면과 관리자 화면은 제외)
     - [ ] 작품 상세처럼 동적 화면의 검색 노출(서버 렌더링·사전 렌더링)은 공개 뒤 3단계에서 따로 판단한다(지금 SPA는 크롤러에게 빈 화면일 수 있다)
 - 완료 기준
