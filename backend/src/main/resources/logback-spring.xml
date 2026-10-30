@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  logback-spring.xml
+  - observability 프로필이 없으면 Boot 기본 설정(콘솔 어펜더, 루트 INFO)과 같게 동작한다.
+    기본값은 Boot가 제공하는 defaults.xml·console-appender.xml을 그대로 가져와 쓴다(base.xml은 파일 어펜더까지 켜서 쓰지 않는다).
+  - observability 프로필이 켜지면 Loki 어펜더가 추가돼 Grafana Cloud Loki로 로그를 보낸다.
+    접속 정보는 환경 변수로만 받는다: GRAFANA_LOKI_URL, GRAFANA_LOKI_USER, GRAFANA_LOKI_TOKEN
+  - 개인정보 원칙: 로그에 담지 않는 것이 원칙이고 아래 마스킹은 실수 대비 안전망이다.
+    Loki로는 메시지와 근본원인 클래스 이름만 간다(스택 트레이스·예외 메시지·MDC·스레드 외 메타데이터는 보내지 않는다).
+-->
+<configuration>
+	<include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+	<include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+	<springProfile name="observability">
+		<!-- 라벨 env 값. 운영은 application-prod.yml이 prod로 정한다(라벨은 app·env·level 3개만 쓴다) -->
+		<springProperty scope="context" name="LOKI_ENV" source="app.observability.env" defaultValue="local"/>
+
+		<!-- 배치가 덜 차도 이 시간(ms)마다 보낸다. 기본 5초(기본 60초는 로그가 너무 늦게 보인다). 시험에서만 줄인다 -->
+		<springProperty scope="context" name="LOKI_BATCH_TIMEOUT_MS" source="app.observability.loki-batch-timeout-ms" defaultValue="5000"/>
+
+		<!-- 메시지 패턴의 %rootCause: 가장 안쪽 원인 클래스 이름(메시지·스택 제외) -->
+		<conversionRule conversionWord="rootCause" class="com.ottnavi.global.config.LokiRootCauseConverter"/>
+
+		<appender name="LOKI" class="com.github.loki4j.logback.Loki4jAppender">
+			<!-- com.ottnavi는 INFO 이상, 그 밖의 라이브러리는 WARN 이상, 전송 라이브러리 자신의 로그는 제외 -->
+			<filter class="com.ottnavi.global.config.LokiLogFilter"/>
+
+			<http>
+				<url>${GRAFANA_LOKI_URL}</url>
+				<auth>
+					<username>${GRAFANA_LOKI_USER}</username>
+					<password>${GRAFANA_LOKI_TOKEN}</password>
+				</auth>
+				<requestTimeoutMs>15000</requestTimeoutMs>   <!-- Grafana Cloud 공식 예시 값 -->
+			</http>
+
+			<batch>
+				<maxBytes>65536</maxBytes>                       <!-- 배치 최대 크기 64KB(Grafana Cloud 안내 값) -->
+				<timeoutMs>${LOKI_BATCH_TIMEOUT_MS}</timeoutMs>
+				<sendQueueMaxBytes>4194304</sendQueueMaxBytes>   <!-- 전송 대기 큐 상한 4MB. 가득 차면 새로 들어오는 로그를 버린다(호출 스레드는 막히지 않는다) -->
+				<useDirectBuffers>false</useDirectBuffers>       <!-- 힙 밖 메모리를 쓰지 않는다(메모리 1GB 운영 환경에서 사용량을 예측하기 위해) -->
+				<drainOnStop>true</drainOnStop>                  <!-- 종료할 때 남은 로그를 마저 보낸다 -->
+			</batch>
+
+			<!-- 라벨은 값 종류가 적은 것만 쓴다. userId·IP·이메일 같은 동적 값은 라벨로 쓰지 않는다 -->
+			<labels>
+				app=ottnavi
+				env=${LOKI_ENV}
+				level=%level
+			</labels>
+			<!-- 스레드·로거·MDC 같은 구조화 메타데이터는 보내지 않는다(Loki4j 2.0 기본값은 MDC까지 보낸다) -->
+			<structuredMetadata>off</structuredMetadata>
+
+			<message>
+				<!-- 1. %replace(%msg): 이메일 모양 문자열을 ***로 가린다 / 2. %rootCause: 예외가 있을 때만 " rootCause=클래스" 를 붙인다 / 3. %nopex: 스택 트레이스 자동 추가를 막는다 -->
+				<pattern>[%thread] %logger{20} - %replace(%msg){'[\w.+-]+@[\w-]+(\.[\w-]+)+', '***'}%replace( rootCause=%rootCause){'^ rootCause=$', ''}%nopex</pattern>
+			</message>
+		</appender>
+	</springProfile>
+
+	<!-- springProfile을 root 안에 중첩하면 Boot가 경고하므로 프로필별로 root를 따로 둔다 -->
+	<springProfile name="!observability">
+		<root level="INFO">
+			<appender-ref ref="CONSOLE"/>
+		</root>
+	</springProfile>
+	<springProfile name="observability">
+		<root level="INFO">
+			<appender-ref ref="CONSOLE"/>
+			<appender-ref ref="LOKI"/>
+		</root>
+	</springProfile>
+</configuration>

@@ -37,5 +37,7 @@ app:
     provider: smtp                # 운영은 실제 발송
     from: ${MAIL_FROM}            # 기본값 없음. 발신 주소(Gmail 계정 주소와 같게)
   admin-batch-token: ${ADMIN_BATCH_TOKEN}   # 기본값 없음. 누락 시 기동이 실패한다(GitHub Actions cron 시크릿과 같아야 함)
+  observability:
+    env: prod                     # Loki 라벨 env 값(logback-spring.xml이 읽는다). 라벨은 app·env·level 3개만 쓴다
   jwt:
     secret: ${JWT_SECRET}         # 기본값 없음. 누락되거나 Base64 디코딩 후 32바이트 미만이면 기동이 실패한다
