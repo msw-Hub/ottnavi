@@ -98,6 +98,32 @@ class SingleFetchRateLimiterTest {
 		assertThat(output.getOut()).contains("근본원인=java.net.SocketTimeoutException").doesNotContain("Redis 연결 실패(테스트)"); // 예외 메시지는 로그에 남기지 않는다
 	}
 
+	@Test
+	void 저장소_오류가_나면_ratelimit_store_error_카운터가_bucket_single_fetch_태그로_늘어난다() {
+		// given
+		SingleFetchRateLimiter errorLimiter = new SingleFetchRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		Counter counter = meterRegistry.find("ratelimit.store_error").tag("bucket", "single_fetch").counter();
+		assertThat(counter.count()).isEqualTo(1.0);
+	}
+
+	@Test
+	void 저장소_오류가_이어지는_동안에도_상세_경고는_한_번만_남는다(CapturedOutput output) {
+		// given
+		SingleFetchRateLimiter errorLimiter = new SingleFetchRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		assertThat(output.getOut()).containsOnlyOnce("근본원인=");
+	}
+
 	private static class FailingProvider implements RateLimitBucketProvider {
 
 		int callCount;

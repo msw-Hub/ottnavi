@@ -23,12 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 public class PublicRateLimiter {
 
 	static final String KEY_PREFIX = "rl:public:";                                       // Redis 키: rl:public:{remoteAddr}
+	static final String STORE_ERROR_METRIC_NAME = "ratelimit.store_error";               // 저장소 오류 횟수 카운터 이름(세 버킷 공통)
 	static final String METRIC_NAME = "ratelimit.rejected";                              // 거부 횟수 카운터 이름(두 버킷 공통)
 	private static final long FAIL_OPEN_PAUSE_NANOS = Duration.ofSeconds(5).toNanos();    // 저장소 오류 뒤 검사를 건너뛰는 시간
 
 	private final RateLimitBucketProvider bucketProvider;
 	private final BucketConfiguration configuration; // 모든 IP가 같은 한도를 쓴다
 	private final MeterRegistry meterRegistry;
+	private final RateLimitSupport.StoreErrorLog storeErrorLog = new RateLimitSupport.StoreErrorLog(); // 같은 장애 동안 경고 로그를 줄인다
 	private final RateLimitSupport.FailureWindow failureWindow = new RateLimitSupport.FailureWindow(FAIL_OPEN_PAUSE_NANOS);
 
 	public PublicRateLimiter(RateLimitBucketProvider bucketProvider, RateLimitProperties.Limit limit,
@@ -54,11 +56,19 @@ public class PublicRateLimiter {
 		try {
 			Bucket bucket = bucketProvider.getBucket(KEY_PREFIX + clientIp, configuration);
 			probe = bucket.tryConsumeAndReturnRemaining(1);
+			storeErrorLog.markRecovered(); // 저장소가 다시 응답하면 다음 장애는 처음 1건부터 남긴다
 		} catch (RuntimeException e) {
 			failureWindow.markFailed();
 			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다. 메시지도 접속 정보(호스트 등)가 섞일 수 있어 클래스 이름만 남긴다
-			log.warn("요청 제한 저장소 오류로 검사를 건너뜁니다(fail-open): {}, 근본원인={}", e.getClass().getSimpleName(),
-					ExceptionRootCause.rootCauseName(e));
+			meterRegistry.counter(PublicRateLimiter.STORE_ERROR_METRIC_NAME, "bucket", "public").increment(); // 태그는 닫힌 값만
+			// 같은 장애 동안은 처음 1건만 상세히, 이후에는 1분에 한 번 건수만 남긴다
+			long skippedCount = storeErrorLog.recordError();
+			if (skippedCount == RateLimitSupport.StoreErrorLog.FIRST_ERROR) {
+				log.warn("요청 제한 저장소 오류로 검사를 건너뜁니다(fail-open): {}, 근본원인={}", e.getClass().getSimpleName(),
+						ExceptionRootCause.rootCauseName(e));
+			} else if (skippedCount > 0) {
+				log.warn("요청 제한 저장소 오류가 계속되고 있습니다(fail-open): 최근 1분간 {}건 발생", skippedCount);
+			}
 			return;
 		}
 

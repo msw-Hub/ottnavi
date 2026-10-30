@@ -73,6 +73,24 @@ public class SystemMetricsService {
 		return new SystemMetricsView(jvm, process, container, Instant.now());
 	}
 
+	/** 프로세스 RSS 바이트. 지표 게이지용이며 값을 읽을 수 없는 환경(Windows·로컬)에서는 NaN이다 */
+	public double readProcessRssBytes() {
+		Long rss = SystemMetricsParser.parseProcStatus(readFileOrNull(procStatusPath)).rssBytes();
+		if (rss == null) {
+			return Double.NaN;
+		}
+		return rss;
+	}
+
+	/** 컨테이너(cgroup) 메모리 사용 바이트. 지표 게이지용이며 값을 읽을 수 없으면 NaN이다 */
+	public double readContainerMemoryUsedBytes() {
+		Long used = measureContainer().memoryUsedBytes();
+		if (used == null) {
+			return Double.NaN;
+		}
+		return used;
+	}
+
 	private JvmView measureJvm() {
 		// 1. 힙·힙 밖 합계
 		MemoryMXBean memory = ManagementFactory.getMemoryMXBean();
