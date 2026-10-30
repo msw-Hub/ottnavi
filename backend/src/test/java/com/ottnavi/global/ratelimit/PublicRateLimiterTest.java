@@ -109,6 +109,32 @@ class PublicRateLimiterTest {
 	}
 
 	/** 항상 저장소 오류를 던지는 창구 */
+	@Test
+	void 저장소_오류가_나면_ratelimit_store_error_카운터가_bucket_public_태그로_늘어난다() {
+		// given
+		PublicRateLimiter errorLimiter = new PublicRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		errorLimiter.check("1.1.1.1");
+
+		// then
+		Counter counter = meterRegistry.find("ratelimit.store_error").tag("bucket", "public").counter();
+		assertThat(counter.count()).isEqualTo(1.0);
+	}
+
+	@Test
+	void 저장소_오류가_이어지는_동안에도_상세_경고는_한_번만_남는다(CapturedOutput output) {
+		// given
+		PublicRateLimiter errorLimiter = new PublicRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		errorLimiter.check("1.1.1.1");
+		errorLimiter.check("1.1.1.1");
+
+		// then
+		assertThat(output.getOut()).containsOnlyOnce("근본원인=");
+	}
+
 	private static class FailingProvider implements RateLimitBucketProvider {
 
 		int callCount;

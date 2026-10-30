@@ -10,7 +10,7 @@
 com.ottnavi
 ├── global/              공통: 어느 기능에서나 쓰는 것
 │   ├── common/            CommonResponse(성공 응답 틀), PageResponse(목록 응답 틀), BaseTimeEntity(생성·수정 시각)
-│   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정, 시계(ClockConfig, KST 기준 Clock 빈), 스케줄러(SchedulingConfig: @EnableScheduling, ShedLock 락 제공자 JDBC·DB 시각), 비동기(AsyncConfig: @EnableAsync만, 실행기는 Boot 자동 구성 `spring.task.execution.*`)
+│   ├── config/            Redis(캐시 이름·TTL·직렬화), 캐시 오류 무시(CacheErrorHandlingConfig), Feign(외부 호출) 설정, 시계(ClockConfig, KST 기준 Clock 빈), 스케줄러(SchedulingConfig: @EnableScheduling, ShedLock 락 제공자 JDBC·DB 시각), 비동기(AsyncConfig: @EnableAsync만, 실행기는 Boot 자동 구성 `spring.task.execution.*`), 관측(Task 096, `observability` 프로필에서만 켜짐: ObservabilityConfig(OTLP 지표 전송 설정)·OtlpMetricsAllowFilter(전송 허용 목록, 개인정보 태그 키 거부), Loki 로그 전송은 `resources/logback-spring.xml` + LokiLogFilter(로그 수준·제외 대상 필터)·LokiRootCauseConverter(스택 대신 근본원인 클래스 이름만))
 │   ├── error/             GlobalExceptionHandler, ErrorCode, BusinessException과 하위 예외(FieldValidationException, ResourceNotFoundException)
 │   ├── ratelimit/         공개 API 요청 제한: 필터(PublicRateLimitFilter), 일반·단건 수집·데모 로그인 버킷 검사(PublicRateLimiter, SingleFetchRateLimiter, DemoLoginRateLimiter: `rl:demo:{ip}` IP당 15분 5회, Task 109), Redis 버킷 창구, 설정
 │   └── security/          보안 설정(SecurityConfig), 오리진 비밀 헤더 필터, 배치 토큰 인증 필터(BatchTokenAuthenticationFilter), 진입 IP 로그 필터(debug), 401·403 응답 처리, AuthUser(인증 주체)
@@ -87,7 +87,7 @@ com.ottnavi
 │   └── domain/            entity(NotificationOutbox: 사용자는 ID만 보관, 삭제는 DB FK CASCADE) · enums(NotificationType, NotificationStatus) · repository(NotificationOutboxRepository: findDueForUpdate, findOneDueForUpdate, insertIfAbsent(네이티브 ON CONFLICT), findIdByDedupeKey, findByUserIdOrderByCreatedAtDescIdDesc, countByStatusAndCreatedAtGreaterThanEqual, findLatestSentAtSince)
 ├── admin/               관리자 API: 수집 실행·복구·재시작·이력 조회(Task 045), 제공처 매핑 조회·변경(Task 046). 보호는 ADMIN JWT 또는 배치 토큰(Task 054)
 │   ├── controller/        AdminCollectController (/api/admin/collect/executions), AdminProviderController (/api/admin/providers, 서비스는 provider/service/AdminProviderService 호출), AdminNotificationController (GET /api/admin/notifications/summary, 서비스는 notification/service/NotificationQueryService 호출, Task 073), AdminSystemMetricsController (GET /api/admin/system-metrics, 운영 메모리 구성 조회, ADMIN 전용: SecurityConfig에서 ADMIN·DEMO 조회 규칙보다 앞에 둠)
-│   ├── service/           CollectExecutionService(시작·재시작·복구, 재계산이나 데이터 정리가 실행 중이면 409: retention/job의 RetentionExecutionQuery 사용), CollectExecutionQueryService(이력·변경 조회), SystemMetricsService (JVM은 JMX, 프로세스는 /proc/self/status, 컨테이너는 cgroup 파일에서 읽는 읽기 전용 측정. 파일 경로는 생성자로 바꿀 수 있음), SystemMetricsParser (/proc·cgroup 글자를 바이트로 바꾸는 순수 함수)
+│   ├── service/           CollectExecutionService(시작·재시작·복구, 재계산이나 데이터 정리가 실행 중이면 409: retention/job의 RetentionExecutionQuery 사용), CollectExecutionQueryService(이력·변경 조회), SystemMetricsService (JVM은 JMX, 프로세스는 /proc/self/status, 컨테이너는 cgroup 파일에서 읽는 읽기 전용 측정. 파일 경로는 생성자로 바꿀 수 있음), SystemMetricsParser (/proc·cgroup 글자를 바이트로 바꾸는 순수 함수), SystemMemoryMetrics (같은 측정값을 `ottnavi.process.rss`·`ottnavi.container.memory.used` 게이지로 노출하는 MeterBinder, 읽지 못하면 NaN)
 │   │   └── model/           CollectViewContext(요청 한 번의 판정 맥락), SystemMetricsView(시스템 지표 값 묶음)
 │   ├── dto/
 │   │   ├── request/         CreateCollectExecutionRequest, UpdateAdminProviderRequest

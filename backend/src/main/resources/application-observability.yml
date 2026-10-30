@@ -1,0 +1,11 @@
+# application-observability.yml: 관측 프로필. 운영에서 --spring.profiles.active=prod,observability 처럼 함께 켠다
+# 접속 주소와 인증 헤더는 환경 변수로만 넣는다(값을 코드·설정에 쓰지 않는다)
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: true
+        step: 60s                                   # 전송 주기
+        url: ${GRAFANA_OTLP_ENDPOINT}               # 예: Grafana Cloud OTLP 게이트웨이의 /v1/metrics 주소
+        headers:
+          Authorization: ${GRAFANA_OTLP_AUTH}       # "Basic ..." 전체 문자열을 환경 변수로 받는다
