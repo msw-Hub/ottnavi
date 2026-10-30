@@ -43,10 +43,21 @@ describe('개인정보처리방침 화면', () => {
     expect(router.state.location.pathname).toBe('/privacy')
 
     // 2. 시행일(한국어 날짜)과 운영자·연락처
-    expect(screen.getByText('2026년 10월 30일', { selector: 'time' })).toHaveAttribute(
+    expect(screen.getByText('2026년 10월 31일', { selector: 'time' })).toHaveAttribute(
       'dateTime',
-      '2026-10-30',
+      '2026-10-31',
     )
+
+    // 2-0. 변경 이력 두 줄의 날짜: 알림 메일 변경은 이전 시행일(10/30), 방문 통계 변경은 현재 시행일(10/31)이다.
+    //      자리표시자가 화면에 남지 않았는지도 함께 확인한다(배포 전 빈 값이 노출되는 사고 방지)
+    expect(screen.getByText('2026년 10월 30일')).toBeInTheDocument()
+    expect(screen.getByText(/변경: 알림 메일 제공에 맞춰/).textContent).toContain(
+      '2026년 10월 30일',
+    )
+    expect(screen.getByText(/변경: 방문\s*통계\(Google Analytics\)/).textContent).toContain(
+      '2026년 10월 31일',
+    )
+    expect(screen.queryByText(/시행일 확정 필요/)).not.toBeInTheDocument()
     expect(screen.getByText(/문선우/)).toBeInTheDocument()
 
     // 2-1. 알림 메일 제공에 맞춘 문구: 예전의 "아직 보내지 않습니다" 문구는 없고, 직접 켠 경우에만 보낸다는 안내가 있다

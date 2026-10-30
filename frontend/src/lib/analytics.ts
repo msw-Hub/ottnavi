@@ -11,6 +11,13 @@
  *   config에 send_page_view: false를 주고, 화면 이동마다 gtag('event', 'page_view', ...)를 직접 보낸다.
  * - allow_google_signals: false는 제3자 광고 식별자 기반 인구통계·관심분야 보고를 끈다.
  *   allow_ad_personalization_signals: false는 광고 개인화 기능을 끈다.
+ *
+ * 쿼리·제외 경로 보호(방침 약속: "주소 뒤에 붙는 값은 보내지 않는다", "관리자·로그인 확인 화면은 집계에서 뺀다"):
+ * 우리가 보내는 page_view만 정리하면 부족하다. GA가 스스로 보내는 이벤트(user_engagement, session_start,
+ * first_visit 등)는 page_location 기본값으로 document.location 전체(?q=검색어 포함)를 쓰기 때문이다. 그래서
+ * - config와 화면 이동마다 gtag('set', ...)로 page_location·page_path·page_title 기본값을 정리한 값으로 바꾸고,
+ * - 제외 경로에서는 GA 공식 차단 표식 window['ga-disable-<측정 ID>'] = true를 세워 gtag.js가 아무것도 보내지 못하게 한다.
+ *   공개 경로로 돌아오면 false로 되돌린다. 이 표식은 gtag.js 로드 전에 먼저 있어야 하므로 초기화보다 앞서 세팅한다.
  */
 
 // 방문 통계에서 뺄 경로. 운영자·평가용 데모 접속이 통계를 왜곡하지 않게 하고, 로그인 콜백은 인증 값이 오가는 곳이라 보내지 않는다.
@@ -28,6 +35,15 @@ declare global {
     dataLayer?: unknown[]
     gtag?: (...args: GtagArguments) => void
   }
+}
+
+/**
+ * GA 공식 차단 표식('ga-disable-<측정 ID>')을 켜거나 끈다.
+ * 이름이 측정 ID마다 달라 Window 전역 타입에 고정 필드로 선언할 수 없다. 인덱스 시그니처로 Window 전체를 넓히면
+ * 다른 전역 접근의 타입 검사가 약해지므로, 좁은 캐스팅을 이 함수 한 곳에만 둔다.
+ */
+function setGaDisabled(measurementId: string, isDisabled: boolean): void {
+  ;(window as unknown as Record<string, unknown>)[`ga-disable-${measurementId}`] = isDisabled
 }
 
 /** 설정된 측정 ID를 돌려준다. 비어 있거나 목업 모드면 null이다(= 방문 통계를 쓰지 않는다). */
@@ -76,7 +92,15 @@ export function initAnalytics(): boolean {
     window.dataLayer!.push(arguments)
   }
   window.gtag('js', new Date())
+  // 최초 config 시점의 자동 이벤트에도 쿼리가 실리지 않게, 현재 경로를 정리해 기본 주소로 넣는다.
+  // 제외 경로면 null이라 키를 생략한다(실제로는 trackPageView가 제외 경로에서 여기까지 오지 않는다)
+  const cleanPath = toTrackablePath(window.location.pathname)
   window.gtag('config', measurementId, {
+    ...(cleanPath !== null && {
+      page_location: `${window.location.origin}${cleanPath}`,
+      page_path: cleanPath,
+      page_title: cleanPath,
+    }),
     send_page_view: false, // SPA라 화면 이동마다 직접 보낸다(trackPageView)
     allow_google_signals: false, // 광고 식별자 기반 인구통계·관심분야 수집 끔
     allow_ad_personalization_signals: false, // 광고 개인화 끔
@@ -99,19 +123,29 @@ export function initAnalytics(): boolean {
  * @param pathname React Router의 location.pathname(쿼리·해시 제외)
  */
 export function trackPageView(pathname: string): void {
-  // 1. 측정 ID가 없으면 끝(스크립트가 없으므로 gtag도 없다)
-  if (!getMeasurementId()) return
+  // 1. 측정 ID가 없으면 끝(스크립트도 표식도 만들지 않는다: 목업·로컬은 전역 변경 0건)
+  const measurementId = getMeasurementId()
+  if (!measurementId) return
 
-  // 2. 제외 경로면 보내지 않는다
+  // 2. 보낼 경로를 정리한다(제외 경로면 null)
   const path = toTrackablePath(pathname)
+
+  // 3. GA 차단 표식을 맞춘다. 제외 경로면 켜고 공개 경로로 돌아오면 끈다.
+  //    gtag.js가 로드되기 전에도 먼저 있어야 하므로 초기화(5번)보다 앞에 둔다
+  setGaDisabled(measurementId, path === null)
+
+  // 4. 제외 경로에서는 GA를 초기화하지도 않는다
   if (path === null) return
 
-  // 3. 아직 초기화 전이면 초기화한 뒤 보낸다
+  // 5. 아직 초기화 전이면 초기화한다(실패하면 끝)
   if (!window.gtag && !initAnalytics()) return
 
-  window.gtag!('event', 'page_view', {
+  // 6. 이후 모든 이벤트(GA 자동 이벤트 포함)의 기본 주소를 정리한 값으로 바꾼 뒤 page_view를 보낸다
+  const pageParams = {
     page_location: `${window.location.origin}${path}`,
     page_path: path,
     page_title: path,
-  })
+  }
+  window.gtag!('set', pageParams)
+  window.gtag!('event', 'page_view', pageParams)
 }

@@ -9,8 +9,8 @@ import {
   GRAFANA_LOG_RETENTION_NOTE,
   GRAFANA_REGION_NOTE,
   PRIVACY_EFFECTIVE_DATE,
-  PRIVACY_NEXT_EFFECTIVE_DATE_NOTE,
   PRIVACY_OPERATOR_NAME,
+  PRIVACY_PREVIOUS_EFFECTIVE_DATE,
 } from '@/features/legal/legalInfo'
 import { formatDate } from '@/lib/format'
 
@@ -27,7 +27,10 @@ import { formatDate } from '@/lib/format'
  * 제목 계층은 h1(화면 제목) → h2(구역)만 써서 목차 없이도 위에서 아래로 훑을 수 있게 한다. 색은 디자인 토큰만 쓴다.
  */
 export function PrivacyPolicyScreen() {
-  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 27일"
+  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 31일"
+  // 변경 이력 첫 줄(알림 메일 변경)에 쓰는 바로 앞 방침의 시행일
+  const previousDateText =
+    formatDate(PRIVACY_PREVIOUS_EFFECTIVE_DATE) ?? PRIVACY_PREVIOUS_EFFECTIVE_DATE
 
   return (
     <article className="mx-auto grid max-w-3xl gap-6 text-[0.9375rem] leading-7 break-keep">
@@ -253,12 +256,12 @@ export function PrivacyPolicyScreen() {
           시행일은 <span className="whitespace-nowrap">{effectiveDateText}</span>입니다.
         </p>
         <p>
-          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 알림 메일 제공에 맞춰
+          <span className="whitespace-nowrap">{previousDateText}</span> 변경: 알림 메일 제공에 맞춰
           알림 메일의 이용 목적과 기록, 처리 위탁 내용을 추가하고 고쳤습니다.
         </p>
         <p>
-          <span className="whitespace-nowrap">{PRIVACY_NEXT_EFFECTIVE_DATE_NOTE}</span> 변경: 방문
-          통계(Google Analytics)와 서버 로그 보관(Grafana Cloud)을 추가했습니다.
+          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계(Google
+          Analytics)와 서버 로그 보관(Grafana Cloud)을 추가했습니다.
         </p>
         <p>
           서비스 이용에 관한 약속은{' '}

@@ -18,6 +18,13 @@ function resetGlobals() {
   document.getElementById('ga4-gtag-script')?.remove()
   delete window.dataLayer
   delete window.gtag
+  delete (window as unknown as Record<string, unknown>)['ga-disable-G-TEST123456']
+  window.history.replaceState(null, '', '/') // 테스트가 만든 쿼리를 지운다
+}
+
+// 차단 표식 값을 읽는다
+function readDisableFlag(): unknown {
+  return (window as unknown as Record<string, unknown>)['ga-disable-G-TEST123456']
 }
 
 describe('방문 통계(GA4)', () => {
@@ -98,5 +105,53 @@ describe('방문 통계(GA4)', () => {
     expect(readCalls().filter((call) => call[0] === 'event')).toHaveLength(0)
     // 비슷한 이름의 경로는 제외하지 않는다
     expect(toTrackablePath('/administrator')).toBe('/administrator')
+  })
+
+  // 확인: 제외 경로에서는 차단 표식이 켜지고 GA가 초기화되지 않으며, 공개 경로로 돌아오면 표식이 꺼지고 page_view가 나간다.
+  // 막으려는 사고: 관리자 화면에서 GA 자동 이벤트가 나가는 것 / 한 번 차단된 뒤 공개 화면 집계가 계속 막히는 것.
+  it('제외 경로에서는 차단 표식을 켜고, 공개 경로로 돌아오면 끈다', () => {
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123456')
+
+    trackPageView('/admin')
+    trackPageView('/admin/collect')
+    expect(readDisableFlag()).toBe(true)
+    expect(window.gtag).toBeUndefined()
+    expect(document.getElementById('ga4-gtag-script')).toBeNull()
+
+    trackPageView('/search')
+    expect(readDisableFlag()).toBe(false)
+    expect(readCalls().filter((call) => call[0] === 'event')).toHaveLength(1)
+  })
+
+  // 확인: 이동 때 'set'으로 기본 주소를 정리하고, 초기 config에도 정리된 주소가 있으며, 현재 주소에 쿼리가 있어도 어디에도 새지 않는다.
+  // 막으려는 사고: GA 자동 이벤트(user_engagement 등)가 document.location 전체(?q=검색어)를 page_location으로 보내는 것.
+  it('주소에 쿼리가 있어도 set·config·page_view 어디에도 쿼리가 실리지 않는다', () => {
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123456')
+    window.history.pushState(null, '', '/search?q=비밀검색어#top')
+
+    trackPageView('/search')
+
+    const calls = readCalls()
+    const config = calls.find((call) => call[0] === 'config')![2] as Record<string, string>
+    expect(config.page_location).toBe(`${window.location.origin}/search`)
+    expect(config.page_path).toBe('/search')
+
+    const set = calls.find((call) => call[0] === 'set')![1] as Record<string, string>
+    expect(set.page_location).toBe(`${window.location.origin}/search`)
+    expect(set.page_path).toBe('/search')
+
+    const serialized = JSON.stringify(calls)
+    expect(serialized).not.toContain('?')
+    expect(serialized).not.toContain('비밀검색어')
+  })
+
+  // 확인: 측정 ID가 비어 있으면 차단 표식도 만들지 않는다.
+  // 막으려는 사고: 로컬·목업에서 전역 객체가 변경되는 것.
+  it('측정 ID가 비어 있으면 차단 표식도 만들지 않는다', () => {
+    vi.stubEnv('VITE_GA_MEASUREMENT_ID', '')
+
+    trackPageView('/admin')
+
+    expect(Object.keys(window).some((key) => key.startsWith('ga-disable-'))).toBe(false)
   })
 })
