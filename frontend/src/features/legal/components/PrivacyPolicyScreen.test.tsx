@@ -61,6 +61,15 @@ describe('개인정보처리방침 화면', () => {
       'mailto:dalsw7@gmail.com',
     )
 
+    // 2-2. 방문 통계(Google Analytics)·서버 로그 보관 문구: 예전의 "추적 도구를 쓰지 않습니다" 문구는 없다
+    expect(
+      screen.queryByText(/별도의 광고·행동 추적 도구를 사용하지 않습니다/),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(/방문 통계 목적으로만 Google Analytics를 씁니다/)).toBeInTheDocument()
+    expect(screen.getByText(/방문 통계 쿠키\(Google Analytics\)/)).toBeInTheDocument()
+    expect(screen.getByText(/Grafana Cloud\(Grafana Labs\)에 보관합니다/)).toBeInTheDocument()
+    expect(screen.getByText(/Grafana Labs\(Grafana Cloud\): 서비스 운영 상태/)).toBeInTheDocument()
+
     // 3. 주요 구역 제목
     for (const name of [
       '1. 처리하는 개인정보',
