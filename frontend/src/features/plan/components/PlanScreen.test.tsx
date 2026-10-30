@@ -23,18 +23,16 @@ import { resetMockSession, setMockOnboardingDone, setMockRole } from '@/mocks/mo
 const server = setupServer(...handlers)
 
 /*
- * 진행 중 요청 추적과 실패 순간 진단 장치.
+ * 실패 순간 진단 장치.
  *
- * 배경: CI에서만 간헐적으로 `ApiError: network 응답 없음`이 테스트 시작 직후(4~17ms)의 첫 준비 요청에서 난다.
- * 가설(미확인): 앞 테스트가 끝날 때 아직 진행 중인 요청이 다음 테스트의 첫 요청에 영향을 준다.
- * 그래서 1) 매 테스트가 끝날 때 진행 중 요청이 0이 될 때까지 기다리고, 2) 실패하면 직전 이벤트 기록을 남겨 원인 단서를 얻는다.
- * 이 장치가 원인을 고쳤는지는 로컬에서 확인할 수 없다(CI에서만 재현됨).
+ * 배경: CI에서 간헐적으로 `ApiError: network 응답 없음`이 테스트 시작 직후의 첫 준비 요청에서 났다.
+ * 원인은 Node 24.22.1에서 취소된 요청 뒤의 빈 연결을 MSW가 실제 네트워크로 통과시키는 문제다(mswjs/interceptors#881).
+ * 그래서 CI의 Node를 24.19.0으로 고정했다(frontend-ci.yml). 같은 증상이 다시 나면 단서가 남도록 진단 출력만 유지한다.
+ * (앞 테스트의 진행 중 요청을 비우는 방식은 효과가 없어 뺐다.)
  *
- * 요청의 시작은 `request:start`, 끝은 `request:end` 또는 `unhandledException`이다. msw 3 소스(lib/_chunks/interceptor-source.js)에서
- * 응답을 보낸 직후·통과·미처리 때는 `request:end`가 오고, 핸들러 조회 중 예외가 나면 `unhandledException`만 온다.
- * 핸들러가 영원히 끝나지 않거나 클라이언트가 중간에 취소(abort)하는 경우 끝 이벤트가 안 올 수 있어, 대기에는 상한을 둔다.
+ * 요청의 시작은 `request:start`, 끝은 `request:end` 또는 `unhandledException`이다. 시작만 있고 끝이 없으면
+ * 응답이 소켓에 닿기 전에 연결이 끊긴 것이다.
  */
-const DRAIN_TIMEOUT_MS = 2000 // 진행 중 요청을 기다리는 최대 시간(끝 이벤트가 안 와도 테스트가 멈추지 않게 하는 상한)
 const RECENT_EVENT_LIMIT = 30 // 진단용으로 남기는 최근 이벤트 수
 const inflightRequests = new Map<string, string>() // requestId -> "메서드 경로"
 const recentEvents: string[] = [] // 링 버퍼(오래된 것부터 버린다)
@@ -96,18 +94,6 @@ const trackerListeners: TrackerEntry[] = [
   ],
 ]
 
-// 진행 중 요청이 0이 될 때까지 상한까지만 기다린다. 넘으면 멈추지 않고 경고만 남기고 넘어간다
-async function drainInflightRequests() {
-  const deadline = Date.now() + DRAIN_TIMEOUT_MS
-  while (inflightRequests.size > 0 && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-  if (inflightRequests.size > 0) {
-    warnDiagnostics(`진행 중 요청이 ${DRAIN_TIMEOUT_MS}ms 안에 끝나지 않았다`)
-    inflightRequests.clear() // 다음 테스트로 남은 기록이 넘어가지 않게 비운다
-  }
-}
-
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' })
   // 서버가 시작된 뒤 한 번만 등록한다. 각 describe가 자기 리스너만 지우므로 이 추적은 파일 끝까지 남는다
@@ -118,12 +104,10 @@ beforeEach(() => {
   setMockRole('USER')
   setMockOnboardingDone(true)
 })
-afterEach(async () => {
+afterEach(() => {
   // 1. 화면을 먼저 정리해 새 요청이 더 생기지 않게 한다
   cleanup()
-  // 2. 진행 중인 요청이 끝날 때까지 기다린다(상한 있음)
-  await drainInflightRequests()
-  // 3. 그 뒤에 목업 상태를 되돌린다
+  // 2. 그 뒤에 목업 상태를 되돌린다
   server.resetHandlers()
   vi.unstubAllEnvs()
   window.history.pushState({}, '', '/') // 시나리오 주소를 지운다
