@@ -1,5 +1,6 @@
 package com.ottnavi.global.ratelimit;
 
+import com.ottnavi.global.common.ExceptionRootCause;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
@@ -11,6 +12,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
+import java.lang.management.ManagementFactory;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -72,16 +74,30 @@ public class RedisRateLimitBucketProvider implements RateLimitBucketProvider, Au
 			throw new IllegalStateException("요청 제한은 단일 Redis 클라이언트만 지원합니다: " + nativeClient.getClass().getName());
 		}
 
-		// 2. 키는 문자열, 값은 byte[]인 연결을 연다
-		connection = redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
+		// 2. 키는 문자열, 값은 byte[]인 연결을 연다. 첫 연결이 느린 원인을 가늠하려고 소요 시간과 JVM 가동 후 경과 시간을 잰다
+		long uptimeMs = ManagementFactory.getRuntimeMXBean().getUptime(); // 기동 후 경과 ms(기동 완료 시각과 비교용)
+		long startNanos = System.nanoTime();
+		try {
+			connection = redisClient.connect(RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE));
+		} catch (RuntimeException e) {
+			// 호스트·비밀번호·URL이 예외 메시지에 섞일 수 있어 클래스 이름만 남기고, 예외는 그대로 다시 던진다
+			log.warn("요청 제한용 Redis 연결 생성에 실패했다: 소요 ms={}, 기동 후 경과 ms={}, 근본원인={}",
+					elapsedMs(startNanos), uptimeMs, ExceptionRootCause.rootCauseName(e));
+			throw e;
+		}
+		long connectMs = elapsedMs(startNanos);
 
 		// 3. Redis 키 TTL은 Bucket4j가 정한다(버킷이 가득 차는 시점 + KEEP_AFTER_FULL)
 		ProxyManager<String> created = Bucket4jLettuce.casBasedBuilder(connection)
 				.expirationAfterWrite(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(KEEP_AFTER_FULL))
 				.maxRetries(MAX_CAS_RETRIES)
 				.build();
-		log.info("요청 제한용 Redis 연결을 만들었습니다.");
+		log.info("요청 제한용 Redis 연결을 만들었습니다: 소요 ms={}, 기동 후 경과 ms={}", connectMs, uptimeMs);
 		return created;
+	}
+
+	private static long elapsedMs(long startNanos) {
+		return (System.nanoTime() - startNanos) / 1_000_000;
 	}
 
 	/** 앱 종료 때 요청 제한용 연결을 닫는다 */

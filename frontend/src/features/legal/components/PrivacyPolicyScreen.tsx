@@ -4,7 +4,14 @@ import {
   PolicyList,
   PolicySection,
 } from '@/features/legal/components/PolicyParts'
-import { PRIVACY_EFFECTIVE_DATE, PRIVACY_OPERATOR_NAME } from '@/features/legal/legalInfo'
+import {
+  GA_RETENTION_NOTE,
+  GRAFANA_LOG_RETENTION_NOTE,
+  GRAFANA_REGION_NOTE,
+  PRIVACY_EFFECTIVE_DATE,
+  PRIVACY_OPERATOR_NAME,
+  PRIVACY_PREVIOUS_EFFECTIVE_DATE,
+} from '@/features/legal/legalInfo'
 import { formatDate } from '@/lib/format'
 
 /**
@@ -20,7 +27,10 @@ import { formatDate } from '@/lib/format'
  * 제목 계층은 h1(화면 제목) → h2(구역)만 써서 목차 없이도 위에서 아래로 훑을 수 있게 한다. 색은 디자인 토큰만 쓴다.
  */
 export function PrivacyPolicyScreen() {
-  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 27일"
+  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 31일"
+  // 변경 이력 첫 줄(알림 메일 변경)에 쓰는 바로 앞 방침의 시행일
+  const previousDateText =
+    formatDate(PRIVACY_PREVIOUS_EFFECTIVE_DATE) ?? PRIVACY_PREVIOUS_EFFECTIVE_DATE
 
   return (
     <article className="mx-auto grid max-w-3xl gap-6 text-[0.9375rem] leading-7 break-keep">
@@ -72,6 +82,22 @@ export function PrivacyPolicyScreen() {
             이 기록은 서비스 운영과 오류 대응에만 씁니다.
           </li>
           <li>
+            서비스 운영과 오류 확인을 위해 서버 로그를 남기고 Grafana Cloud(Grafana Labs)에
+            보관합니다. Grafana Cloud로 보내는 로그에는 이메일, 이름, 접속 IP, 로그인 토큰을 남기지
+            않도록 하며, 실수로 섞인 이메일 모양의 글자는 가려서 보냅니다. 문제를 추적하기 위해
+            서비스 내부에서 사용자를 구별하는 번호(회원 번호)는 로그에 남을 수 있습니다. 오류의 상세
+            호출 기록은 외부로 보내지 않습니다.
+          </li>
+          {/* 방문 통계(Google Analytics 4). 수집 항목·IP 처리는 Google Analytics 도움말(2026-10-30 확인)에 있는 것만 썼다 */}
+          <li>
+            방문 통계(Google Analytics): 방문자 수와 이용 현황을 파악하기 위해 Google Analytics를
+            씁니다. 방문한 화면 주소(검색어처럼 주소 뒤에 붙는 값은 보내지 않습니다), 방문 횟수 같은
+            이용 통계, 대략적인 지역, 브라우저·기기 정보, 어느 주소를 거쳐 들어왔는지(유입 경로)가
+            Google로 전송됩니다. Google Analytics는 접속 IP 주소를 대략적인 지역을 알아내는 데 쓰고
+            저장하기 전에 버립니다. 이 정보는 로그인 정보(이메일, 이름, 회원 번호)와 연결하지 않으며
+            광고 목적으로 쓰지 않습니다. 관리자 화면과 로그인 확인 화면의 이용은 집계에서 뺍니다.
+          </li>
+          <li>
             알림 기록: 알림을 켠 경우 보낼 메일의 종류, 메일 내용을 만드는 데 쓰는 값(표시 이름,
             플랜 요약), 발송 상태와 시각, 실패 원인이 저장됩니다.
           </li>
@@ -83,6 +109,7 @@ export function PrivacyPolicyScreen() {
           <li>로그인과 본인 확인</li>
           <li>찜한 작품, 월 예산, 월 시청 시간을 바탕으로 한 구독 플랜 계산과 계산 결과 저장</li>
           <li>서비스 운영, 과도한 요청 방지, 오류 확인과 대응</li>
+          <li>방문자 수와 이용 현황 파악(방문 통계)</li>
         </PolicyList>
         {/* 이전: "서비스는 아직 알림 메일을 보내지 않습니다. 알림 메일을 제공하게 되면 이 방침을 먼저 고친 뒤 알려 드립니다." — 알림 메일 제공(2026-10-30 시행)에 맞춰 바꿨다 */}
         <p>
@@ -106,6 +133,11 @@ export function PrivacyPolicyScreen() {
             잠깐(최대 3분) 씁니다.
           </li>
           <li>
+            방문 통계 쿠키(Google Analytics): 방문자를 구별하는 쿠키(_ga)와 방문 상태를 이어 가는
+            쿠키(_ga_로 시작하는 쿠키)를 이 서비스 주소에 저장합니다. 기본 보관 기간은 2년입니다.
+            로그인 정보와는 연결하지 않습니다.
+          </li>
+          <li>
             로그인 중 접속 정보(Access Token)는 브라우저 메모리에만 두고 브라우저 저장소에 쓰지
             않습니다. 탭을 닫으면 사라집니다.
           </li>
@@ -114,10 +146,19 @@ export function PrivacyPolicyScreen() {
             잠깐 적어 두고 로그인이 끝나면 지웁니다.
           </li>
         </PolicyList>
-        <p>서비스는 별도의 광고·행동 추적 도구를 사용하지 않습니다.</p>
+        {/* 이전: "서비스는 별도의 광고·행동 추적 도구를 사용하지 않습니다." — 방문 통계(Google Analytics) 도입(2026-10-30)으로 사실과 맞게 바꿨다 */}
+        <p>
+          서비스는 광고나 맞춤 광고를 위한 도구를 사용하지 않습니다. 방문 통계 목적으로만 Google
+          Analytics를 씁니다.
+        </p>
         <p>
           브라우저 설정(예: 사이트 권한 또는 개인정보 설정의 쿠키 항목)에서 쿠키를 막을 수 있습니다.
           다만 쿠키를 막으면 로그인이 필요한 기능을 이용하기 어렵습니다.
+        </p>
+        <p>
+          방문 통계만 막고 싶다면 Google이 제공하는 &ldquo;Google Analytics 차단 브라우저
+          부가기능(opt-out add-on)&rdquo;을 설치할 수 있습니다. 이 부가기능은 웹사이트의 Google
+          Analytics 스크립트가 방문 활동을 Google Analytics로 보내지 못하게 합니다.
         </p>
       </PolicySection>
 
@@ -132,6 +173,15 @@ export function PrivacyPolicyScreen() {
             다만 아래 처리 위탁 업체의 백업에는 각 업체의 정책에 따라 일정 기간 남아 있을 수
             있습니다.
           </li>
+          <li>
+            서버 로그에 남은 회원 번호는 탈퇴해도 바로 지워지지 않고, 로그 보관 기간(
+            {GRAFANA_LOG_RETENTION_NOTE})이 지나면 자동으로 삭제됩니다.
+          </li>
+          <li>
+            방문 통계 데이터는 Google Analytics의 보관 설정에 따라 보관합니다(보관 기간:{' '}
+            {GA_RETENTION_NOTE}). 개별 이용자에 묶이지 않고 합산된 통계는 이 기간이 지나도 남을 수
+            있습니다. 이 데이터는 회원 정보와 연결하지 않으므로 탈퇴할 때 따로 지우지 않습니다.
+          </li>
         </PolicyList>
       </PolicySection>
 
@@ -143,8 +193,13 @@ export function PrivacyPolicyScreen() {
           <li>Cloudtype: 서비스 서버 운영</li>
           <li>Vercel: 서비스 화면 호스팅</li>
           <li>
-            Google: 로그인(계정 인증), 알림 메일 발송(Gmail). 알림을 켠 이용자의 이메일 주소가
-            Gmail을 거쳐 전달됩니다.
+            Google: 로그인(계정 인증), 알림 메일 발송(Gmail), 방문 통계(Google Analytics). 알림을 켠
+            이용자의 이메일 주소가 Gmail을 거쳐 전달되며, 방문 통계에는 이메일 주소를 보내지
+            않습니다.
+          </li>
+          <li>
+            Grafana Labs(Grafana Cloud): 서비스 운영 상태를 보기 위한 지표(숫자)와 서버 로그 보관.
+            서버 위치: {GRAFANA_REGION_NOTE}
           </li>
         </PolicyList>
         <p>
@@ -201,8 +256,12 @@ export function PrivacyPolicyScreen() {
           시행일은 <span className="whitespace-nowrap">{effectiveDateText}</span>입니다.
         </p>
         <p>
-          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 알림 메일 제공에 맞춰
+          <span className="whitespace-nowrap">{previousDateText}</span> 변경: 알림 메일 제공에 맞춰
           알림 메일의 이용 목적과 기록, 처리 위탁 내용을 추가하고 고쳤습니다.
+        </p>
+        <p>
+          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계(Google
+          Analytics)와 서버 로그 보관(Grafana Cloud)을 추가했습니다.
         </p>
         <p>
           서비스 이용에 관한 약속은{' '}

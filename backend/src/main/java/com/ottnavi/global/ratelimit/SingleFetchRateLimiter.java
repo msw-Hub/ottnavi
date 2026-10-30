@@ -1,5 +1,6 @@
 package com.ottnavi.global.ratelimit;
 
+import com.ottnavi.global.common.ExceptionRootCause;
 import com.ottnavi.global.error.ErrorCode;
 import com.ottnavi.global.error.RateLimitExceededException;
 import io.github.bucket4j.Bucket;
@@ -34,6 +35,7 @@ public class SingleFetchRateLimiter {
 	private final RateLimitBucketProvider bucketProvider;
 	private final BucketConfiguration configuration;
 	private final MeterRegistry meterRegistry;
+	private final RateLimitSupport.StoreErrorLog storeErrorLog = new RateLimitSupport.StoreErrorLog(); // 같은 장애 동안 경고 로그를 줄인다
 	private final RateLimitSupport.FailureWindow failureWindow = new RateLimitSupport.FailureWindow(FAIL_CLOSED_PAUSE_NANOS);
 
 	public SingleFetchRateLimiter(RateLimitBucketProvider bucketProvider, RateLimitProperties.Limit limit,
@@ -61,11 +63,19 @@ public class SingleFetchRateLimiter {
 		try {
 			Bucket bucket = bucketProvider.getBucket(KEY_PREFIX + clientIp, configuration);
 			probe = bucket.tryConsumeAndReturnRemaining(1);
+			storeErrorLog.markRecovered(); // 저장소가 다시 응답하면 다음 장애는 처음 1건부터 남긴다
 		} catch (RuntimeException e) {
 			failureWindow.markFailed();
-			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다
-			log.warn("단건 수집 제한 저장소 오류로 요청을 거부합니다(fail-closed): {}: {}",
-					e.getClass().getSimpleName(), e.getMessage());
+			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다. 메시지도 접속 정보(호스트 등)가 섞일 수 있어 클래스 이름만 남긴다
+			meterRegistry.counter(PublicRateLimiter.STORE_ERROR_METRIC_NAME, "bucket", "single_fetch").increment(); // 태그는 닫힌 값만
+			// 같은 장애 동안은 처음 1건만 상세히, 이후에는 1분에 한 번 건수만 남긴다
+			long skippedCount = storeErrorLog.recordError();
+			if (skippedCount == RateLimitSupport.StoreErrorLog.FIRST_ERROR) {
+				log.warn("단건 수집 제한 저장소 오류로 요청을 거부합니다(fail-closed): {}, 근본원인={}", e.getClass().getSimpleName(),
+						ExceptionRootCause.rootCauseName(e));
+			} else if (skippedCount > 0) {
+				log.warn("단건 수집 제한 저장소 오류가 계속되고 있습니다(fail-closed): 최근 1분간 {}건 발생", skippedCount);
+			}
 			throw new RateLimitExceededException(ErrorCode.RATE_LIMIT_EXCEEDED.getMessage(),
 					RateLimitSupport.toCeilSeconds(FAIL_CLOSED_PAUSE_NANOS));
 		}

@@ -65,7 +65,7 @@ public class NotificationCreateService {
 	private Optional<Long> insert(Long userId, NotificationType type, String dedupeKey, Object payload) {
 		// 1. 알림을 끈 사용자는 만들지 않는다
 		if (!userQueryService.isNotificationEnabled(userId)) {
-			log.info("알림이 꺼져 있어 만들지 않는다: userId={}, type={}", userId, type);
+			log.debug("알림이 꺼져 있어 만들지 않는다: userId={}, type={}", userId, type);
 			return Optional.empty();
 		}
 
@@ -76,7 +76,7 @@ public class NotificationCreateService {
 		Instant now = Instant.now(clock);
 		int inserted = outboxRepository.insertIfAbsent(userId, type.name(), dedupeKey, payloadJson, now);
 		if (inserted == 0) {
-			log.info("이미 만들어진 알림이라 건너뛴다: dedupeKey={}", dedupeKey);
+			log.debug("이미 만들어진 알림이라 건너뛴다: dedupeKey={}", dedupeKey);
 			return Optional.empty();
 		}
 

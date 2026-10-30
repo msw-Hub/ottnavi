@@ -12,6 +12,9 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /**
  * 데모 로그인 버킷의 한도 판정과 fail-closed를 검증한다. 메모리 버킷을 쓰므로 Docker·스프링 컨텍스트가 필요 없다.
@@ -22,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * | 저장소 오류면 통과시키지 않고 거부, 잠시 저장소를 다시 부르지 않음 | Redis가 죽었을 때 한도가 풀려 비밀번호를 무제한 시도하는 것 |
  * | 거부 카운터는 bucket=demo_login만 늘어남 | 일반·단건 수집 지표와 섞여 원인을 못 찾는 것 |
  */
+@ExtendWith(OutputCaptureExtension.class)
 class DemoLoginRateLimiterTest {
 
 	private static final RateLimitProperties.Limit LIMIT = new RateLimitProperties.Limit(2, 2, Duration.ofMinutes(15));
@@ -101,6 +105,44 @@ class DemoLoginRateLimiterTest {
 	}
 
 	/** 항상 저장소 오류를 던지는 창구 */
+	@Test
+	void 저장소_오류_경고_로그에_근본_원인_클래스가_남는다(CapturedOutput output) {
+		// given
+		DemoLoginRateLimiter failClosedLimiter = new DemoLoginRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> failClosedLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		assertThat(output.getOut()).contains("근본원인=java.net.SocketTimeoutException").doesNotContain("Redis 연결 실패(테스트)"); // 예외 메시지는 로그에 남기지 않는다
+	}
+
+	@Test
+	void 저장소_오류가_나면_ratelimit_store_error_카운터가_bucket_demo_login_태그로_늘어난다() {
+		// given
+		DemoLoginRateLimiter errorLimiter = new DemoLoginRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		Counter counter = meterRegistry.find("ratelimit.store_error").tag("bucket", "demo_login").counter();
+		assertThat(counter.count()).isEqualTo(1.0);
+	}
+
+	@Test
+	void 저장소_오류가_이어지는_동안에도_상세_경고는_한_번만_남는다(CapturedOutput output) {
+		// given
+		DemoLoginRateLimiter errorLimiter = new DemoLoginRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+		assertThatThrownBy(() -> errorLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		assertThat(output.getOut()).containsOnlyOnce("근본원인=");
+	}
+
 	private static class FailingProvider implements RateLimitBucketProvider {
 
 		int callCount;
@@ -108,7 +150,7 @@ class DemoLoginRateLimiterTest {
 		@Override
 		public Bucket getBucket(String key, BucketConfiguration configuration) {
 			callCount++;
-			throw new IllegalStateException("Redis 연결 실패(테스트)");
+			throw new IllegalStateException("Redis 연결 실패(테스트)", new java.net.SocketTimeoutException("시간 초과"));
 		}
 	}
 }

@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Link, Outlet, ScrollRestoration } from 'react-router'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
 import { useIsDemo } from '@/hooks/useIsDemo'
+import { usePageViewTracking } from '@/hooks/usePageViewTracking'
 import { useSession } from '@/hooks/useSession'
 import { DemoBanner } from '@/app/DemoBanner'
 import { HeaderAccountNav } from '@/app/HeaderAccountNav'
@@ -30,6 +31,8 @@ export function RootLayout() {
   // 머리글의 실제 높이를 재서 토스트 위치 변수에 반영한다(줄 수가 바뀌어도 토스트가 머리글을 덮지 않게, Task 090)
   const headerRef = useRef<HTMLElement>(null)
   useMeasuredHeaderHeight(headerRef)
+  // 화면 이동마다 방문 통계(GA4) page_view를 보낸다. 측정 ID가 비면 아무것도 하지 않는다(lib/analytics.ts)
+  usePageViewTracking()
   // 푸터의 회원 탈퇴 링크를 보일지 정한다. 머리글 계정 영역(HeaderAccountNav)과 같은 훅이라 목업·실제 환경에서 같은 판단을 한다
   const isAuthenticated = useSession().status === 'authenticated'
   const isDemo = useIsDemo()

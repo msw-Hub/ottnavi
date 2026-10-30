@@ -255,7 +255,7 @@ sequenceDiagram
 | Redis Cloud 무료 30MB·초당 100 ops | TMDB 버킷 로컬화, 요청 한도(R11-12) 산정 시 반영, `INFO commandstats`로 실측 | 2차 자료 |
 | Supabase 무료 500MB에 `BATCH_*` 누적. Transaction 풀러 6543은 prepared statement 미지원 | Session 5432 사용, 배치 이력 정리 기준은 2단계 O4 | web |
 | Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않아 대시보드에서 수동으로 켜야 함(초기 기획의 "요청이 서버를 깨운다" 전제는 틀림) | 무료 기간에는 cron을 끄고 수집은 로컬에서 실측, 운영 적재는 MVP 배포 때(3절), 배포는 Hobby(R11-4) | 사용자 실사용 확인 |
-| Loki4j 최신 라인의 Logback 요구 버전과 Boot 관리 Logback 미대조 | 3단계 도입 시 대조 | c7(부분) |
+| Loki4j 2.1은 Logback 1.6을 요구하는데 Boot 4.1이 관리하는 Logback은 1.5.x | Loki4j **2.0.3**(Logback 1.5.38과 맞음) 사용, 2.1 이상은 Boot가 Logback 1.6으로 올린 뒤(2026-10-31 대조) | c7 + 로컬 기동 확인 |
 | Gemini 무료 등급 입력은 제품 개선에 사용됨 | 개인정보를 프롬프트에 넣지 않음 | web |
 | `msw` 3에서 `worker.start()`·`server.listen()`의 `onUnhandledRequest`가 `onUnhandledFrame`으로 바뀜(설치된 타입 정의로 확인). `orval` 8.39와는 생성·타입 검사·런타임 모두 호환 확인 | `onUnhandledFrame: 'bypass'`(브라우저), 테스트 서버는 `'error'` | 실측(Task 017) |
 | TypeScript 6에서 `baseUrl` 없이 `paths`만으로 `@/*` 별칭이 동작함(`baseUrl`을 넣어 본 적은 없고 deprecated 여부는 문서로 확인하지 못함) | `tsconfig.json`·`tsconfig.app.json` 양쪽에 `paths`, `vite.config.ts`에 같은 별칭 | 실측(Task 017) |

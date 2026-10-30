@@ -58,7 +58,7 @@ describe('HeaderAccountMenu', () => {
     expect(hrefOf('내 설정')).toBe('/settings')
     expect(hrefOf('요금 확인')).toBe('/pricing')
     expect(hrefOf('찜 목록, 12개')).toBe('/wishlist')
-    expect(hrefOf('알림 설정, 준비 중')).toBe('/settings/notifications')
+    expect(hrefOf('알림 설정')).toBe('/settings/notifications')
     expect(screen.getByRole('menuitem', { name: '로그아웃' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: '관리 화면' })).not.toBeInTheDocument()
   })
@@ -96,7 +96,7 @@ describe('HeaderAccountMenu', () => {
 
     await user.click(screen.getByRole('button', { name: '내 메뉴' }))
 
-    expect(screen.getByRole('menuitem', { name: '알림 설정, 준비 중' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: '알림 설정' })).toHaveAttribute(
       'aria-current',
       'page',
     )

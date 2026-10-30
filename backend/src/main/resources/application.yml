@@ -71,6 +71,10 @@ spring:
             readTimeout: 5000     # ms
             loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
 management:
+  otlp:
+    metrics:
+      export:
+        enabled: false                  # observability 프로필이 켜질 때만 전송한다. 프로필이 없으면 전송 0건
   health:
     mail:
       enabled: false                    # 메일 서버 연결 확인을 헬스 체크에서 뺀다. 켜 두면 헬스 체크마다 SMTP에 접속하고, 메일 서버가 느리거나 막히면 서비스 전체가 DOWN(503)으로 보인다

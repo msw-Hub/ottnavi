@@ -94,13 +94,13 @@ describe('이력', () => {
     expect(screen.getByText(/^마지막 성공 수집:/)).toBeInTheDocument()
   })
 
-  it('범위 DAILY·WEEKLY는 보이되 고를 수 없고 "2단계부터" 태그가 붙는다', async () => {
+  it('범위 DAILY·WEEKLY는 보이되 고를 수 없고 "자동 실행 전용" 태그가 붙는다', async () => {
     renderCollect()
     await findTable()
     expect(screen.getByRole('radio', { name: '전체(ALL)' })).toBeChecked()
     expect(screen.getByRole('radio', { name: '매일 갱신(DAILY)' })).toBeDisabled()
     expect(screen.getByRole('radio', { name: '주간 갱신(WEEKLY)' })).toBeDisabled()
-    expect(screen.getAllByText('2단계부터')).toHaveLength(2)
+    expect(screen.getAllByText('자동 실행 전용')).toHaveLength(2)
   })
 })
 
