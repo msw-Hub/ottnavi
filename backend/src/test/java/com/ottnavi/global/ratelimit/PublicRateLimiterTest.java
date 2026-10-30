@@ -82,7 +82,7 @@ class PublicRateLimiterTest {
 		failOpenLimiter.check("1.1.1.1");
 
 		// then
-		assertThat(output.getOut()).contains("근본원인=java.net.SocketTimeoutException");
+		assertThat(output.getOut()).contains("근본원인=java.net.SocketTimeoutException").doesNotContain("Redis 연결 실패(테스트)"); // 예외 메시지는 로그에 남기지 않는다
 	}
 
 	@Test

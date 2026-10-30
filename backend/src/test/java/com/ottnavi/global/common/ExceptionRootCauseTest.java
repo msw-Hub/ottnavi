@@ -39,15 +39,16 @@ class ExceptionRootCauseTest {
 	@Test
 	void cause가_서로를_가리키는_순환이어도_끝난다() {
 		// given
-		RuntimeException first = new RuntimeException("첫째");
-		RuntimeException second = new RuntimeException("둘째", first);
+		// 서로 다른 클래스로 만들어, 깊이 상한(10단계)에서 멈춘 위치가 이름으로 드러나게 한다
+		IllegalStateException first = new IllegalStateException("첫째");
+		IllegalArgumentException second = new IllegalArgumentException("둘째", first);
 		first.initCause(second);
 
 		// when
 		String name = ExceptionRootCause.rootCauseName(first);
 
-		// then
-		assertThat(name).isEqualTo("java.lang.RuntimeException");
+		// then (홀수 단계는 둘째, 짝수 단계는 첫째라 10단계에서는 첫째 클래스가 나온다)
+		assertThat(name).isEqualTo("java.lang.IllegalStateException");
 	}
 
 	@Test
