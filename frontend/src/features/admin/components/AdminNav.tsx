@@ -11,7 +11,7 @@ const ADMIN_NAV_ITEMS: {
   { to: '/admin/products', label: 'OTT 구독상품', isComingSoon: false, showsUnmappedCount: false },
   { to: '/admin/providers', label: '제공처 매핑', isComingSoon: false, showsUnmappedCount: true },
   { to: '/admin/collect', label: '수집', isComingSoon: false, showsUnmappedCount: false },
-  { to: '/admin/monitoring', label: '모니터링', isComingSoon: true, showsUnmappedCount: false },
+  { to: '/admin/monitoring', label: '모니터링', isComingSoon: false, showsUnmappedCount: false },
   { to: '/admin/llm', label: 'LLM 도구', isComingSoon: false, showsUnmappedCount: false },
 ]
 
