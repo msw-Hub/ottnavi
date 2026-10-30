@@ -28,6 +28,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-otlp' // 지표를 Grafana Cloud로 보낸다(observability 프로필에서만 켜진다). 버전은 Boot BOM이 맞춘다
+	implementation 'org.springframework.boot:spring-boot-opentelemetry' // OTLP 지표 자동 구성이 이 모듈의 OpenTelemetryProperties 클래스를 요구한다(없으면 자동 구성이 조용히 빠진다)
 	// DB·마이그레이션
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
