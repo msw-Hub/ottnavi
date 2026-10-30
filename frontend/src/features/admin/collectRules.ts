@@ -17,7 +17,7 @@ export const COLLECT_TIER_LABELS: Record<CollectTier, string> = {
   WEEKLY: '주간 갱신(WEEKLY)',
 }
 
-// MVP에서 실행할 수 있는 범위. DAILY·WEEKLY는 2단계(O3, Task 077)에서 연다
+// 수동 실행에서 고를 수 있는 범위. DAILY·WEEKLY는 Task 077로 구현됐지만 예약 실행(cron) 전용이라 수동 실행 범위에서만 닫아 둔다
 export const RUNNABLE_COLLECT_TIERS: CollectTier[] = ['ALL']
 
 // 시뮬레이션: 화면에서 접수한 실행은 이력을 이 횟수만큼 읽으면 완료로 바뀐다(목업 전용, 결정적 규칙)

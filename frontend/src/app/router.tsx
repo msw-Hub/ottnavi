@@ -77,7 +77,7 @@ export const routes: RouteObject[] = [
             },
           },
           {
-            path: 'exclusives', // SCR-03 독점 목록 (Task 075 1차안: 목업 모드에서만 정적 샘플, 운영은 준비 중)
+            path: 'exclusives', // SCR-03 독점 목록 (Task 075 1차안은 목업 정적 샘플이었고 지금은 실제 API로 연결됨, Task 079)
             lazy: {
               Component: () => import('@/pages/ExclusivesPage').then((m) => m.ExclusivesPage),
             },
@@ -97,7 +97,7 @@ export const routes: RouteObject[] = [
             lazy: { Component: () => import('@/pages/TermsPage').then((m) => m.TermsPage) },
           },
           {
-            path: 'accuracy', // SCR-05 정확도 안내 (3단계, 준비 중)
+            path: 'accuracy', // SCR-05 정확도 안내 (실제 화면 AccuracyScreen, Task 089)
             lazy: { Component: () => import('@/pages/AccuracyPage').then((m) => m.AccuracyPage) },
           },
           {

@@ -175,18 +175,15 @@ describe('매핑 저장', () => {
     })
   })
 
-  it('AD 등급을 고르면 "2단계부터" 태그가 붙는다', async () => {
+  it('AD 등급 선택지는 "AD(광고형)"이고 "2단계부터" 태그는 붙지 않는다', async () => {
     const user = userEvent.setup()
     renderProviders()
     const table = await findTable()
 
     const row = bodyRows(table)[0]
     await user.selectOptions(within(row).getByLabelText('Crunchyroll 매핑 서비스'), '넷플릭스')
-    await user.selectOptions(
-      within(row).getByLabelText('Crunchyroll 등급'),
-      'AD(광고형, 2단계부터 계산)',
-    )
-    expect(within(row).getByText('2단계부터')).toBeInTheDocument()
+    await user.selectOptions(within(row).getByLabelText('Crunchyroll 등급'), 'AD(광고형)')
+    expect(within(row).queryByText('2단계부터')).not.toBeInTheDocument()
   })
 
   it('저장이 실패하면 행 아래에 오류가 보이고 고른 값은 그대로 남는다', async () => {

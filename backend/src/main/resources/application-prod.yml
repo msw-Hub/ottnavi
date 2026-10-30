@@ -30,7 +30,7 @@ springdoc:
   swagger-ui:
     enabled: false
 app:
-  frontend-origin: ${APP_FRONTEND_ORIGIN}   # 기본값 없음. 프론트 주소(예: https://ottnavi.vercel.app, 끝에 / 없이)
+  frontend-origin: ${APP_FRONTEND_ORIGIN}   # 기본값 없음. 프론트 주소(예: https://ottnavi.shop, 끝에 / 없이)
   origin-secret:
     value: ${ORIGIN_SECRET}       # 기본값 없음. 누락 시 기동이 실패한다(Vercel 주입 값과 같아야 함)
   mail:

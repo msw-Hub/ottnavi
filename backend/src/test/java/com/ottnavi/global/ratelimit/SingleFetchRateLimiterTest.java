@@ -12,11 +12,15 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 /**
  * 단건 수집 버킷의 한도 판정과 fail-closed를 검증한다. 메모리 버킷을 쓰므로 Docker·스프링 컨텍스트가 필요 없다.
  * 한도: 통 크기 2, 1분에 60개 충전(= 1초에 1개).
  */
+@ExtendWith(OutputCaptureExtension.class)
 class SingleFetchRateLimiterTest {
 
 	private static final RateLimitProperties.Limit LIMIT = new RateLimitProperties.Limit(2, 60, Duration.ofMinutes(1));
@@ -82,6 +86,18 @@ class SingleFetchRateLimiterTest {
 	}
 
 	/** 항상 저장소 오류를 던지는 창구 */
+	@Test
+	void 저장소_오류_경고_로그에_근본_원인_클래스가_남는다(CapturedOutput output) {
+		// given
+		SingleFetchRateLimiter failClosedLimiter = new SingleFetchRateLimiter(new FailingProvider(), LIMIT, meterRegistry);
+
+		// when
+		assertThatThrownBy(() -> failClosedLimiter.check("1.1.1.1")).isInstanceOf(RateLimitExceededException.class);
+
+		// then
+		assertThat(output.getOut()).contains("근본원인=java.net.SocketTimeoutException").doesNotContain("Redis 연결 실패(테스트)"); // 예외 메시지는 로그에 남기지 않는다
+	}
+
 	private static class FailingProvider implements RateLimitBucketProvider {
 
 		int callCount;
@@ -89,7 +105,7 @@ class SingleFetchRateLimiterTest {
 		@Override
 		public Bucket getBucket(String key, BucketConfiguration configuration) {
 			callCount++;
-			throw new IllegalStateException("Redis 연결 실패(테스트)");
+			throw new IllegalStateException("Redis 연결 실패(테스트)", new java.net.SocketTimeoutException("시간 초과"));
 		}
 	}
 }

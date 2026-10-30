@@ -1,5 +1,6 @@
 package com.ottnavi.global.ratelimit;
 
+import com.ottnavi.global.common.ExceptionRootCause;
 import com.ottnavi.global.error.ErrorCode;
 import com.ottnavi.global.error.RateLimitExceededException;
 import io.github.bucket4j.Bucket;
@@ -55,8 +56,9 @@ public class PublicRateLimiter {
 			probe = bucket.tryConsumeAndReturnRemaining(1);
 		} catch (RuntimeException e) {
 			failureWindow.markFailed();
-			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다
-			log.warn("요청 제한 저장소 오류로 검사를 건너뜁니다(fail-open): {}: {}", e.getClass().getSimpleName(), e.getMessage());
+			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다. 메시지도 접속 정보(호스트 등)가 섞일 수 있어 클래스 이름만 남긴다
+			log.warn("요청 제한 저장소 오류로 검사를 건너뜁니다(fail-open): {}, 근본원인={}", e.getClass().getSimpleName(),
+					ExceptionRootCause.rootCauseName(e));
 			return;
 		}
 

@@ -23,7 +23,7 @@ interface CollectRunFormProps {
 // 데모 계정에게 [수집 실행]이 막힌 이유를 적은 문장의 id(버튼이 aria-describedby로 가리킨다)
 const COLLECT_RUN_LOCK_NOTE_ID = 'collect-run-demo-note'
 
-// 범위 선택지. DAILY·WEEKLY는 보이되 고를 수 없다(2단계, 사용자 결정 2026-10-11)
+// 범위 선택지. DAILY·WEEKLY는 예약 실행(cron)이 쓰는 범위라 보이되 수동으로는 고를 수 없다(사용자 결정 2026-10-11, 문구는 2026-10-30에 사실대로 정리)
 const TIER_OPTIONS: { value: CollectTier; isEnabled: boolean }[] = [
   { value: 'ALL', isEnabled: true },
   { value: 'DAILY', isEnabled: false },
@@ -62,7 +62,7 @@ function noticeText(notice: Exclude<RunNotice, { kind: 'ERROR' | 'DATE_INVALID' 
 /**
  * 수집 수동 실행 양식이다(SCR-16): 대상 날짜 + 범위 + [수집 실행].
  *
- * 범위 중 "전체(ALL)"만 고를 수 있다. 매일(DAILY)·주간(WEEKLY) 갱신은 2단계(O3)에서 열리므로 숨기지 않고 비활성 + "2단계부터" 태그로 보인다.
+ * 범위 중 "전체(ALL)"만 고를 수 있다. 매일(DAILY)·주간(WEEKLY) 갱신은 예약 실행(cron) 전용이라 숨기지 않고 비활성 + "자동 실행 전용" 태그로 보인다.
  * 실행은 202로 접수만 되고 실제 수집은 서버에서 비동기로 돈다(TECH 3절). 그래서 결과는 "접수했습니다" 안내이고, 진행은 이력에서 본다.
  * 같은 날짜·범위가 실행 중(409)이거나 이미 성공(409)이면 오류(빨강)가 아니라 info 안내로 보인다(runNotice.ts 주석).
  * 다른 날짜가 실행 중이어도 409 BATCH_ALREADY_RUNNING이다(수집은 한 번에 하나만 돈다, Task 045). 이때는 막고 있는 실행을 안내한다.
@@ -148,7 +148,8 @@ export function CollectRunForm({
               >
                 {COLLECT_TIER_LABELS[value]}
               </Label>
-              {!isEnabled && <PhaseLaterTag />}
+              {/* 이전 문구: "2단계부터"(기본 label). 지금은 예약 실행(cron)으로 이미 돌고 수동 실행만 ALL로 제한된다 */}
+              {!isEnabled && <PhaseLaterTag label="자동 실행 전용" />}
             </div>
           ))}
         </RadioGroup>

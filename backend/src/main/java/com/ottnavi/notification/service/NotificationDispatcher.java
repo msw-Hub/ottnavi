@@ -1,5 +1,6 @@
 package com.ottnavi.notification.service;
 
+import com.ottnavi.global.common.ExceptionRootCause;
 import com.ottnavi.infra.mail.MailClient;
 import com.ottnavi.infra.mail.OutgoingMail;
 import com.ottnavi.notification.domain.enums.NotificationStatus;
@@ -106,8 +107,8 @@ public class NotificationDispatcher {
 		} catch (Exception e) {
 			error = describe(e);
 			// 수신 주소가 예외 메시지에 섞일 수 있어 예외 객체나 메시지는 로그에 남기지 않는다(사유는 DB last_error에 기록)
-			log.warn("알림 발송에 실패했다: outboxId={}, 시도={}, 원인={}", notification.id(), notification.attemptCount(),
-					e.getClass().getSimpleName());
+			log.warn("알림 발송에 실패했다: outboxId={}, 시도={}, 예외={}, 근본원인={}", notification.id(), notification.attemptCount(),
+					e.getClass().getSimpleName(), ExceptionRootCause.rootCauseName(e));
 		}
 
 		// 4. 결과를 기록한다(기록 단계)
