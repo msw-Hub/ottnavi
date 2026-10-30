@@ -233,22 +233,15 @@ export function HeaderAccountMenu({
           >
             찜 목록
           </MenuLink>
-          {/* 알림 설정은 2단계 기능이라 "준비 중" 화면으로 이어진다. 막아 두면 키보드 이동에서 건너뛰어져 이유를 알기 어려워 링크로 둔다.
-              점선 테두리 + 글자라 색만으로 알리지 않는다 */}
+          {/* 알림 설정은 실제 화면(NotificationSettingsPage, Task 071~073)으로 이어지는 일반 링크다.
+              이전: "준비 중" 알약(end)과 accessibleName="알림 설정, 준비 중"을 붙였다(2단계 자리표시 시절).
+              <MenuLink ... accessibleName="알림 설정, 준비 중"
+                end={<span aria-hidden="true" className="ml-auto inline-flex h-5 items-center rounded-full border border-dashed border-input px-1.5 text-[0.6875rem] font-medium text-muted-foreground">준비 중</span>}> */}
           <MenuLink
             to="/settings/notifications"
             search={search}
             currentPath={pathname}
             icon={<BellIcon className="size-4" />}
-            accessibleName="알림 설정, 준비 중"
-            end={
-              <span
-                aria-hidden="true"
-                className="ml-auto inline-flex h-5 items-center rounded-full border border-dashed border-input px-1.5 text-[0.6875rem] font-medium text-muted-foreground"
-              >
-                준비 중
-              </span>
-            }
           >
             알림 설정
           </MenuLink>

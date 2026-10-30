@@ -10,7 +10,7 @@ import { AdminNav } from '@/features/admin/components/AdminNav'
  *
  * 쓰는 방법(frontend-dev가 router.tsx에 연결): RequireAdmin 아래에 "경로 없는 레이아웃 라우트"로 한 번 더 감싼다.
  *   { Component: RequireAdmin, children: [{ Component: AdminLayout, children: [ ...관리자 화면들 ] }] }
- * 이렇게 하면 화면을 옮겨 다녀도 메뉴는 다시 만들어지지 않고 본문만 바뀐다. 모니터링·LLM(준비 중) 화면에도 메뉴가 계속 보인다.
+ * 이렇게 하면 화면을 옮겨 다녀도 메뉴는 다시 만들어지지 않고 본문만 바뀐다. 준비 중인 모니터링 화면에도 메뉴가 계속 보인다.
  *
  * "관리자"를 제목(h1)이 아닌 작은 글자로 둔 이유: 각 화면이 자기 제목(h1, 예: "OTT 구독상품 관리")을 갖는다.
  * 한 화면에 h1이 둘이면 낭독기 사용자가 제목으로 화면을 파악하기 어렵다.

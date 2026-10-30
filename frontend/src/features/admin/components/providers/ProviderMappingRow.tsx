@@ -8,7 +8,7 @@ import { DEMO_READONLY_NOTE_ID } from '@/components/common/DemoReadOnlyHint'
 import { Label } from '@/components/ui/label'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { MappingStateBadge } from '@/features/admin/components/MappingStateBadge'
-import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag'
+// 이전: import { PhaseLaterTag } from '@/features/admin/components/PhaseLaterTag' (AD 선택 태그를 뺐다)
 import { useSaveProviderMapping } from '@/features/admin/hooks/useAdminProviders'
 import type { AdminProvider, ProviderTier } from '@/api/generated/model'
 import {
@@ -114,9 +114,9 @@ export function ProviderMappingRow({ provider, services, variant }: ProviderMapp
         className={SELECT_CLASS}
       >
         <option value="STANDARD">STANDARD(광고 없음)</option>
-        <option value="AD">AD(광고형, 2단계부터 계산)</option>
+        {/* 이전: "AD(광고형, 2단계부터 계산)" 문구와 AD 선택 시 <PhaseLaterTag className="w-fit" /> 태그가 있었다(광고형 판정은 이미 쓰인다) */}
+        <option value="AD">AD(광고형)</option>
       </select>
-      {tier === 'AD' && <PhaseLaterTag className="w-fit" />}
     </div>
   ) : (
     // aria-label은 역할 없는 span에는 낭독기가 읽지 않을 수 있어, 눈에는 "—"만 보이고 낭독기에는 문장이 읽히게 나눈다
