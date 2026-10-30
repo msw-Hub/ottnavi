@@ -19,7 +19,10 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -28,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 막으려는 사고: 성공했는데 SENT가 안 되는 일, 실패한 알림이 영원히 재시도되거나 한 번에 포기되는 일,
  * 탈퇴한 사용자에게 메일이 나가는 일, 최대 시도에 닿은 행이 계속 발송되는 일.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class NotificationDispatcherTest extends IntegrationTestSupport {
 
     @RegisterExtension
@@ -123,6 +127,20 @@ class NotificationDispatcherTest extends IntegrationTestSupport {
             }
         }
         assertThat(greenMail.getReceivedMessages()).isEmpty();
+    }
+
+    @Test
+    void 발송_실패_경고_로그에_근본_원인_클래스가_있고_수신자_주소는_없다(CapturedOutput output) {
+        // given: 형식이 잘못된 수신 주소라 발송에 실패한다
+        Long badUserId = saveUser("not-an-email@@", "dispatch-bad-log");
+        insertDue(badUserId, "k-log");
+
+        // when
+        dispatcher.dispatchDue();
+
+        // then
+        assertThat(output.getOut()).contains("알림 발송에 실패했다").contains("근본원인=");
+        assertThat(output.getOut()).doesNotContain("not-an-email@@");
     }
 
     @Test

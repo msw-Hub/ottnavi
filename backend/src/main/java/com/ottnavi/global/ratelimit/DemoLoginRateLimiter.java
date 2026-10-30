@@ -1,5 +1,6 @@
 package com.ottnavi.global.ratelimit;
 
+import com.ottnavi.global.common.ExceptionRootCause;
 import com.ottnavi.global.error.ErrorCode;
 import com.ottnavi.global.error.RateLimitExceededException;
 import io.github.bucket4j.Bucket;
@@ -57,8 +58,8 @@ public class DemoLoginRateLimiter {
 		} catch (RuntimeException e) {
 			failureWindow.markFailed();
 			// 스택은 남기지 않는다. 장애 동안 같은 스택이 반복해서 쌓이지 않게 한다
-			log.warn("데모 로그인 제한 저장소 오류로 요청을 거부합니다(fail-closed): {}: {}",
-					e.getClass().getSimpleName(), e.getMessage());
+			log.warn("데모 로그인 제한 저장소 오류로 요청을 거부합니다(fail-closed): {}: {}, 근본원인={}",
+					e.getClass().getSimpleName(), e.getMessage(), ExceptionRootCause.rootCauseName(e));
 			throw new RateLimitExceededException(ErrorCode.RATE_LIMIT_EXCEEDED.getMessage(),
 					RateLimitSupport.toCeilSeconds(FAIL_CLOSED_PAUSE_NANOS));
 		}
