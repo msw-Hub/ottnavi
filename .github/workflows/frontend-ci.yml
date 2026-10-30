@@ -31,7 +31,9 @@ jobs:
       # 설치된 msw 3이 어긋나 락 파일 불일치(Missing: msw@2.15.0)로 `npm ci`가 실패한다
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          # Node 24.22.1에서 MSW(@mswjs/interceptors 0.45.7)가 취소된 요청 뒤의 빈 연결을 실제 네트워크로 통과시켜
+          # 다음 테스트의 첫 요청이 끊긴다(mswjs/interceptors#881). 상위 수정이 나오면 `24`로 되돌린다
+          node-version: 24.19.0
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
