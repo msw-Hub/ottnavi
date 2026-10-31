@@ -83,7 +83,9 @@ describe('개인정보처리방침 화면', () => {
 
     // 2-3. 동의 방식 문구: 동의를 받은 경우에만 수집, 거부해도 제한 없음, 6개월 뒤 다시 묻기, 변경 이력 한 줄
     expect(screen.getByText(/방문 통계 수집에 동의한 경우에만 수집합니다/)).toBeInTheDocument()
-    expect(screen.getByText(/거부하면 6개월 뒤에 한 번 다시 여쭙니다/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/거부하거나 동의를 철회하면 그 시점부터 6개월 뒤에 한 번 다시 여쭙니다/),
+    ).toBeInTheDocument()
     expect(screen.getByText(/변경: 방문 통계 수집을\s*동의를 받은 경우에만/)).toBeInTheDocument()
     // 목업(측정 ID 없음)에서는 설정 카드가 없다
     expect(screen.queryByRole('heading', { name: '방문 통계 설정' })).not.toBeInTheDocument()

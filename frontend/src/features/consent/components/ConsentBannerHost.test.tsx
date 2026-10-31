@@ -12,9 +12,21 @@ import { resetConsentStoreForTest } from '@/features/consent/consentStore'
  * 막으려는 사고: 목업·로컬이나 관리자 화면에 띠가 뜨는 것, 이미 고른 방문자에게 계속 묻는 것.
  */
 function renderAt(path: string) {
-  const router = createMemoryRouter([{ path: '*', element: <ConsentBannerHost /> }], {
-    initialEntries: [path],
-  })
+  // RootLayout처럼 포커스를 받을 수 있는 main(tabIndex=-1)을 함께 둔다(선택 뒤 포커스 이동 확인용)
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <>
+            <main id="main" tabIndex={-1} />
+            <ConsentBannerHost />
+          </>
+        ),
+      },
+    ],
+    { initialEntries: [path] },
+  )
   render(<RouterProvider router={router} />)
 }
 
@@ -38,6 +50,14 @@ describe('ConsentBannerHost', () => {
 
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
     expect(window.localStorage.getItem(CONSENT_STORAGE_KEY)).toContain('"denied"')
+  })
+
+  it('동의를 누르면 띠가 사라지고 포커스가 본문(main)으로 옮겨진다', async () => {
+    renderAt('/')
+    await userEvent.click(screen.getByRole('button', { name: '동의' }))
+
+    expect(screen.queryByRole('region')).not.toBeInTheDocument()
+    expect(document.getElementById('main')).toHaveFocus()
   })
 
   it('측정 ID가 없으면(목업·로컬) 띠가 없다', () => {
