@@ -31,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 /** Redis 캐시 설정: 값은 JSON(Jackson 3)으로 저장하고 캐시마다 TTL을 둔다. */
 @Configuration
 @EnableCaching
-@EnableConfigurationProperties({HomeCacheProperties.class, ExclusiveCacheProperties.class})
+@EnableConfigurationProperties({HomeCacheProperties.class, ExclusiveCacheProperties.class, RedisClientProperties.class})
 public class RedisConfig {
 
     // 캐시 이름 (@Cacheable(cacheNames = ...)에서 이 상수를 쓴다)

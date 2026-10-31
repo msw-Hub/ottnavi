@@ -96,6 +96,10 @@ app:
     refresh-reuse-grace: 10s         # 직전 Refresh Token을 재사용으로 보지 않는 유예(동시 요청·응답 유실 대비)
   origin-secret:
     enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
+  redis:                                # Redis 연결 보강(spring.data.redis.*와 별개). 배경은 docs/guides/TROUBLESHOOTING_REDIS_COLD_START.md
+    warm-up:
+      enabled: true                     # 기동 직후 백그라운드에서 Redis 연결을 미리 만든다. 실패해도 앱은 계속 동작한다(테스트에서는 IntegrationTestSupport가 끈다)
+      retry-delay: 30s                  # 예열이 하나라도 실패하면 이만큼 뒤 실패한 쪽만 한 번 더 시도한다(그 뒤에는 반복하지 않는다)
   rate-limit:                           # 공개 API 요청 제한(Task 049, PRD R11-12). 키는 방문자 IP(remoteAddr), 버킷은 Redis에 둔다
     enabled: true                       # 테스트에서만 끈다(IntegrationTestSupport). local 포함 기본 켜짐
     general:                            # /api/public/**, /api/auth/**, /api/oauth2/**, /api/login/** 에 IP별로 건다

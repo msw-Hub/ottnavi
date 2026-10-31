@@ -50,6 +50,11 @@ public class RedisRateLimitBucketProvider implements RateLimitBucketProvider, Au
 		return getProxyManager().builder().build(key, configuration);
 	}
 
+	/** 기동 직후 연결을 미리 만든다(예열). 실패하면 예외가 그대로 올라가며 다음 getBucket 호출에서 다시 시도한다 */
+	public void warmUp() {
+		getProxyManager();
+	}
+
 	/** 처음 한 번만 Redis에 연결해 ProxyManager를 만든다. 실패하면 다음 호출에서 다시 시도한다 */
 	private ProxyManager<String> getProxyManager() {
 		ProxyManager<String> current = proxyManager;
