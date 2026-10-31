@@ -60,6 +60,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	// LLM 줄거리 번역 (관리자 전용, Gemini). Spring AI 2.0.x는 Boot 4.0·4.1을 지원한다
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai'
+	// 방문자 통계: GA Data API 호출용 서비스 계정 토큰. google-genai가 이미 끌고 오는 같은 버전(1.33.0)을 직접 import하므로 전이 의존에 기대지 않고 명시한다
+	implementation 'com.google.auth:google-auth-library-oauth2-http:1.33.0'
 	// Lombok (결정 2)
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
