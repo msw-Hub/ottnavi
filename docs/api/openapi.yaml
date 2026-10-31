@@ -3,7 +3,7 @@ info:
   title: OTT내비 API
   description: |
     OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
-    - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+    - operation은 63개이고 62개는 구현됐고 1개(`getAdminVisitorStats`)는 `x-planned: true`인 제안(미구현)이다(관리자 회원 현황 조회 `getAdminUserStats`(ADMIN·DEMO), 시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
     - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
     - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
   version: 0.1.0
@@ -1544,6 +1544,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommonResponseSystemMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/user-stats:
+    get:
+      tags:
+        - admin
+      operationId: getAdminUserStats
+      security:
+        - bearerAuth: []
+      summary: 회원 현황 조회
+      description: |
+        관리자 모니터링 화면(SCR-17)에 올리는 회원 현황 숫자다. 가입 수, 실제 사용 중인 회원 수(ACTIVE 플랜 보유자 수와 알림을 켠 회원 수 두 가지)를 돌려준다.
+        집계는 `USER` 역할 회원만 센다(관리자·데모 계정 제외). 기준은 한국 시간(KST)이고, 탈퇴는 하드 삭제라 현재 남아 있는 회원만 센다. 알림 설정 행이 없는 회원은 꺼짐으로 센다. 이메일 등 개인정보는 담지 않는다.
+        관리자와 데모 계정(`DEMO`)이 호출할 수 있다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 회원 현황
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminUserStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /admin/visitor-stats:
+    get:
+      tags:
+        - admin
+      operationId: getAdminVisitorStats
+      x-planned: true
+      security:
+        - bearerAuth: []
+      summary: 방문자 통계 조회
+      description: |
+        (제안, 미구현) 관리자 모니터링 화면(SCR-17)에 올리는 방문자 수다. Google Analytics 4의 `activeUsers`를 서버가 대신 조회해 오늘·어제·최근 7일·최근 30일 값을 돌려준다. 방문 통계에 동의한 방문자만 집계되므로 실제 방문자보다 적다. 결과는 서버가 최대 15분 캐시한다. Google Analytics 속성 ID와 계정 정보는 응답에 담지 않는다.
+        Google Analytics 연동이 없거나 조회가 실패해도 오류 코드를 쓰지 않고 200과 `status`(`DISABLED`·`UNAVAILABLE`)로 알리며, 이때 숫자는 모두 `null`이다.
+        관리자와 데모 계정(`DEMO`)이 호출할 수 있다.
+        오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+      responses:
+        '200':
+          description: 방문자 통계(조회 상태 포함)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommonResponseAdminVisitorStats'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4355,6 +4410,128 @@ components:
           sentCount: 148
           failedCount: 1
           latestSentAt: '2026-11-01T03:51:12+09:00'
+    AdminUserStats:
+      type: object
+      description: |
+        회원 현황 숫자. 모든 집계는 `USER` 역할 회원만 센다(관리자·데모 계정 제외). 기준 시각은 한국 시간(KST)이다. 탈퇴는 하드 삭제라 현재 남아 있는 회원만 센다(오늘 가입했다가 탈퇴한 회원은 `todayNewUserCount`에도 들어가지 않는다).
+      required:
+        - totalUserCount
+        - todayNewUserCount
+        - monthNewUserCount
+        - activePlanUserCount
+        - notificationEnabledUserCount
+        - measuredAt
+      properties:
+        totalUserCount:
+          type: integer
+          format: int64
+          description: 현재 남아 있는 회원 수
+        todayNewUserCount:
+          type: integer
+          format: int64
+          description: 오늘 00:00(KST) 이후 가입했고 아직 남아 있는 회원 수
+        monthNewUserCount:
+          type: integer
+          format: int64
+          description: 이번 달 1일 00:00(KST) 이후 가입했고 아직 남아 있는 회원 수
+        activePlanUserCount:
+          type: integer
+          format: int64
+          description: ACTIVE 플랜을 가진 회원 수(실제 사용 중인 회원)
+        notificationEnabledUserCount:
+          type: integer
+          format: int64
+          description: 알림 설정이 켜진 회원 수. 알림 설정 행이 없는 회원은 꺼짐으로 센다
+        measuredAt:
+          type: string
+          format: date-time
+          description: 집계 시각(KST 오프셋)
+    CommonResponseAdminUserStats:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminUserStats'
+      example:
+        success: true
+        data:
+          totalUserCount: 42
+          todayNewUserCount: 3
+          monthNewUserCount: 17
+          activePlanUserCount: 12
+          notificationEnabledUserCount: 20
+          measuredAt: '2026-11-01T10:30:00+09:00'
+    VisitorStatsStatus:
+      type: string
+      description: |
+        방문자 통계 조회 상태. `OK`: 숫자가 채워졌다. `DISABLED`: 서버에 Google Analytics 연동 설정이 없다. `UNAVAILABLE`: Google Analytics 조회가 실패했거나 시간이 초과됐다.
+      enum:
+        - OK
+        - DISABLED
+        - UNAVAILABLE
+    AdminVisitorStats:
+      type: object
+      description: |
+        방문 통계(Google Analytics 4)에서 가져온 방문자 수. 지표는 `activeUsers`이고, 방문 통계에 동의한 방문자만 집계되므로 실제 방문자보다 적다. 서버가 결과를 최대 15분 캐시한다. Google Analytics 속성 ID와 계정 정보는 담지 않는다.
+        `status`가 `OK`가 아니면 숫자와 `fetchedAt`은 모두 `null`이다. 조회 실패는 오류 코드가 아니라 200과 `status`로 알린다.
+      required:
+        - status
+        - todayVisitorCount
+        - yesterdayVisitorCount
+        - last7DaysVisitorCount
+        - last30DaysVisitorCount
+        - fetchedAt
+      properties:
+        status:
+          $ref: '#/components/schemas/VisitorStatsStatus'
+        todayVisitorCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: 오늘 동의한 방문자 수. Google Analytics 처리 지연 때문에 잠정값이다
+        yesterdayVisitorCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: 어제 동의한 방문자 수
+        last7DaysVisitorCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: 오늘을 포함한 최근 7일 동의한 방문자 수. 기간 전체에서 중복을 제거한 값이라 일별 합과 다르다
+        last30DaysVisitorCount:
+          type: integer
+          format: int64
+          nullable: true
+          description: 오늘을 포함한 최근 30일 동의한 방문자 수. 기간 전체에서 중복을 제거한 값이라 일별 합과 다르다
+        fetchedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Google Analytics에서 값을 받아 온 시각. 캐시된 값이면 캐시를 만든 시각이다
+    CommonResponseAdminVisitorStats:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/AdminVisitorStats'
+      example:
+        success: true
+        data:
+          status: OK
+          todayVisitorCount: 8
+          yesterdayVisitorCount: 21
+          last7DaysVisitorCount: 96
+          last30DaysVisitorCount: 310
+          fetchedAt: '2026-11-01T10:25:00+09:00'
     SystemMetrics:
       type: object
       description: 서버의 메모리·스레드 상태 한 번 측정한 값(바이트 단위). 읽을 수 없는 값은 `null`
