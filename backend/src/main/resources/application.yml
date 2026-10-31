@@ -70,6 +70,10 @@ spring:
             connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
             readTimeout: 5000     # ms
             loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
+          ga: # infra.analytics의 @FeignClient(name = "ga")와 맞춘다. 방문자 카드 하나 때문에 관리자 화면이 오래 멈추지 않게 짧게 둔다
+            connectTimeout: 3000  # ms
+            readTimeout: 5000     # ms
+            loggerLevel: none     # URL에 GA 속성 ID가 들어 있고 헤더에 토큰이 있어 요청 로그를 남기지 않는다
 management:
   otlp:
     metrics:
@@ -109,6 +113,11 @@ app:
   demo-login:                           # 데모 계정 로그인(TECH 4절). 둘 다 비우면 꺼지고(POST /api/auth/demo-login이 404), 하나만 있으면 기동이 실패한다
     login-id: ${DEMO_LOGIN_ID:}         # 데모 아이디. 값은 환경 변수로만 넣는다
     password: ${DEMO_LOGIN_PASSWORD:}   # 데모 비밀번호(16자 이상). 값은 환경 변수로만 넣는다
+  analytics:                            # 관리자 방문자 통계(Google Analytics 4 Data API). 둘 다 비우면 꺼지고(status=DISABLED), 하나만 있으면 기동이 실패한다
+    property-id: ${GA_PROPERTY_ID:}     # GA4 속성 ID(숫자). 값은 환경 변수로만 넣는다
+    credentials-base64: ${GA_CREDENTIALS_BASE64:}   # 서비스 계정 키 JSON을 Base64로 인코딩한 값. 값은 환경 변수로만 넣는다
+    base-url: https://analyticsdata.googleapis.com   # GA Data API 주소(테스트에서 WireMock으로 바꾼다)
+    cache-ttl: 15m                      # 성공 결과를 Redis에 두는 시간. 실패는 캐시하지 않는다
   tmdb:
     base-url: https://api.themoviedb.org/3
     api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)

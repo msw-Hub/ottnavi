@@ -1,11 +1,13 @@
 package com.ottnavi.global.config;
 
+import com.ottnavi.admin.service.model.VisitorStatsCacheValue;
 import com.ottnavi.catalog.service.model.ExclusiveTitleList;
 import com.ottnavi.catalog.service.model.GenreInfo;
 import com.ottnavi.catalog.service.model.NewlyAvailableResult;
 import com.ottnavi.catalog.service.model.TitleDetailView;
 import com.ottnavi.catalog.service.model.TitleSearchResult;
 import com.ottnavi.home.service.model.PopularityRankingView;
+import com.ottnavi.infra.analytics.AnalyticsProperties;
 import com.ottnavi.home.service.model.WishlistedTitleListView;
 import com.ottnavi.plan.service.model.PlanCalcResults;
 import org.springframework.boot.cache.autoconfigure.RedisCacheManagerBuilderCustomizer; // Boot 4 위치(3.2 참고)
@@ -45,6 +47,8 @@ public class RedisConfig {
     public static final String HOME_WISHLISTED = "homeWishlisted";     // 찜 많은 작품, 키는 개수
     public static final String HOME_GENRES = "homeGenres";             // 장르 목록, 키는 고정
     public static final String HOME_GENRE_TITLES = "homeGenreTitles";  // 장르별 작품, 키는 장르:페이지:크기
+    // 관리자 방문자 통계(GA 동의 방문자 수), 키는 고정. 성공 결과만 저장하고 실패는 저장하지 않는다. TTL은 app.analytics.cache-ttl
+    public static final String VISITOR_STATS = "visitorStats";
     public static final List<String> HOME_CACHES = List.of(HOME_POPULARITY, HOME_NEW_ARRIVALS, HOME_WISHLISTED,
             HOME_GENRES, HOME_GENRE_TITLES); // 한꺼번에 비울 때 쓰는 전체 목록
 
@@ -61,7 +65,8 @@ public class RedisConfig {
     /** 캐시별 TTL. 기본 설정을 바탕으로 TTL만 바꾼다. */
     @Bean
     public RedisCacheManagerBuilderCustomizer cacheTtlCustomizer(RedisCacheConfiguration base,
-            HomeCacheProperties homeCache, ExclusiveCacheProperties exclusiveCache) {
+            HomeCacheProperties homeCache, ExclusiveCacheProperties exclusiveCache,
+            AnalyticsProperties analyticsProperties) {
         // 작품 상세는 값 타입(TitleDetailView) 전용 직렬화기를 쓴다. 다른 캐시는 기본(범용) 직렬화기를 그대로 둔다
         RedisCacheConfiguration titleDetailConfig = base.entryTtl(Duration.ofHours(24))
                 .serializeValuesWith(SerializationPair.fromSerializer(
@@ -92,8 +97,13 @@ public class RedisConfig {
         RedisCacheConfiguration genreTitlesConfig = base.entryTtl(homeCache.genreTitlesTtl())
                 .serializeValuesWith(SerializationPair.fromSerializer(
                         new JacksonJsonRedisSerializer<>(TitleSearchResult.class)));
+        // 방문자 통계는 숫자 4개와 시각만 든 단순 값(VisitorStatsCacheValue) 전용 직렬화기를 쓴다. TTL은 app.analytics.cache-ttl(기본 15분)이다
+        RedisCacheConfiguration visitorStatsConfig = base.entryTtl(analyticsProperties.cacheTtl())
+                .serializeValuesWith(SerializationPair.fromSerializer(
+                        new JacksonJsonRedisSerializer<>(VisitorStatsCacheValue.class)));
         return builder -> builder
                 .withCacheConfiguration(TITLE_DETAIL, titleDetailConfig)
+                .withCacheConfiguration(VISITOR_STATS, visitorStatsConfig)
                 .withCacheConfiguration(PLAN_CALC, planCalcConfig)
                 .withCacheConfiguration(EXCLUSIVE_TITLES, exclusiveConfig)
                 .withCacheConfiguration(HOME_POPULARITY, popularityConfig)
