@@ -81,6 +81,13 @@ describe('개인정보처리방침 화면', () => {
     expect(screen.getByText(/Grafana Cloud\(Grafana Labs\)에 보관합니다/)).toBeInTheDocument()
     expect(screen.getByText(/Grafana Labs\(Grafana Cloud\): 서비스 운영 상태/)).toBeInTheDocument()
 
+    // 2-3. 동의 방식 문구: 동의를 받은 경우에만 수집, 거부해도 제한 없음, 6개월 뒤 다시 묻기, 변경 이력 한 줄
+    expect(screen.getByText(/방문 통계 수집에 동의한 경우에만 수집합니다/)).toBeInTheDocument()
+    expect(screen.getByText(/거부하면 6개월 뒤에 한 번 다시 여쭙니다/)).toBeInTheDocument()
+    expect(screen.getByText(/변경: 방문 통계 수집을\s*동의를 받은 경우에만/)).toBeInTheDocument()
+    // 목업(측정 ID 없음)에서는 설정 카드가 없다
+    expect(screen.queryByRole('heading', { name: '방문 통계 설정' })).not.toBeInTheDocument()
+
     // 3. 주요 구역 제목
     for (const name of [
       '1. 처리하는 개인정보',

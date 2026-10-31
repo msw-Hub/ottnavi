@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
   ContactEmailLink,
@@ -26,7 +27,13 @@ import { formatDate } from '@/lib/format'
  * 모양: 375px에서도 읽기 좋은 한 열. 줄 길이가 너무 길지 않게 max-w-3xl, 본문은 15px·줄 간격 1.75로 About보다 조금 넉넉히 둔다.
  * 제목 계층은 h1(화면 제목) → h2(구역)만 써서 목차 없이도 위에서 아래로 훑을 수 있게 한다. 색은 디자인 토큰만 쓴다.
  */
-export function PrivacyPolicyScreen() {
+interface PrivacyPolicyScreenProps {
+  // 4절에 끼워 넣을 "방문 통계 설정" 카드. 동의 상태는 features/consent가 맡고(기능 폴더끼리 import 금지) pages가 조립해 넘긴다.
+  // 측정 ID가 없는 환경(목업·로컬)에서는 넘기지 않아 카드 없이 문구만 보인다
+  analyticsSettingsSlot?: ReactNode
+}
+
+export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScreenProps) {
   const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 31일"
   // 변경 이력 첫 줄(알림 메일 변경)에 쓰는 바로 앞 방침의 시행일
   const previousDateText =
@@ -89,10 +96,13 @@ export function PrivacyPolicyScreen() {
             호출 기록은 외부로 보내지 않습니다.
           </li>
           {/* 방문 통계(Google Analytics 4). 수집 항목·IP 처리는 Google Analytics 도움말(2026-10-30 확인)에 있는 것만 썼다 */}
+          {/* 이전: "방문 통계(Google Analytics): 방문자 수와 이용 현황을 파악하기 위해 Google Analytics를 씁니다. 방문한 화면 주소(…" — 동의를 받은 경우에만 수집하도록 바꿔(2026-10-31) 아래 문구로 고쳤다 */}
           <li>
             방문 통계(Google Analytics): 방문자 수와 이용 현황을 파악하기 위해 Google Analytics를
-            씁니다. 방문한 화면 주소(검색어처럼 주소 뒤에 붙는 값은 보내지 않습니다), 방문 횟수 같은
-            이용 통계, 대략적인 지역, 브라우저·기기 정보, 어느 주소를 거쳐 들어왔는지(유입 경로)가
+            쓰며, 방문 통계 수집에 동의한 경우에만 수집합니다. 동의하기 전에는 Google Analytics를
+            불러오지 않고 쿠키도 저장하지 않으며, 거부해도 서비스 이용에 제한이 없습니다. 동의하면
+            방문한 화면 주소(검색어처럼 주소 뒤에 붙는 값은 보내지 않습니다), 방문 횟수 같은 이용
+            통계, 대략적인 지역, 브라우저·기기 정보, 어느 주소를 거쳐 들어왔는지(유입 경로)가
             Google로 전송됩니다. Google Analytics는 접속 IP 주소를 대략적인 지역을 알아내는 데 쓰고
             저장하기 전에 버립니다. 이 정보는 로그인 정보(이메일, 이름, 회원 번호)와 연결하지 않으며
             광고 목적으로 쓰지 않습니다. 관리자 화면과 로그인 확인 화면의 이용은 집계에서 뺍니다.
@@ -133,9 +143,9 @@ export function PrivacyPolicyScreen() {
             잠깐(최대 3분) 씁니다.
           </li>
           <li>
-            방문 통계 쿠키(Google Analytics): 방문자를 구별하는 쿠키(_ga)와 방문 상태를 이어 가는
-            쿠키(_ga_로 시작하는 쿠키)를 이 서비스 주소에 저장합니다. 기본 보관 기간은 2년입니다.
-            로그인 정보와는 연결하지 않습니다.
+            방문 통계 쿠키(Google Analytics): 방문 통계에 동의한 경우에만 방문자를 구별하는
+            쿠키(_ga)와 방문 상태를 이어 가는 쿠키(_ga_로 시작하는 쿠키)를 이 서비스 주소에
+            저장합니다. 기본 보관 기간은 2년입니다. 로그인 정보와는 연결하지 않습니다.
           </li>
           <li>
             로그인 중 접속 정보(Access Token)는 브라우저 메모리에만 두고 브라우저 저장소에 쓰지
@@ -155,6 +165,15 @@ export function PrivacyPolicyScreen() {
           브라우저 설정(예: 사이트 권한 또는 개인정보 설정의 쿠키 항목)에서 쿠키를 막을 수 있습니다.
           다만 쿠키를 막으면 로그인이 필요한 기능을 이용하기 어렵습니다.
         </p>
+        {/* 이전: 이 문단 앞에 동의 절차 안내가 없었다. 동의 방식 도입(2026-10-31)으로 아래 문단을 더했다 */}
+        <p>
+          방문 통계는 동의를 받은 경우에만 수집합니다. 처음 방문하면 화면 아래 안내에서 동의 또는
+          거부를 고를 수 있고, 거부하면 6개월 뒤에 한 번 다시 여쭙니다. 동의한 뒤에도 아래
+          &ldquo;방문 통계 설정&rdquo;이나 화면 맨 아래의 &ldquo;방문 통계 설정&rdquo; 링크에서
+          언제든 철회하거나 바꿀 수 있고, 철회하면 방문 통계 쿠키를 지웁니다. 방문 통계 동의 여부는
+          이 브라우저의 저장소에만 기록하며 서버로 보내지 않습니다.
+        </p>
+        {analyticsSettingsSlot}
         <p>
           방문 통계만 막고 싶다면 Google이 제공하는 &ldquo;Google Analytics 차단 브라우저
           부가기능(opt-out add-on)&rdquo;을 설치할 수 있습니다. 이 부가기능은 웹사이트의 Google
@@ -262,6 +281,12 @@ export function PrivacyPolicyScreen() {
         <p>
           <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계(Google
           Analytics)와 서버 로그 보관(Grafana Cloud)을 추가했습니다.
+        </p>
+        {/* 시행일은 아직 확정 전이라 상수(PRIVACY_EFFECTIVE_DATE)를 따른다. 배포일이 다르면 사용자 결정에 따라 legalInfo.ts에서 고친다 */}
+        <p>
+          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계 수집을
+          동의를 받은 경우에만 하도록 바꾸고, 동의 철회·변경 방법과 거부 시 6개월 뒤 다시 묻는다는
+          내용을 추가했습니다.
         </p>
         <p>
           서비스 이용에 관한 약속은{' '}
