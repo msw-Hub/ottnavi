@@ -176,7 +176,13 @@
 05:42:25 WARN [nio-8080-exec-9] c.o.global.error.GlobalExceptionHandler : 요청 처리 실패: errorCode=TITLE_NOT_FOUND, status=404, path=/api/public/titles/tv/289517, exception=TitleNotFoundException
 ```
 - 원인: 홈 순위는 `popularity_snapshot`(제목·포스터만 저장, `title` 표에 없는 작품도 보이도록 한 설계, V9 주석)에서 만들고, 상세 API(`TitleDetailQueryService.getDetail`)는 `title` 표에서만 찾는다. 신규 작품은 주간(WEEKLY) 수집의 후보 발견에서만 `title`에 들어온다(HANDOFF Task 077 이월: "최대 주 1회 반영"). 설명 전체는 이 문서가 아니라 설계 기록을 따른다.
-- 해결 방향: 인기 수집 Job(`popularityJob`)에 Step 하나를 추가해 **홈 인기 순위 상위 20개 중 `title`에 없는 작품만** TMDB에서 받아 한 번에 저장한다. 상세 화면에는 "상세 정보를 모으는 중" 문구를 둔다(백엔드 완료 뒤 같은 PR).
+- 해결(구현함, 백엔드): 인기 수집 Job(`popularityJob`)이 Step 3개(수집 `popularityCollectStep` → **상세 채우기 `popularityDetailFillStep`** → 스냅샷 삭제 `popularityPurgeStep`)로 바뀌었다. 앞 Step이 실패해도 다음 Step으로 넘어간다.
+  - 대상: 순위 16개(기간 TODAY·WEEK × 전체+서비스 7곳)의 각 상위 20위(`app.popularity.fill.top-n`)를 전체-오늘, 전체-7일, 서비스1-오늘, … 순서로 합쳐 중복을 없애고 `title`에 이미 있는 작품은 뺀다. 한 번에 최대 20작품(`app.popularity.fill.max-titles`)이다. 후보는 캐시(`homePopularity`)를 거치지 않고 방금 쌓은 스냅샷으로 계산한다.
+  - 저장: 작품마다 TMDB 호출(상세·시즌·제공처)을 **트랜잭션 밖에서** 끝낸 뒤, `title`·장르·출연진·시청 단위·제공 상태·제공 상태 이력을 **작품 하나당 트랜잭션 하나**로 저장한다. 작품은 있는데 제공 상태가 없는 중간 상태가 보이지 않는다.
+  - 실패: TMDB 오류나 동시 삽입이 난 작품만 건너뛰고 다른 작품은 계속한다. TMDB에 작품이 없으면(404) 건너뛴다. 작품 제공처가 404면 작품은 저장하고 그 시청 단위의 제공 상태를 "모름"(KR 데이터 없음)으로 저장한다.
+  - 관측: 끝에 로그 한 줄 `인기 작품 상세 채우기 종료: 후보=…, 이미 있음=…, 채움=…, TMDB에 없음=…, 실패=…, 상한으로 제외=…`를 남긴다(Loki `|~ "인기 작품 상세 채우기"`).
+  - 한계: 반영은 **다음 인기 수집 때**다(요청 때 즉시 수집하는 단건 수집은 아니다). 상한을 넘은 작품은 다음 수집 때 채운다. 인기 수집이 끝나면 홈 캐시 5개를 모두 비운다. 관리자 화면에서 인기 수집을 수동 실행하면 바로 채워진다.
+  - 상세 화면의 "상세 정보를 모으는 중" 문구는 프론트 작업이라 이번 백엔드 변경에 포함되지 않았다.
 - 이 개선은 Redis 문제와 별개지만 같은 PR 브랜치에서 커밋을 나눠 진행한다.
 
 ## 8. 배운 것과 운영 메모

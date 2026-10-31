@@ -13,7 +13,7 @@
 - **GA(방문 통계)**: 서비스 전용 계정의 속성으로 교체했고 `VITE_GA_MEASUREMENT_ID`(Vercel Production)로 연결한다. 개인정보 방침 시행일은 2026-10-31이다.
 - **Task 097(모니터링 화면 목업)**: PR #125. 수집 실행 요약은 수집 탭과 겹쳐 빼고 바로가기 카드(Grafana 지표·로그·알림 규칙, Cloudtype 콘솔, 수집 탭) 하나만 둔다. 주소 상수는 `features/admin/components/monitoring/grafanaLink.ts`에 있고 비어 있으면 항목별 "준비 중"이다. 새 API 없음. 097 결정 기한(R11-16)은 2026-11-19.
 - **다음**: Grafana 켜기 → 098 대시보드 → 099 주소 연결(상수만 채움) → 추적(Tracing) 여부는 측정 뒤 결정. 11-04 첫 주간 수집 확인, 11-12 이후 Grafana 체험 종료(약 11-13)와 사용량 확인.
-- **이월**: Redis 연결 10초 타임아웃·유휴 뒤 fail-open 로그(켠 뒤 `ratelimit.store_error`로 빈도 확인), `HV000271` 경고·`spring.data.redis.repositories.enabled` 로그 정리, TMDB 회신 대기(회신 전 운영 `GEMINI_API_KEY` 없음), Search Console 사이트맵 제출, 데모 로그인 실서버 확인, GA 동의 안내 창(법령 절차 확인 필요).
+- **이월**: Redis 첫 요청 지연·fail-open 로그(타임아웃은 이미 명령 2초·연결 5초다. 원인은 서버가 연결을 첫 사용 때 만들어 첫 요청이 연결 생성을 부담하는 것 + CPU 포화(추정). 기동 직후 예열 `RedisWarmUp`(실패 시 30초 뒤 1회 재시도)으로 대응했고, 즉시 거절(REJECT_COMMANDS)은 재발급·로그아웃·데모 로그인 오류 처리 뒤 별도 작업. 배포 뒤 `ratelimit.store_error`로 빈도 확인, 상세는 `docs/guides/TROUBLESHOOTING_REDIS_COLD_START.md`), `HV000271` 경고·`spring.data.redis.repositories.enabled` 로그 정리, TMDB 회신 대기(회신 전 운영 `GEMINI_API_KEY` 없음), Search Console 사이트맵 제출, 데모 로그인 실서버 확인, GA 동의 안내 창(법령 절차 확인 필요).
 
 ## 0. 2026-10-17 범위 개정과 인수인계 요약 (먼저 읽는다)
 
@@ -158,19 +158,19 @@
 **Task 107 이월(2026-10-18)**
 
 1. **인기 수집 cron은 `main` 병합(Task 095) 때 켜진다**: `popularity.yml`의 schedule은 2026-10-21에 풀었고 `main` 전에는 돌지 않는다(UTC 17:47 = KST 02:47로 조정함, 수집 18:17 UTC보다 30분 앞이라 일요일 주간 수집과 겹치지 않는다. 소요 시간은 093에서 측정). 겹치면 인기 수집이 409를 받거나, 인기 수집이 도는 중에 끝난 수집의 자동 재계산이 warn만 남기고 건너뛴다(수동 재실행 API로 복구). 매일 쌓여야 7일 평균이 의미가 있어 공개 직후에는 7일 미만 평균이 나온다.
-2. **순위에 우리 DB에 없는 작품이 나올 수 있다**: 스냅샷은 TMDB 결과를 그대로 저장하므로 아직 수집되지 않은 작품도 순위에 나오고, 그 카드는 `availabilities`가 빈 배열이며 상세로 가면 `TITLE_NOT_FOUND`(404)일 수 있다. 프론트 108이 빈 제공 상태 카드를 어떻게 보일지 정한다.
+2. **순위에 우리 DB에 없는 작품이 나올 수 있다**: 스냅샷은 TMDB 결과를 그대로 저장하므로 아직 수집되지 않은 작품도 순위에 나오고, 그 카드는 `availabilities`가 빈 배열이며 상세로 가면 `TITLE_NOT_FOUND`(404)일 수 있다. 이를 줄이려고 인기 수집 Job에 상세 채우기 Step이 생겼다: 인기 순위 16개(기간 TODAY·WEEK × 전체+서비스 7곳)의 각 상위 20위 작품 중 `title`에 없는 작품은 **다음 인기 수집 때 상세를 채운다**(`popularityJob`의 `popularityDetailFillStep`, 한 번에 최대 20작품, 설정 `app.popularity.fill.*`, 상한을 넘은 작품은 다음 수집 때). 요청 때 즉시 수집하는 **단건 수집은 여전히 이월**이다. 운영 확인은 Loki `{app="ottnavi", env="prod"} |~ "인기 작품 상세 채우기"`의 종료 로그(`후보/이미 있음/채움/TMDB에 없음/실패/상한으로 제외`)로 하고, 배포 직후 관리자 화면에서 인기 수집을 한 번 수동 실행하면 바로 채워진다. 프론트 108이 빈 제공 상태 카드를 어떻게 보일지 정한다.
 3. **프론트 108이 반영할 목업↔계약 차이 6가지**: (1) 목업 `genres`(화면용 7개 묶음 칩)는 API 카드에 없고 탐색은 TMDB 장르(`/public/genres`, 이름 가나다순)와 `/public/genres/{genreId}/titles`를 쓴다. (2) `posterUrl` → `posterPath`(상대 경로, URL은 프론트가 조립). (3) 인기 순위는 `HomeTitle[]`이 아니라 `{period, ottServiceId, snapshotDate, daysCounted, notice, items[{rank, title}]}`이고 "전체" 탭은 `ottServiceId` 생략이다. (4) 새로 볼 수 있게 된 작품에 `arrivalType`(ARRIVAL 입고/RELEASE 공개)이 추가되고 `availableSince`는 유형에 따라 확인일 또는 공개일이다. (5) 찜 많은 작품 응답에 `minUserCount`·`dataAsOf`가 추가되고 항목은 `{title, wishlistUserCount}`로 목업과 같다. (6) 기준일 `HOME_DATA_AS_OF` 상수 대신 응답마다 `dataAsOf`(순위는 `snapshotDate`)를 쓴다.
 4. **구독형(flatrate)만 쓰는 한계**: 후보 수집과 같은 `with_watch_monetization_types=flatrate`로 받으므로 구독 외(대여·구매·광고) 노출이 큰 서비스(쿠팡플레이 등)는 순위가 비거나 짧아 보일 수 있다.
 5. **인물 탐색 한계**: 이름 완전 일치(대소문자 무시)이고 작품당 출연 상위 10명만 저장돼 있다. 동명이인이 섞이고 10번째 밖 출연작은 빠진다(화면 안내 문구는 108).
 6. **조정 위치(사용자가 나중에 바꿀 수 있다)**: `app.home.min-wishlist-users`(3)·`arrival-days`(14)·`release-days`(30), `app.popularity.top-n`(20)·`retention-days`(14), 7일 평균 규칙은 `PopularityRankingRules`, 7일 범위는 `PopularityRankingService.WEEK_DAYS`, 새 작품 대표 선택은 `NewArrivalPicker`, 안내 문구는 `PopularityRankingService.NOTICE`.
-7. **홈·탐색 응답 캐시**: 공개 조회 5개(출연자별 작품 제외)는 Redis에 캐시되므로 TTL(인기 60분·새 작품 30분·찜 10분·장르 24시간·장르별 작품 30분)이 지나기 전에는 이전 값이 나간다. 수집·정리 Job 종료 때 모두, 인기 수집 종료 때 인기 순위를 바로 비운다. 값은 `app.home.cache.*`, 브라우저 캐시는 `browser-seconds`(60)다. Vercel 엣지 캐시는 확인하지 않았다.
+7. **홈·탐색 응답 캐시**: 공개 조회 5개(출연자별 작품 제외)는 Redis에 캐시되므로 TTL(인기 60분·새 작품 30분·찜 10분·장르 24시간·장르별 작품 30분)이 지나기 전에는 이전 값이 나간다. 수집·정리·인기 수집 Job 종료 때 모두 바로 비운다(인기 수집은 상세 채우기로 작품이 늘 수 있어 인기 순위만이 아니라 홈 캐시 전부를 비운다). 값은 `app.home.cache.*`, 브라우저 캐시는 `browser-seconds`(60)다. Vercel 엣지 캐시는 확인하지 않았다.
 8. **인기 순위의 의미가 바뀌었다(2026-10-27, PR #104)**: 수집이 **한국 제작(`with_origin_country=KR`) + 첫 공개일 최근 2년**(`app.popularity.recent-years: 2`)만 받는다. 이전에는 서비스에서 볼 수 있는 모든 인기 작품이었다. 화면 설명(서버 notice)도 "최근 2년 안에 공개된 한국 작품 중 TMDB 인기도 순"으로 바꿨다. 영어권 작품이 순위에 안 나오는 것은 버그가 아니라 이 정책이다. 운영에서 `popularity_snapshot`을 비운 뒤 `popularity` 워크플로를 수동 실행해 한국 드라마·영화가 나오는 것을 확인했다.
 
 **Task 108 이월(2026-10-18, PR #86 병합)**
 
 1. **출연자 탐색 UI 미구현**: 출연자별 작품 API(`people/titles`, 생성 훅 `useListPersonTitles`)는 화면 자리가 없어 연결하지 않았다. 탐색에는 "인물 검색은 준비 중"으로 안내만 둔다. 화면에 넣을 때 "이름 완전 일치·출연 상위 10명만" 한계 문구를 함께 보인다(107 이월 5번).
 2. **(해결, Task 079 PR #90)** 독점 줄은 Task 079에서 재연결했다. 홈은 선택 서비스의 독점 첫 쪽 10편을 보이고 쿠팡플레이는 "드라마만 확인" 안내를 함께 보인다.
-3. **DB에 없는 작품 카드**: 순위에만 있고 우리 DB에 없는 작품은 카드에 "제공 정보 수집 전"으로 보이고, 상세로 가면 "찾을 수 없음"일 수 있다(107 이월 2번의 화면 쪽 처리).
+3. **DB에 없는 작품 카드**: 순위에만 있고 우리 DB에 없는 작품은 카드에 "제공 정보 수집 전"으로 보이고, 상세로 가면 "찾을 수 없음"일 수 있다(107 이월 2번의 화면 쪽 처리). 서버는 인기 수집 때 상위 작품의 상세를 채워 이 경우를 줄인다(107 이월 2번 참고).
 4. **장르 `?genre=` 값이 숫자로 바뀜**: 탐색의 장르 선택 주소가 옛 묶음 이름이 아니라 TMDB 장르 ID(숫자)다. 옛 주소로 저장해 둔 링크는 장르가 풀린 채 열린다.
 
 **Task 078 이월(2026-10-19, PR #88 병합)**
@@ -186,7 +186,7 @@
 
 **Task 077 이월(2026-10-19, PR #91 병합)**
 
-1. **새 찜은 다음 수집 시작 때 DAILY**: 찜 추가·삭제 훅은 만들지 않기로 했다(사용자 결정). 막 찜한 작품은 최대 하루 늦게 매일 갱신으로 들어온다. 신규 작품은 후보 발견이 WEEKLY에서만 돌아 최대 주 1회 반영된다.
+1. **새 찜은 다음 수집 시작 때 DAILY**: 찜 추가·삭제 훅은 만들지 않기로 했다(사용자 결정). 막 찜한 작품은 최대 하루 늦게 매일 갱신으로 들어온다. 신규 작품은 후보 발견이 WEEKLY에서만 돌아 최대 주 1회 반영된다(단 인기 순위 상위 20위에 오른 신규 작품은 다음 인기 수집 때 상세가 채워진다).
 2. **일요일 인기 수집 겹침(해결, 시각 조정)**: `popularity.yml` 시각을 매일 KST 02:47(UTC 17:47)로 앞당겨 WEEKLY 수집(KST 03:17 시작, 수 시간)보다 먼저 끝나게 했다. 인기 수집이 30분 안에 끝나는지는 Task 093에서 cron을 켤 때 측정한다.
 3. **호출량 절감 규모 미측정**: 테스트는 작은 데이터다(Task 100·102).
 4. **`scope=AVAILABILITY_TV`(로컬 전용) 실행은 재맞춤 Step을 돌지 않는다.** 같은 날 완료된 DAILY가 있으면 같은 날짜 DAILY는 다시 못 돈다(`BATCH_ALREADY_COMPLETED`, 기존 규칙).
