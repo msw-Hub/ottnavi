@@ -6,6 +6,7 @@ import type { OttService, TitleSearchItem } from '@/api/generated/model'
 // import { ProviderStatusBadge } from '@/components/common/ProviderStatusBadge'
 // import { CardWishlistAction } from '@/features/home/components/CardWishlistAction'
 import { PosterImage } from '@/components/common/PosterImage'
+import { createPopularityNavState } from '@/lib/popularityNavState'
 import { getTmdbImageUrl } from '@/lib/tmdbImage'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +31,8 @@ interface HomeTitleCardProps {
   // true면 포스터 오른쪽 위의 "볼 수 있는 곳" OTT 로고를 그리지 않는다. 홈 "서비스 독점 작품" 줄 전용: 위 서비스 탭이 이미 어느 서비스인지 말하고
   // 모든 카드가 그 서비스 하나라 로고가 반복될 뿐이다(운영 피드백). 로고 자리는 포스터 위에 떠 있는(absolute) 요소라 빼도 카드 크기·정렬은 그대로다
   isLogoHidden?: boolean
+  // true면 상세로 이동할 때 "인기 순위에서 왔다"는 state를 싣는다(인기 순위 카드 전용). 상세가 404일 때 "상세 정보를 모으는 중" 안내를 보이기 위함이다
+  isFromPopularity?: boolean
 }
 
 /**
@@ -60,6 +63,7 @@ export function HomeTitleCard({
   isServiceInfoHidden = false,
   isFeatured = false,
   isLogoHidden = false,
+  isFromPopularity = false,
 }: HomeTitleCardProps) {
   const detailPath = `/titles/${title.mediaType}/${title.tmdbId}`
   const hasRank = rank !== undefined
@@ -177,6 +181,12 @@ export function HomeTitleCard({
         >
           <Link
             to={detailPath}
+            // 인기 순위 카드만 state를 싣는다. 없으면 undefined라 다른 목록의 이동은 이전과 같다
+            state={
+              isFromPopularity
+                ? createPopularityNavState(title.title, title.posterPath ?? null)
+                : undefined
+            }
             data-card-link=""
             title={title.title}
             className="text-inherit no-underline after:absolute after:inset-0 after:content-[''] group-hover:underline focus-visible:outline-none"

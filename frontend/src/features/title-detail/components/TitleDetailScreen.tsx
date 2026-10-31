@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { PageTitle } from '@/components/common/PageTitle'
+import { PosterImage } from '@/components/common/PosterImage'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ErrorState } from '@/components/common/ErrorState'
 import { LoadingState } from '@/components/common/LoadingState'
@@ -11,6 +12,9 @@ import {
   type TitleDetailParams,
 } from '@/features/title-detail/hooks/useTitleDetail'
 import { useOttServices } from '@/hooks/useOttServices'
+import { usePopularityEntryState } from '@/features/title-detail/hooks/usePopularityEntryState'
+import type { PopularityNavState } from '@/lib/popularityNavState'
+import { getTmdbImageUrl } from '@/lib/tmdbImage'
 
 /**
  * 주소의 문자열(:mediaType, :tmdbId)을 검증해 작품 조회용 값으로 바꾼다. 올바르지 않으면 null이다.
@@ -38,6 +42,8 @@ export function TitleDetailScreen() {
   const { mediaType, tmdbId } = useParams()
   const params = parseTitleParams(mediaType, tmdbId)
   const detail = useTitleDetail(params)
+  // 인기 순위 카드에서 들어왔는지(라우터 state). 아니거나 새로고침한 뒤면 null
+  const popularityState = usePopularityEntryState()
   // 서비스 이름·"데이터 부족" 여부는 서비스 목록 API에 있어 상세와 함께 받는다. 둘 다 준비되었을 때만 본문을 그린다.
   // 주소가 잘못되었으면 서비스 목록도 필요 없어 요청을 막는다
   const services = useOttServices(params !== null)
@@ -65,6 +71,15 @@ export function TitleDetailScreen() {
   if (detail.isError) {
     // 없는 작품(404)은 다시 시도해도 같아서 "다시 시도" 대신 검색으로 돌아가는 링크를 둔다
     const isNotFound = detail.error.status === 404
+    // 인기 순위 카드에서 와서 404면 "곧 반영될 작품"이라 일반 404와 다른 안내를 보인다(state가 없으면 이 분기는 건너뛴다)
+    if (isNotFound && popularityState) {
+      return (
+        <StateLayout>
+          <PopularityPendingNotice state={popularityState} />
+          <BackToSearchLink />
+        </StateLayout>
+      )
+    }
     return (
       <StateLayout>
         <ErrorState
@@ -107,6 +122,31 @@ function StateLayout({ children }: { children: ReactNode }) {
       <h1 className="text-2xl font-semibold">작품 상세</h1>
       {children}
     </section>
+  )
+}
+
+/**
+ * 인기 순위에는 있지만 우리 DB에 상세가 아직 없는 작품의 안내다. 서버가 인기 수집 뒤 상위 작품의 상세를 채우므로 다음 정보 수집 때 반영된다
+ * (한 번에 채우는 작품 수에 상한이 있어 하루를 넘길 수 있으므로 문구에서 기한을 약속하지 않는다).
+ * 오류가 아니라 "기다리면 되는 상태"라 경고색 ErrorState 대신 EmptyState 모양을 쓰고, 낭독기가 바로 읽도록 role="status"로 감싼다.
+ * 카드에서 받은 제목·포스터를 함께 보여 어떤 작품을 기다리는지 알게 한다(새 API 호출 없음).
+ */
+function PopularityPendingNotice({ state }: { state: PopularityNavState }) {
+  return (
+    <div role="status" className="grid gap-3">
+      <div className="flex items-center gap-3">
+        <PosterImage
+          title={state.title}
+          posterUrl={getTmdbImageUrl(state.posterPath, 'w185')}
+          className="w-20 shrink-0"
+        />
+        <p className="min-w-0 text-lg font-semibold break-keep">{state.title}</p>
+      </div>
+      <EmptyState
+        title="상세 정보를 모으는 중이에요"
+        description="새로 인기를 얻은 작품은 다음 정보 수집 때 함께 반영돼요. 조금 뒤에 다시 확인해 주세요."
+      />
+    </div>
   )
 }
 
