@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { initAnalytics, toTrackablePath, trackPageView } from '@/lib/analytics'
+import { initAnalytics, setAnalyticsConsent, toTrackablePath, trackPageView } from '@/lib/analytics'
 
 /*
  * 방문 통계(GA4) 모듈 테스트.
@@ -31,8 +31,10 @@ describe('방문 통계(GA4)', () => {
   beforeEach(() => {
     vi.stubEnv('VITE_USE_MOCK', 'false')
     resetGlobals()
+    setAnalyticsConsent(true) // 기존 테스트는 동의한 방문자 기준이다(동의 관문은 맨 아래 묶음에서 따로 확인한다)
   })
   afterEach(() => {
+    setAnalyticsConsent(false) // 모듈 안의 동의 값을 기본(동의 전)으로 되돌린다
     vi.unstubAllEnvs()
     resetGlobals()
   })
@@ -153,5 +155,58 @@ describe('방문 통계(GA4)', () => {
     trackPageView('/admin')
 
     expect(Object.keys(window).some((key) => key.startsWith('ga-disable-'))).toBe(false)
+  })
+
+  describe('동의 관문', () => {
+    // 확인: 동의 전에는 스크립트·dataLayer·gtag·차단 표식·쿠키가 하나도 생기지 않는다.
+    // 막으려는 사고: 동의 없이 GA가 로드되어 쿠키가 만들어지는 것(사용자 결정 위반).
+    it('동의 전에는 어떤 호출도 스크립트·전역·쿠키를 만들지 않는다', () => {
+      setAnalyticsConsent(false)
+      vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123456')
+
+      expect(initAnalytics()).toBe(false)
+      trackPageView('/search')
+      trackPageView('/admin')
+
+      expect(document.getElementById('ga4-gtag-script')).toBeNull()
+      expect(window.dataLayer).toBeUndefined()
+      expect(window.gtag).toBeUndefined()
+      expect(readDisableFlag()).toBeUndefined()
+      expect(document.cookie).not.toContain('_ga')
+    })
+
+    // 확인: 동의한 뒤 같은 화면에서 trackPageView를 부르면 스크립트가 로드되고 page_view가 한 번 나간다.
+    it('동의하면 스크립트를 불러오고 현재 화면의 page_view를 보낸다', () => {
+      setAnalyticsConsent(false)
+      vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123456')
+      trackPageView('/ranking')
+      expect(document.getElementById('ga4-gtag-script')).toBeNull()
+
+      setAnalyticsConsent(true)
+      trackPageView('/ranking')
+
+      expect(document.getElementById('ga4-gtag-script')).not.toBeNull()
+      expect(readCalls().filter((call) => call[0] === 'event')).toHaveLength(1)
+    })
+
+    // 확인: 철회하면 차단 표식이 켜지고 _ga 쿠키가 지워지며, 이후 page_view는 나가지 않는다(표식도 유지).
+    // 막으려는 사고: 철회했는데 이미 로드된 gtag.js가 계속 전송하거나 쿠키가 남는 것.
+    it('철회하면 차단 표식을 켜고 GA 쿠키를 지우며 이후 전송을 막는다', () => {
+      vi.stubEnv('VITE_GA_MEASUREMENT_ID', 'G-TEST123456')
+      trackPageView('/')
+      document.cookie = '_ga=GA1.1.1; path=/'
+      document.cookie = '_ga_TEST123456=GS1; path=/'
+      document.cookie = 'other=keep; path=/'
+      const eventCountBefore = readCalls().filter((call) => call[0] === 'event').length
+
+      setAnalyticsConsent(false)
+      trackPageView('/ranking')
+
+      expect(readDisableFlag()).toBe(true)
+      expect(document.cookie).not.toContain('_ga')
+      expect(document.cookie).toContain('other=keep') // 다른 쿠키는 건드리지 않는다
+      expect(readCalls().filter((call) => call[0] === 'event')).toHaveLength(eventCountBefore)
+      document.cookie = 'other=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+    })
   })
 })
