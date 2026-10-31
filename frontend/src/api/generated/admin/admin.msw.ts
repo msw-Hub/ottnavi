@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 63개이고 62개는 구현됐고 1개(`getAdminVisitorStats`)는 `x-planned: true`인 제안(미구현)이다(관리자 회원 현황 조회 `getAdminUserStats`(ADMIN·DEMO), 시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -27,6 +27,8 @@ import type {
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
   CommonResponseAdminProviderList,
+  CommonResponseAdminUserStats,
+  CommonResponseAdminVisitorStats,
   CommonResponseApplyOverviewDraftsResult,
   CommonResponseBulkDraftRun,
   CommonResponseCollectExecution,
@@ -81,6 +83,10 @@ export const getCreatePopularityExecutionResponseMock = (): CommonResponsePopula
 export const getGetAdminNotificationSummaryResponseMock = (): CommonResponseAdminNotificationSummary => ({"success":true,"data":{"windowDays":7,"pendingCount":2,"sentCount":148,"failedCount":1,"latestSentAt":"2026-11-01T03:51:12+09:00"}})
 
 export const getGetSystemMetricsResponseMock = (): CommonResponseSystemMetrics => ({"success":true,"data":{"jvm":{"heap":{"used":120000000,"committed":200000000,"max":268435456},"nonHeap":{"used":90000000,"committed":100000000},"memoryPools":[{"name":"G1 Eden Space","area":"HEAP","used":50000000,"committed":80000000},{"name":"Metaspace","area":"NON_HEAP","used":60000000,"committed":62000000}],"buffers":[{"id":"direct","memoryUsed":1048576,"totalCapacity":1048576,"count":12}],"threads":{"live":45,"peak":60,"daemon":20},"classesLoaded":14200,"gc":{"collectionCount":34,"collectionTimeMillis":420},"uptimeSeconds":86400},"process":{"rssBytes":520000000,"peakRssBytes":560000000,"rssAnonBytes":480000000,"rssFileBytes":40000000},"container":{"memoryUsedBytes":700000000,"memoryLimitBytes":1073741824},"measuredAt":"2026-10-28T23:50:00+09:00"}})
+
+export const getGetAdminUserStatsResponseMock = (): CommonResponseAdminUserStats => ({"success":true,"data":{"totalUserCount":42,"todayNewUserCount":3,"monthNewUserCount":17,"activePlanUserCount":12,"notificationEnabledUserCount":20,"measuredAt":"2026-11-01T10:30:00+09:00"}})
+
+export const getGetAdminVisitorStatsResponseMock = (): CommonResponseAdminVisitorStats => ({"success":true,"data":{"status":"OK","todayVisitorCount":8,"yesterdayVisitorCount":21,"last7DaysVisitorCount":96,"last30DaysVisitorCount":310,"fetchedAt":"2026-11-01T10:25:00+09:00"}})
 
 export const getCreatePlanBenchmarkResponseMock = (overrideResponse: Partial<Extract<CommonResponsePlanBenchmark, object>> = {}): CommonResponsePlanBenchmark => ({success: faker.datatype.boolean(), data: {"measuredRuns":3,"warmupRuns":1,"caseCount":1,"cases":[{"caseName":"case-07-greedy-trap","inputHash":"9f2c000000000000000000000000000000000000000000000000000000000000","candidateCount":27,"exact":{"calcRunId":101,"mustCompleted":1,"score":4,"totalCost":28000,"elapsedMicros":21,"elapsedMs":0,"matchesExpected":true},"greedy":{"calcRunId":102,"mustCompleted":1,"score":2,"totalCost":8000,"elapsedMicros":9,"elapsedMs":0,"matchesExpected":true},"mustDiff":0,"scoreDiff":-2,"costDiff":-20000}],"skippedCaseNames":[]}, ...overrideResponse})
 
@@ -327,6 +333,30 @@ export const getGetSystemMetricsMockHandler = (overrideResponse?: CommonResponse
   }, options)
 }
 
+export const getGetAdminUserStatsMockHandler = (overrideResponse?: CommonResponseAdminUserStats | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseAdminUserStats> | CommonResponseAdminUserStats), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/user-stats', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetAdminUserStatsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
+export const getGetAdminVisitorStatsMockHandler = (overrideResponse?: CommonResponseAdminVisitorStats | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<CommonResponseAdminVisitorStats> | CommonResponseAdminVisitorStats), options?: RequestHandlerOptions) => {
+  return http.get('/api/admin/visitor-stats', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getGetAdminVisitorStatsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
+
 export const getCreatePlanBenchmarkMockHandler = (overrideResponse?: CommonResponsePlanBenchmark | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<CommonResponsePlanBenchmark> | CommonResponsePlanBenchmark), options?: RequestHandlerOptions) => {
   return http.post('/api/admin/plan-benchmarks', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
 
@@ -464,6 +494,8 @@ export const getAdminMock = () => [
   getCreatePopularityExecutionMockHandler(),
   getGetAdminNotificationSummaryMockHandler(),
   getGetSystemMetricsMockHandler(),
+  getGetAdminUserStatsMockHandler(),
+  getGetAdminVisitorStatsMockHandler(),
   getCreatePlanBenchmarkMockHandler(),
   getListOverviewCandidatesMockHandler(),
   getCreateOverviewDraftMockHandler(),

@@ -51,6 +51,21 @@ export function formatMinutes(minutes: number | null | undefined): string {
   return `${hours}시간 ${restMinutes}분`
 }
 
+// 개수용 숫자 형식. 모듈에서 한 번만 만든다(매번 만들면 비용이 든다). 개수는 정수라 소수 자리를 두지 않는다
+const COUNT_FORMATTER = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 })
+
+/**
+ * 개수를 "1,234명"처럼 천 단위 쉼표와 단위를 붙여 바꾼다(관리자 운영 현황 카드의 사람 수·건수).
+ * features/home/homeDisplay.ts의 formatCount(단위 없이 쉼표만)와 이름이 겹치지 않게 WithUnit으로 구분했다.
+ *
+ * - 0은 "0명"으로 보인다. 0은 "없음"이 아니라 실제로 센 값이다.
+ * - null·undefined·NaN·Infinity·음수는 EMPTY_DISPLAY("-")만 돌려주고 단위를 붙이지 않는다("-명"은 어색하고 값이 있는 것처럼 읽힌다).
+ */
+export function formatCountWithUnit(count: number | null | undefined, unit = ''): string {
+  if (count == null || !Number.isFinite(count) || count < 0) return EMPTY_DISPLAY
+  return `${COUNT_FORMATTER.format(Math.round(count))}${unit}`
+}
+
 // 날짜만 있는 값('2026-10-09', 계약의 format: date)을 알아보는 정규식이다.
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 

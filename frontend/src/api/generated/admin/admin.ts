@@ -3,7 +3,7 @@
  * Do not edit manually.
  * OTT내비 API
  * OTT내비(ottnavi) 백엔드와 프론트엔드 사이의 계약이다. 이 파일이 유일한 근거이며, 변경 절차는 `.claude/rules/api-contract.md`를 따른다.
- * - operation은 61개이고 모두 구현됐다(시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
+ * - operation은 63개이고 62개는 구현됐고 1개(`getAdminVisitorStats`)는 `x-planned: true`인 제안(미구현)이다(관리자 회원 현황 조회 `getAdminUserStats`(ADMIN·DEMO), 시스템 메모리 지표 조회 관리자 API `getSystemMetrics`(ADMIN 전용), 영어 줄거리 한국어 번역 관리자 API 9개 `listOverviewCandidates`·`createOverviewDraft`·`listOverviewDrafts`·`createBulkOverviewDrafts`·`applyOverviewDrafts`·`editOverviewDraft`·`deleteOverviewDraft`·`revertTitleOverview`·`revertTranslatedOverviews`,Task 110의 알림 메일 예시 조회 `getCurrentPlanMailPreview`, Task 109의 데모 로그인 `loginDemo`, Task 073의 알림 설정·이력·관리자 요약 4개, Task 107의 홈·탐색 공개 조회 6개와 인기 수집 시작 `createPopularityExecution`, Task 082의 탈퇴 `withdrawMe`, Task 078의 서비스별 독점 목록 `listServiceExclusiveTitles` 포함). 미구현 operation에는 `x-planned: true`를 달고 description에 "제안"을 표시하며, 구현하는 PR에서 표시를 지운다.
  * - 성공 응답은 `CommonResponse` 래퍼, 본문 없는 성공은 204(래퍼 없음), 오류 응답은 `application/problem+json`(ProblemDetail + `errorCode`)이다.
  * - 각 operation의 description에 발생할 수 있는 `errorCode`를 적는다. 전체 목록은 `docs/api/error-codes.md`다.
  *
@@ -37,6 +37,8 @@ import type {
   CommonResponseAdminProductList,
   CommonResponseAdminProvider,
   CommonResponseAdminProviderList,
+  CommonResponseAdminUserStats,
+  CommonResponseAdminVisitorStats,
   CommonResponseApplyOverviewDraftsResult,
   CommonResponseBulkDraftRun,
   CommonResponseCollectExecution,
@@ -1573,6 +1575,198 @@ export function useGetSystemMetrics<TData = Awaited<ReturnType<typeof getSystemM
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getGetSystemMetricsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * 관리자 모니터링 화면(SCR-17)에 올리는 회원 현황 숫자다. 가입 수, 실제 사용 중인 회원 수(ACTIVE 플랜 보유자 수와 알림을 켠 회원 수 두 가지)를 돌려준다.
+ * 집계는 `USER` 역할 회원만 센다(관리자·데모 계정 제외). 기준은 한국 시간(KST)이고, 탈퇴는 하드 삭제라 현재 남아 있는 회원만 센다. 알림 설정 행이 없는 회원은 꺼짐으로 센다. 이메일 등 개인정보는 담지 않는다.
+ * 관리자와 데모 계정(`DEMO`)이 호출할 수 있다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 회원 현황 조회
+ */
+export const getAdminUserStats = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseAdminUserStats>(
+      {url: `/admin/user-stats`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminUserStatsQueryKey = () => {
+    return [
+    `/admin/user-stats`
+    ] as const;
+    }
+
+
+export const getGetAdminUserStatsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUserStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminUserStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUserStats>>> = ({ signal }) => getAdminUserStats(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminUserStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUserStats>>>
+export type GetAdminUserStatsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useGetAdminUserStats<TData = Awaited<ReturnType<typeof getAdminUserStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserStats>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserStats<TData = Awaited<ReturnType<typeof getAdminUserStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserStats>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserStats<TData = Awaited<ReturnType<typeof getAdminUserStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 회원 현황 조회
+ */
+
+export function useGetAdminUserStats<TData = Awaited<ReturnType<typeof getAdminUserStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminUserStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * (제안, 미구현) 관리자 모니터링 화면(SCR-17)에 올리는 방문자 수다. Google Analytics 4의 `activeUsers`를 서버가 대신 조회해 오늘·어제·최근 7일·최근 30일 값을 돌려준다. 방문 통계에 동의한 방문자만 집계되므로 실제 방문자보다 적다. 결과는 서버가 최대 15분 캐시한다. Google Analytics 속성 ID와 계정 정보는 응답에 담지 않는다.
+ * Google Analytics 연동이 없거나 조회가 실패해도 오류 코드를 쓰지 않고 200과 `status`(`DISABLED`·`UNAVAILABLE`)로 알리며, 이때 숫자는 모두 `null`이다.
+ * 관리자와 데모 계정(`DEMO`)이 호출할 수 있다.
+ * 오류: `UNAUTHORIZED`(401), `FORBIDDEN`(403), `INTERNAL_ERROR`(500).
+ * @summary 방문자 통계 조회
+ */
+export const getAdminVisitorStats = (
+
+ options?: SecondParameter<typeof customInstance>,signal?: AbortSignal
+) => {
+
+
+      return customInstance<CommonResponseAdminVisitorStats>(
+      {url: `/admin/visitor-stats`, method: 'GET', signal
+    },
+      options);
+    }
+
+
+
+
+export const getGetAdminVisitorStatsQueryKey = () => {
+    return [
+    `/admin/visitor-stats`
+    ] as const;
+    }
+
+
+export const getGetAdminVisitorStatsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVisitorStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVisitorStatsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVisitorStats>>> = ({ signal }) => getAdminVisitorStats(requestOptions, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminVisitorStatsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVisitorStats>>>
+export type GetAdminVisitorStatsQueryError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>
+
+
+export function useGetAdminVisitorStats<TData = Awaited<ReturnType<typeof getAdminVisitorStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVisitorStats>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVisitorStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminVisitorStats<TData = Awaited<ReturnType<typeof getAdminVisitorStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVisitorStats>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVisitorStats>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminVisitorStats<TData = Awaited<ReturnType<typeof getAdminVisitorStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 방문자 통계 조회
+ */
+
+export function useGetAdminVisitorStats<TData = Awaited<ReturnType<typeof getAdminVisitorStats>>, TError = ErrorType<UnauthorizedResponse | ForbiddenResponse | InternalErrorResponse>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVisitorStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminVisitorStatsQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

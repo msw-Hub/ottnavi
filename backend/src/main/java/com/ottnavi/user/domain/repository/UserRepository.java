@@ -2,7 +2,10 @@ package com.ottnavi.user.domain.repository;
 
 import com.ottnavi.user.domain.entity.User;
 import com.ottnavi.user.domain.enums.OAuthProvider;
+import com.ottnavi.user.domain.enums.UserRole;
 import jakarta.persistence.LockModeType;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -33,4 +36,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Modifying(flushAutomatically = true, clearAutomatically = true)
 	@Query("delete from User u where u.id = :id")
 	int deleteByUserId(@Param("id") Long id);
+
+	/** 해당 권한의 회원 수(관리자 모니터링의 전체 회원 수) */
+	long countByRole(UserRole role);
+
+	/** 해당 권한이고 기준 시각 이후(기준 시각 포함)에 가입한 회원 수(오늘·이번 달 신규 회원 수) */
+	long countByRoleAndCreatedAtGreaterThanEqual(UserRole role, Instant createdAt);
+
+	/** 해당 권한이 아닌 사용자의 ID 목록(관리자·데모 계정). 다른 도메인이 집계에서 이들을 빼는 데 쓴다 */
+	@Query("select u.id from User u where u.role <> :role")
+	List<Long> findIdsByRoleNot(@Param("role") UserRole role);
 }
