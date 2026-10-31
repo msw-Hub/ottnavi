@@ -126,7 +126,7 @@ stateDiagram-v2
 - 429·5xx는 Feign `ErrorDecoder`에서 재시도 가능 예외로 바꾸고 `Retryer`로 지수 백오프하며, `Retry-After`가 있으면 우선한다(도출). 타임아웃은 `spring.cloud.openfeign.client.config.tmdb.*`로 클라이언트별 설정한다(c7).
 - 공개 검색의 TMDB 단건 수집도 같은 버킷을 지나므로, 공개 요청 제한의 단건 수집 버킷(R FR-05, 한도 R11-12)이 먼저 걸리게 둔다. 이 버킷은 Redis 장애 시 fail-closed, 일반 공개 버킷은 fail-open이다(도출). 구현(Task 049): 일반 버킷 용량 20·분당 60, 단건 수집 버킷 용량 3·분당 10, Bucket4j `LettuceBasedProxyManager`(키 `rl:public:{ip}`·`rl:fetch:{ip}`), 저장소 오류 뒤 5초간 Redis 호출을 건너뛴다. fail-closed 거부도 기존 `RATE_LIMIT_EXCEEDED`(429)로 낸다.
 
-**GitHub Actions cron 제약(web).** cron은 UTC 기준, 최소 간격 5분, 매시 정각에는 지연될 수 있고, 공개 저장소는 60일 무활동 시 예약 워크플로가 꺼진다. 대응: 정각을 피한 분(예: `17 18 * * *` = KST 03:17, 도출), KST로 환산한 월초 cron, `workflow_dispatch` 수동 실행 병행.
+**GitHub Actions cron 제약(web).** cron은 UTC 기준, 최소 간격 5분, 매시 정각에는 지연될 수 있고, 공개 저장소는 60일 무활동 시 예약 워크플로가 꺼진다. 대응: 정각을 피한 분(예: `17 18 * * *` = KST 03:17, 도출), KST로 환산한 월초 cron, `workflow_dispatch` 수동 실행 병행. 실측(2026-10-31): 정각을 피한 분(17·47)으로 잡아도 일간·인기 순위 예약 실행이 매일 약 4시간(3시간 41분~4시간 32분) 늦게 시작했다. 원인은 미확인이고 그대로 둔다(FIRST_DEPLOY_RECORD 6절).
 
 **무료 기간과 Hobby 전환 이후(도출).**
 - 무료 기간(B1 ~ MVP 배포 전): Cloudtype 무료 플랜은 매일 아침 중지되고 HTTP 요청으로 다시 켜지지 않는다(사용자 실사용 확인). 그래서 GitHub Actions cron은 끈다. `main` 병합은 배포 때만 하므로 MVP 배포 전 Cloudtype에는 수집 코드가 없고, 첫 전체 수집과 성능 실측은 로컬 환경에서 하며 운영 DB 적재는 MVP 배포 때 한다. Supabase가 1주 비활성으로 일시정지되면 대시보드에서 재개한다.
