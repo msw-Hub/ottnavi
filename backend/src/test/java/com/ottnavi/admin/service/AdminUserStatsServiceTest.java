@@ -38,6 +38,9 @@ class AdminUserStatsServiceTest extends IntegrationTestSupport {
 
 	private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
+	// 경계 확인이 아닌 테스트에서 회원을 "오늘 이전"에 가입한 것으로 두는 기본 가입 시각(고정 Clock 2026-11-01보다 과거)
+	private static final String DEFAULT_CREATED_AT = "2026-10-01T09:00:00+09:00";
+
 	@Autowired
 	private UserStatsQueryService userStatsQueryService;
 
@@ -186,9 +189,17 @@ class AdminUserStatsServiceTest extends IntegrationTestSupport {
 		return service.getUserStats();
 	}
 
+	/**
+	 * 회원을 만든다. 가입 시각(created_at)은 실제 현재 시각이 아니라 고정된 과거 값으로 맞춘다.
+	 * 실제 시각을 그대로 두면 테스트를 도는 날짜가 고정 Clock의 날짜(2026-11-01)와 같아지는 순간부터
+	 * "오늘 신규" 숫자가 달라져 테스트가 깨진다(CI에서 실제로 11월 1일 00시 이후에 실패했다).
+	 * 경계를 확인하는 테스트는 setCreatedAt으로 다시 덮어쓴다.
+	 */
 	private User createUser() {
 		String sub = "g" + UUID.randomUUID().toString().replace("-", "");
-		return userRepository.save(User.create(sub + "@example.com", "테스터", OAuthProvider.GOOGLE, sub));
+		User user = userRepository.save(User.create(sub + "@example.com", "테스터", OAuthProvider.GOOGLE, sub));
+		setCreatedAt(user, DEFAULT_CREATED_AT);
+		return user;
 	}
 
 	/** 관리자는 가입 경로로 만들 수 없어 DB에서 권한을 바꾼다 */
@@ -200,7 +211,9 @@ class AdminUserStatsServiceTest extends IntegrationTestSupport {
 
 	private User createDemo() {
 		String sub = "d" + UUID.randomUUID().toString().replace("-", "");
-		return userRepository.save(User.createDemo(sub + "@example.com", "데모", sub));
+		User user = userRepository.save(User.createDemo(sub + "@example.com", "데모", sub));
+		setCreatedAt(user, DEFAULT_CREATED_AT);
+		return user;
 	}
 
 	private UserSetting notificationOn(User user) {
