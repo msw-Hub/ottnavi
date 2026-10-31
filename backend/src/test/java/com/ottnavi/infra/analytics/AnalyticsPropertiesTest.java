@@ -45,6 +45,18 @@ class AnalyticsPropertiesTest {
 	}
 
 	@Test
+	void 캐시_시간이_0_이하이거나_없으면_기동_실패이다() {
+		// when & then: 0, 음수, null 모두 막는다(Redis가 0을 만료 없음으로 읽는 것을 막으려는 것)
+		assertThatThrownBy(() -> new AnalyticsProperties("", "", "http://x", Duration.ZERO))
+				.isInstanceOf(IllegalStateException.class)
+				.hasMessageContaining("cache-ttl");
+		assertThatThrownBy(() -> new AnalyticsProperties("", "", "http://x", Duration.ofMinutes(-1)))
+				.isInstanceOf(IllegalStateException.class);
+		assertThatThrownBy(() -> new AnalyticsProperties("", "", "http://x", null))
+				.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
 	void toString에_속성_ID와_키가_나오지_않는다() {
 		// given
 		AnalyticsProperties props = new AnalyticsProperties("987654321", "c2VjcmV0LWtleQ==", "http://x", Duration.ofMinutes(15));

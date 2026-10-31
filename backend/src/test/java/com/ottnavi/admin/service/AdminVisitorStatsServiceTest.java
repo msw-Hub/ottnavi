@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * 관리자 방문자 통계의 캐시·상태 판정을 실제 Redis(Testcontainers)로 확인한다(Docker Desktop 필요).
@@ -38,6 +39,9 @@ class AdminVisitorStatsServiceTest extends IntegrationTestSupport {
 
 	@Autowired
 	private CacheManager cacheManager;
+
+	@Autowired
+	private StringRedisTemplate redisTemplate;   // 캐시 키의 남은 만료 시간을 읽는 데 쓴다
 
 	private final GaDataClient gaDataClient = mock(GaDataClient.class);
 
@@ -87,6 +91,19 @@ class AdminVisitorStatsServiceTest extends IntegrationTestSupport {
 		assertThat(first.fetchedAt()).isEqualTo(expectedFetchedAt);
 		assertThat(second).isEqualTo(first);   // 숫자와 fetchedAt 모두 캐시를 만든 시각 그대로
 		verify(gaDataClient, times(1)).fetchVisitorCounts();
+	}
+
+	@Test
+	void 캐시_만료_시간이_기본_1시간이_아니라_방문자_통계_설정값_이하로_걸린다() {
+		// given
+		when(gaDataClient.fetchVisitorCounts()).thenReturn(new VisitorCounts(1, 2, 3, 4));
+
+		// when
+		service(enabledProps, FIRST_CALL).getVisitorStats();
+
+		// then: RedisConfig의 기본 TTL(1시간)이 아니라 app.analytics.cache-ttl(기본 15분)이 이 캐시에 적용됐다
+		Long ttlSeconds = redisTemplate.getExpire("visitorStats::current");
+		assertThat(ttlSeconds).isNotNull().isPositive().isLessThanOrEqualTo(Duration.ofMinutes(15).toSeconds());
 	}
 
 	@Test

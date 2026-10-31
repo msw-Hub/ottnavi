@@ -36,6 +36,10 @@ public record AnalyticsProperties(
 			throw new IllegalStateException(
 					"app.analytics의 property-id(GA_PROPERTY_ID)와 credentials-base64(GA_CREDENTIALS_BASE64)는 둘 다 넣거나 둘 다 비워야 합니다.");
 		}
+		// 2. 캐시 시간이 없거나 0 이하면 Redis가 만료 없음으로 읽을 수 있어 막는다(15분 캐시가 영구 캐시가 되는 실수 방지)
+		if (cacheTtl == null || cacheTtl.isZero() || cacheTtl.isNegative()) {
+			throw new IllegalStateException("app.analytics.cache-ttl은 0보다 커야 합니다.");
+		}
 	}
 
 	/** 속성 ID와 키가 모두 있으면 방문자 통계가 켜진 것이다 */
