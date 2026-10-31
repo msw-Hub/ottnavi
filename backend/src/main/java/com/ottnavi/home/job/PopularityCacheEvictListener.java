@@ -8,7 +8,7 @@ import org.springframework.batch.core.listener.JobExecutionListener;
 import org.springframework.stereotype.Component;
 
 /**
- * 인기 수집 Job이 끝나면(완료·실패·중단 모두) 인기 순위 캐시(homePopularity)를 비운다(Task 107).
+ * 인기 수집 Job이 끝나면(완료·실패·중단 모두) 홈 캐시를 모두 비운다(Task 107).
  * 날짜별 인기 순위 기록이 새로 쌓이거나 오래된 날짜가 지워졌으므로, 캐시에 남은 옛 순위(특히 "기록 없음")를 오래 보여 주지 않기 위해서다.
  */
 @Slf4j
@@ -20,7 +20,7 @@ public class PopularityCacheEvictListener implements JobExecutionListener {
 
 	@Override
 	public void afterJob(JobExecution jobExecution) {
-		homeCacheEvictor.evictPopularity();
-		log.info("인기 수집이 끝나 인기 순위 캐시를 비웠다: executionId={}", jobExecution.getId());
+		homeCacheEvictor.evictAll(); // 채운 작품이 홈의 다른 목록(제공 상태 카드 등)에도 영향을 줄 수 있어 홈 캐시를 모두 비운다
+		log.info("인기 수집이 끝나 홈 캐시를 모두 비웠다: executionId={}", jobExecution.getId());
 	}
 }
