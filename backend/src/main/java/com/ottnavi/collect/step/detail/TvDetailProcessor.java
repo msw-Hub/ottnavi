@@ -51,6 +51,15 @@ public class TvDetailProcessor implements ItemProcessor<DetailTarget, TitleDetai
                 .register(meterRegistry);
     }
 
+    /**
+     * Step 밖에서 쓰는 생성자: 방영 여부 기준일을 직접 받는다(인기 작품 채우기, 시각에 의존하는 테스트를 막으려고 고정 날짜를 받는다).
+     * beforeStep이 불리면 Job 파라미터 값이 이 값을 덮어쓴다.
+     */
+    public TvDetailProcessor(TmdbClient tmdbClient, RuntimeDefaults defaults, MeterRegistry meterRegistry, LocalDate today) {
+        this(tmdbClient, defaults, meterRegistry);
+        this.today = today;
+    }
+
     /** Step이 시작될 때 기준일을 Job 파라미터에서 읽는다 */
     @Override
     public void beforeStep(StepExecution stepExecution) {

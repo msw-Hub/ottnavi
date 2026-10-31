@@ -51,27 +51,40 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
     @Override
     public UnitProviders process(AvailabilityTarget target) {
         try {
-            // 1. 영화는 영화 제공처를 그대로 쓴다
-            if (target.unitType() == UnitType.MOVIE) {
-                TmdbWatchProvidersResponse movie = tmdbClient.getMovieWatchProviders(target.tmdbId());
-                return new UnitProviders(target.watchUnitId(), DetailMapper.toKrProviders(movie));
-            }
-            // 2. 시즌은 먼저 시즌 단위 제공처로 판정한다
-            TmdbWatchProvidersResponse season = tmdbClient.getTvSeasonWatchProviders(target.tmdbId(), target.seasonNumber());
-            KrProviders providers = DetailMapper.toKrProviders(season);
-            // 3. 시즌 단위에 KR 정보가 있으면 그것만 쓴다(작품 단위는 부르지 않는다)
-            if (providers.krDataPresent()) {
-                return new UnitProviders(target.watchUnitId(), providers);
-            }
-            // 4. 시즌 단위 KR 정보가 비어 있으면 작품 단위 제공처로 대신 판정한다
-            fallbackUnitCount++;
-            return new UnitProviders(target.watchUnitId(), seriesProviders(target.tmdbId()));
+            // 1. 시청 단위의 KR 제공처를 구한다(영화·시즌 구분과 시즌→작품 대체 규칙은 fetchProviders가 가진다)
+            KrProviders providers = fetchProviders(target.unitType(), target.tmdbId(), target.seasonNumber());
+            return new UnitProviders(target.watchUnitId(), providers);
         } catch (TmdbNotFoundException e) {
-            // 5. TMDB에 제공처 정보가 없으면(404) 이 단위만 건너뛴다
+            // 2. TMDB에 제공처 정보가 없으면(404) 이 단위만 건너뛴다
             log.warn("TMDB에 제공처 정보가 없어 이 단위를 건너뛴다: watchUnitId={}, tmdbId={}, seasonNumber={}",
                     target.watchUnitId(), target.tmdbId(), target.seasonNumber());
             return null;
         }
+    }
+
+    /**
+     * 시청 단위 하나의 KR 제공처를 TMDB에서 받는다. 수집 판정 Step과 인기 작품 채우기가 같은 규칙을 쓰려고 process에서 뺐다.
+     * 영화는 영화 제공처를, 시즌은 시즌 단위 제공처를 쓰고 시즌 단위 KR 정보가 비어 있을 때만 작품(시리즈) 단위로 대신한다(PRD 5.4 / FR-02).
+     * 영화·시즌 단위 조회가 404면 TmdbNotFoundException이 올라간다(호출 쪽이 건너뛸지 정한다).
+     *
+     * @param seasonNumber 시즌 번호. 영화는 쓰지 않는다
+     */
+    public KrProviders fetchProviders(UnitType unitType, int tmdbId, Integer seasonNumber) {
+        // 1. 영화는 영화 제공처를 그대로 쓴다
+        if (unitType == UnitType.MOVIE) {
+            TmdbWatchProvidersResponse movie = tmdbClient.getMovieWatchProviders(tmdbId);
+            return DetailMapper.toKrProviders(movie);
+        }
+        // 2. 시즌은 먼저 시즌 단위 제공처로 판정한다
+        TmdbWatchProvidersResponse season = tmdbClient.getTvSeasonWatchProviders(tmdbId, seasonNumber);
+        KrProviders providers = DetailMapper.toKrProviders(season);
+        // 3. 시즌 단위에 KR 정보가 있으면 그것만 쓴다(작품 단위는 부르지 않는다)
+        if (providers.krDataPresent()) {
+            return providers;
+        }
+        // 4. 시즌 단위 KR 정보가 비어 있으면 작품 단위 제공처로 대신 판정한다
+        fallbackUnitCount++;
+        return seriesProviders(tmdbId);
     }
 
     /** 작품 단위 KR 제공처를 돌려준다. 직전과 같은 시리즈면 호출하지 않고, 작품 단위가 404면 KR 데이터 없음으로 본다 */

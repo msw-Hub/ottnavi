@@ -2,10 +2,18 @@ package com.ottnavi.catalog.service;
 
 import com.ottnavi.catalog.domain.entity.Title;
 import com.ottnavi.catalog.domain.repository.TitleRepository;
+import com.ottnavi.catalog.domain.enums.MediaType;
 import com.ottnavi.catalog.service.model.CandidateTitle;
+import com.ottnavi.catalog.service.model.TitleKey;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +25,32 @@ import org.springframework.transaction.annotation.Transactional;
 public class TitleCollectService {
 
     private final TitleRepository titleRepository;
+
+    /**
+     * 주어진 작품 키 중 이미 title 표에 있는 키만 돌려준다. 작품 구분(영화·드라마)별로 tmdb_id IN 조회를 한 번씩만 한다.
+     * 인기 순위 상위 작품 중 채울 작품(표에 없는 작품)을 가릴 때 쓴다.
+     */
+    public Set<TitleKey> findExistingKeys(Collection<TitleKey> keys) {
+        // 1. 작품 구분별로 TMDB ID를 모은다
+        Map<MediaType, List<Integer>> idsByType = new EnumMap<>(MediaType.class);
+        for (TitleKey key : keys) {
+            List<Integer> ids = idsByType.get(key.mediaType());
+            if (ids == null) {
+                ids = new ArrayList<>();
+                idsByType.put(key.mediaType(), ids);
+            }
+            ids.add(key.tmdbId());
+        }
+
+        // 2. 구분마다 한 번씩 조회해 있는 키를 모은다
+        Set<TitleKey> existing = new HashSet<>();
+        for (Map.Entry<MediaType, List<Integer>> entry : idsByType.entrySet()) {
+            for (Integer tmdbId : titleRepository.findTmdbIdsByMediaTypeAndTmdbIdIn(entry.getKey(), entry.getValue())) {
+                existing.add(new TitleKey(entry.getKey(), tmdbId));
+            }
+        }
+        return existing;
+    }
 
     /**
      * 후보를 저장하고 새로 저장한 개수를 돌려준다.
