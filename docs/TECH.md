@@ -274,6 +274,9 @@ sequenceDiagram
 | `JobRepository`는 이미 열린 트랜잭션 안에서 실행 기록을 만드는 것을 거부한다 | 실행·복구를 부르는 서비스와 `CollectJobLauncher`에 `@Transactional`을 붙이지 않는다 | 실측(Task 045) |
 | `@Bean(defaultCandidate = false)`로 둔 두 번째 `JobOperator`가 Boot의 Batch 자동 구성과 충돌하지 않는다. Boot 기본 동기 operator도 그대로 주입된다 | 비동기 operator는 `@Qualifier("collectJobOperator")`로만 받는다 | 실측(Task 045) |
 | `BATCH_JOB_EXECUTION_PARAMS`의 `LocalDate` 파라미터는 `PARAMETER_VALUE`에 ISO 문자열(`2026-10-15`)로 저장된다 | 날짜 조회는 문자열 비교·`CAST(... AS DATE)`로 한다(`CollectExecutionQuery`) | 실측(Task 045) |
+| 방문자 통계(Task 097 확장)용 `com.google.auth:google-auth-library-oauth2-http:1.33.0`은 `google-genai`(Spring AI Gemini 스타터)가 이미 끌고 와 있어 새 라이브러리가 아니다 | 직접 import하므로 `build.gradle`에 같은 버전으로 명시해 전이 의존에 기대지 않는다. 새 의존성 추가 없음 | 실측(`gradlew dependencies`) |
+| GA Data API `runReport`에 `dateRanges`를 여럿 보내면 응답에 `dateRange` 차원이 자동으로 붙고 행의 값이 `date_range_0`, `date_range_1`…(요청 순서의 0부터 번호)로 온다. 값이 없는 범위의 행은 빠질 수 있고, 범위가 겹치면 겹친 날의 데이터가 양쪽 행에 모두 들어간다. `today`·`yesterday`·`NdaysAgo`는 속성의 시간대 기준으로 풀린다 | `GaDataClient`가 오늘·어제·`6daysAgo~today`·`29daysAgo~today` 4개를 요청 한 번에 보내고 행이 없는 범위는 0으로 읽는다. 서버가 날짜를 계산하지 않는다. 표준 속성은 하루 20만 토큰·시간당 4만 토큰이라 1회 호출 + 15분 캐시로 쓴다 | 공식 문서(Data API basics·runReport·quotas, context7) |
+| 테스트 소스의 `@Configuration`(중첩 클래스 포함)은 앱 전체 컴포넌트 스캔에 잡혀 다른 통합 테스트 컨텍스트에 섞일 수 있다(가짜 빈 충돌 `BeanDefinitionOverrideException`). `@TestConfiguration`은 `@SpringBootTest(classes=…)`에 넘기면 Boot가 `OttnaviApplication`까지 올린다 | GA 클라이언트 테스트는 `AnnotationConfigApplicationContext`에 `@Configuration`이 아닌 클래스(`@EnableFeignClients`·`@Import`만 붙임)를 직접 `register`해 가벼운 컨텍스트를 만든다(`GaTestSupport`) | 실측(Task 097 확장) |
 
 ---
 

@@ -1698,6 +1698,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - [x] V-F: 목업 흐름 재현, 콘솔 에러 0건.
 - 진행(2026-10-31): 목업 화면 완료(`features/admin/components/monitoring/`: "무엇을 어디서 보나" 바로가기 카드 하나(Grafana 지표·로그·알림 규칙, Cloudtype 콘솔, 수집 탭), 수집 실행 요약은 수집 탭과 겹쳐 뺐고 `CollectRunSummary.tsx`는 보류로 남김. 주소는 `grafanaLink.ts`의 `GRAFANA_DASHBOARD_URL`이며 빈 문자열이면 비활성 "준비 중"). 관리자·데모 계정, 데스크톱·375px 확인, 단위 테스트 추가. 실제 연결은 099 대기(098 선행).
 - 진행(2026-11-01, 범위 확장): 사용자 결정으로 운영 현황 카드 3개를 더한다(PR-1: 회원 현황 `GET /api/admin/user-stats` 백엔드 구현·계약, 알림 메일 발송 카드는 기존 `GET /api/admin/notifications/summary` 재사용, 동의한 방문자 수 `GET /api/admin/visitor-stats`는 계약(`x-planned`)과 화면 목업만. PR-2: Google Analytics Data API REST 호출(서비스 계정 토큰, OpenFeign), Redis 15분 캐시, 환경 변수 `GA_PROPERTY_ID`·`GA_CREDENTIALS_BASE64`, 배포는 24시간 메모리 측정 뒤). 이에 따라 Task 099의 "새 API 없음" 전제는 바뀌었다. 설계는 opus 설계 승인본.
+- 진행(2026-11-01, PR-2 서버 구현 완료·커밋 전, 브랜치 `feature/q1-visitor-stats`): `GET /api/admin/visitor-stats`를 구현했다(`infra/analytics`의 `GaDataClient`가 날짜 범위 4개를 요청 한 번에 읽고, `AdminVisitorStatsService`가 Redis `visitorStats`에 15분 캐시, 연동 설정이 없으면 DISABLED·조회 실패는 200 + UNAVAILABLE이며 실패는 캐시하지 않는다). 계약의 `x-planned`를 지웠고 operation 63개 모두 구현이다. 환경 변수 `GA_PROPERTY_ID`·`GA_CREDENTIALS_BASE64`는 둘 다 비우면 꺼지고 하나만 있으면 기동이 실패한다. 실제 구글 호출은 아직 확인하지 않았다(서비스 계정 키·속성 권한은 사용자 몫, 배포는 24시간 메모리 측정 뒤).
 
 #### Task 098: Grafana Cloud 관측 연동으로 배포 환경 지표·로그 수집 ⬜ `[3단계 이월]`
 - 태그: [B] · PRD: Q1, FR-20, 6절 관측 · 선행: 096, 097 · 브랜치: `feature/q1-observability`
