@@ -7,7 +7,7 @@ interface PrivacyRevisionListProps {
 }
 
 /**
- * 개인정보처리방침 10절의 변경 이력이다. 항목마다 한 줄("2026년 10월 31일 변경: …")로 그리고,
+ * 개인정보처리방침 13절(방침의 변경)의 변경 이력이다. 항목마다 한 줄("2026년 10월 31일 변경: …")로 그리고,
  * 이전 방침 경로(previousPolicyPath)가 있는 항목에만 "이전 방침 보기" 링크를 붙인다(없으면 링크가 없다).
  */
 export function PrivacyRevisionList({ revisions }: PrivacyRevisionListProps) {
