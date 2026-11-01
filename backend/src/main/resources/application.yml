@@ -79,9 +79,18 @@ management:
     metrics:
       export:
         enabled: false                  # observability 프로필이 켜질 때만 전송한다. 프로필이 없으면 전송 0건
+  opentelemetry:
+    enabled: ${TRACING_ENABLED:false}   # 요청 추적(Tracing)의 스위치. 기본 꺼짐이며 false면 OTel SDK가 no-op이라 추적 객체·내보내기 스레드·전송이 없다. 켜는 값은 Cloudtype 환경 변수 TRACING_ENABLED=true (observability 프로필의 주소·인증이 함께 필요)
+  tracing:
+    export:
+      enabled: ${TRACING_ENABLED:false}   # 내보내기 전체 스위치(opentelemetry.enabled와 같은 값). 꺼짐이면 span 내보내기 객체를 만들지 않는다
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}   # 표본 비율(0.0~1.0). 0.1이면 요청 10건 중 약 1건만 기록한다. 추적이 켜졌을 때만 쓰인다
   health:
     mail:
       enabled: false                    # 메일 서버 연결 확인을 헬스 체크에서 뺀다. 켜 두면 헬스 체크마다 SMTP에 접속하고, 메일 서버가 느리거나 막히면 서비스 전체가 DOWN(503)으로 보인다
+logging:
+  expect-correlation-id: false          # 추적을 켜도 콘솔 로그에 추적 번호([traceId-spanId])를 넣지 않는다(로그 개인정보 설계). Boot는 이 값을 management.tracing.export.enabled에서 가져오므로 명시해서 막는다
 server:
   forward-headers-strategy: framework   # Cloudtype은 Boot가 아는 클라우드가 아니라 기본값이 NONE(TECH 4절)
 springdoc:

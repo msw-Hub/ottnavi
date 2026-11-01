@@ -9,3 +9,10 @@ management:
         url: ${GRAFANA_OTLP_ENDPOINT}               # 예: Grafana Cloud OTLP 게이트웨이의 /v1/metrics 주소
         headers:
           Authorization: ${GRAFANA_OTLP_AUTH}       # "Basic ..." 전체 문자열을 환경 변수로 받는다
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${GRAFANA_OTLP_TRACES_ENDPOINT:}   # 추적 전송 주소(예: Grafana Cloud OTLP 게이트웨이의 /v1/traces). TRACING_ENABLED=true일 때만 쓰인다
+          headers:
+            Authorization: ${GRAFANA_OTLP_TRACES_AUTH:}   # "Basic ..." 전체 문자열. 지표용 토큰에 traces:write 권한이 없을 수 있어 별도 변수로 받는다

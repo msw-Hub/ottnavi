@@ -11,13 +11,13 @@
 |---|---|---|
 | 지표(metric) | 메모리 650MB, 요청 수 120건/분, 오류 3건 | 작고 가벼워 그래프로 오래 보관한다. "지금 이상하다"를 알려 준다 |
 | 로그(log) | `알림 발송에 실패했다: outboxId=17, 근본원인=...` | 양이 많다. "왜 그런가"를 읽을 때 쓴다 |
-| 추적(trace) | 요청 하나가 컨트롤러 → DB → Redis를 거친 시간 | 느린 곳을 찾을 때 쓴다(선택, 4단계) |
+| 추적(trace) | 요청 하나가 컨트롤러 → DB → Redis를 거친 시간 | 느린 곳을 찾을 때 쓴다(4단계, 구현됨·기본 꺼짐) |
 
 | 보내는 것 | 방법 | 도착지 | 단계 |
 |---|---|---|---|
 | 지표 | Micrometer OTLP(60초마다) | Grafana Mimir | 2단계 |
 | 로그 | Loki4j 2.0.x(Logback의 출력 장소) | Grafana Loki | 3단계 |
-| 추적 | OpenTelemetry | 미정 | 4단계(운영 메모리를 잰 뒤 결정) |
+| 추적 | Micrometer Tracing + OpenTelemetry(OTLP) | Grafana Tempo | 4단계(기본 꺼짐, `TRACING_ENABLED=true`로 켠다) |
 
 OTLP와 Loki4j는 고르는 관계가 아니라 **둘 다 쓰는 관계**다. OTLP는 데이터를 보내는 통신 규격(OpenTelemetry Protocol)이고 Loki4j는 로그를 Loki로 보내는 라이브러리다. OTLP로 로그도 보낼 수 있지만 로그 전송 설정과 마스킹을 Logback에서 다루기 쉽고 지표 전송과 서로 영향을 주지 않아서 로그에는 Loki4j를 쓴다. 모든 전송은 `observability` 프로필이 켜졌을 때만 동작하고, 프로필이 없으면 지금과 똑같다.
 
@@ -26,7 +26,7 @@ OTLP와 Loki4j는 고르는 관계가 아니라 **둘 다 쓰는 관계**다. OT
 | 1 | 로그 정리 + 메모리 게이지 | 커밋 `7bd6b30` |
 | 2 | OTLP 지표 전송(허용 목록 필터) | 커밋 `5406e22` |
 | 3 | Loki 로그 전송 + 마스킹 + 방침 문구, GA 방문 통계 | 구현·검증 완료, 미커밋 |
-| 4 | 추적(선택) | 시작 전 |
+| 4 | 추적: 켜고 끄기·개인정보 필터·Redis 구간 구현(DB 구간은 별도 라이브러리가 필요해 보류) | 구현·검증 완료(기본 꺼짐), 미커밋 |
 | 5 | 문서(TECH, `.env.example`) | 시작 전 |
 
 ## 2. 용어
@@ -69,7 +69,7 @@ OTLP와 Loki4j는 고르는 관계가 아니라 **둘 다 쓰는 관계**다. OT
 - 쓰기 권한 이름은 `metrics:write`, `logs:write`, `traces:write`(공식 문서)다.
 - **결정**: 정책 하나(이 스택만, `metrics:write`와 `logs:write`만)와 토큰 하나를 지표와 로그 양쪽에 쓴다. 쓰기 전용이라 최소 권한이고 비밀 값이 하나다.
 - **함정**: 각 카드의 "Generate now"는 쓰지 않는다. Loki 카드의 생성 창은 **읽기 전용 권한**(`logs:read` 등)을 주고, OpenTelemetry 카드의 창은 권한을 고를 수 없이 쓰기 권한을 한꺼번에(`alerts:write`, `rules:write` 포함) 준다.
-- 토큰에는 만료일(2027-10-15)이 있다. 만료되면 지표와 로그 전송이 조용히 멈춘다.
+- 토큰에는 만료일(2027-10-18)이 있다(지표·로그용과 추적용 토큰 모두, 2026-11-01에 같은 날로 맞췄다). 만료되면 지표·로그·추적 전송이 조용히 멈춘다.
 
 ### 3-3. Loki의 라벨과 스트림
 
@@ -118,6 +118,20 @@ Loki는 **라벨 조합 하나가 스트림 하나**다. 라벨 값이 다양해
 
 한계: 이 점검은 테스트가 만든 로그 범위다. 운영에서만 나는 라이브러리 로그는 보지 못했다.
 
+### 4-3. 추적
+
+추적은 요청 처리 중에 만들어지는 span(구간 기록)을 Grafana Tempo로 보낸다. 규칙은 다음과 같다.
+
+| 규칙 | 구현 |
+|---|---|
+| 쿼리 문자열·전체 주소·SQL·Redis 명령 인자는 싣지 않는다 | `TracingPrivacyFilter`(ObservationFilter)가 **높은 카디널리티 값을 모두 지운다.** Spring이 전체 주소를 `http.url`로, Lettuce가 Redis 명령과 인자를 `db.statement`로 이 분류에 넣는다 |
+| 경로는 템플릿만 남긴다 | 낮은 카디널리티 값 `uri`가 `/api/public/titles/{mediaType}/{tmdbId}`처럼 템플릿으로 나온다. 실제 값(`/movie/603`)은 위 규칙으로 사라진다 |
+| IP·사용자 에이전트·사용자 식별 속성은 싣지 않는다 | 기본 규약이 싣지 않고, 이름이 알려진 속성(`client.address`, `user_agent.original`, `enduser.id`, `net.sock.peer.addr`, `db.user` 등)은 낮은 카디널리티에서도 지운다 |
+| 예외 메시지·스택은 싣지 않는다 | 예외는 관측이 끝나기 전에 span에 기록돼 관측 필터로는 못 지운다. `SanitizingSpanExporter`가 **내보내기 직전** 이벤트(메시지·스택)를 비우고 상태 설명을 지운다. 예외 종류는 `exception` 값(클래스 단순 이름)으로 남는다 |
+| 추적 번호를 로그에 넣지 않는다 | `logging.expect-correlation-id=false`. Boot는 이 값을 추적 켜짐 여부에서 가져와 콘솔 로그에 `[traceId-spanId]`를 붙이므로 명시해서 막는다. Loki 메시지 패턴에는 원래 MDC가 없다 |
+
+한계: 이름 목록(차단 키)은 목록에 없는 새 키를 못 막는다. 대신 높은 카디널리티 전체 삭제가 기본 방어이고, 새 라이브러리 관측(예: JDBC)을 추가하면 어떤 키가 낮은 카디널리티로 나오는지 `TracingPrivacyTest`처럼 실제 전송 본문으로 확인해야 한다. `MDC`·사용자 id를 span에 넣는 코드는 없다(`src/main` 검색).
+
 ## 5. 코드 흐름
 
 ### 5-1. Redis 장애 때 로그 줄이기 (1단계)
@@ -164,6 +178,28 @@ Loki는 **라벨 조합 하나가 스트림 하나**다. 라벨 값이 다양해
 | 6 | `Loki4jAppender` | 라벨 `app`, `env`, `level`만 붙여 내부 큐에 넣고 바로 돌아간다. 별도 스레드가 64KB 또는 5초마다 `/loki/api/v1/push`로 POST한다 |
 
 로그 한 줄의 예(가상): `log.error("알림 처리 중 예외가 났다: outboxId=17, 수신자=hong@example.com", e)`에서 e의 가장 안쪽 원인이 `SocketTimeoutException`이면, 콘솔에는 메시지 전체와 스택이 남고 Loki에는 `... 수신자=*** rootCause=java.net.SocketTimeoutException`만 간다. `drainOnStop=true`라 종료할 때 큐에 남은 로그를 마저 보낸다(Loki 장애 중 종료가 길어질 수 있다는 추정은 운영 배포 때 종료 시간으로 확인한다).
+
+### 5-5. 요청 추적 (4단계)
+
+스위치는 환경 변수 하나다. `TRACING_ENABLED`(기본 false)가 `application.yml`의 `management.opentelemetry.enabled`(OTel SDK 전체)와 `management.tracing.export.enabled`(내보내기와 로그 상관관계)에 연결된다. 설정 이름은 spring-boot-micrometer-tracing 4.1.1 jar의 `spring-configuration-metadata.json`과 자동 구성 클래스로 확인했다.
+
+| 상태 | 만들어지는 것 | 요청 처리 |
+|---|---|---|
+| 꺼짐(기본) | `TracingConfig.noopTracer`가 아무것도 기록하지 않는 `Tracer.NOOP`을 등록한다. Boot의 OTel 브리지 Tracer는 `ConditionalOnMissingBean`이라 물러난다. 내보내기 객체·추적 공급자·전송 스레드가 없고 필터도 등록되지 않는다 | span이 만들어지지 않는다 |
+| 켜짐 | 추적 공급자, OTLP 내보내기(`SanitizingSpanExporter`로 감쌈), 개인정보 필터가 만들어진다. 요청마다 표본 비율(`TRACING_SAMPLING_PROBABILITY`, 기본 0.1)만 기록한다 | HTTP 요청, Redis 명령이 span이 된다 |
+
+켜짐 순서: 요청 → `ServerHttpObservationFilter`가 관측 시작 → Redis 호출 때 `LettuceObservationAutoConfiguration`이 등록한 Lettuce 추적이 하위 관측 생성 → 관측 종료 시 `TracingPrivacyFilter`가 값을 지움 → Micrometer Tracing이 span으로 변환 → 배치로 모아 `SanitizingSpanExporter` → OTLP HTTP로 `GRAFANA_OTLP_TRACES_ENDPOINT`에 POST(`GRAFANA_OTLP_TRACES_AUTH` 헤더). 요청 스레드는 전송을 기다리지 않는다.
+
+| 환경 변수 | 기본 | 설명 |
+|---|---|---|
+| `TRACING_ENABLED` | false | 추적 스위치 |
+| `TRACING_SAMPLING_PROBABILITY` | 0.1 | 표본 비율(0.0~1.0) |
+| `GRAFANA_OTLP_TRACES_ENDPOINT` | 없음 | 추적 전송 주소(`/v1/traces`로 끝나는 전체 URL). 켤 때 필수 |
+| `GRAFANA_OTLP_TRACES_AUTH` | 없음 | `Basic ...` 전체 문자열. 지표용 토큰에 `traces:write` 권한이 없을 수 있어 별도 변수로 받는다 |
+
+주의: `TRACING_ENABLED=true`인데 주소가 비어 있으면 **서버가 기동에 실패한다**(OTLP 내보내기 생성이 "Invalid endpoint"로 예외를 던짐, `TracingToggleTest`가 확인). 잘못된 설정을 바로 알리는 방향이지만 배포를 막는다. 추적을 켤 때는 주소·인증 변수를 먼저 넣는다. 추적 설정은 `observability` 프로필의 `application-observability.yml`에서 주소·인증을 읽으므로 `prod,observability`로 실행할 때만 의미가 있다. 이 프로필 없이 `TRACING_ENABLED=true`만 켜면 기동은 되지만 주소가 없어 내보내기가 만들어지지 않는다(`TracingToggleTest`가 확인). 즉 아무것도 전송하지 않는다.
+
+켠 뒤 메모리 비교: 8-2절의 기준(기동 직후 약 496MiB, 2일 뒤 약 738MB)과 같은 경과 시간끼리 비교한다. 꺼진 채 이 코드를 배포해 RSS를 먼저 재고, `TRACING_ENABLED=true`로 재배포해 30분·24시간 뒤를 잰다. 중단 기준은 8-2와 같다(RSS +100MB 또는 컨테이너 사용률 85%).
 
 ## 6. 문법: 물어본 것만
 
@@ -242,10 +278,12 @@ GA 쪽 설정이 코드와 방침에 영향을 주는 점:
 
 - 지표는 Micrometer OTLP, 로그는 Loki4j **2.0.3**(Boot 4.1.1의 Logback 1.5.38과 맞는 계열, 2.1은 Logback 1.6 필요). 켜고 끄기는 `observability` 프로필, 프로필이 없으면 지금과 동일.
 - 097·099용 새 API는 없다(기존 수집 실행·알림 요약·시스템 지표 API + Grafana 링크). DEMO 계정에도 Grafana 링크를 보인다.
-- 의존성 `spring-boot-opentelemetry`는 유지한다(없으면 OTLP 자동 구성이 빠짐). `llm.call`, `llm.call.duration`은 허용 목록에 넣는다(태그 `operation`·`result`는 닫힌 값).
+- 의존성은 `spring-boot-starter-opentelemetry`로 바꿨다(기존 `spring-boot-opentelemetry` 포함. 지표 OTLP 자동 구성에 필요한 클래스를 계속 제공하고 추적 의존성을 더한다). `llm.call`, `llm.call.duration`은 허용 목록에 넣는다(태그 `operation`·`result`는 닫힌 값).
 - Loki에는 `com.ottnavi` INFO 이상 + 라이브러리 WARN 이상만 보내고, 스택 트레이스는 보내지 않으며, 이메일 모양 글자는 가린다. `drainOnStop=true`.
 - 로그 줄이기는 직접 만든 코드(`StoreErrorLog`)를 쓴다. 기동 직후 Redis 미리 연결은 이번에 하지 않는다.
 - 개인정보처리방침에 로그의 외부 보관·마스킹, 회원 번호 기록, 방문 통계(Google Analytics), 처리 위탁(Grafana Labs, 서버 위치 일본)을 반영한다. 동의 안내 창은 만들지 않았고 한국 법령상 필요한지는 확인하지 못했다.
+
+- 추적: 표본 10%, 범위는 웹 요청과 Redis, 기본 꺼짐(환경 변수로 켠다). 개인정보 규칙은 4-3절. JDBC 구간은 Boot 기본 포함이 아니고 별도 라이브러리가 필요해 보류했다. 추적 번호는 로그에 넣지 않는다.
 
 ### 8-2. 메모리 영향 측정 계획
 
@@ -253,6 +291,7 @@ GA 쪽 설정이 코드와 방침에 영향을 주는 점:
 
 ### 8-3. 아직 확인하지 못한 것
 
+- 추적: 실제 Grafana Tempo로의 전송과 켠 뒤 메모리·기동 시간 영향, 실제 컨트롤러·보안 필터 체인에서 나오는 span 목록(시험은 서버 관측 필터만 거쳤다), 꺼진 상태의 클래스 로딩 증가분(측정하지 않음)
 - 실서버 시계열 개수(추정 250~450개), `spring.batch.job` 지표가 나오는지, 의존성 추가의 실제 메모리·기동 시간 영향
 - 실제 Grafana Cloud로의 전송(Cloudtype에서 나가는 통신, 응답이 없거나 4xx·5xx일 때)- 실제 Redis 장애에서 로그가 줄어드는지, 게이지가 실제 Linux 컨테이너에서 도는지
 - 운영에서만 나는 라이브러리 로그에 개인정보가 섞이는지, `drainOnStop=true`일 때 Loki 장애 중 종료 시간
@@ -265,3 +304,4 @@ GA 쪽 설정이 코드와 방침에 영향을 주는 점:
 | 2026-10-30 | 문서 신설(1·2단계) |
 | 2026-10-31 | 질문 일지 형태를 기술 핵심 중심으로 재구성: 코드 흐름, 문법, Grafana·Loki 개념, 개인정보 설계, GA 방문 통계. 계정·화면 조작과 개인 환경 문제는 제외 |
 | 2026-10-31 | 로컬 전체 기동 결과 반영(3-5절): 환경 변수가 비면 기동 실패, 연결 불가 값이면 정상 기동 |
+| 2026-11-01 | 추적(4단계) 구현 반영: 기본 꺼짐 스위치, 개인정보 필터, 환경 변수, 켠 뒤 메모리 비교 기준 |
