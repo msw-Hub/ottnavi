@@ -40,6 +40,11 @@ public interface TitleRepository extends JpaRepository<Title, Long> {
     /** 작품 구분 하나와 TMDB ID 여러 개로 작품을 한 번에 찾는다. 홈 인기 순위가 스냅샷의 작품을 카드로 바꿀 때 쓴다 */
     List<Title> findByMediaTypeAndTmdbIdIn(MediaType mediaType, Collection<Integer> tmdbIds);
 
+    /** 작품 구분 하나와 TMDB ID 여러 개 중 이미 title 표에 있는 TMDB ID만 가볍게 조회한다(엔티티·제공 상태를 읽지 않는다) */
+    @Query("select t.tmdbId from Title t where t.mediaType = :mediaType and t.tmdbId in :tmdbIds")
+    List<Integer> findTmdbIdsByMediaTypeAndTmdbIdIn(@Param("mediaType") MediaType mediaType,
+            @Param("tmdbIds") Collection<Integer> tmdbIds);
+
     /** 장르에 연결된 작품을 한 페이지 조회한다. 정렬은 {@link #searchByTitle}와 같다(최근 개봉 그룹 → 과거 → 미래·모름, 그룹 안은 인기도 내림차순) */
     @Query(value = "select t from Title t where t.id in (select tg.title.id from TitleGenre tg where tg.genre.id = :genreId) "
             + "order by " + RECENT_GROUP_ORDER + ", t.popularity desc nulls last, t.id asc",

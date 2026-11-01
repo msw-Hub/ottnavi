@@ -17,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 @Import(TestcontainersConfig.class)
 @TestPropertySource(properties = {
         "app.rate-limit.enabled=false",
+        "app.redis.warm-up.enabled=false",
         "app.plan-recalc.auto-start=false",
         "app.notification.scheduler-enabled=false",
         "app.notification.immediate-send-enabled=false",

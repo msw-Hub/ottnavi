@@ -160,6 +160,7 @@ export function PopularRail({ servicesQuery }: PopularRailProps) {
                   focusServiceId={service?.ottServiceId}
                   rank={item.rank}
                   rankLabel="인기"
+                  isFromPopularity
                   isFeatured
                   // H-1-3(사용자 요청): 서비스 탭을 고르면 카드마다 나오던 "넷플릭스 [있음]" 줄을 뺀다. 고른 탭이 이미 서비스를 말하고,
                   // 이 목록은 그 서비스에서 볼 수 있다고 확인된 작품만이라 모든 카드가 같은 "있음"이다(독점 줄과 같은 이유).

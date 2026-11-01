@@ -212,6 +212,7 @@ function PopularSection({ service, services, period }: PopularSectionProps) {
                   focusServiceId={service?.ottServiceId}
                   rank={item.rank}
                   rankLabel="인기"
+                  isFromPopularity
                 />
               </li>
             ))}
