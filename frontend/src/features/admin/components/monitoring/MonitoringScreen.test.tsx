@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/providers'
+import { MONITORING_LINK_URLS } from '@/features/admin/components/monitoring/grafanaLink'
 import { MonitoringScreen } from '@/features/admin/components/monitoring/MonitoringScreen'
 import { handlers } from '@/mocks/handlers'
 import { resetMockSession, setMockRole } from '@/mocks/mockSession'
@@ -39,6 +40,43 @@ function renderScreen(scenario?: string) {
     </Providers>,
   )
 }
+
+describe('모니터링 바로가기 주소', () => {
+  it('값이 있는 주소는 https이고 토큰·비밀번호처럼 보이는 값이 붙지 않는다', () => {
+    for (const url of Object.values(MONITORING_LINK_URLS)) {
+      if (url === '') continue
+      expect(url).toMatch(/^https:\/\//)
+      expect(url).not.toMatch(/token|password|passwd|secret|api_?key|auth=/i)
+    }
+  })
+
+  it('연결된 바깥 도구는 새 탭 링크이고 알림 규칙만 준비 중이다', async () => {
+    window.history.pushState({}, '', '/')
+    render(
+      <Providers>
+        <MemoryRouter>
+          <MonitoringScreen />
+        </MemoryRouter>
+      </Providers>,
+    )
+
+    const dashboard = await screen.findByRole('link', { name: /Grafana 대시보드 열기/ })
+    expect(dashboard).toHaveAttribute(
+      'href',
+      expect.stringContaining('ottnavi.grafana.net/d/ottnavi-overview'),
+    )
+    expect(dashboard).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: /Grafana 로그 탐색 열기/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('ottnavi.grafana.net/explore'),
+    )
+    expect(screen.getByRole('link', { name: /Cloudtype 콘솔 열기/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('app.cloudtype.io'),
+    )
+    expect(screen.getByRole('button', { name: 'Grafana 알림 규칙 준비 중' })).toBeDisabled()
+  })
+})
 
 describe('모니터링 화면의 운영 현황', () => {
   it('관리자에게 회원 현황·방문자 수·메일 발송 숫자가 모두 보인다', async () => {

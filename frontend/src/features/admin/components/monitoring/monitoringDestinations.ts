@@ -11,7 +11,8 @@ import type { MonitoringLinkKey } from '@/features/admin/components/monitoring/g
 /*
  * 모니터링 화면의 "무엇을 어디서 보나" 줄 목록이다(Task 097).
  * 한 줄 = 보고 싶은 것(topic) + 가는 곳(이름·아이콘) + 이동 버튼.
- * 큰 틀만 적는다. 대시보드 패널 이름은 Task 098에서 정해지므로 여기에 단정해 쓰지 않는다.
+ * 대시보드 줄의 글은 Grafana 대시보드 "ottnavi 운영 개요"의 패널(메모리·CPU·DB 연결 풀·응답 시간·TMDB 호출)에 맞췄다.
+ * 패널을 크게 바꾸면 이 글도 함께 고친다.
  */
 
 // 줄마다 같이 쓰는 표시 정보
@@ -39,7 +40,7 @@ export type MonitoringRow = MonitoringExternalRow | MonitoringInternalRow
 export const MONITORING_ROWS: MonitoringRow[] = [
   {
     kind: 'external',
-    topic: '서버 메모리·DB 연결 풀·응답 시간',
+    topic: '서버 메모리·CPU·DB 연결 풀·응답 시간·TMDB 호출',
     placeLabel: 'Grafana 대시보드',
     icon: LayoutDashboardIcon,
     linkKey: 'grafanaDashboard',

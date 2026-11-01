@@ -1,7 +1,8 @@
 /*
  * 관리자 모니터링(SCR-17) 바로가기 주소 모음이다(Task 097, PRD 11절 16번).
  *
- * 아직 주소가 정해지지 않아 모두 빈 문자열로 둔다. 항목마다 따로 판단해, 비어 있는 항목만 "준비 중"(비활성)으로 보인다.
+ * 주소가 정해진 항목만 채우고(2026-11-01: 대시보드·로그 탐색·Cloudtype), 비어 있는 항목만 "준비 중"(비활성)으로 보인다.
+ * 알림 규칙은 아직 규칙을 만들지 않아 빈 문자열로 두고, 규칙을 만들 때 그 목록 주소를 넣는다.
  * 주소가 정해지면 해당 상수 한 줄만 바꾸면 된다. 비밀 값이 아니라 브라우저에 그대로 보이는 링크이므로 코드에 둬도 된다.
  * 단, 토큰·비밀번호가 붙은 주소(예: 로그인 없이 열리는 공유 키가 들어간 주소)는 넣지 않는다.
  * 데모(DEMO) 계정에도 같은 링크가 보인다(관측 설계 결정 2026-10-30).
@@ -17,10 +18,14 @@ export type MonitoringLinkKey =
 // 항목별 주소. 빈 문자열이면 그 항목만 "준비 중"이다
 export type MonitoringLinkUrls = Record<MonitoringLinkKey, string>
 
-export const GRAFANA_DASHBOARD_URL = '' // Grafana 대시보드(서버 지표)
-export const GRAFANA_EXPLORE_URL = '' // Grafana 로그 탐색(Explore)
+// Grafana 대시보드 "ottnavi 운영 개요"(고유 ID ottnavi-overview). 제목 부분을 빼 제목을 바꿔도 주소가 깨지지 않는다. 최근 6시간, 1분마다 새로고침
+export const GRAFANA_DASHBOARD_URL =
+  'https://ottnavi.grafana.net/d/ottnavi-overview?from=now-6h&to=now&refresh=1m'
+// Grafana 로그 탐색(Explore): 경고·오류 로그 쿼리 {app="ottnavi", env="prod", level=~"(?i)warn|error"}가 이미 들어 있고 최근 24시간이다
+export const GRAFANA_EXPLORE_URL =
+  'https://ottnavi.grafana.net/explore?schemaVersion=1&panes=%7B%22if0%22:%7B%22datasource%22:%22grafanacloud-logs%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22expr%22:%22%7Bapp%3D%5C%22ottnavi%5C%22,%20env%3D%5C%22prod%5C%22,level%3D~%5C%22%28%3Fi%29warn%7Cerror%5C%22%7D%22,%22queryType%22:%22range%22,%22datasource%22:%7B%22type%22:%22loki%22,%22uid%22:%22grafanacloud-logs%22%7D,%22editorMode%22:%22code%22,%22direction%22:%22backward%22%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D,%22panelsState%22:%7B%22logs%22:%7B%22sortOrder%22:%22Descending%22%7D%7D,%22compact%22:false%7D%7D'
 export const GRAFANA_ALERT_RULES_URL = '' // Grafana 알림 규칙 목록
-export const CLOUDTYPE_CONSOLE_URL = '' // Cloudtype 콘솔(서버 배포·재시작)
+export const CLOUDTYPE_CONSOLE_URL = 'https://app.cloudtype.io/@swmoon7/backend:main/ottnavi' // Cloudtype 콘솔(서버 배포·재시작)
 
 // 화면 조립(MonitoringScreen)이 그대로 넘기는 묶음
 export const MONITORING_LINK_URLS: MonitoringLinkUrls = {
