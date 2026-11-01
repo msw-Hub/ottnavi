@@ -163,7 +163,7 @@ class TracingPrivacyTest {
 			String body = waitForBody(10);
 
 			// then
-			assertThat(body).isNotEmpty();
+			assertThat(body).contains(TEMPLATE);   // 본문이 압축·인코딩되지 않고 읽히는 상태에서 부재를 확인한다
 			assertThat(body).doesNotContain("secret-query-word");
 			assertThat(body).doesNotContain("hong@example.com");
 			assertThat(body).doesNotContain("q=");
@@ -178,7 +178,7 @@ class TracingPrivacyTest {
 			String body = waitForBody(10);
 
 			// then
-			assertThat(body).isNotEmpty();
+			assertThat(body).contains(TEMPLATE);   // 본문이 압축·인코딩되지 않고 읽히는 상태에서 부재를 확인한다
 			assertThat(body).doesNotContain("203.0.113.77");
 			assertThat(body).doesNotContain("198.51.100.5");
 			assertThat(body).doesNotContain("SecretAgent");

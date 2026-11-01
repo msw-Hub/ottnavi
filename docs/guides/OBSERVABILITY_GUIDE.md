@@ -67,7 +67,7 @@ OTLP와 Loki4j는 고르는 관계가 아니라 **둘 다 쓰는 관계**다. OT
 
 - **접근 정책(access policy)**은 권한(scope)과 영역(realm)으로 이루어지고, 토큰은 정책에 속해 그 권한을 갖는다. 토큰은 서비스(지표·로그)에 묶이지 않고 **권한에 묶인다**.
 - 쓰기 권한 이름은 `metrics:write`, `logs:write`, `traces:write`(공식 문서)다.
-- **결정**: 정책 하나(이 스택만, `metrics:write`와 `logs:write`만)와 토큰 하나를 지표와 로그 양쪽에 쓴다. 쓰기 전용이라 최소 권한이고 비밀 값이 하나다.
+- **결정**: 정책 두 개(이 스택만)와 토큰 두 개를 쓴다. 지표·로그용은 정책 `ottnavi-write`(`metrics:write`, `logs:write`)와 토큰 `ottnavi-write-token`, 추적용은 정책 `ottnavi-traces-write`(`traces:write`)와 토큰 `ottnavi-traces-write-token`이다. 모두 쓰기 전용이라 최소 권한이고, 추적을 따로 둔 것은 추적 토큰만 따로 폐기·교체하기 위해서다.
 - **함정**: 각 카드의 "Generate now"는 쓰지 않는다. Loki 카드의 생성 창은 **읽기 전용 권한**(`logs:read` 등)을 주고, OpenTelemetry 카드의 창은 권한을 고를 수 없이 쓰기 권한을 한꺼번에(`alerts:write`, `rules:write` 포함) 준다.
 - 토큰에는 만료일(2027-10-18)이 있다(지표·로그용과 추적용 토큰 모두, 2026-11-01에 같은 날로 맞췄다). 만료되면 지표·로그·추적 전송이 조용히 멈춘다.
 
@@ -130,7 +130,7 @@ Loki는 **라벨 조합 하나가 스트림 하나**다. 라벨 값이 다양해
 | 예외 메시지·스택은 싣지 않는다 | 예외는 관측이 끝나기 전에 span에 기록돼 관측 필터로는 못 지운다. `SanitizingSpanExporter`가 **내보내기 직전** 이벤트(메시지·스택)를 비우고 상태 설명을 지운다. 예외 종류는 `exception` 값(클래스 단순 이름)으로 남는다 |
 | 추적 번호를 로그에 넣지 않는다 | `logging.expect-correlation-id=false`. Boot는 이 값을 추적 켜짐 여부에서 가져와 콘솔 로그에 `[traceId-spanId]`를 붙이므로 명시해서 막는다. Loki 메시지 패턴에는 원래 MDC가 없다 |
 
-한계: 이름 목록(차단 키)은 목록에 없는 새 키를 못 막는다. 대신 높은 카디널리티 전체 삭제가 기본 방어이고, 새 라이브러리 관측(예: JDBC)을 추가하면 어떤 키가 낮은 카디널리티로 나오는지 `TracingPrivacyTest`처럼 실제 전송 본문으로 확인해야 한다. `MDC`·사용자 id를 span에 넣는 코드는 없다(`src/main` 검색).
+한계: Redis(Lettuce) 구간의 `db.statement` 제거는 합성 값을 넣은 `TracingPrivacyFilterTest`로만 확인했고, 실제 Redis 호출이 만든 span의 전송 본문으로는 확인하지 못했다. 이름 목록(차단 키)은 목록에 없는 새 키를 못 막는다. 대신 높은 카디널리티 전체 삭제가 기본 방어이고, 새 라이브러리 관측(예: JDBC)을 추가하면 어떤 키가 낮은 카디널리티로 나오는지 `TracingPrivacyTest`처럼 실제 전송 본문으로 확인해야 한다. `MDC`·사용자 id를 span에 넣는 코드는 없다(`src/main` 검색).
 
 ## 5. 코드 흐름
 
@@ -197,7 +197,7 @@ Loki는 **라벨 조합 하나가 스트림 하나**다. 라벨 값이 다양해
 | `GRAFANA_OTLP_TRACES_ENDPOINT` | 없음 | 추적 전송 주소(`/v1/traces`로 끝나는 전체 URL). 켤 때 필수 |
 | `GRAFANA_OTLP_TRACES_AUTH` | 없음 | `Basic ...` 전체 문자열. 지표용 토큰에 `traces:write` 권한이 없을 수 있어 별도 변수로 받는다 |
 
-주의: `TRACING_ENABLED=true`인데 주소가 비어 있으면 **서버가 기동에 실패한다**(OTLP 내보내기 생성이 "Invalid endpoint"로 예외를 던짐, `TracingToggleTest`가 확인). 잘못된 설정을 바로 알리는 방향이지만 배포를 막는다. 추적을 켤 때는 주소·인증 변수를 먼저 넣는다. 추적 설정은 `observability` 프로필의 `application-observability.yml`에서 주소·인증을 읽으므로 `prod,observability`로 실행할 때만 의미가 있다. 이 프로필 없이 `TRACING_ENABLED=true`만 켜면 기동은 되지만 주소가 없어 내보내기가 만들어지지 않는다(`TracingToggleTest`가 확인). 즉 아무것도 전송하지 않는다.
+주의: `TRACING_ENABLED=true`인데 주소가 비어 있으면 **서버가 기동에 실패한다**(OTLP 내보내기 생성이 "Invalid endpoint"로 예외를 던짐, `TracingToggleTest`가 확인). 잘못된 설정을 바로 알리는 방향이지만 배포를 막는다. 추적을 켤 때는 주소·인증 변수를 먼저 넣는다. `TRACING_ENABLED`를 빈 문자열로 정의해도 기본값 false로 대체되지 않고 boolean 바인딩 오류로 서버가 기동에 실패한다(켜지지는 않는다, `TracingToggleTest`가 확인). 끌 때는 변수를 지우거나 `false`로 쓴다. 추적 설정은 `observability` 프로필의 `application-observability.yml`에서 주소·인증을 읽으므로 `prod,observability`로 실행할 때만 의미가 있다. 이 프로필 없이 `TRACING_ENABLED=true`만 켜면 기동은 되지만 주소가 없어 내보내기가 만들어지지 않는다(`TracingToggleTest`가 확인). 즉 아무것도 전송하지 않는다.
 
 켠 뒤 메모리 비교: 8-2절의 기준(기동 직후 약 496MiB, 2일 뒤 약 738MB)과 같은 경과 시간끼리 비교한다. 꺼진 채 이 코드를 배포해 RSS를 먼저 재고, `TRACING_ENABLED=true`로 재배포해 30분·24시간 뒤를 잰다. 중단 기준은 8-2와 같다(RSS +100MB 또는 컨테이너 사용률 85%).
 

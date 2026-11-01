@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * 추적(span)에 개인정보가 실리지 않게 관측 결과를 걸러내는 필터다.
  *
- * 예외 메시지·스택은 이 필터로 지울 수 없다(예외는 관측이 끝나기 전에 span에 기록된다). TracingSpanFilter가 내보내기 직전에 지운다.
+ * 예외 메시지·스택은 이 필터로 지울 수 없다(예외는 관측이 끝나기 전에 span에 기록된다). SanitizingSpanExporter가 내보내기 직전에 지운다.
  *
  * 규칙(2026-11-01 결정):
  * 1. 낮은 카디널리티 값(요청 방식 method, 경로 템플릿 uri, 응답 상태 status, 결과 outcome, 예외 종류)만 남기고

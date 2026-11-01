@@ -64,6 +64,16 @@ class TracingToggleTest {
 	}
 
 	@Test
+	void 스위치가_빈_문자열로_정의되면_켜지지_않고_기동이_실패해_잘못된_설정을_바로_알린다() {
+		// 빈 값은 기본값(false)으로 대체되지 않고 boolean 바인딩에서 실패한다. 조용히 켜지는 일은 없다
+		runner("TRACING_ENABLED=").run(context -> {
+			// then
+			assertThat(context).hasFailed();
+			assertThat(context.getStartupFailure()).hasStackTraceContaining("management.opentelemetry.enabled");
+		});
+	}
+
+	@Test
 	void observability_프로필이_없어도_기본은_꺼짐이다() {
 		runner("spring.profiles.active=local").run(context -> {
 			// then
