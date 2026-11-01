@@ -2,14 +2,15 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import {
   ContactEmailLink,
+  ExternalPolicyLink,
   PolicyList,
   PolicySection,
 } from '@/features/legal/components/PolicyParts'
+import { PrivacyProcessorTable } from '@/features/legal/components/PrivacyProcessorTable'
 import { PrivacyRevisionList } from '@/features/legal/components/PrivacyRevisionList'
 import {
   GA_RETENTION_NOTE,
   GRAFANA_LOG_RETENTION_NOTE,
-  GRAFANA_REGION_NOTE,
   PRIVACY_EFFECTIVE_DATE,
   PRIVACY_OPERATOR_NAME,
   PRIVACY_REVISIONS,
@@ -52,6 +53,20 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
           방침으로 알려 드립니다.
         </p>
       </header>
+
+      {/* 한눈에 보기(2026-11-02 추가): 긴 방침을 다 읽기 전에 "무엇을 저장하고 어디서 처리하며 어디로 묻는지"를 먼저 보이게 한다.
+          제목 계층은 h1→h2만 쓰는 화면이라 h2 절 번호와 섞이지 않게 굵은 문단으로 이름을 붙이고, 가는 선 상자로 본문과 나눈다 */}
+      <section
+        aria-label="한눈에 보기"
+        className="grid gap-1.5 rounded-md border border-border p-4"
+      >
+        <p className="font-semibold">한눈에 보기</p>
+        <p>
+          이 서비스는 Google 로그인으로 받은 이메일·이름, 이용자가 입력한 설정·찜·플랜만 저장합니다.
+          서비스 운영에 Supabase, Redis Cloud, Cloudtype, Vercel, Google, Grafana를 이용하며 일부는
+          해외에서 처리됩니다(6절). 문의는 9절의 연락처로 해 주세요.
+        </p>
+      </section>
 
       <PolicySection id="privacy-items" title="1. 처리하는 개인정보">
         <p>Google 계정으로 로그인할 때 Google에서 다음 정보를 받아 저장합니다.</p>
@@ -207,7 +222,8 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
 
       <PolicySection id="privacy-processors" title="6. 처리 위탁과 해외 이전">
         <p>서비스를 운영하기 위해 다음 업체의 서비스를 이용합니다.</p>
-        <PolicyList>
+        {/* 이전: 업체 이름과 용도만 적은 점 목록(Supabase·Redis Cloud·Cloudtype·Vercel·Google·Grafana Labs) — 법인·국가·처리 정보·목적을 담은 업체별 표로 바꿨다(2026-11-02) */}
+        {/* <PolicyList>
           <li>Supabase: 개인정보를 저장하는 데이터베이스(PostgreSQL)</li>
           <li>Redis Cloud: 로그인 유지 정보와 요청 제한 정보 보관</li>
           <li>Cloudtype: 서비스 서버 운영</li>
@@ -221,7 +237,24 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
             Grafana Labs(Grafana Cloud): 서비스 운영 상태를 보기 위한 지표(숫자)와 서버 로그 보관.
             서버 위치: {GRAFANA_REGION_NOTE}
           </li>
-        </PolicyList>
+        </PolicyList> */}
+        <PrivacyProcessorTable />
+        {/* 공통 사항은 표 바로 아래, 방문 통계 국외 이전 고지 위에 둔다("방문 통계는 아래 설정에 따름"의 "아래"가 그 고지를 가리킨다) */}
+        <p>
+          <span className="font-semibold">근거와 공통 사항:</span> 서비스 제공(계약 이행)을 위한
+          처리 위탁·보관은 개인정보 보호법 제28조의8 제1항 제3호 가목에 따라 이 방침에 공개합니다.
+          방문 통계는 별도 동의(제1호)를 받습니다. 이전 시기·방법: 서비스를 이용하는 동안 인터넷으로
+          전송됩니다. 보유·이용 기간: 회원 탈퇴 시 삭제(업체 백업은 업체 정책에 따름), 서버 로그
+          14일, 방문 통계는 아래 설정에 따름. 거부 방법·효과: 이전을 원하지 않으면 서비스를 이용하지
+          않거나 회원 탈퇴를 해야 하며, 방문 통계만 거부해도 이용에는 제한이 없습니다. 업체별
+          개인정보 문의는 각 업체의 공식 개인정보 안내(예:{' '}
+          <ExternalPolicyLink href="https://policies.google.com/privacy">Google</ExternalPolicyLink>
+          , <ExternalPolicyLink href="https://supabase.com/privacy">Supabase</ExternalPolicyLink>,{' '}
+          <ExternalPolicyLink href="https://vercel.com/legal/privacy-notice">
+            Vercel
+          </ExternalPolicyLink>
+          )를 보세요.
+        </p>
         <p>
           일부 서비스는 해외 서버를 거칠 수 있습니다. 작품과 제공처 정보는 TMDB(JustWatch 기반)에서
           가져오며, 이때 이용자의 개인정보는 TMDB로 보내지 않습니다.
@@ -280,8 +313,10 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
             에서 계정과 모든 정보를 직접 삭제할 수 있습니다.
           </li>
           <li>
-            그 밖에 열람, 정정, 삭제, 처리 정지를 원하면 <ContactEmailLink />로 연락해 주세요.
-            요청을 받으면 지체 없이 처리합니다.
+            그 밖에 열람, 정정, 삭제, 처리 정지를 원하면 <ContactEmailLink />로 연락해 주세요.{' '}
+            {/* 이전: "요청을 받으면 지체 없이 처리합니다." — 열람 10일·정정 등 결과 통지 10일의 처리 기한으로 바꿨다(2026-11-02) */}
+            열람 요구는 받은 날부터 10일 이내에 처리하고, 정정·삭제·처리 정지는 지체 없이 조치한 뒤
+            10일 이내에 결과를 알려 드립니다.
           </li>
           <li>대리인을 통해서도 같은 방법으로 요청할 수 있습니다.</li>
         </PolicyList>
@@ -299,7 +334,49 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
         </dl>
       </PolicySection>
 
-      <PolicySection id="privacy-changes" title="10. 방침의 변경">
+      {/* 10~12절(2026-11-02 추가): 안전성 확보 조치, 권익침해 구제방법, 만 14세 미만 아동 안내 */}
+      <PolicySection id="privacy-safety" title="10. 개인정보의 안전성 확보 조치">
+        <PolicyList>
+          <li>
+            개인정보를 다루는 사람은 운영자 1명이며, 관리자 기능은 운영자 계정(관리자 권한)만 쓸 수
+            있습니다. 평가용 계정은 조회만 할 수 있습니다.
+          </li>
+          <li>
+            비밀번호는 받거나 저장하지 않습니다(Google 로그인). 로그인 유지 정보는 원문이 아닌
+            해시로 저장합니다.
+          </li>
+          <li>
+            서비스 접속은 HTTPS, 데이터베이스 연결은 암호화합니다. 데이터베이스를 외부에서 직접
+            부르는 기능은 꺼 두었습니다.
+          </li>
+          <li>
+            요청 횟수 제한과 요청 출처 확인으로 비정상 접근을 막고, 서비스가 Grafana Cloud로 보내는
+            서버 로그에는 이메일·이름·접속 IP·토큰을 남기지 않습니다.{' '}
+            {/* 이전: "서버 로그에는 …"(2절의 호스팅 제공사 접속 기록에 IP가 남을 수 있다는 문구와 범위가 달라 Grafana로 보내는 로그로 좁혔다) */}
+          </li>
+          <li>키·토큰 같은 비밀 값은 소스 코드에 두지 않고 서버 환경 변수로만 보관합니다.</li>
+        </PolicyList>
+      </PolicySection>
+
+      {/* 기관명은 링크로 두지 않고 글자로만 쓴다(전화번호·주소도 글자). 오래 남는 문서라 외부 주소가 바뀌어도 깨진 링크가 생기지 않게 한다 */}
+      <PolicySection id="privacy-remedy" title="11. 권익침해 구제방법">
+        <p>
+          개인정보 침해에 대한 구제는 먼저 이 서비스(9절)로 문의해 주세요. 해결되지 않으면 개인정보
+          침해신고센터(국번 없이 118, privacy.kisa.or.kr), 개인정보 분쟁조정위원회(1833-6972,
+          kopico.go.kr), 경찰청 사이버범죄 신고(국번 없이 182)에 상담·신고할 수 있습니다.
+        </p>
+      </PolicySection>
+
+      <PolicySection id="privacy-children" title="12. 만 14세 미만 아동">
+        <p>
+          OTT내비는 만 14세 미만 아동을 대상으로 하는 서비스가 아닙니다. 이용자의 나이를 수집하거나
+          확인하지 않으므로, 만 14세 미만 아동은 회원가입(Google 로그인)과 방문 통계 동의를 하지
+          말아 주세요.
+        </p>
+      </PolicySection>
+
+      {/* 이전: "10. 방침의 변경" — 10~12절 추가로 13절이 됐다(id는 그대로) */}
+      <PolicySection id="privacy-changes" title="13. 방침의 변경">
         <p>
           이 방침이 바뀌면 시행 7일 전부터 이 화면에 바뀐 내용과 새 시행일을 알립니다. 지금 방침의
           시행일은 <span className="whitespace-nowrap">{effectiveDateText}</span>입니다.

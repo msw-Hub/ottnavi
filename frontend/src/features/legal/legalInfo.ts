@@ -12,7 +12,7 @@ export const TERMS_EFFECTIVE_DATE = '2026-10-27' // 이용약관 시행일(같�
 // 방침 변경 이력 한 건
 export interface PrivacyRevision {
   effectiveDate: string // 이 변경의 시행일(ISO 형식. <time dateTime>에 그대로 쓰고 화면에는 한국어 날짜로 바꿔 보인다)
-  summary: string // 무엇이 바뀌었는지 한두 문장(10절에 "시행일 변경: …" 형태로 보인다)
+  summary: string // 무엇이 바뀌었는지 한두 문장(13절 "방침의 변경"에 "시행일 변경: …" 형태로 보인다)
   previousPolicyPath?: string // 이 변경 "전" 방침 전문을 보는 화면 경로(예: /privacy/versions/2026-10-31). 없으면 링크를 보이지 않는다
 }
 
@@ -39,6 +39,11 @@ export const PRIVACY_REVISIONS: readonly PrivacyRevision[] = [
     effectiveDate: '2026-11-01',
     summary:
       '방문 통계 수집을 동의를 받은 경우에만 하도록 바꾸고, 동의 철회·변경 방법과 거부 시 6개월 뒤 다시 묻는다는 내용을 추가했습니다.',
+  },
+  {
+    effectiveDate: '2026-11-02',
+    summary:
+      '처리 위탁·해외 이전을 업체별 표로 정리하고, 안전성 확보 조치, 권익침해 구제방법, 만 14세 미만 아동 안내를 추가했으며 정보주체 권리 처리 기한을 밝혔습니다.',
   },
 ]
 
