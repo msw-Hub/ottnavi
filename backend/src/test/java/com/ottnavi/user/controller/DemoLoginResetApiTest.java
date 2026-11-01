@@ -12,11 +12,13 @@ import com.ottnavi.global.security.token.RefreshTokenStore;
 import com.ottnavi.support.IntegrationTestSupport;
 import jakarta.servlet.http.Cookie;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -49,6 +51,9 @@ class DemoLoginResetApiTest extends IntegrationTestSupport {
 
 	@Autowired
 	private JdbcTemplate jdbc;
+
+	@Autowired
+	private StringRedisTemplate redis; // RT 계열 키가 실제로 지워졌는지 직접 확인한다
 
 	@MockitoSpyBean
 	private RefreshTokenStore refreshTokenStore; // 진짜 Redis 저장소를 감싸서 일부 호출만 실패시킨다
@@ -141,6 +146,45 @@ class DemoLoginResetApiTest extends IntegrationTestSupport {
 		mockMvc.perform(post("/api/auth/refresh").header(HttpHeaders.ORIGIN, ORIGIN).cookie(new Cookie("rt", newRefreshToken)))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.role").value("DEMO"));
+	}
+
+	@Test
+	void 다시_로그인하면_이전_사용자의_Redis_RT_계열이_폐기된다() throws Exception {
+		// given: 첫 방문자의 RT 계열이 Redis에 있다
+		mockMvc.perform(login()).andExpect(status().isOk());
+		long oldUserId = demoUserIds().get(0);
+		Set<String> oldFamilyIds = redis.opsForSet().members("rt:user:" + oldUserId);
+		assertThat(oldFamilyIds).isNotEmpty();
+
+		// when
+		mockMvc.perform(login()).andExpect(status().isOk());
+
+		// then: 이전 사용자의 계열 목록과 계열 키가 모두 없다
+		assertThat(redis.hasKey("rt:user:" + oldUserId)).isFalse();
+		for (String familyId : oldFamilyIds) {
+			assertThat(redis.hasKey("rt:fam:" + familyId)).isFalse();
+		}
+	}
+
+	@Test
+	void 비밀번호가_틀리면_데모_행과_데이터가_지워지지_않는다() throws Exception {
+		// given: 데이터가 있는 데모 계정
+		mockMvc.perform(login()).andExpect(status().isOk());
+		long oldUserId = demoUserIds().get(0);
+		insertData(oldUserId);
+		String wrongBody = "{\"loginId\": \"" + LOGIN_ID + "\", \"password\": \"wrong-dummy-password-typed\"}";
+
+		// when & then
+		mockMvc.perform(post(URL).header(HttpHeaders.ORIGIN, ORIGIN).contentType(MediaType.APPLICATION_JSON).content(wrongBody))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.errorCode").value("DEMO_LOGIN_FAILED"));
+
+		// then: 같은 사용자 id의 행과 데이터, Redis 세션이 그대로다
+		assertThat(demoUserIds()).containsExactly(oldUserId);
+		assertThat(count("user_setting", "user_id", oldUserId)).isEqualTo(1);
+		assertThat(count("wishlist_item", "user_id", oldUserId)).isEqualTo(1);
+		assertThat(count("plan", "user_id", oldUserId)).isEqualTo(2);
+		assertThat(redis.hasKey("rt:user:" + oldUserId)).isTrue();
 	}
 
 	/** 설정·구독·찜·플랜 2개(ACTIVE, DRAFT)·알림 행을 넣는다 */
