@@ -89,7 +89,7 @@ export class ApiError extends Error {
   readonly detail: string | null // ProblemDetail의 detail(서버가 쓴 설명). 화면 문구로 쓰지 말고 userMessage를 쓴다
   readonly fieldErrors: FieldError[] // VALIDATION_FAILED일 때 필드별 오류. 없으면 빈 배열이라 바로 map해도 된다
   readonly userMessage: string // 화면에 보일 한국어 문장(errorMessages.ts 표에서 찾은 값)
-  // 다시 시도해도 되는 때까지 남은 초(응답의 Retry-After 헤더, 서버는 429에 싣는다). 헤더가 없거나 응답이 없으면 null.
+  // 다시 시도해도 되는 때까지 남은 초(응답의 Retry-After 헤더, 서버는 429와 503(AUTH_STORE_UNAVAILABLE)에 싣는다). 헤더가 없거나 응답이 없으면 null.
   // 화면이 "약 N분 뒤에 다시 시도"처럼 남은 시간을 안내할 때 쓴다(Task 109 데모 로그인)
   readonly retryAfterSeconds: number | null
   // 인터셉터가 이미 사용자에게 알렸는지(예: 429 토스트). true면 화면이 같은 내용을 또 띄우지 않는다.
@@ -177,7 +177,7 @@ function readContentType(headers: unknown): string {
   return typeof value === 'string' ? value.toLowerCase() : ''
 }
 
-// 응답 헤더에서 Retry-After(초)를 읽는다. 서버는 429에 정수 초로 싣는다(error-codes.md RATE_LIMIT_EXCEEDED).
+// 응답 헤더에서 Retry-After(초)를 읽는다. 서버는 429와 503(AUTH_STORE_UNAVAILABLE)에 정수 초로 싣는다(error-codes.md RATE_LIMIT_EXCEEDED, AUTH_STORE_UNAVAILABLE).
 // HTTP 날짜 형식이나 음수·소수처럼 초로 읽을 수 없는 값은 null로 두고, 화면은 기본 안내 문장을 쓴다
 function readRetryAfterSeconds(headers: unknown): number | null {
   if (!isRecord(headers)) return null

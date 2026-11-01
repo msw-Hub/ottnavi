@@ -2,6 +2,7 @@ package com.ottnavi.user.service;
 
 import com.ottnavi.global.error.ResourceNotFoundException;
 import com.ottnavi.global.ratelimit.DemoLoginRateLimiter;
+import com.ottnavi.global.security.token.RefreshTokenStore;
 import com.ottnavi.user.exception.DemoLoginFailedException;
 import com.ottnavi.user.service.model.LoginUser;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +22,12 @@ import org.springframework.stereotype.Service;
  * 설정이 비어 있음(꺼짐)           → 404 RESOURCE_NOT_FOUND(경로가 없는 것처럼 보인다)
  * 같은 IP의 시도가 15분 5회를 넘음 → 429 RATE_LIMIT_EXCEEDED
  * 아이디나 비밀번호가 틀림          → 401 DEMO_LOGIN_FAILED(어느 쪽이 틀렸는지 알리지 않는다)
- * 둘 다 맞음                       → 데모 계정 행(없으면 생성)의 LoginUser
+ * 둘 다 맞음                       → 이전 데모 데이터를 비우고 새 데모 계정 행의 LoginUser
  * </pre>
+ *
+ * 데모 계정은 모든 방문자가 한 행을 같이 쓰므로, 로그인할 때마다 이전 방문자의 데이터를 지우고 새로 시작한다.
+ * 순서: 기존 행이 있으면 ① Redis에서 그 사용자의 Refresh Token 계열을 폐기(실패하면 503으로 끝나고 DB는 그대로)
+ * → ② 행 삭제(UserDemoResetWriter, 하위 데이터는 FK CASCADE) → ③ 새 행 생성. 사용자 id는 로그인마다 새로 발급된다.
  *
  * Origin 검사(403)는 컨트롤러가 꺼짐 확인 뒤, 이 서비스의 login 앞에서 한다.
  * 입력한 아이디·비밀번호는 어떤 로그에도 남기지 않는다. 트랜잭션은 UserLoginService가 맡고 이 클래스는 트랜잭션 밖이다
@@ -34,12 +39,17 @@ public class DemoLoginService {
 
 	private final DemoLoginProperties properties;
 	private final UserLoginService userLoginService;
+	private final UserDemoResetWriter userDemoResetWriter; // 데모 행 삭제 트랜잭션(다른 빈이라야 @Transactional이 적용된다)
+	private final RefreshTokenStore refreshTokenStore;     // 이전 데모 세션의 Refresh Token 계열 폐기용
 	private final ObjectProvider<DemoLoginRateLimiter> rateLimiterProvider; // 요청 제한을 끈 설정(테스트)에서는 빈이 없다
 
 	public DemoLoginService(DemoLoginProperties properties, UserLoginService userLoginService,
+			UserDemoResetWriter userDemoResetWriter, RefreshTokenStore refreshTokenStore,
 			ObjectProvider<DemoLoginRateLimiter> rateLimiterProvider) {
 		this.properties = properties;
 		this.userLoginService = userLoginService;
+		this.userDemoResetWriter = userDemoResetWriter;
+		this.refreshTokenStore = refreshTokenStore;
 		this.rateLimiterProvider = rateLimiterProvider;
 	}
 
@@ -75,7 +85,14 @@ public class DemoLoginService {
 			throw new DemoLoginFailedException("아이디 또는 비밀번호가 올바르지 않습니다.");
 		}
 
-		// 4. 데모 계정 행을 찾거나 만든다. 동시 첫 로그인으로 유니크 위반이 나면 먼저 만든 행을 다시 읽는다
+		// 4. 이전 방문자의 데모 데이터를 비운다. 세션을 먼저 끊고(Redis 실패 시 503으로 끝나 DB는 그대로) 그다음 행을 지운다
+		Optional<LoginUser> previous = userLoginService.findDemo();
+		if (previous.isPresent()) {
+			refreshTokenStore.revokeAllOf(previous.get().userId());
+			userDemoResetWriter.deleteDemoUser(previous.get().userId());
+		}
+
+		// 5. 데모 계정 행을 새로 만든다. 동시 로그인으로 유니크 위반이 나면 먼저 만든 행을 다시 읽는다
 		LoginUser loginUser;
 		try {
 			loginUser = userLoginService.findOrCreateDemo();

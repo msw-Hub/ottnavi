@@ -147,6 +147,73 @@ describe('로그아웃', () => {
       role: null,
     })
   })
+  // 서버가 토큰을 폐기하지 못했는데(503) 로컬만 지우면 새로고침 때 쿠키로 로그인이 되살아난다. 그래서 상태를 유지한다
+  it('서버 로그아웃이 503이면 로그인 상태를 유지하고 이동하지 않고 안내를 보인다', async () => {
+    const user = userEvent.setup()
+    server.use(
+      mswHttp.post('/api/auth/logout', () =>
+        HttpResponse.json(
+          {
+            title: 'Service Unavailable',
+            status: 503,
+            detail: '일시적인 문제로 처리하지 못했습니다.',
+            instance: '/api/auth/logout',
+            errorCode: 'AUTH_STORE_UNAVAILABLE',
+          },
+          {
+            status: 503,
+            headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '5' },
+          },
+        ),
+      ),
+    )
+    useAuthStore.getState().setSession('t', 'USER')
+    const router = renderAt('/probe')
+
+    await user.click(await screen.findByRole('button', { name: '로그아웃' }))
+
+    expect(
+      await screen.findByText(
+        '일시적인 문제로 로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      ),
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/probe')
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'authenticated',
+      accessToken: 't',
+      role: 'USER',
+    })
+  })
+
+  it('서버 로그아웃이 500이면 지금처럼 이 기기에서는 로그아웃하고 첫 화면으로 간다', async () => {
+    const user = userEvent.setup()
+    server.use(
+      mswHttp.post('/api/auth/logout', () =>
+        HttpResponse.json(
+          {
+            title: 'Internal Server Error',
+            status: 500,
+            detail: '오류',
+            instance: '/api/auth/logout',
+            errorCode: 'INTERNAL_ERROR',
+          },
+          { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    useAuthStore.getState().setSession('t', 'USER')
+    const router = renderAt('/probe')
+
+    await user.click(await screen.findByRole('button', { name: '로그아웃' }))
+
+    expect(await screen.findByRole('heading', { name: '첫 화면' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/')
+    expect(useAuthStore.getState()).toMatchObject({
+      status: 'guest',
+      accessToken: null,
+      role: null,
+    })
+  })
 })
 
 describe('RequireAdmin', () => {
