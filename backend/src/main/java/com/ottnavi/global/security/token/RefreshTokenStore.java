@@ -3,7 +3,7 @@ package com.ottnavi.global.security.token;
 /**
  * Refresh Token 서버 측 저장소(TECH 4절, R11-21). 토큰은 `{familyId}.{secret}` 형식이고 서버에는 해시만 둔다.
  * 구현은 Redis이며, 나중에 PostgreSQL 구현으로 바꿀 수 있게 인터페이스로 둔다.
- * 저장소 오류(Redis 장애)는 잡지 않고 예외로 올린다(fail-closed).
+ * 저장소 오류(Redis 장애)는 인증 성공으로 보지 않고(fail-closed) AuthStoreUnavailableException으로 올려 503으로 응답한다.
  */
 public interface RefreshTokenStore {
 

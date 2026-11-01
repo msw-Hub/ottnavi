@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 /**
  * Access Token 재발급과 로그아웃(TECH 4절), 데모 로그인 직후의 토큰 발급. 쿠키를 쓰는 경로라 Origin을 먼저 검사한다.
  * Redis 호출은 트랜잭션 밖이고, DB 조회는 UserLoginService가 읽기 트랜잭션으로 맡는다.
- * Redis 장애는 잡지 않고 올려 500으로 응답한다(fail-closed, 401로 오해하지 않게).
+ * Redis 장애는 저장소가 AuthStoreUnavailableException으로 바꿔 올리고 503으로 응답한다(fail-closed, 401로 오해하지 않게).
  * 토큰 원문·familyId는 로그에 남기지 않는다.
  */
 @Slf4j

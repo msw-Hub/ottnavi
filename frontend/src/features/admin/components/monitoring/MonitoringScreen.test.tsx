@@ -50,7 +50,7 @@ describe('모니터링 바로가기 주소', () => {
     }
   })
 
-  it('연결된 바깥 도구는 새 탭 링크이고 알림 규칙만 준비 중이다', async () => {
+  it('연결된 바깥 도구(대시보드·로그 탐색·알림 규칙·Cloudtype)는 새 탭 링크다', async () => {
     window.history.pushState({}, '', '/')
     render(
       <Providers>
@@ -74,7 +74,10 @@ describe('모니터링 바로가기 주소', () => {
       'href',
       expect.stringContaining('app.cloudtype.io'),
     )
-    expect(screen.getByRole('button', { name: 'Grafana 알림 규칙 준비 중' })).toBeDisabled()
+    expect(screen.getByRole('link', { name: /Grafana 알림 규칙 열기/ })).toHaveAttribute(
+      'href',
+      expect.stringContaining('ottnavi.grafana.net/alerting/list'),
+    )
   })
 })
 

@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -218,6 +219,37 @@ describe('데모 계정 로그인 화면', () => {
     expect(refreshRequestCount).toBe(0)
     expect(demoLoginRequestCount).toBe(1)
     expect(useAuthStore.getState().accessToken).toBe('old-token') // 로그인 상태도 그대로다
+  })
+
+  it('503(인증 저장소 장애)이면 일반 오류 문장이 보이고 폼은 그대로 남는다', async () => {
+    // 목업 시나리오에 503이 없어 이 테스트에서만 핸들러를 덮어쓴다(계약: 503 + AUTH_STORE_UNAVAILABLE + Retry-After: 5)
+    server.use(
+      http.post('/api/auth/demo-login', () =>
+        HttpResponse.json(
+          {
+            title: 'Service Unavailable',
+            status: 503,
+            detail: '일시적인 문제로 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+            instance: '/api/auth/demo-login',
+            errorCode: 'AUTH_STORE_UNAVAILABLE',
+          },
+          {
+            status: 503,
+            headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '5' },
+          },
+        ),
+      ),
+    )
+    const user = userEvent.setup()
+    renderLogin()
+
+    await submitDemoLogin(user)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '잠시 문제가 생겨 로그인하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    )
+    expect(screen.getByRole('form', { name: '데모 계정 로그인' })).toBeInTheDocument()
+    expect(getMockRole()).toBe('GUEST')
   })
 
   it('404(데모 로그인 꺼짐)면 폼 대신 사용할 수 없다는 안내가 보인다', async () => {

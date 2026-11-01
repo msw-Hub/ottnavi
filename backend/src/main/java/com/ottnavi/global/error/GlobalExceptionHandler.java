@@ -76,6 +76,20 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 				.body(problem);
 	}
 
+	/**
+	 * 인증 저장소(Redis) 장애를 503 AUTH_STORE_UNAVAILABLE로 응답하고 Retry-After: 5 헤더를 붙인다.
+	 * 화면이 잠시 뒤 다시 시도하도록 알리는 응답이다. 장애 중 요청마다 스택이 쌓이지 않게,
+	 * 로그는 저장소 구현이 남기는 warn 한 줄로 갈음하고 여기서는 남기지 않는다.
+	 */
+	@ExceptionHandler(AuthStoreUnavailableException.class)
+	public ResponseEntity<ProblemDetail> handleAuthStoreUnavailable(AuthStoreUnavailableException ex) {
+		ErrorCode errorCode = ex.getErrorCode();
+		ProblemDetail problem = problemDetail(errorCode.getStatus(), errorCode, errorCode.getMessage());
+		return ResponseEntity.status(errorCode.getStatus())
+				.header(HttpHeaders.RETRY_AFTER, String.valueOf(AuthStoreUnavailableException.RETRY_AFTER_SECONDS))
+				.body(problem);
+	}
+
 	/** 필드를 지정한 검증 실패를 400 VALIDATION_FAILED와 fieldErrors 한 건으로 응답한다 */
 	@ExceptionHandler(FieldValidationException.class)
 	public ProblemDetail handleFieldValidationException(FieldValidationException ex, HttpServletRequest request) {

@@ -83,7 +83,8 @@ export function WithdrawScreen({
             <InfoIcon aria-hidden="true" />
             <AlertTitle>데모 계정은 탈퇴할 수 없어요</AlertTitle>
             <AlertDescription className="break-keep text-info">
-              여러 방문자가 함께 쓰는 공용 계정이라, 계정과 데이터가 지워지지 않도록 막아 두었어요.
+              여러 방문자가 함께 쓰는 공용 계정이라 탈퇴할 수 없어요. 이 계정의 내용은 로그인할
+              때마다 초기화돼요.
             </AlertDescription>
           </Alert>
         )}

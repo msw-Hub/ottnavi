@@ -73,7 +73,7 @@ public class AuthController {
 		// 1. 꺼져 있으면 경로가 없는 것처럼 404, 그다음 Origin 검사(로그인 CSRF 방지)
 		demoLoginService.verifyEnabled();
 		authTokenService.verifyOrigin(origin);
-		// 2. 한도·아이디·비밀번호를 확인하고 데모 계정 행을 찾거나 만든다(DB 트랜잭션은 이 안에서 끝난다)
+		// 2. 한도·아이디·비밀번호를 확인하고 이전 데모 데이터를 지운 뒤 새 데모 계정 행을 만든다(DB 트랜잭션은 이 안에서 끝난다)
 		LoginUser loginUser = demoLoginService.login(body.loginId(), body.password(), request.getRemoteAddr());
 		// 3. 트랜잭션 밖에서 토큰을 발급하고 Refresh Token을 쿠키로 심는다
 		TokenIssue issue = authTokenService.issueForLogin(loginUser);

@@ -85,7 +85,8 @@ interface DemoLoginSectionProps {
  * 로그인 화면(SCR-06)의 "데모 계정으로 로그인" 구역이다(Task 109).
  *
  * 데모 계정은 Google 계정 없이 서비스를 둘러보도록 여러 방문자가 함께 쓰는 공용 계정이다. 아이디·비밀번호는 제출 문서로만 전달하고
- * 화면에는 적지 않는다. 일반 방문자가 회원가입 폼으로 오해하지 않도록 평소에는 접어 두고, /login?demo=1일 때만 펼쳐서 보인다(사용자 결정 Q1).
+ * 화면에는 적지 않는다. 데모 로그인이 성공할 때마다 서버가 이전 방문자의 찜·설정·플랜을 모두 지우고 처음 상태로 시작하므로(로그인마다 초기화),
+ * 안내 상자에 이 사실과 "동시에 쓰면 내 내용이 사라질 수 있음"을 적는다. 일반 방문자가 회원가입 폼으로 오해하지 않도록 평소에는 접어 두고, /login?demo=1일 때만 펼쳐서 보인다(사용자 결정 Q1).
  *
  * 상태별 표시(UI 1차안):
  * - 빈 칸: 요청을 보내지 않고 칸 아래에 안내, 첫 빈 칸으로 포커스(React Hook Form의 검증·포커스 기능을 쓴다)
@@ -240,7 +241,7 @@ export function DemoLoginSection({ from, isInitiallyOpen }: DemoLoginSectionProp
               aria-busy={login.isPending}
               className="grid gap-4 rounded-xl border border-border bg-card p-4"
             >
-              {/* 안내 상자. 공용 계정이라 생기는 일(공유·초기화·막힌 기능)을 먼저 알린다. 비밀번호 값은 적지 않는다 */}
+              {/* 안내 상자. 공용 계정이라 생기는 일(로그인마다 초기화·막힌 기능)을 먼저 알린다. 비밀번호 값은 적지 않는다 */}
               <div className="flex gap-2.5 rounded-lg border border-info bg-info-bg px-3 py-2.5 text-sm text-info">
                 <InfoIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 <div className="grid gap-1.5">
@@ -250,8 +251,12 @@ export function DemoLoginSection({ from, isInitiallyOpen }: DemoLoginSectionProp
                   <ul className="grid list-disc gap-1 pl-5 break-keep">
                     <li>아이디와 비밀번호는 제출 문서에 적혀 있어요.</li>
                     <li>
-                      여러 방문자가 함께 쓰는 계정이라 찜·설정·플랜이 다른 사람과 공유되고, 언제든
-                      초기화될 수 있어요. 개인 정보는 입력하지 마세요.
+                      {/* 이전 문구(로그인마다 초기화로 서버 동작이 바뀌어 교체):
+                          여러 방문자가 함께 쓰는 계정이라 찜·설정·플랜이 다른 사람과 공유되고, 언제든
+                          초기화될 수 있어요. 개인 정보는 입력하지 마세요. */}
+                      여러 방문자가 함께 쓰는 계정이에요. 로그인할 때마다 이전에 담아 둔
+                      찜·설정·플랜이 모두 지워지고 처음 상태로 시작해요. 다른 사람이 동시에 쓰면 내
+                      내용이 사라질 수 있어요. 개인 정보는 입력하지 마세요.
                     </li>
                     <li>
                       관리자 화면은 조회만 할 수 있고, 회원 탈퇴와 알림 설정 변경은 할 수 없어요.
