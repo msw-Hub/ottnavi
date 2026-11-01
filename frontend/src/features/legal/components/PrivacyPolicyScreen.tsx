@@ -5,13 +5,14 @@ import {
   PolicyList,
   PolicySection,
 } from '@/features/legal/components/PolicyParts'
+import { PrivacyRevisionList } from '@/features/legal/components/PrivacyRevisionList'
 import {
   GA_RETENTION_NOTE,
   GRAFANA_LOG_RETENTION_NOTE,
   GRAFANA_REGION_NOTE,
   PRIVACY_EFFECTIVE_DATE,
   PRIVACY_OPERATOR_NAME,
-  PRIVACY_PREVIOUS_EFFECTIVE_DATE,
+  PRIVACY_REVISIONS,
 } from '@/features/legal/legalInfo'
 import { formatDate } from '@/lib/format'
 
@@ -34,10 +35,8 @@ interface PrivacyPolicyScreenProps {
 }
 
 export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScreenProps) {
-  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE // "2026년 10월 31일"
-  // 변경 이력 첫 줄(알림 메일 변경)에 쓰는 바로 앞 방침의 시행일
-  const previousDateText =
-    formatDate(PRIVACY_PREVIOUS_EFFECTIVE_DATE) ?? PRIVACY_PREVIOUS_EFFECTIVE_DATE
+  // 지금 시행일(변경 이력의 맨 뒤 항목에서 나온다). 예: "2026년 11월 1일"
+  const effectiveDateText = formatDate(PRIVACY_EFFECTIVE_DATE) ?? PRIVACY_EFFECTIVE_DATE
 
   return (
     <article className="mx-auto grid max-w-3xl gap-6 text-[0.9375rem] leading-7 break-keep">
@@ -305,20 +304,8 @@ export function PrivacyPolicyScreen({ analyticsSettingsSlot }: PrivacyPolicyScre
           이 방침이 바뀌면 시행 7일 전부터 이 화면에 바뀐 내용과 새 시행일을 알립니다. 지금 방침의
           시행일은 <span className="whitespace-nowrap">{effectiveDateText}</span>입니다.
         </p>
-        <p>
-          <span className="whitespace-nowrap">{previousDateText}</span> 변경: 알림 메일 제공에 맞춰
-          알림 메일의 이용 목적과 기록, 처리 위탁 내용을 추가하고 고쳤습니다.
-        </p>
-        <p>
-          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계(Google
-          Analytics)와 서버 로그 보관(Grafana Cloud)을 추가했습니다.
-        </p>
-        {/* 시행일은 아직 확정 전이라 상수(PRIVACY_EFFECTIVE_DATE)를 따른다. 배포일이 다르면 사용자 결정에 따라 legalInfo.ts에서 고친다 */}
-        <p>
-          <span className="whitespace-nowrap">{effectiveDateText}</span> 변경: 방문 통계 수집을
-          동의를 받은 경우에만 하도록 바꾸고, 동의 철회·변경 방법과 거부 시 6개월 뒤 다시 묻는다는
-          내용을 추가했습니다.
-        </p>
+        {/* 변경 이력은 legalInfo.ts의 PRIVACY_REVISIONS 목록에서 그린다. 방침을 바꿀 때는 그 목록 맨 뒤에 항목만 더한다 */}
+        <PrivacyRevisionList revisions={PRIVACY_REVISIONS} />
         <p>
           서비스 이용에 관한 약속은{' '}
           <Link to="/terms" className="text-primary underline underline-offset-3">
