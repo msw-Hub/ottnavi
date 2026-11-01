@@ -43,21 +43,27 @@ describe('개인정보처리방침 화면', () => {
     expect(router.state.location.pathname).toBe('/privacy')
 
     // 2. 시행일(한국어 날짜)과 운영자·연락처
-    expect(screen.getByText('2026년 10월 31일', { selector: 'time' })).toHaveAttribute(
+    // 현재 시행일은 변경 이력(PRIVACY_REVISIONS)의 맨 뒤 항목 날짜다
+    expect(screen.getByText('2026년 11월 1일', { selector: 'time' })).toHaveAttribute(
       'dateTime',
-      '2026-10-31',
+      '2026-11-01',
     )
 
-    // 2-0. 변경 이력 두 줄의 날짜: 알림 메일 변경은 이전 시행일(10/30), 방문 통계 변경은 현재 시행일(10/31)이다.
+    // 2-0. 변경 이력 세 줄: 알림 메일 변경(10/30), 방문 통계·서버 로그 보관 추가(10/31), 동의 방식 변경(현재 시행일 11/1).
+    //      각 줄의 날짜는 그 변경의 날짜로 고정되어 있어야 한다(시행일이 바뀌어도 앞 줄이 따라 바뀌면 안 된다).
     //      자리표시자가 화면에 남지 않았는지도 함께 확인한다(배포 전 빈 값이 노출되는 사고 방지)
-    expect(screen.getByText('2026년 10월 30일')).toBeInTheDocument()
     expect(screen.getByText(/변경: 알림 메일 제공에 맞춰/).textContent).toContain(
       '2026년 10월 30일',
     )
     expect(screen.getByText(/변경: 방문\s*통계\(Google Analytics\)/).textContent).toContain(
       '2026년 10월 31일',
     )
+    expect(screen.getByText(/변경: 방문 통계 수집을\s*동의를 받은 경우에만/).textContent).toContain(
+      '2026년 11월 1일',
+    )
     expect(screen.queryByText(/시행일 확정 필요/)).not.toBeInTheDocument()
+    // 지금은 이전 방침 전문을 두지 않아 "이전 방침 보기" 링크가 없다
+    expect(screen.queryByRole('link', { name: '이전 방침 보기' })).not.toBeInTheDocument()
     expect(screen.getByText(/문선우/)).toBeInTheDocument()
 
     // 2-1. 알림 메일 제공에 맞춘 문구: 예전의 "아직 보내지 않습니다" 문구는 없고, 직접 켠 경우에만 보낸다는 안내가 있다
@@ -80,6 +86,15 @@ describe('개인정보처리방침 화면', () => {
     expect(screen.getByText(/방문 통계 쿠키\(Google Analytics\)/)).toBeInTheDocument()
     expect(screen.getByText(/Grafana Cloud\(Grafana Labs\)에 보관합니다/)).toBeInTheDocument()
     expect(screen.getByText(/Grafana Labs\(Grafana Cloud\): 서비스 운영 상태/)).toBeInTheDocument()
+
+    // 2-3. 동의 방식 문구: 동의를 받은 경우에만 수집, 거부해도 제한 없음, 6개월 뒤 다시 묻기, 변경 이력 한 줄
+    expect(screen.getByText(/방문 통계 수집에 동의한 경우에만 수집합니다/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/거부하거나 동의를 철회하면 그 시점부터 6개월 뒤에 한 번 다시 여쭙니다/),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/변경: 방문 통계 수집을\s*동의를 받은 경우에만/)).toBeInTheDocument()
+    // 목업(측정 ID 없음)에서는 설정 카드가 없다
+    expect(screen.queryByRole('heading', { name: '방문 통계 설정' })).not.toBeInTheDocument()
 
     // 3. 주요 구역 제목
     for (const name of [

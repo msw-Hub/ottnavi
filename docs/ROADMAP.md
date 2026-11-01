@@ -1316,8 +1316,9 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - 매일 수집이 돌아야 하므로 실제 운영 적재는 Task 093(cron 활성화)에 의존한다.
 - 결과(2026-10-18, 브랜치 `feature/b9-home-explore`, PR #84로 병합): 공개 조회 6개(`GET /api/public/popularity-rankings`·`wishlisted-titles`·`newly-available-titles`·`genres`·`genres/{genreId}/titles`·`people/titles`)와 관리자 `POST /api/admin/popularity/executions`(202·409, 배치 토큰 허용)를 구현했다. 인기 수집 Job(`popularityJob`, Step 2개: 수집 → 14일 지난 스냅샷 삭제, 같은 날 재실행은 교체라 멱등)은 수집·재계산·정리와 서로 409로 막는다. 워크플로 `popularity.yml`은 `workflow_dispatch`만 켜 있고 schedule은 주석이다(Task 093에서 켠다).
   - 결정(2026-10-18 사용자, 11절 39번): 새로 볼 수 있게 된 작품 = 입고(최근 14일 안에 없음·모름 → 있음) 또는 공개(첫 적재라도 공개일 30일 이내, 공개일 모르면 제외), 같은 작품·서비스는 최근 한 건. 찜 많은 작품 = 작품 단위 사용자 수·"다 봤음" 제외·3명 미만 제외·빈 목록이면 프론트가 줄을 숨김. 인기 7일 평균 = 스냅샷이 있는 날 수로 나누고 없던 날은 0. 장르·인물 탐색은 우리 DB만(인물은 이름 완전 일치, 대소문자 무시). 기준 수치는 `app.home.*`·`app.popularity.*` 설정값, 평균 규칙은 `PopularityRankingRules` 한 곳이다.
-  - 응답 캐시(2026-10-18 사용자 결정, 같은 브랜치): 공개 조회 5개를 Redis(`homePopularity` 60분·`homeNewArrivals` 30분·`homeWishlisted` 10분·`homeGenres` 24시간·`homeGenreTitles` 30분, `app.home.cache.*`)에 캐시하고 브라우저에 `Cache-Control: public, max-age=60`을 준다. 출연자별 작품은 캐시하지 않는다. 수집·정리 Job 종료 때 5개 모두, 인기 수집 Job 종료 때 인기 순위를 비운다. 상세는 TECH 3절.
+  - 응답 캐시(2026-10-18 사용자 결정, 같은 브랜치): 공개 조회 5개를 Redis(`homePopularity` 60분·`homeNewArrivals` 30분·`homeWishlisted` 10분·`homeGenres` 24시간·`homeGenreTitles` 30분, `app.home.cache.*`)에 캐시하고 브라우저에 `Cache-Control: public, max-age=60`을 준다. 출연자별 작품은 캐시하지 않는다. 수집·정리 Job 종료 때 5개 모두, 인기 수집 Job 종료 때도 5개 모두 비운다(2026-11-01 상세 채우기 Step 추가 이후, 그 전에는 인기 순위만). 상세는 TECH 3절.
   - 넘길 내용: Task 108(프론트 연결)이 목업과 계약의 차이 6가지를 반영한다(HANDOFF 참고). 순위에는 우리 DB에 없는 작품이 나올 수 있다(`availabilities`가 빈 배열). 구독형(flatrate)만 쓴다.
+  - 후속 기록(2026-11-01, 브랜치 `feature/fix-cold-start-popular-detail`, 새 Task 번호 없음): ① 기동 직후 Redis 연결 예열(`RedisWarmUp`, 실패 시 30초 뒤 1회 재시도, 원인 분석은 `docs/guides/TROUBLESHOOTING_REDIS_COLD_START.md`). ② 인기 수집 Job에 상세 채우기 Step(`popularityDetailFillStep`)을 추가해 Step 3개(수집 → 상세 채우기 → 스냅샷 삭제)가 됐다: 순위 16개(기간 2 × 전체+서비스 7곳) 각 상위 20위 중 `title`에 없는 작품만 최대 20작품(`app.popularity.fill.*`) TMDB에서 받아 작품 하나당 한 트랜잭션으로 저장한다(요청 때 즉시 수집하는 단건 수집은 여전히 이월). ③ 인기 수집 Job 종료 때 홈 캐시 5개를 모두 비운다. 배포는 `main` 묶음 때 한다.
 
 #### Task 108: 홈·탐색 실제 API 연결로 첫 화면 완성 ✅ `[v0.1.0 포함]`
 - 태그: [F] · PRD: FR-22, FR-23, SCR-19~21 · 선행: 107, 106 · 브랜치(제안): `feature/f-home-api`
@@ -1690,12 +1691,15 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
   - V-H: 생성일, 무료 한도, 보관 위치(값 제외)를 기록했다.
 - 진행(2026-10-31): 계정·스택(보관 위치 일본)과 쓰기 토큰 하나(`metrics:write`·`logs:write`, 만료 2027-10-15)를 만들었다. 환경 변수 5개는 켜는 시점(배포 뒤 방침 시행일 이후)에 Cloudtype에 등록한다. 무료 한도는 가입 후 14일 체험이 끝나면 적용되고 실측은 켠 뒤에 한다.
 
-#### Task 097: 관리자 모니터링 화면 목업 구현으로 표시 범위 확정 ⬜ `[3단계 이월]`
+#### Task 097: 관리자 모니터링 화면 목업 구현으로 표시 범위 확정 ✅ `[3단계 이월]`
 - 태그: [F] · PRD: Q1, FR-20, SCR-17 · 선행: 095, 037 · 기한 전제: R11-16(2026-11-19) · 브랜치: `feature/q1-monitoring-mock`
 - 구현 사항
-  - [ ] R11-16 결정 범위(추천안: Grafana Cloud 링크와 수집 실행 요약)로 목업. 새 API가 필요하면 계약 변경안 기록·승인
+  - [x] R11-16 결정 범위(추천안: Grafana Cloud 링크와 수집 실행 요약)로 목업. 새 API가 필요하면 계약 변경안 기록·승인 (새 API 없음. 사용자 결정 2026-10-31: 수집 탭과 겹치는 수집 실행 요약은 빼고 Grafana 링크 카드만 둔다)
 - 완료 기준
-  - V-F: 목업 흐름 재현, 콘솔 에러 0건.
+  - [x] V-F: 목업 흐름 재현, 콘솔 에러 0건.
+- 진행(2026-10-31): 목업 화면 완료(`features/admin/components/monitoring/`: "무엇을 어디서 보나" 바로가기 카드 하나(Grafana 지표·로그·알림 규칙, Cloudtype 콘솔, 수집 탭), 수집 실행 요약은 수집 탭과 겹쳐 뺐고 `CollectRunSummary.tsx`는 보류로 남김. 주소는 `grafanaLink.ts`의 `GRAFANA_DASHBOARD_URL`이며 빈 문자열이면 비활성 "준비 중"). 관리자·데모 계정, 데스크톱·375px 확인, 단위 테스트 추가. 실제 연결은 099 대기(098 선행).
+- 진행(2026-11-01, 범위 확장): 사용자 결정으로 운영 현황 카드 3개를 더한다(PR-1: 회원 현황 `GET /api/admin/user-stats` 백엔드 구현·계약, 알림 메일 발송 카드는 기존 `GET /api/admin/notifications/summary` 재사용, 동의한 방문자 수 `GET /api/admin/visitor-stats`는 계약(`x-planned`)과 화면 목업만. PR-2: Google Analytics Data API REST 호출(서비스 계정 토큰, OpenFeign), Redis 15분 캐시, 환경 변수 `GA_PROPERTY_ID`·`GA_CREDENTIALS_BASE64`, 배포는 24시간 메모리 측정 뒤). 이에 따라 Task 099의 "새 API 없음" 전제는 바뀌었다. 설계는 opus 설계 승인본.
+- 진행(2026-11-01, PR-2 서버 구현 완료, PR #128, 브랜치 `feature/q1-visitor-stats`): `GET /api/admin/visitor-stats`를 구현했다(`infra/analytics`의 `GaDataClient`가 날짜 범위 4개를 요청 한 번에 읽고, `AdminVisitorStatsService`가 Redis `visitorStats`에 15분 캐시, 연동 설정이 없으면 DISABLED·조회 실패는 200 + UNAVAILABLE이며 실패는 캐시하지 않는다). 계약의 `x-planned`를 지웠고 operation 63개 모두 구현이다. 환경 변수 `GA_PROPERTY_ID`·`GA_CREDENTIALS_BASE64`는 둘 다 비우면 꺼지고 하나만 있으면 기동이 실패한다. 실제 구글 호출은 아직 확인하지 않았다(서비스 계정과 GA 속성 뷰어 권한은 2026-11-01 사용자가 준비했고 키는 비밀번호 관리자에 보관했다. Cloudtype 환경 변수 등록은 `main` 배포 때 하고, 배포는 Grafana를 켠 뒤 메모리 측정이 안정된 다음에 한다).
 
 #### Task 098: Grafana Cloud 관측 연동으로 배포 환경 지표·로그 수집 ⬜ `[3단계 이월]`
 - 태그: [B] · PRD: Q1, FR-20, 6절 관측 · 선행: 096, 097 · 브랜치: `feature/q1-observability`
@@ -1712,6 +1716,7 @@ PRD는 주차만 정했다(예상치). 10절의 기한을 날짜로 적기 위�
 - 태그: [F] · PRD: Q1, SCR-17 · 선행: 098 · 브랜치: `feature/q1-monitoring-api`
 - 완료 기준
   - V-FS: 관리자 계정으로 화면이 로드되고 요약 값이 API와 같다.
+- 진행(2026-11-01, 브랜치 `feature/q1-monitoring-links`): 바로가기 카드의 주소 연결을 마쳤다(`grafanaLink.ts`: Grafana 대시보드 `ottnavi 운영 개요`(고유 ID `ottnavi-overview`), 로그 탐색(경고·오류 쿼리, 최근 24시간), Cloudtype 콘솔). 알림 규칙은 규칙을 아직 만들지 않아 "준비 중"으로 남긴다(규칙을 만들 때 그 목록 주소를 연결). 운영 현황 카드 3개와 API는 PR #127·#128로 완료. 로그인하지 않은 상태에서 Grafana 주소가 로그인 화면으로 가는 것(공개 대시보드·익명 접근 없음), Google·GitHub 2단계 인증 켜짐을 확인했다.
 
 #### Task 100: k6 성능 측정과 개선으로 응답 시간 목표 근거 확보 ⬜ `[3단계 이월]`
 - 태그: [B] · PRD: Q2, 6절 성능, R11-29, R11-30 · 선행: 095 · 브랜치: `feature/q2-k6-performance`
@@ -1787,7 +1792,7 @@ PRD 11절 확정 항목 4번(무료 기간 수집 방식)과 5번(Actions 트리
 | 번호 | 항목 | 분류 | 결정 시점(제안) | 관련 Task |
 |---|---|---|---|---|
 | R11-15 | SCR-05 정적 콘텐츠 여부 | 결정 필요 | 2026-11-19 | 089 |
-| R11-16 | SCR-17 표시 항목 | 결정 필요 | 2026-11-19 | 097, 099 |
+| R11-16 | SCR-17 표시 항목 | 확정(2026-11-01): 바로가기 카드 + 운영 현황 카드 3개, 수집 요약 제외 | — | 097, 099 |
 | R11-17 | 가입 안내 1회 판정 조건·저장 방식 | 결정 필요 | 2026-11-05 (O2 전) | 073 |
 | R11-22 | FR-15에 SUBSCRIBE_GUIDE 포함 | 결정 필요 | 2026-11-05 | 073 |
 | R11-23 | 제공처 매핑 관리 별도 FR 없음(FR-18 흡수) | 결정 필요 | 2026-10-22 (F6 전) | 046, 061 |

@@ -1,5 +1,9 @@
 import { useRef } from 'react'
 import { Link, Outlet, ScrollRestoration } from 'react-router'
+import { ConsentBannerHost } from '@/features/consent/components/ConsentBannerHost'
+import { CONSENT_SETTINGS_ANCHOR_ID } from '@/features/consent/components/ConsentSettingsCard'
+import { useConsent } from '@/features/consent/consentStore'
+import { getMeasurementId } from '@/lib/analytics'
 import { useMeasuredHeaderHeight } from '@/hooks/useMeasuredHeaderHeight'
 import { useIsDemo } from '@/hooks/useIsDemo'
 import { usePageViewTracking } from '@/hooks/usePageViewTracking'
@@ -32,7 +36,11 @@ export function RootLayout() {
   const headerRef = useRef<HTMLElement>(null)
   useMeasuredHeaderHeight(headerRef)
   // 화면 이동마다 방문 통계(GA4) page_view를 보낸다. 측정 ID가 비면 아무것도 하지 않는다(lib/analytics.ts)
-  usePageViewTracking()
+  // 방문자가 동의했을 때만 전송한다(사용자 결정 2026-10-31). 동의 상태가 바뀌면(동의·철회) 훅이 바로 반영한다
+  const { analyticsEnabled } = useConsent()
+  usePageViewTracking(analyticsEnabled)
+  // 푸터의 "방문 통계 설정" 링크는 방문 통계를 쓰는 환경(측정 ID 있음)에서만 보인다. 목업·로컬은 설정할 대상이 없다
+  const hasAnalytics = getMeasurementId() !== null
   // 푸터의 회원 탈퇴 링크를 보일지 정한다. 머리글 계정 영역(HeaderAccountNav)과 같은 훅이라 목업·실제 환경에서 같은 판단을 한다
   const isAuthenticated = useSession().status === 'authenticated'
   const isDemo = useIsDemo()
@@ -120,6 +128,12 @@ export function RootLayout() {
           </Link>
           {/* 출처 표기 자리. 화면별 JustWatch 출처는 SourceAttribution(Task 026), TMDB 로고·고지문은 About 화면(Task 027)에서 채운다 */}
           <p>작품·제공처 정보 출처: TMDB, JustWatch</p>
+          {/* 방문 통계 동의를 바꾸거나 철회하는 자리(처리방침 4절의 설정 카드로 이동). 측정 ID가 있을 때만 보인다 */}
+          {hasAnalytics && (
+            <Link to={`/privacy#${CONSENT_SETTINGS_ANCHOR_ID}`} className={FOOTER_LINK_CLASS}>
+              방문 통계 설정
+            </Link>
+          )}
           {/*
             회원 탈퇴 링크(SCR-13). 이전에는 내 설정 맨 아래 오른쪽에 작은 빨간 글자로 있어 뜬금없어 보였다(운영 피드백, 사용자 확정으로 푸터로 옮김).
             - 로그인한 사용자에게만 보인다(useSession의 authenticated). 확인 중(checking)·비로그인·재발급 오류에서는 숨긴다.
@@ -151,6 +165,13 @@ export function RootLayout() {
 
       {/* 찜 추가 직후 팝업. 앱에 한 번만 둔다(열림 상태는 hooks/useWishlistAddedDialog). Link를 쓰므로 라우터 안인 여기에 둔다 */}
       <WishlistAddedDialog />
+
+      {/*
+        방문 통계 동의 안내 띠. 바깥 세로 상자(min-h-svh flex-col)의 마지막 자식이어야 한다: 띠가 sticky bottom-0라
+        스크롤 중에는 화면 아래에 붙고, 페이지 끝에서는 푸터 뒤 원래 자리에 놓여 푸터를 가리지 않는다.
+        띠를 보일지는 ConsentBannerHost가 정한다(측정 ID 있음 + 제외 경로 아님 + 아직 선택 안 함).
+      */}
+      <ConsentBannerHost />
     </div>
   )
 }

@@ -62,6 +62,7 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		registry.add("app.tmdb.base-url", () -> wireMock.baseUrl() + "/3");
 		registry.add("app.tmdb.retry.initial-backoff", () -> "10ms"); // 실패 시나리오가 느려지지 않게 대기를 줄인다
 		registry.add("app.tmdb.retry.max-backoff", () -> "40ms");
+		registry.add("app.popularity.fill.enabled", () -> "false"); // 상세 채우기는 PopularityDetailFillIntegrationTest가 따로 확인한다(여기서는 스냅샷 수집·정리만 본다)
 	}
 
 	@AfterAll
@@ -107,8 +108,9 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		long executionId = popularityLauncher.start();
 		awaitFinished(executionId);
 
-		// then: 서비스 7곳 × (영화 2건 + 드라마 2건) = 28행, 두 Step 모두 완료
-		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		// then: 서비스 7곳 × (영화 2건 + 드라마 2건) = 28행, 세 Step 모두 완료(채우기 Step은 꺼져 있어 바로 끝난다)
+		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityDetailFillStep=COMPLETED",
+				"popularityPurgeStep=COMPLETED");
 		assertThat(countRows()).isEqualTo(28);
 		Integer todayRows = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM popularity_snapshot WHERE snapshot_date = ?",
 				Integer.class, LocalDate.now(KST));
@@ -145,7 +147,8 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		awaitFinished(executionId);
 
 		// then: 실패가 아니라 정상 흐름이다. 28행에서 디즈니+ 드라마 2행만 빠진다
-		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityDetailFillStep=COMPLETED",
+				"popularityPurgeStep=COMPLETED");
 		assertThat(countRows()).isEqualTo(26);
 	}
 
@@ -165,7 +168,8 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		awaitFinished(secondExecutionId);
 
 		// then: 그 자리의 같은 날 행만 지워지고 나머지 26행은 그대로다
-		assertThat(stepStatuses(secondExecutionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(stepStatuses(secondExecutionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityDetailFillStep=COMPLETED",
+				"popularityPurgeStep=COMPLETED");
 		assertThat(jdbcTemplate.queryForObject(disneyTvRows, Integer.class)).isZero();
 		assertThat(countRows()).isEqualTo(26);
 	}
@@ -180,7 +184,8 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		awaitFinished(secondExecutionId);
 
 		// then
-		assertThat(stepStatuses(secondExecutionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(stepStatuses(secondExecutionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityDetailFillStep=COMPLETED",
+				"popularityPurgeStep=COMPLETED");
 		assertThat(countRows()).isEqualTo(28);
 	}
 
@@ -195,7 +200,8 @@ class PopularityJobIntegrationTest extends IntegrationTestSupport {
 		awaitFinished(executionId);
 
 		// then: 28행에서 디즈니+ 드라마 2행만 빠진다
-		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityPurgeStep=COMPLETED");
+		assertThat(stepStatuses(executionId)).containsExactly("popularityCollectStep=COMPLETED", "popularityDetailFillStep=COMPLETED",
+				"popularityPurgeStep=COMPLETED");
 		assertThat(countRows()).isEqualTo(26);
 	}
 

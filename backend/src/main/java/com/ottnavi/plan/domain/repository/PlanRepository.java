@@ -40,6 +40,15 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
 	@Query("delete from Plan p where p.userId = :userId and p.status = com.ottnavi.plan.domain.enums.PlanStatus.DRAFT")
 	int deleteDraftsByUserId(@Param("userId") Long userId);
 
+	/** ACTIVE 플랜을 가진 사용자 수(제외 목록 없음) */
+	@Query("select count(distinct p.userId) from Plan p where p.status = com.ottnavi.plan.domain.enums.PlanStatus.ACTIVE")
+	long countActivePlanUsers();
+
+	/** ACTIVE 플랜을 가진 사용자 수에서 제외할 사용자 ID를 뺀다. 목록이 비면 호출하지 않는다(NOT IN 빈 목록 회피) */
+	@Query("select count(distinct p.userId) from Plan p where p.status = com.ottnavi.plan.domain.enums.PlanStatus.ACTIVE "
+			+ "and p.userId not in :excludedUserIds")
+	long countActivePlanUsersExcluding(@Param("excludedUserIds") Collection<Long> excludedUserIds);
+
 	/** 해당 상태의 플랜 전부(매월 재계산이 ACTIVE 전체에서 대상을 고른다) */
 	List<Plan> findAllByStatus(PlanStatus status);
 

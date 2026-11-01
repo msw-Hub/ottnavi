@@ -18,6 +18,10 @@
  * - config와 화면 이동마다 gtag('set', ...)로 page_location·page_path·page_title 기본값을 정리한 값으로 바꾸고,
  * - 제외 경로에서는 GA 공식 차단 표식 window['ga-disable-<측정 ID>'] = true를 세워 gtag.js가 아무것도 보내지 못하게 한다.
  *   공개 경로로 돌아오면 false로 되돌린다. 이 표식은 gtag.js 로드 전에 먼저 있어야 하므로 초기화보다 앞서 세팅한다.
+ *
+ * 동의 관문(사용자 결정 2026-10-31): 방문자가 방문 통계에 동의하기 전에는 gtag.js를 불러오지 않고, dataLayer·gtag를 만들지 않으며,
+ * 쿠키(_ga, _ga_*)도 만들지 않는다. 동의 상태는 setAnalyticsConsent로 주입받는다(저장·판정은 features/consent가 맡는다.
+ * lib가 feature를 import하지 않게 하려고, 이쪽은 "허용됨/아님" 한 비트만 받는다). 기본값은 허용 안 됨이다.
  */
 
 // 방문 통계에서 뺄 경로. 운영자·평가용 데모 접속이 통계를 왜곡하지 않게 하고, 로그인 콜백은 인증 값이 오가는 곳이라 보내지 않는다.
@@ -26,6 +30,9 @@ const EXCLUDED_PATH_PREFIXES = ['/admin', '/auth/callback', '/__dev']
 
 // gtag 스크립트 태그에 붙이는 id. 같은 스크립트를 두 번 넣지 않았는지 확인하는 표식이다
 const GA_SCRIPT_ELEMENT_ID = 'ga4-gtag-script'
+
+// 방문 통계 동의 여부. 기본은 false(동의 전). 새로고침하면 다시 false로 시작하고, 저장된 동의를 읽은 뒤 setAnalyticsConsent로 켠다
+let consentGranted = false
 
 // gtag 호출 한 번의 인자 묶음(command, 대상/이벤트 이름, 옵션 객체)
 type GtagArguments = unknown[]
@@ -44,6 +51,58 @@ declare global {
  */
 function setGaDisabled(measurementId: string, isDisabled: boolean): void {
   ;(window as unknown as Record<string, unknown>)[`ga-disable-${measurementId}`] = isDisabled
+}
+
+/**
+ * GA가 만드는 쿠키(_ga, _ga_<컨테이너>)를 지운다. 동의 철회 때만 부른다.
+ *
+ * 한계(코드로 확인할 수 없는 부분):
+ * - 쿠키는 만들 때의 이름·도메인·경로가 같아야 지워진다. GA는 보통 접속 주소의 가장 위쪽 등록 가능 도메인(예: ottnavi.shop)에
+ *   path=/로 만든다. 그래서 현재 호스트와 상위 도메인 후보를 모두 만료시키되, 브라우저가 거부하는 후보(공개 접미사 등)는 조용히 무시된다.
+ * - 쓰기 결과를 되읽어 확인하지 않는다. 지워졌는지는 호출한 쪽이 알 수 없다(HttpOnly가 아닌 GA 쿠키라 보통 지워진다).
+ * - 이미 불러온 gtag.js는 새로고침 전까지 메모리에 남아 있다. 그래서 쿠키를 지우는 것만으로는 부족하고, GA 공식 차단 표식
+ *   ga-disable-<측정 ID>를 켜서 이후 전송과 쿠키 재생성을 막는다. 새로고침하면 동의가 없는 상태로 시작하므로 스크립트 자체가 로드되지 않는다.
+ */
+function clearAnalyticsCookies(): void {
+  // 1. 지울 쿠키 이름을 모은다(_ga, _ga_로 시작하는 것만. 이 서비스는 _gid 등 다른 GA 쿠키를 쓰지 않는다)
+  const names = document.cookie
+    .split(';')
+    .map((part) => part.split('=')[0].trim())
+    .filter((name) => name === '_ga' || name.startsWith('_ga_'))
+
+  // 2. 도메인 후보를 만든다: 현재 호스트와 앞 구간을 하나씩 떼어 낸 상위 도메인(최상위 'shop' 같은 한 구간은 건너뛴다)
+  const labels = window.location.hostname.split('.')
+  const domains: (string | undefined)[] = [undefined] // undefined = domain 속성 없이(현재 호스트 전용 쿠키)
+  for (let i = 0; i < labels.length - 1; i++) {
+    const host = labels.slice(i).join('.')
+    domains.push(host, `.${host}`)
+  }
+
+  // 3. 이름 × 도메인 조합마다 만료 시각을 과거로 써서 지운다
+  for (const name of names) {
+    for (const domain of domains) {
+      document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domain ? `; domain=${domain}` : ''}`
+    }
+  }
+}
+
+/**
+ * 방문 통계 동의 여부를 알려 준다. true → false로 바뀔 때(철회)만 전송 차단과 쿠키 삭제를 한다.
+ * 같은 값을 다시 넣으면 아무 일도 하지 않는다(화면 이동마다 불려도 안전하다).
+ * 켜는 쪽(false → true)은 여기서 스크립트를 불러오지 않는다: 현재 화면의 page_view를 보내는 trackPageView가 초기화까지 맡는다.
+ */
+export function setAnalyticsConsent(granted: boolean): void {
+  // 1. 바뀌지 않았으면 끝
+  if (granted === consentGranted) return
+  consentGranted = granted
+
+  // 2. 철회면 차단 표식을 켜고 쿠키를 지운다(측정 ID가 없으면 만들 것도 없다)
+  if (!granted) {
+    const measurementId = getMeasurementId()
+    if (!measurementId) return
+    setGaDisabled(measurementId, true)
+    clearAnalyticsCookies()
+  }
 }
 
 /** 설정된 측정 ID를 돌려준다. 비어 있거나 목업 모드면 null이다(= 방문 통계를 쓰지 않는다). */
@@ -77,9 +136,9 @@ export function toTrackablePath(pathnameOrUrl: string): string | null {
  * 설정에 user_id·이메일 같은 사용자 식별값은 절대 넣지 않는다(방침 약속). GA가 쿠키(_ga)로 만드는 익명 ID만 쓴다.
  */
 export function initAnalytics(): boolean {
-  // 1. 측정 ID가 없으면(비어 있음·목업) 스크립트도 전송도 없다
+  // 1. 측정 ID가 없거나(비어 있음·목업) 방문자가 동의하지 않았으면 스크립트도 전송도 없다
   const measurementId = getMeasurementId()
-  if (!measurementId) return false
+  if (!measurementId || !consentGranted) return false
 
   // 2. 이미 넣었으면 다시 넣지 않는다(화면을 옮길 때마다 불려도 스크립트와 config는 한 번이다)
   if (document.getElementById(GA_SCRIPT_ELEMENT_ID)) return true
@@ -123,9 +182,10 @@ export function initAnalytics(): boolean {
  * @param pathname React Router의 location.pathname(쿼리·해시 제외)
  */
 export function trackPageView(pathname: string): void {
-  // 1. 측정 ID가 없으면 끝(스크립트도 표식도 만들지 않는다: 목업·로컬은 전역 변경 0건)
+  // 1. 측정 ID가 없거나 동의 전이면 끝(스크립트도 표식도 만들지 않는다: 목업·로컬·동의 전은 전역 변경 0건.
+  //    철회 뒤 표식이 false로 되돌아가지 않도록, 표식을 만지는 3번보다 앞에서 막는다)
   const measurementId = getMeasurementId()
-  if (!measurementId) return
+  if (!measurementId || !consentGranted) return
 
   // 2. 보낼 경로를 정리한다(제외 경로면 null)
   const path = toTrackablePath(pathname)

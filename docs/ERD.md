@@ -190,7 +190,7 @@ erDiagram
 | id | BIGINT | PK | |
 | watch_unit_id, ott_service_id | BIGINT | FK | |
 | before_status, after_status | VARCHAR(20) | | before_status는 NULL 허용(신규는 NULL), after_status는 필수 |
-| job_execution_id | BIGINT | | Spring Batch 실행 ID (FK 없이 참조값만). 배치 밖(단건 수집)에서 생긴 변경이면 NULL. **인덱스 있음**: 실행별 "바뀐 작품" 조회와 실행 이력의 변경 건수 집계가 이 값으로 거른다 |
+| job_execution_id | BIGINT | | Spring Batch 실행 ID (FK 없이 참조값만). 수집 Job 밖에서 생긴 변경이면 NULL: 단건 수집, 또는 인기 순위 상위 작품 상세 채우기(`popularityJob`의 `popularityDetailFillStep`이 새 작품의 제공 상태를 처음 적재할 때이며 이력의 `before_status`도 NULL). **인덱스 있음**: 실행별 "바뀐 작품" 조회와 실행 이력의 변경 건수 집계가 이 값으로 거른다 |
 | changed_at | TIMESTAMPTZ | | 재계산·변경 알림의 입력 |
 
 ### genre / title_genre / title_cast — 상세 화면용 부속 데이터

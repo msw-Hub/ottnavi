@@ -4,6 +4,7 @@ import {
   formatDataAsOf,
   formatDate,
   formatDateTime,
+  formatCountWithUnit,
   formatDateTimeKorean,
   formatElapsed,
   formatIsoDate,
@@ -194,5 +195,19 @@ describe('formatElapsed', () => {
     expect(formatElapsed(start, null)).toBe(EMPTY_DISPLAY)
     expect(formatElapsed(start, '2026-10-10T02:00:00+09:00')).toBe(EMPTY_DISPLAY)
     expect(formatElapsed(start, 'abc')).toBe(EMPTY_DISPLAY)
+  })
+})
+
+describe('formatCountWithUnit', () => {
+  it('천 단위 쉼표와 단위를 붙이고 0은 "0명"으로 보인다', () => {
+    expect(formatCountWithUnit(1234, '명')).toBe('1,234명')
+    expect(formatCountWithUnit(0, '명')).toBe('0명')
+  })
+
+  it('값이 없거나 올바르지 않으면 단위 없이 "-"만 돌려준다', () => {
+    expect(formatCountWithUnit(null, '명')).toBe('-')
+    expect(formatCountWithUnit(undefined, '명')).toBe('-')
+    expect(formatCountWithUnit(Number.NaN, '명')).toBe('-')
+    expect(formatCountWithUnit(-1, '명')).toBe('-')
   })
 })

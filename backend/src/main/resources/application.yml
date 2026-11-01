@@ -70,6 +70,10 @@ spring:
             connectTimeout: 3000  # ms. 연결이 안 되면 빨리 실패해 DB 연결을 붙잡지 않는다(TECH T-2)
             readTimeout: 5000     # ms
             loggerLevel: basic    # 요청 메서드·URL·상태·소요 시간만. 본문·헤더(API 토큰)는 남기지 않는다
+          ga: # infra.analytics의 @FeignClient(name = "ga")와 맞춘다. 방문자 카드 하나 때문에 관리자 화면이 오래 멈추지 않게 짧게 둔다
+            connectTimeout: 3000  # ms
+            readTimeout: 5000     # ms
+            loggerLevel: none     # URL에 GA 속성 ID가 들어 있고 헤더에 토큰이 있어 요청 로그를 남기지 않는다
 management:
   otlp:
     metrics:
@@ -92,6 +96,10 @@ app:
     refresh-reuse-grace: 10s         # 직전 Refresh Token을 재사용으로 보지 않는 유예(동시 요청·응답 유실 대비)
   origin-secret:
     enabled: true                       # Vercel 경유 요청만 받는다(TECH T-8 ①). 안전한 쪽을 기본으로 두고 local에서만 끈다
+  redis:                                # Redis 연결 보강(spring.data.redis.*와 별개). 배경은 docs/guides/TROUBLESHOOTING_REDIS_COLD_START.md
+    warm-up:
+      enabled: true                     # 기동 직후 백그라운드에서 Redis 연결을 미리 만든다. 실패해도 앱은 계속 동작한다(테스트에서는 IntegrationTestSupport가 끈다)
+      retry-delay: 30s                  # 예열이 하나라도 실패하면 이만큼 뒤 실패한 쪽만 한 번 더 시도한다(그 뒤에는 반복하지 않는다)
   rate-limit:                           # 공개 API 요청 제한(Task 049, PRD R11-12). 키는 방문자 IP(remoteAddr), 버킷은 Redis에 둔다
     enabled: true                       # 테스트에서만 끈다(IntegrationTestSupport). local 포함 기본 켜짐
     general:                            # /api/public/**, /api/auth/**, /api/oauth2/**, /api/login/** 에 IP별로 건다
@@ -109,6 +117,11 @@ app:
   demo-login:                           # 데모 계정 로그인(TECH 4절). 둘 다 비우면 꺼지고(POST /api/auth/demo-login이 404), 하나만 있으면 기동이 실패한다
     login-id: ${DEMO_LOGIN_ID:}         # 데모 아이디. 값은 환경 변수로만 넣는다
     password: ${DEMO_LOGIN_PASSWORD:}   # 데모 비밀번호(16자 이상). 값은 환경 변수로만 넣는다
+  analytics:                            # 관리자 방문자 통계(Google Analytics 4 Data API). 둘 다 비우면 꺼지고(status=DISABLED), 하나만 있으면 기동이 실패한다
+    property-id: ${GA_PROPERTY_ID:}     # GA4 속성 ID(숫자). 값은 환경 변수로만 넣는다
+    credentials-base64: ${GA_CREDENTIALS_BASE64:}   # 서비스 계정 키 JSON을 Base64로 인코딩한 값. 값은 환경 변수로만 넣는다
+    base-url: https://analyticsdata.googleapis.com   # GA Data API 주소(테스트에서 WireMock으로 바꾼다)
+    cache-ttl: 15m                      # 성공 결과를 Redis에 두는 시간. 실패는 캐시하지 않는다
   tmdb:
     base-url: https://api.themoviedb.org/3
     api-token: ${TMDB_API_KEY:}   # 읽기 액세스 토큰(Bearer). 기본값을 비워 둔다(6절 함정 5)
@@ -159,6 +172,10 @@ app:
     top-n: 20                   # 서비스·매체(영화/드라마)마다 저장하는 상위 작품 수(TMDB discover 한 쪽이 20개라 20이 최대)
     retention-days: 14          # 스냅샷 보관 일수(오늘 포함). 이보다 오래된 날짜는 인기 수집 Job이 지운다
     recent-years: 2             # 순위에 넣는 작품의 첫 공개일 범위(오늘에서 이 햇수 전부터). 한국 제작(with_origin_country=KR)만 넣는다
+    fill:                       # 인기 순위 상위 작품 중 title 표에 없는 작품의 상세 채우기(홈 순위에는 보이는데 상세가 404인 문제 방지)
+      enabled: true               # false면 채우기를 하지 않는다
+      top-n: 20                   # 순위 16개(기간 2 x 범위 8) 각각에서 보는 상위 작품 수(홈이 보여 주는 최대 개수)
+      max-titles: 20              # 한 번에 채우는 최대 작품 수(TMDB 호출량을 묶는 안전장치)
   home:                       # 홈 공통 목록 규칙(Task 107, PRD 11절 39번)
     min-wishlist-users: 3       # "찜 많은 작품"에 넣는 최소 찜 사용자 수. 이보다 적은 작품은 목록에서 뺀다
     arrival-days: 14            # "새로 볼 수 있게 된 작품": 없음·모름 → 있음으로 바뀐 것을 확인한 최근 일수(입고)

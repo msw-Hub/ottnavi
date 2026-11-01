@@ -7,6 +7,7 @@ import com.ottnavi.plan.domain.repository.PlanRepository;
 import com.ottnavi.plan.service.model.ActivePlanView;
 import com.ottnavi.plan.service.model.PlanDraftView;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -53,5 +54,16 @@ public class PlanQueryService {
 		single.add(plan);
 		PlanDraftView view = planViewLoader.load(single).get(0);
 		return Optional.of(new ActivePlanView(view, plan.getActivatedAt()));
+	}
+
+	/**
+	 * ACTIVE 플랜을 가진 사용자 수를 센다. 관리자·데모 계정처럼 user 도메인이 알려 준 ID는 뺀다.
+	 * 목록이 비면 NOT IN 없이 전체를 센다(빈 컬렉션 바인딩 동작에 기대지 않는다).
+	 */
+	public long countActivePlanUsers(Collection<Long> excludedUserIds) {
+		if (excludedUserIds == null || excludedUserIds.isEmpty()) {
+			return planRepository.countActivePlanUsers();
+		}
+		return planRepository.countActivePlanUsersExcluding(excludedUserIds);
 	}
 }

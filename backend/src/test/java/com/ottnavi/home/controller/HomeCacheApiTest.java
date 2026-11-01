@@ -139,7 +139,7 @@ class HomeCacheApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
-	void 인기_수집_종료_리스너는_인기_순위_캐시만_비운다() throws Exception {
+	void 인기_수집_종료_리스너는_상세_채우기로_작품이_늘_수_있어_홈_캐시를_모두_비운다() throws Exception {
 		// given
 		insertGenreWithTitle(GENRE_A, "캐시장르A", 9400031);
 		requestAllFiveLists();
@@ -148,9 +148,9 @@ class HomeCacheApiTest extends IntegrationTestSupport {
 		popularityCacheEvictListener.afterJob(mock(JobExecution.class));
 
 		// then
-		assertThat(redis.keys(RedisConfig.HOME_POPULARITY + "::*")).isEmpty();
-		assertThat(redis.keys(RedisConfig.HOME_GENRES + "::*")).isNotEmpty();
-		assertThat(redis.keys(RedisConfig.HOME_NEW_ARRIVALS + "::*")).isNotEmpty();
+		for (String name : RedisConfig.HOME_CACHES) {
+			assertThat(redis.keys(name + "::*")).as("%s 비워짐", name).isEmpty();
+		}
 	}
 
 	@Test
