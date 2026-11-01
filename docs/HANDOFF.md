@@ -12,7 +12,7 @@
 - **GitHub Actions 예약 지연**: 예약 수집이 설정보다 약 4시간 늦게 돈다. 설정은 정상이고 원인은 미확인이며 그대로 두기로 했다(FIRST_DEPLOY_RECORD 6절).
 - **GA(방문 통계)**: 서비스 전용 계정의 속성으로 교체했고 `VITE_GA_MEASUREMENT_ID`(Vercel Production)로 연결한다. 개인정보 방침 시행일은 2026-10-31이다.
 - **Task 097(모니터링 화면 목업)**: PR #125. 수집 실행 요약은 수집 탭과 겹쳐 빼고 바로가기 카드(Grafana 지표·로그·알림 규칙, Cloudtype 콘솔, 수집 탭) 하나만 둔다. 주소 상수는 `features/admin/components/monitoring/grafanaLink.ts`에 있고 비어 있으면 항목별 "준비 중"이다(2026-11-01: Grafana 대시보드 `ottnavi 운영 개요`·로그 탐색(경고·오류, 최근 24시간)·Cloudtype 콘솔 주소를 연결했고, 알림 규칙은 규칙을 만들 때 연결한다). 새 API 없음. 097 결정 기한(R11-16)은 2026-11-19.
-- **다음**: Grafana 켜기 → 098 대시보드 → 099 주소 연결(상수만 채움) → 추적(Tracing) 여부는 측정 뒤 결정. 11-04 첫 주간 수집 확인, 11-12 이후 Grafana 체험 종료(약 11-13)와 사용량 확인.
+- **다음**: 2026-11-02 `develop` → `main` 배포(처리방침 시행일 상수를 배포일로 변경, Cloudtype 환경 변수 `GA_PROPERTY_ID`·`GA_CREDENTIALS_BASE64` 등록, KST 06:30~09:00 수집 시간대 피함, 배포 직후 관리자 화면에서 인기 수집 수동 실행·첫 요청 응답 시간·Loki `Redis 예열`·`인기 작품 상세 채우기` 로그 확인) → 알림 규칙을 만들고 `grafanaLink.ts`에 그 목록 주소 연결 → 11-04 첫 주간 수집 확인, 11-12 이후 Grafana 체험 종료(약 11-13)와 사용량 확인. 추적(Tracing) 여부는 배포 뒤 측정으로 결정. Grafana를 켠 뒤 6시간 메모리 측정(2026-11-01, Cloudtype 대시보드 약 675MB)은 안정(약 4시간에 plateau).
 - **이월**: Redis 첫 요청 지연·fail-open 로그(타임아웃은 이미 명령 2초·연결 5초다. 원인은 서버가 연결을 첫 사용 때 만들어 첫 요청이 연결 생성을 부담하는 것 + CPU 포화(추정). 기동 직후 예열 `RedisWarmUp`(실패 시 30초 뒤 1회 재시도)으로 대응했고, 즉시 거절(REJECT_COMMANDS)은 재발급·로그아웃·데모 로그인 오류 처리 뒤 별도 작업. 배포 뒤 `ratelimit.store_error`로 빈도 확인, 상세는 `docs/guides/TROUBLESHOOTING_REDIS_COLD_START.md`), `HV000271` 경고·`spring.data.redis.repositories.enabled` 로그 정리, TMDB 회신 대기(회신 전 운영 `GEMINI_API_KEY` 없음), Search Console 사이트맵 제출, 데모 로그인 실서버 확인, GA 동의 안내 창(법령 절차 확인 필요).
 
 ## 0. 2026-10-17 범위 개정과 인수인계 요약 (먼저 읽는다)
