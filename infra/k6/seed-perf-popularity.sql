@@ -1,6 +1,7 @@
 -- 성능 측정 DB(ottnavi_perf)에만 넣는 "합성" 인기 순위 스냅샷이다(Task 100). 실제 TMDB 인기 순위가 아니다.
 -- 측정 DB에는 인기 수집(TMDB 호출)을 돌릴 수 없어 popularity_snapshot이 비어 있으므로, title.popularity로 비슷한 모양을 만든다.
--- 실행: docker compose -f infra/docker-compose.yml exec -T postgres psql -U ottnavi -d ottnavi_perf -v ON_ERROR_STOP=1 -f - < infra/k6/seed-perf-popularity.sql
+-- 실행(Git Bash): docker compose -f infra/docker-compose.yml exec -T postgres psql -U ottnavi -d ottnavi_perf -v ON_ERROR_STOP=1 -f - < infra/k6/seed-perf-popularity.sql
+-- 실행(PowerShell): cmd /c "docker compose -f infra/docker-compose.yml exec -T postgres psql -U ottnavi -d ottnavi_perf -v ON_ERROR_STOP=1 -f - < infra\k6\seed-perf-popularity.sql"
 -- 전체 순위는 서비스 1~7의 행을 합쳐 계산되므로(PopularityRankingService) "전체"용 행은 따로 넣지 않는다.
 
 -- 1. 이전에 넣은 합성 시드를 지운다(측정 DB 전용이라 표 전체를 비운다)

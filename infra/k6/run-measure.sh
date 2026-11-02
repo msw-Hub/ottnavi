@@ -10,6 +10,7 @@ export MSYS_NO_PATHCONV=1   # Git Bash가 /scripts 경로를 Windows 경로로 �
 SCRIPT="$1"; NAME="$2"; STATS_SECONDS="$3"; shift 3
 COMPOSE=(docker compose -f infra/docker-compose.yml --profile perf)
 RESULTS=infra/k6/results
+mkdir -p "$RESULTS"   # 결과 폴더는 .gitignore 대상이라 새로 받은 저장소에는 없다
 TS=$(date +%Y%m%d-%H%M%S)
 PREFIX="${TS}_${NAME}"
 BACKEND=ottnavi-backend-perf-1

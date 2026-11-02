@@ -10,7 +10,7 @@ $compose = @('compose', '-f', 'infra/docker-compose.yml')
 
 # 1. 기존 복사본을 지우고 개발 DB를 템플릿으로 새로 복사한다
 docker @compose exec -T postgres psql -U ottnavi -d postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ottnavi_perf"
-if ($LASTEXITCODE -ne 0) { throw '기존 복사본 삭제에 실패했다' }
+if ($LASTEXITCODE -ne 0) { throw '기존 복사본 삭제에 실패했다(측정 백엔드가 접속 중이면 먼저 내린다: docker compose -f infra/docker-compose.yml --profile perf stop backend-perf)' }
 docker @compose exec -T postgres psql -U ottnavi -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE ottnavi_perf TEMPLATE ottnavi"
 if ($LASTEXITCODE -ne 0) { throw '복사본 생성에 실패했다(개발 백엔드가 개발 DB에 붙어 있는지 확인)' }
 

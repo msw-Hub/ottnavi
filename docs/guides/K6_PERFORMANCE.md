@@ -1,7 +1,7 @@
 # k6 성능 측정 가이드 (Task 100)
 
 > 이 문서는 사용자가 요청해 만든 설명·결과 기록이다. 근거 문서가 아니고 코드와 측정 파일이 기준이다. 규칙의 근거는 PRD(R11-29·R11-30)·ROADMAP Task 100이다.
-> 측정일 2026-11-02~03. 원본 결과는 `infra/k6/results/`(커밋하지 않음)에 있고 환경은 같은 폴더의 `ENVIRONMENT.md`, 진행은 `RUN_LOG.md`에 있다.
+> 측정일 2026-11-02~03. 측정 원본(k6 요약·CSV·`docker stats` 기록·로그)은 `infra/k6/results/`에 로컬로만 있고 커밋하지 않는다. 측정 환경 기록 `ENVIRONMENT.md`와 진행 기록 `RUN_LOG.md`만 같은 폴더에서 저장소에 추적한다.
 
 ## 0. 한눈에 보기
 
@@ -254,7 +254,7 @@ OOM 0건, 재시작 0건. 메모리 압박 신호는 없었다. 동시 계산에
 ```powershell
 docker compose -f infra/docker-compose.yml up -d                    # 개발 postgres·redis (이미 떠 있으면 생략)
 .\infra\k6\prepare-perf-db.ps1 -Users 50                            # 측정 DB 복사본 생성 (개발 백엔드는 꺼 둔다)
-docker compose -f infra/docker-compose.yml exec -T postgres psql -U ottnavi -d ottnavi_perf -f - < infra/k6/seed-perf-popularity.sql
+cmd /c "docker compose -f infra/docker-compose.yml exec -T postgres psql -U ottnavi -d ottnavi_perf -v ON_ERROR_STOP=1 -f - < infra\k6\seed-perf-popularity.sql"   # PowerShell은 < 리다이렉트를 못 써서 cmd를 거친다
 cd backend; .\gradlew.bat bootJar -x test; cd ..                    # 측정용 jar
 docker compose -f infra/docker-compose.yml --profile perf up -d --build --wait backend-perf
 docker compose -f infra/docker-compose.yml --profile perf run --rm --no-deps k6 run /scripts/prepare-users.js   # 사용자 설정·찜 입력

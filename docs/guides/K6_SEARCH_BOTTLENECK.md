@@ -144,7 +144,7 @@ create extension if not exists pg_trgm with schema extensions;
 |---|---|
 | 확장 설치 권한 부족으로 마이그레이션 실패 → 서버 기동 실패 | 5-4의 사전 설치 |
 | 로컬·CI(Testcontainers)에서 `extensions` 폴더가 없음 | 초안의 `CREATE SCHEMA IF NOT EXISTS`와 폴더 명시 |
-| 수집 때 `title`을 쓰면 인덱스도 갱신해야 함 | 수집은 하루 수 번, 33천 행 규모라 영향이 작을 것으로 예상(측정하지 않음) |
+| 수집 때 `title`을 쓰면 인덱스도 갱신해야 함 | 수집은 하루 수 번, 3만 3천 행 규모라 영향이 작을 것으로 예상(측정하지 않음) |
 | 인덱스 생성 중 `title` 쓰기가 잠깐 막힘 | 생성 약 0.5초(측정 DB 기준), 33,192건 규모라 사실상 무시 가능 |
 
 ## 6. 개선 전후를 어떻게 비교하나
@@ -188,7 +188,7 @@ create extension if not exists pg_trgm with schema extensions;
 ## 10. 기록과 재현
 | 항목 | 위치 |
 |---|---|
-| 한계 찾기 결과 | `infra/k6/results/20261102-*_s6read_C1_r1~r3*`, `20261103-000221_s6readfine_C1_r1*` |
+| 한계 찾기 결과(원본, 로컬 전용이라 저장소에 없음) | `infra/k6/results/20261102-*_s6read_C1_r1~r3*`, `20261103-000221_s6readfine_C1_r1*` |
 | 진행 기록·환경 | `infra/k6/results/RUN_LOG.md`, `ENVIRONMENT.md` |
 | 인덱스 실험 | 이 문서 4장(측정 DB에서 트랜잭션 안에 실행 후 되돌림) |
 | 측정 방법·재현 명령 | `K6_PERFORMANCE.md` 2~5, 10장 |
