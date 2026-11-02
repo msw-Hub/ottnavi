@@ -1,0 +1,207 @@
+[
+ {
+  "mediaType": "tv",
+  "tmdbId": 314939,
+  "seasonNumber": 1,
+  "runtime": 511,
+  "services": [
+   5,
+   7
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 911430,
+  "seasonNumber": null,
+  "runtime": 140,
+  "services": [
+   3,
+   4
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 95480,
+  "seasonNumber": 1,
+  "runtime": 289,
+  "services": [
+   3,
+   4
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 57800,
+  "seasonNumber": null,
+  "runtime": 88,
+  "services": [
+   1,
+   2
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 8355,
+  "seasonNumber": null,
+  "runtime": 94,
+  "services": [
+   1,
+   2
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 318846,
+  "seasonNumber": null,
+  "runtime": 130,
+  "services": [
+   2,
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 79744,
+  "seasonNumber": 1,
+  "runtime": 854,
+  "services": [
+   1,
+   6
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 98,
+  "seasonNumber": null,
+  "runtime": 154,
+  "services": [
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 152601,
+  "seasonNumber": null,
+  "runtime": 126,
+  "services": [
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 5092,
+  "seasonNumber": 1,
+  "runtime": 1095,
+  "services": [
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 97546,
+  "seasonNumber": 1,
+  "runtime": 339,
+  "services": [
+   3,
+   4
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 1408,
+  "seasonNumber": 1,
+  "runtime": 965,
+  "services": [
+   1,
+   6
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 866398,
+  "seasonNumber": null,
+  "runtime": 106,
+  "services": [
+   1,
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 65334,
+  "seasonNumber": 1,
+  "runtime": 572,
+  "services": [
+   1,
+   4
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 131631,
+  "seasonNumber": null,
+  "runtime": 123,
+  "services": [
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 125988,
+  "seasonNumber": 1,
+  "runtime": 534,
+  "services": [
+   3,
+   4
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 497828,
+  "seasonNumber": null,
+  "runtime": 147,
+  "services": [
+   1,
+   4,
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 94664,
+  "seasonNumber": 1,
+  "runtime": 552,
+  "services": [
+   1,
+   4,
+   6
+  ]
+ },
+ {
+  "mediaType": "movie",
+  "tmdbId": 156022,
+  "seasonNumber": null,
+  "runtime": 132,
+  "services": [
+   5,
+   6
+  ]
+ },
+ {
+  "mediaType": "tv",
+  "tmdbId": 71790,
+  "seasonNumber": 1,
+  "runtime": 942,
+  "services": [
+   1,
+   6
+  ]
+ }
+]
