@@ -10,6 +10,7 @@ import { HomeTitleCard } from '@/features/home/components/HomeTitleCard'
 import { RailSkeleton } from '@/features/home/components/RailSection'
 import { useExploreTitles, useGenres } from '@/features/home/hooks/useHomeLists'
 import { useOttServices } from '@/hooks/useOttServices'
+import { isSearchQueryTooShort, SEARCH_QUERY_TOO_SHORT_MESSAGE } from '@/lib/searchQuery'
 import { cn } from '@/lib/utils'
 
 // 작품 구분 칩. 'all'은 구분하지 않음
@@ -47,7 +48,11 @@ function parseGenreId(raw: string | null): number | null {
  */
 export function ExploreScreen() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const query = (searchParams.get('q') ?? '').trim()
+  const typedQuery = (searchParams.get('q') ?? '').trim()
+  // 너무 짧은 검색어(1글자)는 서버가 400으로 거절하므로 검색어가 없는 것으로 보고 다른 조건(장르 등)대로 결과를 보인다.
+  // 입력창에는 입력한 글자를 그대로 두고 안내만 띄운다(글자 수 규칙은 lib/searchQuery)
+  const isQueryTooShort = isSearchQueryTooShort(typedQuery)
+  const query = isQueryTooShort ? '' : typedQuery
   const type = searchParams.get('type') ?? 'all'
   const genreId = parseGenreId(searchParams.get('genre'))
   const isNewOnly = searchParams.get('view') === 'new'
@@ -78,6 +83,11 @@ export function ExploreScreen() {
     // 빈 값이면 검색어만 지운다(고른 장르·새 작품 조건이 안내 없이 풀리지 않게)
     if (!value) {
       updateParams({ q: null })
+      return
+    }
+    // 너무 짧으면 검색이 적용되지 않으므로 고른 장르·새 작품 조건은 그대로 두고 검색어만 주소에 남긴다(안내가 뜬다)
+    if (isSearchQueryTooShort(value)) {
+      updateParams({ q: value })
       return
     }
     updateParams({ q: value, genre: null, view: null })
@@ -111,10 +121,10 @@ export function ExploreScreen() {
               />
               {/* key={query}: 주소의 검색어가 바뀌면(뒤로 가기 등) 입력창을 새로 만들어 같은 글자로 맞춘다(TitleSearchForm과 같은 방식) */}
               <input
-                key={query}
+                key={typedQuery}
                 type="search"
                 name="q"
-                defaultValue={query}
+                defaultValue={typedQuery}
                 aria-label="작품 제목"
                 aria-describedby="explore-search-hint"
                 placeholder="작품 제목"
@@ -128,6 +138,12 @@ export function ExploreScreen() {
           <p id="explore-search-hint" className="text-sm text-muted-foreground">
             인물 검색은 준비 중이에요. 지금은 작품 제목으로만 찾아요.
           </p>
+          {/* 글자 수 안내: 제출 직후 낭독기가 바로 읽도록 role="status"(급하지 않은 알림) */}
+          {isQueryTooShort && (
+            <p role="status" className="text-sm font-semibold">
+              {SEARCH_QUERY_TOO_SHORT_MESSAGE}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-3">

@@ -27,6 +27,7 @@ import { memberHandlers } from '@/mocks/memberHandlers'
 import { notificationHandlers } from '@/mocks/notificationHandlers'
 import { statsHandlers } from '@/mocks/statsHandlers'
 import { getMockRole } from '@/mocks/mockSession'
+import { isSearchQueryTooShort, SEARCH_QUERY_TOO_SHORT_MESSAGE } from '@/lib/searchQuery'
 
 // MSW 요청 핸들러 모음. 목업 모드(VITE_USE_MOCK=true)에서 브라우저가 이 핸들러로 /api 요청을 가로챈다.
 // orval이 계약(docs/api/openapi.yaml)의 operation마다 태그별 핸들러를 생성하고, 여기서 한 배열로 펼친다.
@@ -152,6 +153,17 @@ const publicScreenHandlers: RequestHandler[] = [
         'Bad Request',
         'VALIDATION_FAILED',
         '검색어를 입력해 주세요.',
+      )
+    }
+    // 2글자 미만 거절: 실제 서버(TitleSearchService)와 계약(minLength 2)을 같게 맞춘다(글자 수 규칙은 lib/searchQuery)
+    // (목업 확인용 '*'는 모든 픽스처를 보는 장치라 1글자지만 예외로 통과시킨다)
+    if (query !== '*' && isSearchQueryTooShort(query)) {
+      return problemResponse(
+        request,
+        400,
+        'Bad Request',
+        'VALIDATION_FAILED',
+        SEARCH_QUERY_TOO_SHORT_MESSAGE,
       )
     }
 
