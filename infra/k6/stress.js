@@ -10,7 +10,7 @@ import exec from 'k6/execution';
 import { check } from 'k6';
 import {
   BASE_URL, SUMMARY_TREND_STATS, REQUEST_TIMEOUT, searchTerms, detailMissKeys, detailHitKeys, typicalSettings, worstSettings,
-  measureTags, perApiThresholds, TYPICAL_USER_MAX, WORST_MUST_USERS,
+  measureTags, perApiThresholds, searchLengthTag, searchLengthThresholds, TYPICAL_USER_MAX, WORST_MUST_USERS,
 } from './lib/common.js';
 import { signAccessToken } from './lib/auth.js';
 import { samplerScenario, sampleServerMetrics } from './lib/sampler.js';
@@ -81,7 +81,7 @@ export const options = {
     'http_req_duration{api:plan-calc}': MODE === 'worst'
       ? ['max>=0']
       : [{ threshold: 'p(95)<2000', abortOnFail: true, delayAbortEval: '20s' }],
-  }, perApiThresholds(['search', 'detail-miss', 'detail-hit', 'popularity', 'plan-calc', 'settings-put'])),
+  }, perApiThresholds(['search', 'detail-miss', 'detail-hit', 'popularity', 'plan-calc', 'settings-put']), searchLengthThresholds('search')),
 };
 
 function readTags(api) {
@@ -94,8 +94,11 @@ export function readOnce() {
   const r = i % 10;
   let res;
   if (r < 4) {
-    const term = searchTerms[i % searchTerms.length];
-    res = http.get(`${BASE_URL}/api/public/titles?q=${encodeURIComponent(term)}&page=0&size=20`, readTags('search'));
+    // 검색 순번(반복 10번마다 4건)으로 고른다. i % 길이로 고르면 i % 10 < 4인 자리만 걸려 30개 중 12개만 쓰였다(2026-11-03 수정)
+    const term = searchTerms[(Math.floor(i / 10) * 4 + r) % searchTerms.length];
+    const params = readTags('search');
+    params.tags.tlen = searchLengthTag(term);
+    res = http.get(`${BASE_URL}/api/public/titles?q=${encodeURIComponent(term)}&page=0&size=20`, params);
   } else if (r < 7) {
     // 상세는 미스(매번 다른 작품) 2 : 히트(warmup이 채운 50개) 1
     const miss = r !== 6;

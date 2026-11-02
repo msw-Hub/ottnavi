@@ -14,7 +14,11 @@ export const REQUEST_TIMEOUT = '120s'; // 최악 입력 계산이 기본 60초�
 // 측정 데이터(init 컨텍스트에서 한 번 읽어 VU끼리 공유한다)
 export const wishlistPool = new SharedArray('wishlistPool', () => JSON.parse(open('/scripts/data/wishlist-pool.json')));
 export const worstWishlist = new SharedArray('worstWishlist', () => JSON.parse(open('/scripts/data/worst-wishlist.json')));
+// 검색어 30개: 2글자 이하 15개와 3글자 이상 15개를 번갈아 둔다(차례로 돌면 두 종류가 섞이게)
 export const searchTerms = new SharedArray('searchTerms', () => JSON.parse(open('/scripts/data/search-terms.json')));
+// 2글자 연속 구간이 쓰는 2글자 이하 검색어만 모은 목록
+export const shortSearchTerms = new SharedArray('shortSearchTerms',
+  () => JSON.parse(open('/scripts/data/search-terms.json')).filter((term) => searchLengthTag(term) === 'short'));
 export const detailMissKeys = new SharedArray('detailMissKeys', () => JSON.parse(open('/scripts/data/detail-miss-keys.json')));
 export const detailHitKeys = new SharedArray('detailHitKeys', () => JSON.parse(open('/scripts/data/detail-hit-keys.json')));
 
@@ -80,13 +84,41 @@ export function measureTags(api) {
   return { kind: 'measure', api: api };
 }
 
+/**
+ * 검색어 글자 수 태그. 2글자 이하는 short, 3글자 이상은 long이다.
+ * 트라이그램 인덱스는 3글자 조각이라 2글자 이하에는 쓰이지 않으므로 개선 전후를 이 둘로 나눠 본다.
+ * 한글 음절은 코드 포인트 하나라 Array.from으로 센다(앞뒤 공백은 서버가 잘라 내므로 trim 뒤 길이)
+ */
+export function searchLengthTag(term) {
+  return Array.from(term.trim()).length <= 2 ? 'short' : 'long';
+}
+
+/** 검색 요청 태그(측정 태그 + 글자 수 태그) */
+export function searchTags(api, term) {
+  return Object.assign(measureTags(api), { tlen: searchLengthTag(term) });
+}
+
 /** API 태그마다 요약에 하위 지표가 나오게 하는 임계값(항상 통과)을 만든다 */
 export function perApiThresholds(apis) {
   const thresholds = {};
   for (const api of apis) {
-    thresholds[`http_req_duration{api:${api}}`] = ['max>=0'];
-    thresholds[`http_req_failed{api:${api}}`] = ['rate>=0'];
-    thresholds[`http_reqs{api:${api}}`] = ['count>=0'];
+    Object.assign(thresholds, alwaysPassThresholds(`api:${api}`));
   }
   return thresholds;
+}
+
+/** 검색 API를 글자 수 태그(short·long)로 나눈 하위 지표를 요약에 나오게 한다 */
+export function searchLengthThresholds(api = 'search') {
+  return Object.assign({},
+    alwaysPassThresholds(`api:${api},tlen:short`),
+    alwaysPassThresholds(`api:${api},tlen:long`));
+}
+
+/** 태그 조건 하나에 대해 응답 시간·실패율·요청 수 하위 지표를 만드는 항상 통과 임계값 */
+export function alwaysPassThresholds(tagFilter) {
+  return {
+    [`http_req_duration{${tagFilter}}`]: ['max>=0'],
+    [`http_req_failed{${tagFilter}}`]: ['rate>=0'],
+    [`http_reqs{${tagFilter}}`]: ['count>=0'],
+  };
 }

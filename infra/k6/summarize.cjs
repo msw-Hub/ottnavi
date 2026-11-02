@@ -7,13 +7,15 @@ const summary = JSON.parse(fs.readFileSync(`${prefix}.json`, 'utf8'));
 const m = summary.metrics;
 const fmt = (v) => (v === undefined ? '-' : Number(v).toFixed(1));
 
-// 1. API 태그별 응답 시간·오류율·처리량
+// 1. API 태그별(그리고 검색 글자 수 tlen·연속 구간 phase 같은 추가 태그별) 응답 시간·오류율·처리량
+//    하위 지표 이름 {api:search,tlen:short}는 "search tlen:short"처럼 줄 앞에 붙인다
 for (const key of Object.keys(m).filter((k) => k.startsWith('http_req_duration{api:')).sort()) {
-  const api = key.slice('http_req_duration{api:'.length, -1);
+  const filter = key.slice('http_req_duration{'.length, -1);
+  const label = filter.replace(/^api:/, '').replace(/,/g, ' ');
   const d = m[key];
-  const failed = m[`http_req_failed{api:${api}}`];
-  const reqs = m[`http_reqs{api:${api}}`];
-  console.log(`${api}: n=${d.count} med=${fmt(d.med)} p95=${fmt(d['p(95)'])} p99=${fmt(d['p(99)'])} max=${fmt(d.max)} `
+  const failed = m[`http_req_failed{${filter}}`];
+  const reqs = m[`http_reqs{${filter}}`];
+  console.log(`${label}: n=${d.count} avg=${fmt(d.avg)} med=${fmt(d.med)} p95=${fmt(d['p(95)'])} p99=${fmt(d['p(99)'])} max=${fmt(d.max)} `
     + `fail=${failed ? (failed.value * 100).toFixed(2) : '-'}% rate=${reqs ? fmt(reqs.rate) : '-'}/s`);
 }
 

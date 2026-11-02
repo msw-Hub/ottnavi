@@ -64,7 +64,9 @@ targets.forEach((target, k) => {
   }
   const perApi = {};
   for (const r of durations) {
-    const api = extra(r).api;
+    // 검색은 글자 수 태그(tlen)가 있으면 search/short·search/long으로 나눠 본다
+    const tags = extra(r);
+    const api = tags.tlen ? `${tags.api}/${tags.tlen}` : tags.api;
     (perApi[api] = perApi[api] || []).push(Number(r[col.metric_value]));
   }
   const apiP95 = Object.entries(perApi).map(([a, v]) => `${a}=${f(pct(v, 95), 0)}`).join(' ');
