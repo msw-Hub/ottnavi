@@ -26,23 +26,29 @@ import org.springframework.transaction.annotation.Transactional;
 public class TitleSearchService {
 
     private static final char ESCAPE_CHAR = '\\'; // LIKE 이스케이프 문자
+    private static final int MIN_KEYWORD_LENGTH = 2; // 검색어 최소 글자 수(앞뒤 공백 제외)
 
     private final TitleRepository titleRepository;
     private final TitleCardAssembler titleCardAssembler;
     private final Clock clock; // KST 기준 오늘(ClockConfig)
 
     /**
-     * 검색어로 작품을 한 페이지 찾는다. 검색어는 앞뒤 공백을 뺀 뒤 1자 이상이어야 한다.
-     * 예: q=" 기생 " → 제목 또는 원제에 "기생"이 들어간 작품, 인기도 높은 순.
+     * 검색어로 작품을 한 페이지 찾는다. 검색어는 앞뒤 공백을 뺀 뒤 2글자 이상이어야 한다.
+     * 예: q=" 기생 " → 제목 또는 원제에 "기생"이 들어간 작품, 인기도 높은 순. q="기" → 400(2글자 미만).
+     * 1글자를 막는 이유: 결과가 지나치게 많아 의미 있는 검색이 되기 어렵고, 제목 검색 인덱스(트라이그램)는 3글자 조각이라
+     * 1~2글자에는 도움이 되지 않아 비용이 큰 검색이 된다(K6_SEARCH_BOTTLENECK 8장).
      */
     public TitleSearchResult search(String q, int page, int size) {
-        // 1. 검색어 검증: 앞뒤 공백을 빼고 비면 오류
+        // 1. 검색어 검증: 앞뒤 공백을 빼고 비면 오류, 2글자 미만이어도 오류(글자 수는 이모지 등이 2로 세어지지 않게 코드 포인트로 센다)
         String keyword = "";
         if (q != null) {
             keyword = q.trim();
         }
         if (keyword.isEmpty()) {
             throw new FieldValidationException("q", "검색어를 입력해 주세요.");
+        }
+        if (keyword.codePointCount(0, keyword.length()) < MIN_KEYWORD_LENGTH) {
+            throw new FieldValidationException("q", "검색어는 2글자 이상 입력해 주세요.");
         }
 
         // 2. 제목·원제 부분 일치 조회(최근 2년 개봉작 먼저, 그 안은 인기도 내림차순)

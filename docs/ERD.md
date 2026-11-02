@@ -140,8 +140,8 @@ erDiagram
 | id | BIGINT | PK | 내부 키. 다른 테이블은 이것만 참조 |
 | media_type | VARCHAR(10) | UK | MOVIE / TV (`CHECK`). DB는 대문자로 저장하고 API는 소문자 `movie`/`tv`다. 변환은 도메인 enum(`MediaType`)이 맡는다 |
 | tmdb_id | INT | UK | `UNIQUE(media_type, tmdb_id)`로 영화·드라마 ID 충돌 해결 |
-| title | VARCHAR(300) | | 한국어 제목 (없으면 원제) |
-| original_title | VARCHAR(300) | | NULL 허용. 영화 original_title / 드라마 original_name |
+| title | VARCHAR(300) | | 한국어 제목 (없으면 원제). **trigram GIN 인덱스 있음**(V12 `idx_title_title_trgm`, `extensions.gin_trgm_ops`): 검색 `ilike '%키워드%'`가 3글자 이상일 때 이 인덱스를 쓴다. `pg_trgm` 확장은 `extensions` 스키마에 둔다 |
+| original_title | VARCHAR(300) | | NULL 허용. 영화 original_title / 드라마 original_name. **trigram GIN 인덱스 있음**(V12 `idx_title_original_title_trgm`) |
 | overview | TEXT | | NULL 허용. 줄거리 |
 | overview_lang | VARCHAR(5) | | NULL 허용. ko / en. 영어로 대체했는지 표시 |
 | overview_translated_at | TIMESTAMPTZ | | NULL 허용(V11). 관리자가 반영한 한국어 번역 줄거리의 반영 시각. NULL이면 번역이 아니다(TMDB가 준 줄거리이거나 줄거리 없음). `overview_lang='ko'`만으로는 번역과 TMDB가 원래 준 한국어를 구분할 수 없어 둔다. 수집은 번역일 때만 새 영어 줄거리로 덮어쓰지 않고(TMDB 한국어가 오면 번역 표시를 NULL로 비우고 교체), 영어로 되돌리기(단건·대량)는 이 값이 있는 작품만 대상으로 줄거리·언어·이 컬럼을 모두 NULL로 만든다. 번역이 소량이라 인덱스는 두지 않았다 |

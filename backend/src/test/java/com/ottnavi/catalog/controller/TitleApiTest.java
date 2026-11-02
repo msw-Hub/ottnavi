@@ -212,9 +212,9 @@ class TitleApiTest extends IntegrationTestSupport {
 		saveMovie(900002, "100 실화", "Real 2", "10");
 
 		// when
-		var result = mockMvc.perform(get(SEARCH_URL).param("q", "%"));
+		var result = mockMvc.perform(get(SEARCH_URL).param("q", "0%"));
 
-		// then: %를 와일드카드로 풀면 두 작품이 모두 나온다
+		// then: %를 와일드카드로 풀면 "0%"가 "100 실화"의 "0 "에도 맞아 두 작품이 모두 나온다
 		result.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.totalElements").value(1))
 				.andExpect(jsonPath("$.data.content[0].tmdbId").value(900001));
@@ -233,8 +233,21 @@ class TitleApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 검색어가_2글자_미만이면_400_VALIDATION_FAILED이다() throws Exception {
+		// 앞뒤 공백을 뺀 글자 수로 센다: "가", " a "는 1글자
+		mockMvc.perform(get(SEARCH_URL).param("q", "가"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"))
+				.andExpect(jsonPath("$.fieldErrors[0].field").value("q"))
+				.andExpect(jsonPath("$.fieldErrors[0].message").value("검색어는 2글자 이상 입력해 주세요."));
+		mockMvc.perform(get(SEARCH_URL).param("q", " a "))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
+	}
+
+	@Test
 	void 페이지_크기가_범위를_벗어나면_400_VALIDATION_FAILED이다() throws Exception {
-		mockMvc.perform(get(SEARCH_URL).param("q", "a").param("size", "101"))
+		mockMvc.perform(get(SEARCH_URL).param("q", "ab").param("size", "101"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
 	}

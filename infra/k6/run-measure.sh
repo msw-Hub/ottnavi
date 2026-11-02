@@ -8,7 +8,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash가 /scripts 경로를 Windows 경로로 바꾸지 않게 한다
 
 SCRIPT="$1"; NAME="$2"; STATS_SECONDS="$3"; shift 3
-COMPOSE=(docker compose -f infra/docker-compose.yml --profile perf)
+# PERF_COMPOSE_EXTRA에 파일 경로를 주면 그 compose 파일을 얹는다(예: C2 구성 infra/k6/compose.plan-cache.yml). 재기동 때 설정이 기본으로 되돌아가지 않게 같은 파일을 계속 쓴다
+COMPOSE=(docker compose -f infra/docker-compose.yml ${PERF_COMPOSE_EXTRA:+-f "$PERF_COMPOSE_EXTRA"} --profile perf)
 RESULTS=infra/k6/results
 mkdir -p "$RESULTS"   # 결과 폴더는 .gitignore 대상이라 새로 받은 저장소에는 없다
 TS=$(date +%Y%m%d-%H%M%S)

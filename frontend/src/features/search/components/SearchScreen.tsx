@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { SearchResultCard } from '@/features/search/components/SearchResultCard'
 import { useSearchTitles, type SearchTitlesData } from '@/features/search/hooks/useSearchTitles'
 import { useOttServices } from '@/hooks/useOttServices'
+import { isSearchQueryTooShort } from '@/lib/searchQuery'
 
 /**
  * SCR-01 검색 화면의 본문이다. pages/SearchPage는 이 컴포넌트를 연결만 한다(pages는 얇게, frontend.md).
@@ -26,8 +27,32 @@ export function SearchScreen() {
   return (
     <section className="flex flex-col gap-5">
       <h1 className="text-2xl font-semibold">작품 검색</h1>
-      {query ? <SearchResults query={query} /> : <SearchIntro />}
+      <SearchBody query={query} />
     </section>
+  )
+}
+
+/**
+ * 검색어 상태에 따라 안내(없음) / 글자 수 안내(너무 짧음) / 결과 중 하나를 그린다.
+ * 너무 짧은 검색어는 서버가 400으로 거절하므로 요청을 보내지 않고 여기서 먼저 알린다(글자 수 규칙은 lib/searchQuery).
+ */
+function SearchBody({ query }: { query: string }) {
+  if (query === '') {
+    return <SearchIntro />
+  }
+  if (isSearchQueryTooShort(query)) {
+    return <SearchTooShort />
+  }
+  return <SearchResults query={query} />
+}
+
+// 검색어가 1글자일 때 보이는 안내. 오류가 아니라 입력 안내라서 서버에 요청하지 않고 이 화면에서 바로 알린다
+function SearchTooShort() {
+  return (
+    <EmptyState
+      title="검색어를 2글자 이상 입력해 주세요"
+      description="한 글자로는 결과가 너무 많아 찾기 어렵습니다. 작품 제목의 일부를 두 글자 이상 입력해 보세요."
+    />
   )
 }
 

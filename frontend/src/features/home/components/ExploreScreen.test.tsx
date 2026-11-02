@@ -107,6 +107,20 @@ describe('탐색 화면', () => {
     })
   })
 
+  it('검색어가 1글자이면 안내가 보이고, 고른 장르와 결과는 그대로 남는다', async () => {
+    const user = userEvent.setup()
+    renderExplore('/explore?genre=80')
+
+    await screen.findByRole('list', { name: '탐색 결과' })
+    await user.type(screen.getByRole('searchbox', { name: '작품 제목' }), '카')
+    await user.click(screen.getByRole('button', { name: '찾기' }))
+
+    // 검색이 적용되지 않으므로 장르 조건은 주소에 그대로 있고 결과 목록도 남아 있다
+    expect(await screen.findByText('검색어는 2글자 이상 입력해 주세요.')).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('genre=80')
+    expect(screen.getByRole('list', { name: '탐색 결과' })).toBeInTheDocument()
+  })
+
   it('"새로 볼 수 있게 된 작품만"을 누르면 새 작품 목록으로 바뀐다', async () => {
     const user = userEvent.setup()
     renderExplore()
