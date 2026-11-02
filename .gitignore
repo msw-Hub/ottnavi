@@ -24,3 +24,6 @@ dist/
 *.iml
 .DS_Store
 Thumbs.db
+
+# k6 성능 측정 결과(Task 100). 스크립트는 추적하고 결과 파일은 추적하지 않는다
+infra/k6/results/
