@@ -30,6 +30,7 @@ export * from './applyOverviewDraftItemReason';
 export * from './applyOverviewDraftsRequest';
 export * from './applyOverviewDraftsResult';
 export * from './arrivalType';
+export * from './authStoreUnavailableResponse';
 export * from './availabilityStatus';
 export * from './badGatewayResponse';
 export * from './badRequestResponse';

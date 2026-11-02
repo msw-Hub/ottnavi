@@ -89,7 +89,7 @@ public class RedisWarmUp {
 		long startNanos = System.nanoTime();
 		try {
 			step.run();
-			log.info("Redis {}을 마쳤다: 대상={}, 소요 ms={}", label, name, elapsedMs(startNanos));
+			log.info("Redis {} 완료: 대상={}, 소요 ms={}", label, name, elapsedMs(startNanos)); // 이전: "{}을 마쳤다"(라벨이 "예열 재시도"이면 조사가 어긋났다)
 			return true;
 		} catch (RuntimeException e) {
 			log.warn("Redis {}에 실패했다(앱은 계속 동작한다): 대상={}, 소요 ms={}, 근본원인={}",

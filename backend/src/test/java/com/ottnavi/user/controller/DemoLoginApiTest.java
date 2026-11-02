@@ -146,6 +146,24 @@ class DemoLoginApiTest extends IntegrationTestSupport {
 	}
 
 	@Test
+	void 요청_제한으로_429가_나도_데모_행과_데이터가_지워지지_않는다() throws Exception {
+		// given: 맞게 로그인해 데이터를 넣고, 같은 IP로 틀린 시도를 4번 해 한도 5회를 채운다
+		mockMvc.perform(login("10.9.0.8", LOGIN_ID, PASSWORD)).andExpect(status().isOk());
+		long oldUserId = jdbc.queryForObject("SELECT id FROM users WHERE oauth_provider = 'DEMO'", Long.class);
+		jdbc.update("INSERT INTO user_setting (user_id, monthly_budget, monthly_watch_minutes, watch_preset) VALUES (?, 30000, 1200, 'NORMAL')", oldUserId);
+		for (int i = 0; i < 4; i++) {
+			mockMvc.perform(login("10.9.0.8", LOGIN_ID, "wrong-dummy-password-typed")).andExpect(status().isUnauthorized());
+		}
+
+		// when: 여섯 번째는 맞는 비밀번호지만 429다
+		mockMvc.perform(login("10.9.0.8", LOGIN_ID, PASSWORD)).andExpect(status().isTooManyRequests());
+
+		// then: 같은 사용자 id의 행과 데이터가 그대로다(초기화는 요청 제한 검사 뒤에만 일어난다)
+		assertThat(jdbc.queryForList("SELECT id FROM users WHERE oauth_provider = 'DEMO'", Long.class)).containsExactly(oldUserId);
+		assertThat(jdbc.queryForObject("SELECT count(*) FROM user_setting WHERE user_id = ?", Integer.class, oldUserId)).isEqualTo(1);
+	}
+
+	@Test
 	void 로그인_뒤_재발급해도_DEMO_권한이_유지된다() throws Exception {
 		// given
 		MvcResult loggedIn = mockMvc.perform(login("10.9.0.7", LOGIN_ID, PASSWORD))

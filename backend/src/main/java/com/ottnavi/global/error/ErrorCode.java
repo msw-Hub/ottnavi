@@ -26,6 +26,9 @@ public enum ErrorCode {
 	// 데모 로그인
 	DEMO_LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."),
 
+	// 인증 저장소(Redis)
+	AUTH_STORE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "일시적인 문제로 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."), // Refresh Token 저장소 장애. Retry-After 5초
+
 	// 작품
 	TITLE_NOT_FOUND(HttpStatus.NOT_FOUND, "작품을 찾을 수 없습니다."),
 

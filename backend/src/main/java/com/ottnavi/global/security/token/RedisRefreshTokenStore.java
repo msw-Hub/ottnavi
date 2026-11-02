@@ -1,5 +1,6 @@
 package com.ottnavi.global.security.token;
 
+import com.ottnavi.global.error.AuthStoreUnavailableException;
 import com.ottnavi.global.security.jwt.JwtProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -10,6 +11,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -20,7 +23,9 @@ import org.springframework.stereotype.Component;
  *     rt:user:{userId} SET(familyId 목록). 기존 rl:public:·rl:fetch: 접두사와 겹치지 않는다.
  * 교체·폐기 판정은 Lua 스크립트 하나로 원자적으로 처리해 같은 토큰의 동시 요청이 경쟁하지 않게 한다.
  * 토큰 원문·familyId는 로그에 남기지 않는다.
+ * Redis 오류(DataAccessException)는 AuthStoreUnavailableException(503)으로 바꿔 던진다.
  */
+@Slf4j
 @Component
 public class RedisRefreshTokenStore implements RefreshTokenStore {
 
@@ -101,6 +106,51 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 
 	@Override
 	public String issue(Long userId) {
+		try {
+			return doIssue(userId);
+		} catch (DataAccessException e) {
+			throw unavailable(e);
+		}
+	}
+
+	@Override
+	public RefreshRotation rotate(String rawToken) {
+		try {
+			return doRotate(rawToken);
+		} catch (DataAccessException e) {
+			throw unavailable(e);
+		}
+	}
+
+	@Override
+	public void revoke(String rawToken) {
+		try {
+			doRevoke(rawToken);
+		} catch (DataAccessException e) {
+			throw unavailable(e);
+		}
+	}
+
+	@Override
+	public void revokeAllOf(Long userId) {
+		try {
+			doRevokeAllOf(userId);
+		} catch (DataAccessException e) {
+			throw unavailable(e);
+		}
+	}
+
+	/**
+	 * Redis 오류를 AuthStoreUnavailableException(503)으로 바꾼다. Lettuce 타임아웃·연결 실패는
+	 * Spring이 DataAccessException 계열(QueryTimeoutException, RedisConnectionFailureException 등)로 감싼다.
+	 * 로그에는 원인 클래스 이름만 남기고 토큰·familyId·사용자 정보는 남기지 않는다.
+	 */
+	private AuthStoreUnavailableException unavailable(DataAccessException e) {
+		log.warn("Refresh Token 저장소(Redis) 호출에 실패했습니다: cause={}", e.getClass().getSimpleName());
+		return new AuthStoreUnavailableException("Refresh Token 저장소를 사용할 수 없습니다.", e);
+	}
+
+	private String doIssue(Long userId) {
 		// 1. 계열 번호와 비밀 값을 난수로 만든다
 		String familyId = randomUrlSafe(FAMILY_ID_BYTES);
 		String secret = randomUrlSafe(SECRET_BYTES);
@@ -110,9 +160,8 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 		return familyId + "." + secret;
 	}
 
-	@Override
 	@SuppressWarnings("unchecked")
-	public RefreshRotation rotate(String rawToken) {
+	private RefreshRotation doRotate(String rawToken) {
 		// 1. 형식이 틀리면 Redis를 부르지 않고 없는 계열로 본다
 		Matcher matcher = match(rawToken);
 		if (matcher == null) {
@@ -141,8 +190,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 		return RefreshRotation.reused(userId);
 	}
 
-	@Override
-	public void revoke(String rawToken) {
+	private void doRevoke(String rawToken) {
 		Matcher matcher = match(rawToken);
 		if (matcher == null) {
 			return;
@@ -154,8 +202,7 @@ public class RedisRefreshTokenStore implements RefreshTokenStore {
 		}
 	}
 
-	@Override
-	public void revokeAllOf(Long userId) {
+	private void doRevokeAllOf(Long userId) {
 		String userKey = USER_PREFIX + userId;
 		Set<String> familyIds = redis.opsForSet().members(userKey);
 		if (familyIds != null) {

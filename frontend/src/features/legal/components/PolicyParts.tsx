@@ -24,6 +24,30 @@ export function PolicyList({ children }: { children: ReactNode }) {
   return <ul className="grid list-disc gap-1.5 pl-5">{children}</ul>
 }
 
+interface ExternalPolicyLinkProps {
+  href: string // 외부 업체의 공식 개인정보 안내 주소
+  children: ReactNode // 화면에 보이는 링크 글자(업체 이름)
+}
+
+/*
+ * 외부 업체의 개인정보 안내로 가는 본문 링크. 새 탭에서 연다.
+ * rel="noopener noreferrer": 새 탭의 외부 페이지가 window.opener로 이 화면을 조작하지 못하게 하고, 어느 주소에서 왔는지도 넘기지 않는다.
+ * 새 탭에서 열린다는 사실은 화면 글자를 바꾸지 않도록 낭독기용 글자(sr-only)로만 알린다(About 화면의 TMDB 링크와 같은 방식).
+ */
+export function ExternalPolicyLink({ href, children }: ExternalPolicyLinkProps) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-primary underline underline-offset-3"
+    >
+      {children}
+      <span className="sr-only">(새 탭에서 열림)</span>
+    </a>
+  )
+}
+
 // 문의 이메일 링크. 누르면 메일 앱이 열린다. 본문 링크라 밑줄과 primary 색을 함께 써서 색만으로 링크임을 알리지 않는다
 export function ContactEmailLink() {
   return (
