@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 328" width="760" height="328" role="img" aria-label="첫 전체 수집 단계별 소요. 제공 상태 판정 3시간 42분, 드라마 상세 2시간 28분, 영화 상세 1시간 59분 등 합계 8시간 33분">
+<title>첫 전체 수집: 합계 8시간 33분 48초</title>
+<style>
+.s{fill:#fcfcfb;stroke:#e4e3de}.t{fill:#0b0b0b}.m{fill:#52514e}.g{stroke:#e4e3de}
+.c1{fill:#2a78d6}.c2{fill:#eb6834}.c3{fill:#1baf7a}
+text{font-family:-apple-system,"Segoe UI","Noto Sans KR","Malgun Gothic",sans-serif}
+@media (prefers-color-scheme:dark){.s{fill:#1a1a19;stroke:#33332f}.t{fill:#f0efec}.m{fill:#c3c2b7}.g{stroke:#33332f}
+.c1{fill:#3987e5}.c2{fill:#d95926}.c3{fill:#199e70}}
+</style>
+<rect class="s" x="0.5" y="0.5" width="759" height="327" rx="12"/>
+<text class="t" x="24" y="34" font-size="17" font-weight="700">첫 전체 수집: 합계 8시간 33분 48초</text>
+<text class="m" x="24" y="56" font-size="12.5">작품 33,190건 · 시청 단위 40,016건 · 제공 상태 280,112건을 수집·판정했습니다</text>
+<text class="m" x="188" y="98" font-size="12.5" text-anchor="end">refreshTierStep</text><path class="c1" d="M200 84h1.5a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1 -1.5 1.5h-1.5z"/><text class="t" x="211" y="98" font-size="13" font-weight="700">1.5초</text><text class="m" x="188" y="128" font-size="12.5" text-anchor="end">providerListStep</text><path class="c1" d="M200 114h1.5a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1 -1.5 1.5h-1.5z"/><text class="t" x="211" y="128" font-size="13" font-weight="700">3.9초</text><text class="m" x="188" y="158" font-size="12.5" text-anchor="end">tvCandidateStep</text><path class="c1" d="M200 144h9a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-9z"/><text class="t" x="221" y="158" font-size="13" font-weight="700">7분 39초</text><text class="m" x="188" y="188" font-size="12.5" text-anchor="end">movieCandidateStep</text><path class="c1" d="M200 174h24a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-24z"/><text class="t" x="236" y="188" font-size="13" font-weight="700">15분 50초</text><text class="m" x="188" y="218" font-size="12.5" text-anchor="end">movieDetailStep</text><path class="c1" d="M200 204h204a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-204z"/><text class="t" x="416" y="218" font-size="13" font-weight="700">1시간 59분 21초</text><text class="m" x="188" y="248" font-size="12.5" text-anchor="end">tvDetailStep</text><path class="c1" d="M200 234h254a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-254z"/><text class="t" x="466" y="248" font-size="13" font-weight="700">2시간 28분 13초</text><text class="m" x="188" y="278" font-size="12.5" text-anchor="end">availabilityStep</text><path class="c1" d="M200 264h383a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-383z"/><text class="t" x="595" y="278" font-size="13" font-weight="700">3시간 42분 37초</text><line class="g" x1="200" y1="76" x2="200" y2="290"/><text class="m" x="24" y="314" font-size="11.5">운영(Cloudtype, 메모리 1GB·vCPU 없음) 2026-10-27, 실패 0건, 끝난 뒤 DB 171MB·메모리 최대 577MB</text>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 298" width="760" height="298" role="img" aria-label="읽기 부하 마지막 안정 단계. 인덱스 없음 160, 인덱스만 160, 적용안 275 req/s">
+<title>읽기 부하를 버티는 한계 (마지막 안정 단계, 클수록 좋음)</title>
+<style>
+.s{fill:#fcfcfb;stroke:#e4e3de}.t{fill:#0b0b0b}.m{fill:#52514e}.g{stroke:#e4e3de}
+.c1{fill:#2a78d6}.c2{fill:#eb6834}.c3{fill:#1baf7a}
+text{font-family:-apple-system,"Segoe UI","Noto Sans KR","Malgun Gothic",sans-serif}
+@media (prefers-color-scheme:dark){.s{fill:#1a1a19;stroke:#33332f}.t{fill:#f0efec}.m{fill:#c3c2b7}.g{stroke:#33332f}
+.c1{fill:#3987e5}.c2{fill:#d95926}.c3{fill:#199e70}}
+</style>
+<rect class="s" x="0.5" y="0.5" width="759" height="297" rx="12"/>
+<text class="t" x="24" y="34" font-size="17" font-weight="700">읽기 부하를 버티는 한계 (마지막 안정 단계, 클수록 좋음)</text>
+<text class="m" x="24" y="56" font-size="12.5">검색 병목을 풀어 초당 160건에서 275건까지 안정적으로 처리합니다</text>
+<text class="m" x="238" y="110" font-size="12.5" text-anchor="end">인덱스 없음</text><path class="c1" d="M250 96h194a4 4 0 0 1 4 4v12a4 4 0 0 1 -4 4h-194z"/><text class="t" x="456" y="111" font-size="13" font-weight="700">160 req/s</text><text class="m" x="456" y="129" font-size="11.5">180 req/s에서 응답이 무너짐</text><text class="m" x="238" y="166" font-size="12.5" text-anchor="end">인덱스만</text><path class="c2" d="M250 152h194a4 4 0 0 1 4 4v12a4 4 0 0 1 -4 4h-194z"/><text class="t" x="456" y="167" font-size="13" font-weight="700">160 req/s</text><text class="m" x="456" y="185" font-size="11.5">180 req/s에서 응답이 무너짐</text><text class="m" x="238" y="222" font-size="12.5" text-anchor="end">인덱스 + 매번 계획 세우기 (적용)</text><path class="c3" d="M250 208h336a4 4 0 0 1 4 4v12a4 4 0 0 1 -4 4h-336z"/><text class="t" x="598" y="223" font-size="13" font-weight="700">275 req/s</text><text class="m" x="598" y="241" font-size="11.5">325 req/s에서 응답이 무너짐</text><line class="g" x1="250" y1="88" x2="250" y2="264"/><text class="m" x="24" y="278" font-size="11.5">범위마다 1회 측정, 같은 날 A/B 값만 비교 근거로 사용 (개발 시점 첫 측정값과는 다름)</text>
+</svg>
