@@ -34,7 +34,7 @@
   - 변수를 저장하면 곧바로 재배포된다(저장과 배포가 분리돼 있지 않다)
 - **Vercel** Production = `main`. `vercel.json`의 `/api` rewrite가 Cloudtype 공개 주소로 넘긴다(서비스를 수정만 했으므로 주소 불변). `ORIGIN_SECRET`은 Cloudtype·Vercel·GitHub가 같은 값
 - **GitHub Actions** 시크릿 `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, `BACKEND_BASE_URL`(Cloudtype 공개 주소, 배포 뒤 확인해 등록). 변수 `CRON_ENABLED`는 첫 수집 안정 확인 뒤에 만든다(지금 없음 = 예약 실행은 모두 건너뜀)
-- **Supabase** Session Pooler 5432, PostgreSQL 17.11, Flyway V1~V9
+- **Supabase** Session Pooler 5432, PostgreSQL 17.11, Flyway V1~V9(첫 배포 시점. 2026-11-03 기준 V1~V12)
 - **Redis Cloud** Free 30MB, 버전 8.6, eviction `allkeys-lru`, persistence 없음, TLS 꺼짐(평문), RESP3
 
 ## 3. 겪은 문제와 원인, 해결
