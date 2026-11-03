@@ -105,15 +105,15 @@ paths:
         `dataAsOf`는 이 페이지 작품들의 판정 확인일(KST) 중 가장 오래된 날짜다(결과가 없으면 전체 판정의 최신 확인일).
         `isExternalCollectFailed`는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입하기 전까지 항상 `false`다. 필드는 호환을 위해 유지한다.
         페이지네이션 응답(`content`, `page`, `size`, `totalElements`, `totalPages`)이다.
-        오류: `VALIDATION_FAILED`(400, 검색어 없음·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+        오류: `VALIDATION_FAILED`(400, 검색어 없음·2글자 미만·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
       parameters:
         - name: q
           in: query
-          description: 검색어(제목). 앞뒤 공백을 뺀 뒤 1자 이상
+          description: 검색어(제목). 앞뒤 공백을 뺀 뒤 2글자 이상(1글자 검색은 결과가 지나치게 많고 인덱스 효과가 없어 제한한다)
           required: true
           schema:
             type: string
-            minLength: 1
+            minLength: 2
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
       responses:

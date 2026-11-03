@@ -14,8 +14,8 @@ import type { SizeParamParameter } from './sizeParamParameter';
 
 export type SearchTitlesParams = {
 /**
- * 검색어(제목). 앞뒤 공백을 뺀 뒤 1자 이상
- * @minLength 1
+ * 검색어(제목). 앞뒤 공백을 뺀 뒤 2글자 이상(1글자 검색은 결과가 지나치게 많고 인덱스 효과가 없어 제한한다)
+ * @minLength 2
  */
 q: string;
 /**

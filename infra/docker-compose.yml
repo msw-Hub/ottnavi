@@ -1,5 +1,6 @@
 # 로컬 개발용 PostgreSQL·Redis. 실행: docker compose -f infra/docker-compose.yml up -d
-# - 백엔드와 프론트는 컨테이너로 띄우지 않고 PC에서 직접 실행한다. 측정용 백엔드 컨테이너는 Task 100에서 추가한다.
+# - 백엔드와 프론트는 컨테이너로 띄우지 않고 PC에서 직접 실행한다. 단 성능 측정(k6, Task 100)만 예외로, 프로필 perf에
+#   측정용 백엔드·Redis·k6 컨테이너가 있다(기본 `up`에는 뜨지 않는다). 사용법은 docs/guides/K6_PERFORMANCE.md.
 # - 접속 정보는 환경 변수로 바꿀 수 있고, 없으면 아래 기본값을 쓴다(로컬 컨테이너 전용 값이며 운영에 재사용하지 않는다).
 #   compose는 .env를 이 파일이 있는 infra/ 기준으로 찾으므로, 루트 .env를 쓰려면 --env-file .env 를 붙인다.
 name: ottnavi # 컨테이너·볼륨 이름 접두사를 고정한다
@@ -33,6 +34,64 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # ===== 성능 측정(k6, Task 100). `--profile perf`를 붙일 때만 뜬다 =====
+  # DB는 개발 DB를 건드리지 않도록 같은 postgres 안의 복사본 ottnavi_perf를 쓴다(infra/k6/prepare-perf-db.ps1이 만든다).
+  redis-perf:
+    profiles: [perf]
+    image: redis:8.6-alpine # 개발 Redis와 섞이지 않게 측정 전용으로 따로 둔다(저장 없음)
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend-perf:
+    profiles: [perf]
+    build:
+      context: ../backend                                  # jar가 들어 있는 폴더
+      dockerfile: ../infra/k6/Dockerfile.backend-perf      # Dockerfile은 backend/ 밖에 둔다(Cloudtype이 backend/의 Dockerfile을 빌드에 쓸 가능성을 아예 없애려는 것)
+    image: ottnavi-backend-perf
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+    mem_limit: ${PERF_MEM_LIMIT:-1g}        # 컨테이너 메모리 상한. 운영과 같은 1g가 기본이고 판정 시 512m로 바꾼다
+    memswap_limit: ${PERF_MEM_LIMIT:-1g}    # 스왑을 허용하지 않아 메모리 부족이 숨지 않게 한다
+    cpus: ${PERF_CPUS:-1}                   # CPU 상한. 운영 서버의 CPU는 구독이 없어 정확히 모르므로 비교용으로 고정한다
+    environment:
+      SPRING_PROFILES_ACTIVE: local         # 개발 키·오리진 검사 끔. observability 프로필은 켜지 않아 Grafana로 아무것도 보내지 않는다
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ottnavi_perf
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-ottnavi}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-ottnavi}
+      SPRING_DATA_REDIS_HOST: redis-perf
+      # 요청 제한을 끈다(k6가 한 IP에서 몰아 보내면 429만 나와 측정이 안 된다). 측정 컨테이너에만 적용된다
+      SPRING_APPLICATION_JSON: '{"app":{"rate-limit":{"enabled":false}}}'
+      JAVA_TOOL_OPTIONS: ${PERF_JAVA_OPTS:--Xmx512m}   # 운영(1GB 서버)과 같은 -Xmx512m이 기본. 512m 컨테이너 판정 때는 낮춘다
+    ports:
+      - "127.0.0.1:8081:8080"               # 개발 서버(8080)와 겹치지 않게 8081로 연다
+    healthcheck:
+      # 웹 서버 포트는 DB·마이그레이션 준비가 끝난 뒤에 열리므로 포트가 열리면 요청을 받을 수 있다
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+
+  k6:
+    profiles: [perf]
+    image: grafana/k6:1.0.0
+    depends_on:
+      backend-perf:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://backend-perf:8080
+      JWT_SECRET: b3R0bmF2aS1sb2NhbC1kZXYtb25seS1qd3Qtc2VjcmV0LWtleS0wMTIzNDU2Nzg5   # application-local.yml의 개발 전용 키(저장소에 공개된 값, 운영 키 아님)
+    volumes:
+      - ./k6:/scripts
+    entrypoint: ["k6"]
 
 volumes:
   postgres-data:

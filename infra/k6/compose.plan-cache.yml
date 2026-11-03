@@ -1,0 +1,10 @@
+# 성능 측정 C2 구성(Task 100): 연결마다 "계획 캐시 방식"을 사용자 정의 계획으로 고정한다.
+# 배경: pg_trgm 인덱스가 있을 때 2글자 검색이 범용 계획(generic plan)으로 굳으면 인덱스를 통째로 읽어 느려진다(K6_SEARCH_BOTTLENECK 4장).
+# 이 설정(force_custom_plan)은 계획을 굳히지 않고 연결마다 "매번 검색어를 보고 계획을 새로 세우게" 한다(문서에서는 "매번 계획 세우기"라 부른다).
+# 사용: PERF_COMPOSE_EXTRA=infra/k6/compose.plan-cache.yml 환경 변수를 주고 run-measure.sh를 실행하거나,
+#       docker compose -f infra/docker-compose.yml -f infra/k6/compose.plan-cache.yml --profile perf up -d --no-deps --force-recreate --wait backend-perf
+# 기본 SPRING_APPLICATION_JSON(요청 제한 끄기)에 connection-init-sql 한 줄만 더한다. 환경 변수 이름 변환(CONNECTION_INIT_SQL) 문제를 피하려고 JSON으로 준다.
+services:
+  backend-perf:
+    environment:
+      SPRING_APPLICATION_JSON: '{"app":{"rate-limit":{"enabled":false}},"spring":{"datasource":{"hikari":{"connection-init-sql":"SET plan_cache_mode = force_custom_plan"}}}}'

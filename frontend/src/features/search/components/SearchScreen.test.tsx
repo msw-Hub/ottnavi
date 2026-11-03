@@ -78,6 +78,24 @@ describe('검색 화면', () => {
     expect(screen.getByText(/제목으로 검색해 보세요/)).toBeInTheDocument()
   })
 
+  it('검색어가 1글자이면 서버에 요청하지 않고 2글자 이상 입력하라는 안내만 보인다', () => {
+    // given: 검색 API가 불리면 센다(불리지 않아야 한다)
+    let requestCount = 0
+    server.use(
+      mswHttp.get('/api/public/titles', () => {
+        requestCount += 1
+        return HttpResponse.json({})
+      }),
+    )
+
+    // when
+    renderSearchAt(`/?q=${encodeURIComponent('가')}`)
+
+    // then
+    expect(screen.getByText('검색어를 2글자 이상 입력해 주세요')).toBeInTheDocument()
+    expect(requestCount).toBe(0)
+  })
+
   it('제목이 같은 영화와 드라마가 각각 구분되어 나오고, 출처와 기준일이 보인다', async () => {
     renderSearchAt(`/?q=${encodeURIComponent('카지노')}`)
 
@@ -248,17 +266,17 @@ describe('검색 화면의 더보기', () => {
   it('검색어를 바꾸면 이어 붙인 목록이 아니라 처음부터 다시 시작한다', async () => {
     serveFakePagedTitles(25)
     const user = userEvent.setup()
-    const router = renderSearchAt(`/?q=${encodeURIComponent('가')}`)
+    const router = renderSearchAt(`/?q=${encodeURIComponent('가가')}`)
 
-    await screen.findByText('가 작품 1')
+    await screen.findByText('가가 작품 1')
     await user.click(screen.getByRole('button', MORE_BUTTON))
     await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(20))
 
-    await router.navigate(`/?q=${encodeURIComponent('나')}`)
+    await router.navigate(`/?q=${encodeURIComponent('나나')}`)
 
-    expect(await screen.findByText('나 작품 1')).toBeInTheDocument()
+    expect(await screen.findByText('나나 작품 1')).toBeInTheDocument()
     expect(screen.getAllByRole('article')).toHaveLength(10)
-    expect(screen.queryByText('가 작품 1')).not.toBeInTheDocument()
+    expect(screen.queryByText('가가 작품 1')).not.toBeInTheDocument()
     expect(screen.getByRole('button', MORE_BUTTON)).toBeInTheDocument()
   })
 

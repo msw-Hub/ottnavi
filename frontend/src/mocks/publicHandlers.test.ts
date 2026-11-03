@@ -57,6 +57,13 @@ describe('검색·상세 (계약 모양)', () => {
     expect(res.data).toMatchObject({ page: 0, totalElements: 1 })
   })
 
+  it('검색어가 1글자이면 실제 서버처럼 400 VALIDATION_FAILED다', async () => {
+    await expect(searchTitles({ q: '가' })).rejects.toMatchObject({
+      status: 400,
+      errorCode: 'VALIDATION_FAILED',
+    })
+  })
+
   it('X-Mock-Page-Size 헤더가 한 페이지 크기를 줄인다', async () => {
     const res = await AXIOS_INSTANCE.get('/public/titles', {
       params: { q: '*', page: 0, size: 10 },

@@ -7,6 +7,10 @@ spring:
   datasource:
     hikari:
       maximum-pool-size: 5        # Supabase Session Pooler 한도 고려
+      # 연결마다 쿼리 계획을 굳히지 않고 매번 검색어 값을 보고 새로 세우게 한다(PostgreSQL plan_cache_mode).
+      # 제목 검색의 트라이그램 인덱스(V12)와 함께 써야 한다: 굳은 범용 계획이 2글자 검색을 인덱스 경로로 보내 약 1.8배 느려지는 것을 막는다(K6_SEARCH_BOTTLENECK 4장).
+      # 연결 단위 설정이라 Session Pooler(5432)에서만 유지된다. Transaction Pooler(6543)로 바꾸면 이 설정을 다시 확인해야 한다.
+      connection-init-sql: SET plan_cache_mode = force_custom_plan
   task:
     execution:                    # @Async 실행기(구독 안내 알림 생성·즉시 발송, Task 073). Boot 자동 구성 실행기를 쓴다
       thread-name-prefix: async-

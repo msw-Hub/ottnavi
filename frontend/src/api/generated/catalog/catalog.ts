@@ -183,7 +183,7 @@ export function useListServiceExclusiveTitles<TData = Awaited<ReturnType<typeof 
  * `dataAsOf`는 이 페이지 작품들의 판정 확인일(KST) 중 가장 오래된 날짜다(결과가 없으면 전체 판정의 최신 확인일).
  * `isExternalCollectFailed`는 단건 수집(DB에 없는 작품을 TMDB에서 가져오는 기능)을 도입하기 전까지 항상 `false`다. 필드는 호환을 위해 유지한다.
  * 페이지네이션 응답(`content`, `page`, `size`, `totalElements`, `totalPages`)이다.
- * 오류: `VALIDATION_FAILED`(400, 검색어 없음·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
+ * 오류: `VALIDATION_FAILED`(400, 검색어 없음·2글자 미만·page/size 범위 밖), `INVALID_REQUEST`(400), `RATE_LIMIT_EXCEEDED`(429), `INTERNAL_ERROR`(500).
  * @summary 작품 검색
  */
 export const searchTitles = (
