@@ -16,6 +16,7 @@ import { buildDefaultValues } from '@/features/onboarding/defaultValues'
 import { RequiredMark } from '@/features/onboarding/components/RequiredMark'
 import { ServiceSubscriptionRow } from '@/features/onboarding/components/ServiceSubscriptionRow'
 import { WatchTimeField } from '@/features/onboarding/components/WatchTimeField'
+import { useServicePlanOptions } from '@/hooks/useServicePlanOptions'
 import { useSaveUserSettings } from '@/hooks/useUserSettings'
 import type { UserSettings } from '@/api/generated/model'
 import {
@@ -39,6 +40,9 @@ const FIELD_LABELS: Record<string, string> = {
 // 4번 "계산할 요금제" 구역의 id. 요금 확인 화면(pricing/PricingScreen)의 링크가 주소 #뒤에 같은 값을 붙인다.
 // 기능 폴더끼리 import하지 않는 규칙이라 상수를 공유하지 않고 양쪽에 같은 글자를 쓴다(바꾸면 둘 다 바꾼다)
 const PRICE_MODE_SECTION_ID = 'price-mode'
+
+// 선택지가 없는 서비스에 넘기는 빈 목록. 렌더링마다 새 배열을 만들지 않도록 상수로 둔다
+const NO_PLAN_NAMES: string[] = []
 
 // 이름표 표에서 찾는다. hasOwn으로 확인하는 이유: 서버가 "constructor" 같은 이름을 보내도 객체 기본 속성이 딸려 나오지 않게 하기 위함이다
 function getFieldLabel(field: string): string {
@@ -108,6 +112,7 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
   const {
     register,
     control,
+    setValue,
     handleSubmit,
     formState: { errors },
   } = useForm<OnboardingFormValues>({
@@ -116,6 +121,8 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
     shouldFocusError: false, // 기본 포커스는 쓰지 않고 아래 focusFirstInvalidField가 화면 순서로 직접 옮긴다
   })
   const monthlyBudget = useWatch({ control, name: 'monthlyBudget' })
+  // 서비스별 요금제 이름 선택지(요금 목록 API). 로딩 중·실패면 빈 객체라 각 줄은 지금처럼 직접 입력 칸만 보이고 저장은 막히지 않는다
+  const planNameOptions = useServicePlanOptions()
 
   // 주소가 #price-mode로 끝나면(요금 확인 화면의 "설정에서 … 요금제로 바꾸기" 링크) 4번 "계산할 요금제" 구역으로 내려가 체크박스에 포커스를 준다.
   // 왜 여기(폼)에서 하나: 설정 화면은 내 설정·서비스 목록을 다 불러온 뒤에야 이 폼을 그린다(SettingsScreen). 그 전에는 구역이 화면에 없어
@@ -203,6 +210,8 @@ export function SettingsForm({ settings, services }: SettingsFormProps) {
             control={control}
             register={register}
             errors={errors}
+            setValue={setValue}
+            planNameOptions={planNameOptions[service.ottServiceId] ?? NO_PLAN_NAMES}
           />
         ))}
       </SectionCard>

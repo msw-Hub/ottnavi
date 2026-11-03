@@ -504,3 +504,7 @@ docs/      PRD, ERD, TECH, ROADMAP, 설명 문서(guides), API 계약(api)
 | UI·테스트 | [shadcn/ui](https://ui.shadcn.com/), [orval](https://orval.dev/), [MSW](https://mswjs.io/), [Vitest](https://vitest.dev/), [Testcontainers](https://testcontainers.com/) |
 
 버전별 차이가 큰 라이브러리(Spring Boot 4.1의 Jackson 3, orval, msw 3 등)는 설치된 버전의 공식 문서와 타입 정의를 기준으로 확인했고, 알려진 함정은 [`TECH.md`](docs/TECH.md) 6절에 모아 두었습니다.
+
+## 라이선스
+
+이 저장소의 **소스 코드와 문서**는 [MIT 라이선스](LICENSE)로 공개합니다. 단, 서비스가 보여 주는 작품 정보·이미지는 [TMDB](https://www.themoviedb.org/)의 데이터이고 제공처 정보는 JustWatch 기반이라, 이 라이선스가 아니라 각 제공자의 이용 조건을 따릅니다. TMDB 로고는 TMDB의 자산입니다.

@@ -66,8 +66,8 @@ function AboutSection({ id, title, children }: AboutSectionProps) {
  * - 비영리 운영 안내: TMDB 무료 API는 비상업 용도라, 광고·유료화를 하지 않는다고 밝힌다.
  * - "확정"이 아니라 "확인된 범위"라는 표현.
  *
- * TMDB 로고는 아직 승인된 로고 파일이 없어 자리표시 박스로 두었다. 로고 사용 가이드(승인 파일·조건)는 확인 전이다
- * (docs/TASK003_POLICY_PRICING.md "미확인"). 승인 로고는 Task 088 등에서 가이드를 확인한 뒤 이 박스를 이미지로 교체한다.
+ * TMDB 로고는 공식 로고 페이지에서 받은 SVG(public/tmdb-logo.svg)를 그대로 쓴다(2026-11-03, 자리표시 박스를 교체했다).
+ * 로고 세부 사용 조건(이용약관)은 사용자가 확인하며, 파일은 수정하지 않는다.
  */
 export function AboutScreen() {
   return (
@@ -110,15 +110,20 @@ export function AboutScreen() {
       </AboutSection>
 
       <AboutSection id="about-sources" title="데이터 출처">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* 승인된 TMDB 로고 파일이 오기 전까지의 자리표시. 로고 교체 전에는 글자만 보인다(Task 088 등에서 이미지로 교체) */}
-          <div
-            role="img"
-            aria-label="TMDB 로고 자리 (승인 로고로 교체 예정)"
-            className="grid h-14 w-28 flex-none place-items-center rounded-lg border border-dashed border-border bg-muted text-sm font-bold tracking-wide text-muted-foreground"
-          >
-            TMDB
-          </div>
+        {/* 로고를 고지문 첫 줄 위쪽에 맞춘다(items-start). 가운데 정렬이면 모바일에서 고지문이 6~7줄로 길어질 때
+            로고가 문단 한가운데 떠 보여 어느 문장의 로고인지 흐려진다.
+            이전: className="flex flex-wrap items-center gap-4" */}
+        <div className="flex flex-wrap items-start gap-4">
+          {/* TMDB 공식 로고(themoviedb.org/about/logos-attribution에서 받은 SVG 그대로, 수정하지 않았다. 2026-11-03).
+              약관이 "자신의 로고보다 덜 눈에 띄는 크기"를 요구한다. 헤더의 "OTT내비" 글자 로고(18px 굵은 글씨, 폭 약 65px)와 비교하면
+              높이 40px(h-10, 폭 약 55px)의 3줄 컬러 로고는 더 커 보여서 높이 32px(h-8, 폭 약 44px)로 줄였다.
+              안의 "THE·DB" 글자가 약 9px로 아직 읽히는 크기다. 너비는 원본 비율(185:133)을 따른다.
+              어두운 배경(카드)에서도 그라데이션의 밝은 초록·하늘색이 충분히 보여 따로 배경 박스를 두지 않는다.
+              mt-1은 로고 윗선을 고지문 첫 줄 글자 높이에 맞추는 값이다.
+              이전: <img src="/tmdb-logo.svg" alt="TMDB" className="h-10 w-auto flex-none" />
+              이전: 승인 로고 파일이 오기 전까지의 자리표시 박스
+              <div role="img" aria-label="TMDB 로고 자리 (승인 로고로 교체 예정)" className="grid h-14 w-28 flex-none place-items-center rounded-lg border border-dashed border-border bg-muted text-sm font-bold tracking-wide text-muted-foreground">TMDB</div> */}
+          <img src="/tmdb-logo.svg" alt="TMDB" className="mt-1 h-8 w-auto flex-none" />
           <div className="grid min-w-0 flex-1 gap-1.5">
             {/* 고지 문구는 원문 그대로(영어). 낭독기가 영어로 읽도록 lang="en"을 붙인다 */}
             <p lang="en" className="text-[0.9375rem]">

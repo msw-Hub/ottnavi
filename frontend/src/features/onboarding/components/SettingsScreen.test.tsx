@@ -182,3 +182,92 @@ describe('내 설정 저장 검증(Task 058)', () => {
     expect(router.state.location.pathname).toBe('/settings')
   })
 })
+
+describe('요금제 이름 선택 상자', () => {
+  // 서비스 목록 순서상 첫 번째(넷플릭스)를 "구독 중"으로 바꿔 요금제·결제일 칸을 연다
+  async function subscribeFirstService(user: ReturnType<typeof userEvent.setup>) {
+    await screen.findByRole('heading', { level: 1, name: '시작하기' })
+    await user.click(screen.getAllByRole('radio', { name: '구독 중' })[0])
+  }
+
+  it('선택지에서 요금제를 고르면 저장 요청의 요금제 이름에 그 이름이 들어간다', async () => {
+    let savedBody: { subscriptions: { ottServiceId: number; planName: string | null }[] } | null =
+      null
+    server.use(
+      mswHttp.put('/api/me/settings', async ({ request }) => {
+        savedBody = (await request.json()) as NonNullable<typeof savedBody>
+        return HttpResponse.json({
+          success: true,
+          data: {
+            isOnboardingDone: true,
+            subscriptions: [],
+            monthlyBudget: 20000,
+            monthlyWatchMinutes: 900,
+            watchPreset: 'NORMAL',
+            isLowestPriceMode: false,
+          },
+        })
+      }),
+    )
+    const user = userEvent.setup()
+    renderSettings()
+    await subscribeFirstService(user)
+
+    // 요금 목록을 불러오면 선택 상자가 나타나고, 단품만 들어 있다(번들은 없다)
+    const select = await screen.findByRole('combobox', { name: /요금제 이름/ })
+    expect(screen.queryByRole('option', { name: /번들|더블 이용권/ })).not.toBeInTheDocument()
+    await user.selectOptions(select, '넷플릭스 광고형 스탠다드')
+    // 선택지를 골랐으므로 직접 입력 칸은 숨은 채다
+    expect(screen.queryByRole('textbox', { name: '요금제 이름 직접 입력' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/월 예산/), '20000')
+    await user.click(screen.getByRole('button', { name: '저장하기' }))
+
+    await waitFor(() => expect(savedBody).not.toBeNull())
+    const netflix = savedBody!.subscriptions.find((s) => s.ottServiceId === 1)
+    expect(netflix?.planName).toBe('넷플릭스 광고형 스탠다드')
+  })
+
+  it('"직접 입력"을 고르면 입력 칸이 나타나고 거기에 쓴 글자가 요금제 이름이 된다', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+    await subscribeFirstService(user)
+
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: /요금제 이름/ }),
+      '직접 입력',
+    )
+    const input = await screen.findByRole('textbox', { name: '요금제 이름 직접 입력' })
+    await user.type(input, '내 요금제')
+    expect(input).toHaveValue('내 요금제')
+  })
+
+  it('저장된 요금제 이름이 선택지에 없으면 처음부터 "직접 입력" 모드로 그 글자를 보여 준다', async () => {
+    // 기본 설정의 넷플릭스는 구독 중 + 요금제 이름 "스탠다드"(선택지는 "넷플릭스 스탠다드" 등이라 일치하지 않는다)
+    setMockOnboardingDone(true)
+    renderSettings()
+
+    const select = await screen.findByRole('combobox', { name: /요금제 이름/ })
+    expect(select).toHaveDisplayValue('직접 입력')
+    expect(screen.getByRole('textbox', { name: '요금제 이름 직접 입력' })).toHaveValue('스탠다드')
+  })
+
+  it('요금제 선택지가 비면 선택 상자 없이 지금처럼 입력 칸만 보인다', async () => {
+    let isRequested = false
+    server.use(
+      mswHttp.get('/api/me/service-prices', () => {
+        isRequested = true
+        return HttpResponse.json({ success: true, data: { services: [] } })
+      }),
+    )
+    setMockOnboardingDone(true)
+    renderSettings()
+
+    await screen.findByRole('button', { name: '저장하기' })
+    await waitFor(() => expect(isRequested).toBe(true))
+    // 응답이 화면에 반영될 시간을 한 번 준 뒤에도 선택 상자가 없어야 한다
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByRole('combobox', { name: /요금제 이름/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /요금제 이름/ })).toHaveValue('스탠다드')
+  })
+})
