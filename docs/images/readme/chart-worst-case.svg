@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 226" width="760" height="226" role="img" aria-label="최악 입력 동시 계산 p95. 1건 4.3초, 2건 8.6초, 4건 20.0초">
+<title>최악 입력 플랜 계산 시간 (p95, 로컬 컨테이너 CPU 1개)</title>
+<style>
+.s{fill:#fcfcfb;stroke:#e4e3de}.t{fill:#0b0b0b}.m{fill:#52514e}.g{stroke:#e4e3de}
+.c1{fill:#2a78d6}.c2{fill:#eb6834}.c3{fill:#1baf7a}
+text{font-family:-apple-system,"Segoe UI","Noto Sans KR","Malgun Gothic",sans-serif}
+@media (prefers-color-scheme:dark){.s{fill:#1a1a19;stroke:#33332f}.t{fill:#f0efec}.m{fill:#c3c2b7}.g{stroke:#33332f}
+.c1{fill:#3987e5}.c2{fill:#d95926}.c3{fill:#199e70}}
+</style>
+<rect class="s" x="0.5" y="0.5" width="759" height="225" rx="12"/>
+<text class="t" x="24" y="34" font-size="17" font-weight="700">최악 입력 플랜 계산 시간 (p95, 로컬 컨테이너 CPU 1개)</text>
+<text class="m" x="24" y="56" font-size="12.5">평상시 계산은 약 40ms이고, 후보 조합이 상한 근처인 입력은 완전탐색으로 끝납니다</text>
+<text class="m" x="118" y="99" font-size="13" text-anchor="end">동시 1건</text><path class="c1" d="M130 84h90a4 4 0 0 1 4 4v14a4 4 0 0 1 -4 4h-90z"/><text class="t" x="232" y="100" font-size="13" font-weight="700">4.3초</text><text class="m" x="118" y="135" font-size="13" text-anchor="end">동시 2건</text><path class="c1" d="M130 120h184a4 4 0 0 1 4 4v14a4 4 0 0 1 -4 4h-184z"/><text class="t" x="326" y="136" font-size="13" font-weight="700">8.6초</text><text class="m" x="118" y="171" font-size="13" text-anchor="end">동시 4건</text><path class="c1" d="M130 156h432a4 4 0 0 1 4 4v14a4 4 0 0 1 -4 4h-432z"/><text class="t" x="574" y="172" font-size="13" font-weight="700">20초</text><line class="g" x1="130" y1="76" x2="130" y2="186"/><text class="m" x="24" y="210" font-size="11.5">찜 20개 · 7개 서비스 모두 미구독 · 예산 10만 원, p95 · CPU 1개를 나눠 써서 동시 건수에 비례해 늘어남 (오류 0건)</text>
+</svg>
