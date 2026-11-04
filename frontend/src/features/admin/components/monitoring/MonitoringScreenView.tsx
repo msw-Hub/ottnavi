@@ -28,6 +28,7 @@ export interface MonitoringOverviewProps {
 
 interface MonitoringScreenViewProps {
   urls: MonitoringLinkUrls // 바깥 도구별 주소(빈 문자열인 줄은 준비 중). 보통 MONITORING_LINK_URLS
+  isDemo?: boolean // 데모 계정이면 true. 바로가기 카드가 관리자 전용 줄을 "관리자 전용"으로 막아 보인다(기본 false)
   overview?: MonitoringOverviewProps // 없으면 "운영 현황" 줄을 그리지 않는다(바로가기만 있던 기존 화면·테스트 그대로)
 }
 
@@ -41,7 +42,11 @@ interface MonitoringScreenViewProps {
  * 2열에서 방문자 카드를 한 줄 전체로 늘리는 이유: 3번째 카드가 왼쪽 반 칸에만 남으면 오른쪽이 비어 정렬이 어긋나 보인다.
  * 한 줄 전체일 때는 방문자 카드 안의 숫자 4칸도 한 줄로 펼쳐진다(VisitorStatsCard의 @container).
  */
-export function MonitoringScreenView({ urls, overview }: MonitoringScreenViewProps) {
+export function MonitoringScreenView({
+  urls,
+  isDemo = false,
+  overview,
+}: MonitoringScreenViewProps) {
   return (
     <section className="flex flex-col gap-5">
       <div className="grid gap-1">
@@ -75,7 +80,7 @@ export function MonitoringScreenView({ urls, overview }: MonitoringScreenViewPro
         </section>
       )}
 
-      <MonitoringLinksCard urls={urls} />
+      <MonitoringLinksCard urls={urls} isDemo={isDemo} />
     </section>
   )
 }

@@ -58,6 +58,32 @@ describe('모니터링 화면의 바로가기', () => {
     expect(screen.queryByRole('link', { name: /Grafana 대시보드 열기/ })).not.toBeInTheDocument()
   })
 
+  it('데모 계정이면 관리자 전용 줄은 주소가 있어도 비활성 "관리자 전용"이고 안내 문구가 보인다', () => {
+    render(
+      <MemoryRouter>
+        <MonitoringScreenView
+          isDemo
+          urls={{
+            grafanaDashboard: 'https://example.grafana.net/public-dashboards/abc',
+            grafanaExplore: 'https://example.grafana.net/explore',
+            grafanaAlertRules: 'https://example.grafana.net/alerting',
+            cloudtypeConsole: 'https://app.cloudtype.io/x',
+          }}
+        />
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('link', { name: /Grafana 대시보드 열기/ })).toHaveAttribute(
+      'href',
+      'https://example.grafana.net/public-dashboards/abc',
+    )
+    expect(screen.getByRole('button', { name: 'Grafana 로그 탐색 관리자 전용' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Grafana 알림 규칙 관리자 전용' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cloudtype 콘솔 관리자 전용' })).toBeDisabled()
+    expect(screen.getByText(/로그·알림 규칙·서버 콘솔은 보안상 관리자 계정으로만/)).toBeVisible()
+    // 준비 중 안내는 막힌 줄 때문에 나타나지 않는다
+    expect(screen.queryByText(/주소가 아직 등록되지 않았습니다/)).not.toBeInTheDocument()
+  })
+
   it('수집 실행 결과 줄은 주소 상수와 상관없이 수집 탭으로 이어진다', () => {
     renderView(EMPTY_URLS)
     expect(screen.getByRole('link', { name: '수집 탭' })).toHaveAttribute('href', '/admin/collect')
