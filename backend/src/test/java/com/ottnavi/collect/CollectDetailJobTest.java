@@ -418,21 +418,49 @@ class CollectDetailJobTest extends IntegrationTestSupport {
     }
 
     @Test
-    void 제공처_조회가_404면_그_단위의_기존_제공_상태와_이력을_건드리지_않는다() throws Exception {
+    void 영화_제공처_조회가_404면_기존_있음이_한국_정보_없음으로_모름이_되고_이력이_남는다() throws Exception {
+        // given: 첫 수집에서 Netflix 있음으로 저장된 영화
         stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 1, "title", 900001);
         stubMovie(900001, "줄거리", 100, "[]", cast(0));
         stubMovieProviders(900001, region(new int[] {8}, new int[] {}));
         start(nextParameters());
         long unitId = unitIdOf(900001);
-        Object checkedAt = availability(unitId, "NETFLIX").get("checked_at");
 
-        // 두 번째 수집: 제공처 조회가 404가 됐다
+        // when: 두 번째 수집에서 제공처 조회가 404가 됐다(작품이 TMDB에서 사라짐)
         wireMock.stubFor(get(urlPathEqualTo("/3/movie/900001/watch/providers")).willReturn(aResponse().withStatus(404)));
         JobExecution second = start(nextParameters());
 
+        // then: 옛 있음이 남지 않고 모름(NO_KR_DATA)으로 바뀌며, 그 변경이 이번 실행의 이력으로 남는다
         assertThat(second.getStatus()).isEqualTo(BatchStatus.COMPLETED);
-        assertThat(availability(unitId, "NETFLIX")).containsEntry("status", "AVAILABLE").containsEntry("checked_at", checkedAt);
-        assertThat(count("availability_change")).isEqualTo(7);   // 첫 수집의 신규 7건 그대로
+        assertThat(availability(unitId, "NETFLIX")).containsEntry("status", "UNKNOWN")
+                .containsEntry("unknown_reason", "NO_KR_DATA");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM availability_change WHERE job_execution_id = ? "
+                + "AND before_status = 'AVAILABLE' AND after_status = 'UNKNOWN'", Integer.class, second.getId()))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void 시즌_제공처_조회가_404면_기존_있음이_한국_정보_없음으로_모름이_되고_이력이_남는다() throws Exception {
+        // given: 첫 수집에서 시즌 1이 Disney+ 있음으로 저장된 드라마
+        stubDiscover(DISCOVER_TV, "8|1796", 1, 1, "name", 800001);
+        stubTv(800001, "[]", "[{\"id\":810001,\"season_number\":1,\"name\":\"시즌 1\",\"air_date\":\"2023-03-01\"}]");
+        stubSeason(800001, 1, "시즌 1", "2023-03-01", "[{\"episode_number\":1,\"air_date\":\"2023-03-01\",\"runtime\":60}]");
+        stubSeasonProviders(800001, 1, region(new int[] {337}, new int[] {}));
+        start(nextParameters());
+        long unitId = jdbcTemplate.queryForObject("SELECT id FROM watch_unit", Long.class);
+
+        // when: 두 번째 수집에서 시즌 단위 제공처 조회가 404가 됐다(시즌 상세는 그대로 온다)
+        wireMock.stubFor(get(urlPathEqualTo("/3/tv/800001/season/1/watch/providers"))
+                .willReturn(aResponse().withStatus(404)));
+        JobExecution second = start(nextParameters());
+
+        // then: 옛 있음이 남지 않고 모름(NO_KR_DATA)으로 바뀌며, 그 변경이 이번 실행의 이력으로 남는다
+        assertThat(second.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        assertThat(availability(unitId, "DISNEY_PLUS")).containsEntry("status", "UNKNOWN")
+                .containsEntry("unknown_reason", "NO_KR_DATA");
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM availability_change WHERE job_execution_id = ? "
+                + "AND before_status = 'AVAILABLE' AND after_status = 'UNKNOWN'", Integer.class, second.getId()))
+                .isEqualTo(1);
     }
 
     // 멱등과 이력
