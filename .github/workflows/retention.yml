@@ -52,9 +52,26 @@ jobs:
           echo "응답 상태: ${status}"
           cat response.json
           echo
-          # 2. 202(접수)와 409(수집·재계산·정리가 이미 실행 중)는 성공으로 본다. 그 외는 실패로 알린다
-          if [ "${status}" = "202" ] || [ "${status}" = "409" ]; then
+          # 2. 202(접수)는 성공이다
+          if [ "${status}" = "202" ]; then
             exit 0
+          fi
+          # 3. 409는 서버가 알려 준 오류 코드로 나눈다. 수집·재계산·정리가 실행 중이면 BATCH_ALREADY_RUNNING이다
+          if [ "${status}" = "409" ]; then
+            # 오류 코드를 읽는 jq가 러너에 없으면 설치한다(대개 미리 설치돼 있어 건너뛴다. 항상 설치하면 패키지 저장소 장애가 정상 요청까지 실패시킬 수 있다)
+            if ! command -v jq >/dev/null 2>&1; then
+              echo "jq가 없어 설치합니다."
+              sudo apt-get update -qq && sudo apt-get install -y -qq jq || echo "jq 설치에 실패했습니다."
+            fi
+            error_code=$(jq -r '.errorCode // empty' response.json 2>/dev/null || true)
+            echo "오류 코드: ${error_code:-없음}"
+            if [ "${error_code}" = "BATCH_ALREADY_RUNNING" ]; then
+              # 다른 작업이 실행 중이라 이번 요청은 시작되지 않았다. 메일은 보내지 않고 경고만 남긴다(다음 예약 때 다시 시도한다)
+              echo "::warning::다른 작업이 실행 중이라 이번 데이터 정리 요청은 시작되지 않았습니다."
+              exit 0
+            fi
+            echo "::error::알 수 없는 409 응답입니다(오류 코드 ${error_code:-없음})."
+            exit 1
           fi
           echo "데이터 정리 시작 요청이 실패했습니다(상태 ${status})."
           exit 1
