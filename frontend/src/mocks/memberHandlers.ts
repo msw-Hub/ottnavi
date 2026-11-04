@@ -731,13 +731,23 @@ export const memberHandlers: RequestHandler[] = [
 
     // 예산·시청 시간이 없으면 계산할 수 없다(PRD FR-10 수용: 없이 계산을 요청하면 400)
     const settings = getEffectiveSettings()
+    // 서버(PlanInputService)처럼 어느 조건에 걸렸는지 fieldErrors의 field로 구분한다: 예산·시청 시간 없음 monthlyBudget, 계산할 찜 없음 wishlist.
+    // 화면(요금 확인)은 field가 wishlist이면 서버 문구 대신 찜 안내 문구를 보인다.
+    // 이전: fieldErrors 없이 detail만 보냈다(validationError(request, '월 예산과 월 시청 시간을 먼저 입력해 주세요.') 등)
     if (!settings || settings.monthlyBudget === null || settings.monthlyWatchMinutes === null) {
-      return validationError(request, '월 예산과 월 시청 시간을 먼저 입력해 주세요.')
+      return validationError(request, '요청 값이 올바르지 않습니다.', [
+        {
+          field: 'monthlyBudget',
+          message: '월 예산과 월 시청 시간을 먼저 입력해야 계산할 수 있습니다.',
+        },
+      ])
     }
     // 다 봤음으로 표시한 작품은 계산에서 빠진다(PRD FR-09)
     const hasTargets = [...mockWishlist.values()].some((entry) => entry.watchedAt === null)
     if (!hasTargets) {
-      return validationError(request, '계산할 찜 작품이 없습니다. 작품을 찜해 주세요.')
+      return validationError(request, '요청 값이 올바르지 않습니다.', [
+        { field: 'wishlist', message: '다 보지 않은 찜이 1개 이상 있어야 계산할 수 있습니다.' },
+      ])
     }
 
     // 1. 계산 결과를 저장해 둔다(서버가 DB에 초안 3종을 저장하고 기존 초안은 덮어쓰는 것과 같다)

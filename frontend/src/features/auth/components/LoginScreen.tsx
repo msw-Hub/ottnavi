@@ -1,5 +1,5 @@
 import { CalendarRangeIcon, HeartIcon, SaveIcon } from 'lucide-react'
-import { createSearchParams, useLocation, useNavigate } from 'react-router'
+import { createSearchParams, Link, useLocation, useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { DemoLoginSection } from '@/features/auth/components/DemoLoginSection'
 import { saveLoginReturnTo } from '@/lib/loginReturn'
@@ -11,6 +11,10 @@ const GOOGLE_AUTHORIZATION_PATH = '/api/oauth2/authorization/google'
 
 // 데모 계정 폼을 펼친 채로 열게 하는 로그인 화면 주소 파라미터(/login?demo=1, Task 109)
 const DEMO_QUERY_PARAM = 'demo'
+
+// 로그인 고지문 안의 약관·방침 링크 모양. 회색 글 안에서 밑줄로 링크임을 드러내고(색만으로 구분하지 않음), 마우스를 올리면 글자가 진해진다
+const LOGIN_NOTICE_LINK_CLASS =
+  'rounded-sm underline underline-offset-3 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none'
 
 // 로그인하면 쓸 수 있는 기능 안내(PRD SCR-06 "로그인 혜택 안내")
 const LOGIN_BENEFITS = [
@@ -93,6 +97,23 @@ export function LoginScreen() {
         <Button type="button" size="lg" className="h-11" onClick={handleLogin}>
           Google로 로그인
         </Button>
+        {/* 로그인 전 고지: 누르기 직전에 무엇에 동의하는지와 받는 정보를 짧게 알린다(가입 화면이 따로 없어 이 버튼이 곧 가입이다).
+            링크는 회색 글 안에서 밑줄로 구분해 색만으로 링크임을 알리지 않는다. 문구는 개인정보처리방침 1·3절과 맞춘다.
+            문장이 길어져(3줄) 행간을 조금 넓히고(leading-relaxed) 단어 단위로 줄을 바꿔(break-keep) 가운데 정렬 글이 덜 들쭉날쭉하게 했다 */}
+        <p className="text-center text-sm leading-relaxed break-keep text-muted-foreground">
+          로그인하면{' '}
+          <Link to="/terms" className={LOGIN_NOTICE_LINK_CLASS}>
+            이용약관
+          </Link>
+          과{' '}
+          <Link to="/privacy" className={LOGIN_NOTICE_LINK_CLASS}>
+            개인정보처리방침
+          </Link>
+          {/* 이전: 에 동의한 것으로 봅니다. Google 계정의 이메일과 이름만 받아 회원 식별과 알림 메일에 씁니다.
+              (계정 고유 번호 누락, 알림을 켠 경우에만 보낸다는 조건 누락으로 방침과 어긋났다) */}
+          에 동의한 것으로 봅니다. Google 계정의 이메일·이름·계정 고유 번호를 받아 로그인과 본인
+          확인에 쓰고, 알림을 켠 경우에만 그 이메일로 알림 메일을 보냅니다.
+        </p>
       </div>
 
       {/* 데모 계정 로그인(Task 109). 평소에는 접혀 있고 /login?demo=1이면 펼쳐진 채로 시작한다(사용자 결정 Q1) */}

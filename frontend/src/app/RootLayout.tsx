@@ -119,6 +119,11 @@ export function RootLayout() {
           <Link to="/about" className={FOOTER_LINK_CLASS}>
             서비스 소개(About)
           </Link>
+          {/* 데이터 정확도 안내(SCR-05, 공개 화면). 이전에는 들어갈 링크가 어디에도 없어 주소를 직접 쳐야만 볼 수 있었다.
+              "제공처 정보를 얼마나 믿어도 되는지"는 서비스 소개와 같은 맥락이라 바로 옆에 두고, 로그인과 상관없이 늘 보인다 */}
+          <Link to="/accuracy" className={FOOTER_LINK_CLASS}>
+            데이터 정확도
+          </Link>
           {/* 개인정보처리방침: 로그인 여부와 상관없이 모두에게 보인다(Google 로그인 동의 화면 게시에 필요한 공개 주소) */}
           <Link to="/privacy" className={FOOTER_LINK_CLASS}>
             개인정보처리방침

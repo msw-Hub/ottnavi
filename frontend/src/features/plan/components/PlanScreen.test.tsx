@@ -227,11 +227,27 @@ describe('플랜 결과 화면', () => {
     expect(await screen.findByText('추천형 플랜을 저장했어요')).toBeInTheDocument()
   })
 
-  it('초안도 현재 플랜도 없으면 계산 안내를 보인다', async () => {
+  it('초안도 현재 플랜도 없고 찜이 있으면 요금 확인으로 가는 계산 안내를 보인다', async () => {
+    // 찜이 있어야 "요금 확인하고 계산하기"가 다음 할 일이다(찜이 없으면 아래 테스트처럼 작품 찾기로 보낸다)
+    await customInstance({
+      url: '/me/wishlist-items',
+      method: 'POST',
+      data: { mediaType: 'movie', tmdbId: 496243, seasonNumber: null, priority: 'MUST' },
+    })
     renderPlanScreen()
 
     expect(await screen.findByText('아직 계산한 플랜이 없어요')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '요금 확인하고 계산하기' })).toBeVisible()
+    expect(await screen.findByRole('link', { name: '요금 확인하고 계산하기' })).toBeVisible()
+  })
+
+  it('찜이 하나도 없으면 빈 상태가 작품 찾기로 보낸다', async () => {
+    renderPlanScreen()
+
+    expect(
+      await screen.findByText('보고 싶은 작품을 찜한 뒤 요금을 확인하고 계산해요.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '작품 찾아보기' })).toHaveAttribute('href', '/search')
+    expect(screen.queryByRole('link', { name: '요금 확인하고 계산하기' })).not.toBeInTheDocument()
   })
 
   it('선택이 서로 다르면 유형마다 카드가 3장이다', async () => {
@@ -285,6 +301,16 @@ describe('알림 켜기 안내(저장 직후)', () => {
       'href',
       '/settings/notifications',
     )
+    // 알림이 꺼져 있으면 저장 완료 상자는 메일 안내를 단정하지 않고 변경 내역을 안내한다
+    expect(screen.getByText(/바뀐 점은 '변경 내역 보기'에서 볼 수 있어요/)).toBeInTheDocument()
+  })
+
+  it('저장 완료 상자의 "이번 달 보기"를 누르면 "달별 구독과 볼 작품" 제목으로 포커스가 옮겨 간다', async () => {
+    Element.prototype.scrollIntoView = vi.fn() // jsdom에는 scrollIntoView가 없어 호출만 흉내 낸다
+    const user = await saveAs('USER')
+
+    await user.click(screen.getByRole('link', { name: '이번 달 보기' }))
+    expect(screen.getByRole('heading', { level: 2, name: '달별 구독과 볼 작품' })).toHaveFocus()
   })
 
   it('알림을 이미 켠 회원에게는 안내가 보이지 않는다', async () => {
@@ -300,6 +326,8 @@ describe('알림 켜기 안내(저장 직후)', () => {
     await waitFor(() => expect(settingRequestCount).toBe(1))
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(screen.queryByRole('group', { name: '알림 켜기 안내' })).not.toBeInTheDocument()
+    // 켜진 것을 확인했을 때만 저장 완료 상자가 메일 알림을 약속한다
+    expect(await screen.findByText(/월이 바뀌면 새 플랜을 메일로 알려 드리고/)).toBeInTheDocument()
   })
 
   it('데모 계정에게는 안내가 보이지 않고 알림 설정 요청도 보내지 않는다', async () => {

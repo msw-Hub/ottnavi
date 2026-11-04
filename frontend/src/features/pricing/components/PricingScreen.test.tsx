@@ -213,6 +213,7 @@ describe('요금 확인 화면', () => {
   })
 
   it('90일 넘게 확인하지 않은 요금에만 카드에 경고를 보이고, 줄별 확인일 문구는 없다(계산은 막지 않는다)', async () => {
+    await addWishlistItem() // 찜이 없으면 버튼이 막히므로, 오래된 요금이 계산을 막지 않는지만 보려고 찜을 하나 둔다
     // 고정한 시각(2026-10-13)의 어제와 오래된 일시(넷플릭스 2026-06-14)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     useServicePrices([
@@ -266,6 +267,7 @@ describe('요금 확인 화면', () => {
 
   it('계산하는 동안 화면 가운데에 닫을 수 없는 진행 창이 뜨고, 끝나면 사라진다(실패하면 오류 안내가 남는다)', async () => {
     const user = userEvent.setup()
+    await addWishlistItem() // 찜이 있어야 계산 버튼이 열린다
     // 계산 응답을 붙잡아 두었다가 풀어 준다. 진행 창이 떠 있는 순간을 확인하려는 것
     let release: () => void = () => {}
     const gate = new Promise<void>((resolve) => {
@@ -294,14 +296,42 @@ describe('요금 확인 화면', () => {
     expect(await screen.findByText('플랜을 계산하지 못했어요')).toBeInTheDocument()
   })
 
-  it('찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다', async () => {
+  // 이전 테스트: "찜한 작품이 없으면 계산이 실패하고, 찜 목록으로 가는 링크와 함께 이유를 알린다"(버튼을 눌러 400을 받은 뒤 오류 상자를 봤다).
+  // 지금은 찜이 없으면 누르기 전에 안내하고 버튼을 막으므로 아래 두 테스트로 바꿨다
+  it('찜한 작품이 없으면 계산 전에 안내 상자를 보이고 계산 버튼을 막으며, 버튼이 안내 상자를 설명으로 가리킨다', async () => {
+    renderPricing('/pricing?mock=1')
+
+    const notice = await screen.findByRole('note')
+    expect(within(notice).getByText('찜한 작품을 먼저 담아 주세요')).toBeInTheDocument()
+    // 목업 확인용 주소 파라미터를 이어 붙여 검색 화면으로 간다
+    expect(within(notice).getByRole('link', { name: '작품 찾아보기' })).toHaveAttribute(
+      'href',
+      '/search?mock=1',
+    )
+    const button = screen.getByRole('button', { name: '3개월 플랜 계산하기' })
+    expect(button).toBeDisabled()
+    expect(button).toHaveAccessibleDescription(/찜한 작품을 먼저 담아 주세요/)
+  })
+
+  it('찜 개수를 읽지 못했는데 서버가 찜 없음(400 fieldErrors.wishlist)으로 거절하면, 오류 상자에 찜 안내 문구를 보인다', async () => {
     const user = userEvent.setup()
+    // 찜 목록 조회가 실패하면 화면은 찜 안내를 보이지 않고 버튼도 막지 않는다(서버 판단에 맡긴다)
+    server.use(
+      http.get('/api/me/wishlist-items', () =>
+        HttpResponse.json(
+          { title: '오류', status: 500, errorCode: 'INTERNAL_ERROR' },
+          { status: 500, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
     const router = renderPricing()
 
     await user.click(await screen.findByRole('button', { name: '3개월 플랜 계산하기' }))
 
-    expect(await screen.findByText('플랜을 계산하지 못했어요')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '찜 목록 확인하기' })).toBeInTheDocument()
+    const alert = await screen.findByRole('alert')
+    expect(within(alert).getByText('찜한 작품을 먼저 담아 주세요')).toBeInTheDocument()
+    expect(within(alert).getByRole('link', { name: '작품 찾아보기' })).toBeInTheDocument()
+    expect(screen.queryByText('플랜을 계산하지 못했어요')).not.toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/pricing') // 실패하면 이동하지 않는다
   })
 })
