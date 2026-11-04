@@ -2580,6 +2580,28 @@ components:
         - COMPLETED
         - FAILED
         - STOPPED
+    CollectStepCode:
+      type: string
+      description: |
+        수집 실행의 진행 표시 단계. 화면 라벨은 프론트가 붙인다. 몇 초 안에 끝나는 준비 단계(refresh_tier 재맞춤, 제공처 목록)는 넣지 않는다.
+        MOVIE_CANDIDATE 영화 후보 발견 / TV_CANDIDATE 드라마 후보 발견 / MOVIE_DETAIL 영화 상세 / TV_DETAIL 드라마 상세·시즌 / AVAILABILITY 제공 상태 판정(시즌 판정만 하는 실행도 이 값)
+      enum:
+        - MOVIE_CANDIDATE
+        - TV_CANDIDATE
+        - MOVIE_DETAIL
+        - TV_DETAIL
+        - AVAILABILITY
+    CollectStepStatus:
+      type: string
+      description: |
+        수집 실행 안의 단계 하나의 상태. 실행 상태(`CollectExecutionStatus`)와 다른 값이다(실행이 실패여도 앞 단계는 완료일 수 있다).
+        PENDING 아직 시작하지 않음(실패·중단된 실행이면 시작하지 못한 단계) / RUNNING 진행 중 / COMPLETED 끝남(재시작한 실행이면 앞선 실행에서 끝낸 단계 포함) / FAILED 실패(복구로 실패 처리된 단계 포함) / STOPPED 서버가 꺼져 끝나지 못한 단계
+      enum:
+        - PENDING
+        - RUNNING
+        - COMPLETED
+        - FAILED
+        - STOPPED
     CollectTier:
       type: string
       description: 수집 범위(TECH 3절). ALL 전체 일괄(수동 전체 실행), DAILY 찜한 작품만(후보 발견 생략), WEEKLY 후보 발견 + 나머지 작품(Task 077)
@@ -5300,6 +5322,7 @@ components:
         - canRecover
         - canRestart
         - recalcTargetCount
+        - progress
       properties:
         executionId:
           type: integer
@@ -5347,6 +5370,180 @@ components:
           format: int32
           nullable: true
           description: 이 수집 뒤 이어 돈 재계산 중 가장 최근 실행의 대상 플랜 수. 재계산이 없거나 아직 끝나지 않았으면 null
+        progress:
+          allOf:
+            - $ref: '#/components/schemas/CollectProgress'
+          nullable: true
+          description: 단계별 진행. 서버는 늘 채우지만 화면은 null이면 진행 표시를 숨긴다
+      example:
+        executionId: 7
+        targetDate: '2026-11-04'
+        tier: WEEKLY
+        status: RUNNING
+        startedAt: '2026-11-04T04:00:00+09:00'
+        endedAt: null
+        processedCount: 600
+        changedCount: 0
+        failureReason: null
+        canRecover: false
+        canRestart: false
+        recalcTargetCount: null
+        progress:
+          totalStepCount: 5
+          completedStepCount: 2
+          currentStep: MOVIE_DETAIL
+          steps:
+            - step: MOVIE_CANDIDATE
+              status: COMPLETED
+              processedCount: 18620
+              totalCount: 18620
+              percent: 100
+              completedServiceCount: null
+              totalServiceCount: null
+            - step: TV_CANDIDATE
+              status: COMPLETED
+              processedCount: 9410
+              totalCount: 9410
+              percent: 100
+              completedServiceCount: null
+              totalServiceCount: null
+            - step: MOVIE_DETAIL
+              status: RUNNING
+              processedCount: 600
+              totalCount: 2400
+              percent: 25
+              completedServiceCount: null
+              totalServiceCount: null
+            - step: TV_DETAIL
+              status: PENDING
+              processedCount: 0
+              totalCount: null
+              percent: 0
+              completedServiceCount: null
+              totalServiceCount: null
+            - step: AVAILABILITY
+              status: PENDING
+              processedCount: 0
+              totalCount: null
+              percent: 0
+              completedServiceCount: null
+              totalServiceCount: null
+    CollectProgress:
+      type: object
+      description: |
+        수집 실행 한 건의 단계별 진행. 화면은 "completedStepCount/totalStepCount 단계"와 단계별 퍼센트를 보여 준다. 남은 시간 추정은 주지 않는다.
+        끝난 실행(완료·실패·중단)은 Batch 기록만으로 만들고, 실행 중인 단계의 전체 대상 수와 후보 단계의 서비스 진행은 실행 중일 때만 온다.
+      required:
+        - totalStepCount
+        - completedStepCount
+        - currentStep
+        - steps
+      properties:
+        totalStepCount:
+          type: integer
+          format: int32
+          description: 그 실행이 거치는 단계 수. ALL·WEEKLY는 5, DAILY는 3(후보 발견 생략), 시즌 판정만 하는 실행(scope=AVAILABILITY_TV)은 1
+        completedStepCount:
+          type: integer
+          format: int32
+          description: 끝난(COMPLETED) 단계 수
+        currentStep:
+          allOf:
+            - $ref: '#/components/schemas/CollectStepCode'
+          nullable: true
+          description: 지금 진행 중인 단계. 진행 중인 단계가 없으면(준비 단계·단계 사이, 끝남, 실패·중단) null
+        steps:
+          type: array
+          description: 그 실행이 거치는 단계를 실행 순서대로(길이는 totalStepCount)
+          items:
+            $ref: '#/components/schemas/CollectStepProgress'
+      example:
+        totalStepCount: 5
+        completedStepCount: 0
+        currentStep: MOVIE_CANDIDATE
+        steps:
+          - step: MOVIE_CANDIDATE
+            status: RUNNING
+            processedCount: 5240
+            totalCount: null
+            percent: 35
+            completedServiceCount: 2
+            totalServiceCount: 7
+          - step: TV_CANDIDATE
+            status: PENDING
+            processedCount: 0
+            totalCount: null
+            percent: 0
+            completedServiceCount: null
+            totalServiceCount: null
+          - step: MOVIE_DETAIL
+            status: PENDING
+            processedCount: 0
+            totalCount: null
+            percent: 0
+            completedServiceCount: null
+            totalServiceCount: null
+          - step: TV_DETAIL
+            status: PENDING
+            processedCount: 0
+            totalCount: null
+            percent: 0
+            completedServiceCount: null
+            totalServiceCount: null
+          - step: AVAILABILITY
+            status: PENDING
+            processedCount: 0
+            totalCount: null
+            percent: 0
+            completedServiceCount: null
+            totalServiceCount: null
+    CollectStepProgress:
+      type: object
+      description: 수집 실행 안의 단계 하나의 진행
+      required:
+        - step
+        - status
+        - processedCount
+        - totalCount
+        - percent
+        - completedServiceCount
+        - totalServiceCount
+      properties:
+        step:
+          $ref: '#/components/schemas/CollectStepCode'
+        status:
+          $ref: '#/components/schemas/CollectStepStatus'
+        processedCount:
+          type: integer
+          format: int32
+          description: >-
+            읽어 처리한 건수(후보 단계는 발견한 후보 수, 상세는 작품 수, 판정은 시청 단위 수). TMDB 404로 건너뛴 것도 읽은 수에 든다.
+            진행 중인 상세·판정 단계를 재시작했다면 앞선 실행이 처리한 위치부터 센 처음부터의 수이고, 끝난 단계는 그 단계를 실행한 시도가 읽은 수다. 대기면 0
+        totalCount:
+          type: integer
+          format: int32
+          nullable: true
+          description: 전체 대상 수. 진행 중인 상세·판정 단계는 단계 시작 때 센 값, 완료면 처리 수와 같다. 후보 단계(전체 수를 미리 알 수 없음)·실패·중단·대기는 null
+        percent:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: >-
+            진행률(0~100 정수, 버림). 완료 100, 대기 0. 진행 중인 상세·판정 단계는 processedCount / totalCount(대상이 0건이면 100, 넘치면 100),
+            진행 중인 후보 단계는 (끝낸 서비스 + 지금 서비스에서 읽은 쪽 / 마지막 쪽) / 전체 서비스로 낸 근사값이다.
+            실패·중단이거나 실행 중인데 아직 첫 값을 받기 전이면 null
+        completedServiceCount:
+          type: integer
+          format: int32
+          nullable: true
+          description: 후보 단계에서 discover를 끝낸 서비스 수("서비스 n/7곳"의 n). 진행 중인 후보 단계만 값이 있고 그 밖은 null
+        totalServiceCount:
+          type: integer
+          format: int32
+          nullable: true
+          description: 후보 단계에서 discover할 서비스 수(보통 7). 진행 중인 후보 단계만 값이 있고 그 밖은 null
     CollectExecutionPage:
       description: 수집 실행 이력 한 페이지(페이지네이션 고정 형태)
       allOf:
@@ -5390,6 +5587,46 @@ components:
               canRecover: false
               canRestart: false
               recalcTargetCount: 12
+              progress:
+                totalStepCount: 5
+                completedStepCount: 5
+                currentStep: null
+                steps:
+                  - step: MOVIE_CANDIDATE
+                    status: COMPLETED
+                    processedCount: 18620
+                    totalCount: 18620
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: TV_CANDIDATE
+                    status: COMPLETED
+                    processedCount: 9410
+                    totalCount: 9410
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: MOVIE_DETAIL
+                    status: COMPLETED
+                    processedCount: 1100
+                    totalCount: 1100
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: TV_DETAIL
+                    status: COMPLETED
+                    processedCount: 740
+                    totalCount: 740
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: AVAILABILITY
+                    status: COMPLETED
+                    processedCount: 4210
+                    totalCount: 4210
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
             - executionId: 4
               targetDate: '2026-10-11'
               tier: ALL
@@ -5402,6 +5639,46 @@ components:
               canRecover: false
               canRestart: false
               recalcTargetCount: null
+              progress:
+                totalStepCount: 5
+                completedStepCount: 2
+                currentStep: null
+                steps:
+                  - step: MOVIE_CANDIDATE
+                    status: COMPLETED
+                    processedCount: 18620
+                    totalCount: 18620
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: TV_CANDIDATE
+                    status: COMPLETED
+                    processedCount: 9410
+                    totalCount: 9410
+                    percent: 100
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: MOVIE_DETAIL
+                    status: FAILED
+                    processedCount: 120
+                    totalCount: null
+                    percent: null
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: TV_DETAIL
+                    status: PENDING
+                    processedCount: 0
+                    totalCount: null
+                    percent: 0
+                    completedServiceCount: null
+                    totalServiceCount: null
+                  - step: AVAILABILITY
+                    status: PENDING
+                    processedCount: 0
+                    totalCount: null
+                    percent: 0
+                    completedServiceCount: null
+                    totalServiceCount: null
     CommonResponseCollectExecution:
       type: object
       required:
@@ -5417,7 +5694,7 @@ components:
         data:
           executionId: 3
           targetDate: '2026-10-10'
-          tier: ALL
+          tier: DAILY
           status: FAILED
           startedAt: '2026-10-10T03:00:00+09:00'
           endedAt: null
@@ -5427,6 +5704,32 @@ components:
           canRecover: false
           canRestart: true
           recalcTargetCount: null
+          progress:
+            totalStepCount: 3
+            completedStepCount: 1
+            currentStep: null
+            steps:
+              - step: MOVIE_DETAIL
+                status: COMPLETED
+                processedCount: 430
+                totalCount: 430
+                percent: 100
+                completedServiceCount: null
+                totalServiceCount: null
+              - step: TV_DETAIL
+                status: FAILED
+                processedCount: 210
+                totalCount: null
+                percent: null
+                completedServiceCount: null
+                totalServiceCount: null
+              - step: AVAILABILITY
+                status: PENDING
+                processedCount: 0
+                totalCount: null
+                percent: 0
+                completedServiceCount: null
+                totalServiceCount: null
     CollectExecutionChange:
       type: object
       description: 실행에서 제공 상태가 바뀐 작품 한 건(서비스 단위)

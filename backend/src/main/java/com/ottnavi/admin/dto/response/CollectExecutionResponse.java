@@ -21,6 +21,7 @@ import java.time.OffsetDateTime;
  * @param canRecover     복구 버튼을 켤 수 있는지
  * @param canRestart     재시작 버튼을 켤 수 있는지
  * @param recalcTargetCount 이 수집 뒤 이어 돈 재계산의 대상 플랜 수. 재계산이 없거나 끝나지 않았으면 null (Task 069 2단계에서 채운다)
+ * @param progress       단계별 진행. 서버는 늘 채우지만 계약은 nullable이다(화면은 null이면 진행 표시를 숨긴다)
  */
 public record CollectExecutionResponse(
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "5") long executionId,
@@ -34,5 +35,6 @@ public record CollectExecutionResponse(
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) String failureReason,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "false") boolean canRecover,
 		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, example = "false") boolean canRestart,
-		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "12") Integer recalcTargetCount) {
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true, example = "12") Integer recalcTargetCount,
+		@Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) CollectProgressResponse progress) {
 }

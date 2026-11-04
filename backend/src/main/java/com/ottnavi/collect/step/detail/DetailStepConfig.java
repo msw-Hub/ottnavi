@@ -5,8 +5,11 @@ import com.ottnavi.catalog.domain.enums.UnitType;
 import com.ottnavi.catalog.domain.rule.RuntimeDefaults;
 import com.ottnavi.catalog.service.model.TitleDetail;
 import com.ottnavi.catalog.service.model.UnitProviders;
+import com.ottnavi.collect.job.CollectProgressRegistry;
 import com.ottnavi.collect.job.CollectProperties;
+import com.ottnavi.collect.job.CollectStepCode;
 import com.ottnavi.collect.job.CollectTier;
+import com.ottnavi.collect.step.StepProgressListener;
 import com.ottnavi.infra.tmdb.TmdbClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
@@ -40,15 +43,24 @@ public class DetailStepConfig {
     private static final Map<String, Object> SEASON_FIXED_PARAMETERS = Map.of("unitType", UnitType.SEASON);
     private static final int CHUNK_SIZE = 10; // 작품·단위 하나가 TMDB 호출 여러 번이라 chunk를 작게 둔다(TECH T-2)
 
+    // 대상 조건(from·where)은 한 번만 쓰고 Reader 쿼리와 진행 표시의 전체 대상 count 쿼리가 함께 쓴다(둘이 어긋나지 않게)
+    private static final String TITLE_FROM_WHERE = "from Title t where t.mediaType = :mediaType "
+            + "and t.refreshTier in :refreshTiers";
+    private static final String UNIT_FROM_WHERE = "from WatchUnit u join u.title t "
+            + "where t.refreshTier in :refreshTiers";
+    private static final String SEASON_UNIT_FROM_WHERE = "from WatchUnit u join u.title t "
+            + "where u.unitType = :unitType and t.refreshTier in :refreshTiers";
+
     private static final String TITLE_QUERY = "select new com.ottnavi.collect.step.detail.DetailTarget("
-            + "t.id, t.mediaType, t.tmdbId) from Title t where t.mediaType = :mediaType "
-            + "and t.refreshTier in :refreshTiers order by t.id";
+            + "t.id, t.mediaType, t.tmdbId) " + TITLE_FROM_WHERE + " order by t.id";
     private static final String UNIT_QUERY = "select new com.ottnavi.collect.step.detail.AvailabilityTarget("
-            + "u.id, u.unitType, t.tmdbId, u.seasonNumber) from WatchUnit u join u.title t "
-            + "where t.refreshTier in :refreshTiers order by u.id";
+            + "u.id, u.unitType, t.tmdbId, u.seasonNumber) " + UNIT_FROM_WHERE + " order by u.id";
     private static final String SEASON_UNIT_QUERY = "select new com.ottnavi.collect.step.detail.AvailabilityTarget("
-            + "u.id, u.unitType, t.tmdbId, u.seasonNumber) from WatchUnit u join u.title t "
-            + "where u.unitType = :unitType and t.refreshTier in :refreshTiers order by u.id";
+            + "u.id, u.unitType, t.tmdbId, u.seasonNumber) " + SEASON_UNIT_FROM_WHERE + " order by u.id";
+
+    private static final String TITLE_COUNT_QUERY = "select count(t) " + TITLE_FROM_WHERE;
+    private static final String UNIT_COUNT_QUERY = "select count(u) " + UNIT_FROM_WHERE;
+    private static final String SEASON_UNIT_COUNT_QUERY = "select count(u) " + SEASON_UNIT_FROM_WHERE;
 
     // :refreshTiers(대상 작품의 refresh_tier 목록)는 Step 시작 때 TierReaderParameterListener가 tier로 다시 채운다.
     // 아래 Reader 빌드 값은 리스너 없이 쓸 때를 위한 기본값(전체)이다
@@ -100,22 +112,28 @@ public class DetailStepConfig {
     @Bean
     public Step movieDetailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                 JpaPagingItemReader<DetailTarget> movieTitleReader, TmdbClient tmdbClient,
-                                RuntimeDefaults runtimeDefaults, DetailWriter writer) {
+                                RuntimeDefaults runtimeDefaults, DetailWriter writer,
+                                EntityManagerFactory entityManagerFactory, CollectProgressRegistry progressRegistry) {
+        Map<String, Object> fixedParameters = Map.of("mediaType", MediaType.MOVIE);
         return new StepBuilder(MOVIE_DETAIL_STEP, jobRepository)
                 .<DetailTarget, TitleDetail>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager) // 지정하지 않으면 Batch 6 기본값이 트랜잭션 없는 매니저다
                 .reader(movieTitleReader)
                 .processor(new MovieDetailProcessor(tmdbClient, runtimeDefaults))
                 .writer(writer)
-                .listener(new TierReaderParameterListener(movieTitleReader, Map.of("mediaType", MediaType.MOVIE))) // tier로 읽을 작품 범위를 정한다
+                .listener(new TierReaderParameterListener(movieTitleReader, fixedParameters)) // tier로 읽을 작품 범위를 정한다
+                .listener(StepProgressListener.forTargets(CollectStepCode.MOVIE_DETAIL, "영화 상세", movieTitleReader,
+                        TITLE_COUNT_QUERY, fixedParameters, entityManagerFactory, progressRegistry)) // 진행 로그·표시
                 .build();
     }
 
     @Bean
     public Step tvDetailStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                              JpaPagingItemReader<DetailTarget> tvTitleReader, TmdbClient tmdbClient,
-                             RuntimeDefaults runtimeDefaults, MeterRegistry meterRegistry, DetailWriter writer) {
+                             RuntimeDefaults runtimeDefaults, MeterRegistry meterRegistry, DetailWriter writer,
+                             EntityManagerFactory entityManagerFactory, CollectProgressRegistry progressRegistry) {
         TvDetailProcessor processor = new TvDetailProcessor(tmdbClient, runtimeDefaults, meterRegistry);
+        Map<String, Object> fixedParameters = Map.of("mediaType", MediaType.TV);
         return new StepBuilder(TV_DETAIL_STEP, jobRepository)
                 .<DetailTarget, TitleDetail>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager)
@@ -123,25 +141,35 @@ public class DetailStepConfig {
                 .processor(processor)
                 .writer(writer)
                 .listener(processor) // beforeStep에서 기준일(targetDate)을 받는다
-                .listener(new TierReaderParameterListener(tvTitleReader, Map.of("mediaType", MediaType.TV)))
+                .listener(new TierReaderParameterListener(tvTitleReader, fixedParameters))
+                .listener(StepProgressListener.forTargets(CollectStepCode.TV_DETAIL, "드라마 상세", tvTitleReader,
+                        TITLE_COUNT_QUERY, fixedParameters, entityManagerFactory, progressRegistry))
                 .build();
     }
 
     @Bean
     public Step availabilityStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                  JpaPagingItemReader<AvailabilityTarget> watchUnitReader,
-                                 AvailabilityProcessor processor, AvailabilityWriter writer) {
+                                 AvailabilityProcessor processor, AvailabilityWriter writer,
+                                 EntityManagerFactory entityManagerFactory, CollectProgressRegistry progressRegistry) {
+        StepProgressListener progressListener = StepProgressListener.forTargets(CollectStepCode.AVAILABILITY,
+                "제공 상태 판정", watchUnitReader, UNIT_COUNT_QUERY, Map.of(), entityManagerFactory, progressRegistry);
         return buildAvailabilityStep(AVAILABILITY_STEP, jobRepository, transactionManager, watchUnitReader,
-                Map.of(), processor, writer);
+                Map.of(), processor, writer, progressListener);
     }
 
     /** scope=AVAILABILITY_TV 전용: 판정 Step과 같은 Processor·Writer로 드라마 시즌 단위만 다시 판정한다 */
     @Bean
     public Step tvAvailabilityStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                    JpaPagingItemReader<AvailabilityTarget> seasonUnitReader,
-                                   AvailabilityProcessor processor, AvailabilityWriter writer) {
+                                   AvailabilityProcessor processor, AvailabilityWriter writer,
+                                   EntityManagerFactory entityManagerFactory,
+                                   CollectProgressRegistry progressRegistry) {
+        StepProgressListener progressListener = StepProgressListener.forTargets(CollectStepCode.AVAILABILITY,
+                "시즌 제공 상태 판정", seasonUnitReader, SEASON_UNIT_COUNT_QUERY, SEASON_FIXED_PARAMETERS,
+                entityManagerFactory, progressRegistry);
         return buildAvailabilityStep(TV_AVAILABILITY_STEP, jobRepository, transactionManager, seasonUnitReader,
-                SEASON_FIXED_PARAMETERS, processor, writer);
+                SEASON_FIXED_PARAMETERS, processor, writer, progressListener);
     }
 
     /** 판정 Step 조립: 전체 판정과 시즌 전용 판정이 Reader와 이름만 다르고 나머지는 같다 */
@@ -149,7 +177,8 @@ public class DetailStepConfig {
                                               PlatformTransactionManager transactionManager,
                                               JpaPagingItemReader<AvailabilityTarget> reader,
                                               Map<String, Object> readerFixedParameters,
-                                              AvailabilityProcessor processor, AvailabilityWriter writer) {
+                                              AvailabilityProcessor processor, AvailabilityWriter writer,
+                                              StepProgressListener progressListener) {
         return new StepBuilder(stepName, jobRepository)
                 .<AvailabilityTarget, UnitProviders>chunk(CHUNK_SIZE)
                 .transactionManager(transactionManager)
@@ -159,6 +188,7 @@ public class DetailStepConfig {
                 .listener(writer) // beforeStep에서 jobExecutionId를 받는다
                 .listener(processor) // beforeStep에서 작품 단위 임시 저장을 비우고 afterStep에서 대체 판정 횟수를 남긴다
                 .listener(new TierReaderParameterListener(reader, readerFixedParameters)) // tier로 읽을 작품 범위를 정한다
+                .listener(progressListener) // 진행 로그·표시(전체 대상 수는 Reader와 같은 조건으로 센다)
                 .build();
     }
 
