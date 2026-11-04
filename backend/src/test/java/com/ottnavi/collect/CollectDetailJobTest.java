@@ -10,7 +10,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
+import com.github.tomakehurst.wiremock.stubbing.StubMapping;
+import com.ottnavi.collect.job.CollectExecutionQuery;
+import com.ottnavi.collect.job.CollectExecutionStatus;
 import com.ottnavi.collect.job.CollectJobParameters;
+import com.ottnavi.collect.job.CollectProgressRules;
+import com.ottnavi.collect.job.CollectStepCode;
+import com.ottnavi.collect.job.CollectStepStatus;
 import com.ottnavi.collect.job.CollectTier;
 import com.ottnavi.support.IntegrationTestSupport;
 import java.time.LocalDate;
@@ -22,12 +28,15 @@ import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParameters;
 import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -70,6 +79,9 @@ class CollectDetailJobTest extends IntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private CollectExecutionQuery executionQuery;
 
     @BeforeEach
     void 초기화() {
@@ -569,7 +581,91 @@ class CollectDetailJobTest extends IntegrationTestSupport {
         }
     }
 
+    @Test
+    void 재시작한_실행의_진행은_앞선_실행이_끝낸_후보_단계를_완료로_이어받고_뒤_실행_기록은_앞_실행에_섞이지_않는다()
+            throws Exception {
+        // given: 영화 상세에서 실패한 실행과, 그 실행을 재시작해 끝낸 실행
+        RestartedRun run = failMovieDetailThenRestart();
+        long failedId = run.failed().getId();
+        long restartedId = run.restarted().getId();
+
+        // when
+        Map<Long, Map<CollectStepCode, CollectProgressRules.StepRecord>> found =
+                executionQuery.findStepRecords(List.of(failedId, restartedId));
+        Map<CollectStepCode, CollectProgressRules.StepRecord> restartedRecords = found.get(restartedId);
+        CollectProgressRules.Progress progress = CollectProgressRules.progressOf(CollectTier.ALL, null,
+                CollectExecutionStatus.COMPLETED, restartedRecords, Map.of());
+
+        // then: 후보 단계는 재시작한 실행이 다시 돌지 않아 앞선 실행의 COMPLETED 기록을 이어받는다
+        CollectProgressRules.StepRecord movieCandidate = restartedRecords.get(CollectStepCode.MOVIE_CANDIDATE);
+        assertThat(movieCandidate.isOfThisExecution()).isFalse();
+        assertThat(movieCandidate.batchStatus()).isEqualTo(BatchStatus.COMPLETED);
+        // 영화 상세는 앞선 실행의 FAILED가 아니라 재시작한 실행의 기록이다(이어 읽은 15건)
+        CollectProgressRules.StepRecord movieDetail = restartedRecords.get(CollectStepCode.MOVIE_DETAIL);
+        assertThat(movieDetail.isOfThisExecution()).isTrue();
+        assertThat(movieDetail.batchStatus()).isEqualTo(BatchStatus.COMPLETED);
+        assertThat(movieDetail.readCount()).isEqualTo(15);
+        assertThat(progress.completedStepCount()).isEqualTo(5);
+        for (CollectProgressRules.StepProgress step : progress.steps()) {
+            assertThat(step.status()).as(step.step().name()).isEqualTo(CollectStepStatus.COMPLETED);
+        }
+        // 앞선 실행 쪽에는 뒤 실행(재시작)의 기록이 끼어들지 않는다: 영화 상세는 자기 FAILED, 드라마 상세는 기록 없음
+        Map<CollectStepCode, CollectProgressRules.StepRecord> failedRecords = found.get(failedId);
+        assertThat(failedRecords.get(CollectStepCode.MOVIE_DETAIL).batchStatus()).isEqualTo(BatchStatus.FAILED);
+        assertThat(failedRecords).doesNotContainKey(CollectStepCode.TV_DETAIL);
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void 재시작한_상세_단계의_진행은_재시작_전_위치를_더해_처음부터의_수로_센다(CapturedOutput output) throws Exception {
+        // given: 25편 중 첫 chunk(10건)를 커밋하고 실패한 뒤 재시작한다
+
+        // when
+        RestartedRun run = failMovieDetailThenRestart();
+
+        // then: 재시작 Step의 시작에서 앞선 실행의 위치(10)를 읽고, 끝 로그는 이번에 읽은 15건이 아니라 25/25다
+        assertThat(run.restarted().getStatus()).isEqualTo(BatchStatus.COMPLETED);
+        assertThat(output.getOut()).contains("[진행] 영화 상세 시작: 전체 대상 25건, 재시작이라 10건 다음부터 이어 읽는다");
+        assertThat(output.getOut()).contains("[진행] 영화 상세 끝(COMPLETED): 처리 25/25건 (100%)");
+    }
+
     // 도우미
+
+    /** 실패한 실행과 그 실행을 재시작한 실행 */
+    private record RestartedRun(JobExecution failed, JobExecution restarted) {
+    }
+
+    /**
+     * 영화 25편(chunk 3개: 10, 10, 5) 중 900015에서 TMDB 500이 계속돼 영화 상세 Step이 실패하게 한 뒤,
+     * 오류를 걷어 내고 같은 실행을 재시작한다. 첫 chunk(10건)만 커밋된 상태에서 재시작한다.
+     */
+    private RestartedRun failMovieDetailThenRestart() throws Exception {
+        // 1. 후보 25편(두 쪽)과 상세 응답을 등록한다
+        Object[] firstPage = new Object[20];
+        for (int i = 0; i < 20; i++) {
+            firstPage[i] = 900001 + i;
+        }
+        Object[] secondPage = new Object[5];
+        for (int i = 0; i < 5; i++) {
+            secondPage[i] = 900021 + i;
+        }
+        stubDiscover(DISCOVER_MOVIE, "8|1796", 1, 2, "title", firstPage);
+        stubDiscover(DISCOVER_MOVIE, "8|1796", 2, 2, "title", secondPage);
+        for (int id = 900001; id <= 900025; id++) {
+            stubMovie(id, "줄거리 " + id, 100, "[]", cast(0));
+        }
+
+        // 2. 두 번째 chunk 안의 900015는 재시도 뒤에도 서버 오류라 Step이 실패한다
+        StubMapping failing = wireMock.stubFor(get(urlPathEqualTo("/3/movie/900015")).atPriority(1)
+                .willReturn(aResponse().withStatus(500)));
+        JobExecution failed = start(nextParameters());
+        assertThat(failed.getStatus()).isEqualTo(BatchStatus.FAILED);
+
+        // 3. TMDB가 살아났다고 보고 같은 실행을 재시작한다
+        wireMock.removeStub(failing);
+        JobExecution restarted = jobOperator.restart(failed);
+        return new RestartedRun(failed, restarted);
+    }
 
     private JobExecution start(JobParameters parameters) throws Exception {
         return jobOperator.start(collectJob, parameters);
