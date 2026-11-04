@@ -436,7 +436,7 @@ export function buildMockCollectExecutions(
       status: 'STOPPED',
       startedAt: toSeoulIso(d2, '03:00'),
       endedAt: null,
-      processedCount: 740,
+      processedCount: 2610, // 상세 두 단계의 합(영화 상세 1870 + 드라마 상세 740). 계약상 "상세 단계에서 저장한 작품 수"다
       changedCount: 5,
       failureReason: null,
       canRecover: true, // 중단됨이라 복구할 수 있다
