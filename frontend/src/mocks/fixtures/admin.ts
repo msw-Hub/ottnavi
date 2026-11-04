@@ -22,6 +22,9 @@ import type {
   AdminProvider,
   CollectExecutionChange,
   CollectExecution,
+  CollectProgress,
+  CollectStepCode,
+  CollectStepProgress,
 } from '@/api/generated/model'
 import { addDays } from '@/lib/dateUtils'
 
@@ -284,6 +287,81 @@ export function buildMockAdminProviders(today: string): AdminProvider[] {
 
 /* ===== 수집 (SCR-16) ===== */
 
+/*
+ * ----- 단계별 진행(progress) 만들기 -----
+ * 서버(CollectProgressRules)가 내려주는 모양을 그대로 흉내 낸다. 전체(ALL) 실행은 5단계를 이 순서로 차례대로 돈다(CollectJobConfig).
+ * 상태별 값 규칙(계약 CollectStepProgress): 대기는 처리 0·퍼센트 0, 완료는 전체 수 = 처리 수·퍼센트 100,
+ * 실패·중단됨은 전체 수·퍼센트 null, 서비스 수(completed/totalServiceCount)는 진행 중인 후보 단계에만 있다.
+ */
+export const MOCK_COLLECT_STEPS: CollectStepCode[] = [
+  'MOVIE_CANDIDATE',
+  'TV_CANDIDATE',
+  'MOVIE_DETAIL',
+  'TV_DETAIL',
+  'AVAILABILITY',
+]
+
+// 대기 단계 한 줄
+export function pendingStep(step: CollectStepCode): CollectStepProgress {
+  return {
+    step,
+    status: 'PENDING',
+    processedCount: 0,
+    totalCount: null,
+    percent: 0,
+    completedServiceCount: null,
+    totalServiceCount: null,
+  }
+}
+
+// 완료 단계 한 줄. processedCount: 그 단계가 처리한 수
+export function completedStep(step: CollectStepCode, processedCount: number): CollectStepProgress {
+  return {
+    step,
+    status: 'COMPLETED',
+    processedCount,
+    totalCount: processedCount,
+    percent: 100,
+    completedServiceCount: null,
+    totalServiceCount: null,
+  }
+}
+
+// 실패·중단된 단계 한 줄. 멈춘 단계는 전체 수·퍼센트를 내지 않는다
+export function haltedStep(
+  step: CollectStepCode,
+  status: 'FAILED' | 'STOPPED',
+  processedCount: number,
+): CollectStepProgress {
+  return {
+    step,
+    status,
+    processedCount,
+    totalCount: null,
+    percent: null,
+    completedServiceCount: null,
+    totalServiceCount: null,
+  }
+}
+
+/**
+ * 단계 목록으로 실행 하나의 progress를 만든다. 끝난 단계 수와 지금 단계(처음 만나는 진행 중 단계)는 목록에서 센다(서버 progressOf와 같은 방식).
+ * steps: MOCK_COLLECT_STEPS 순서의 단계 5줄
+ */
+export function buildMockProgress(steps: CollectStepProgress[]): CollectProgress {
+  return {
+    totalStepCount: steps.length,
+    completedStepCount: steps.filter((s) => s.status === 'COMPLETED').length,
+    currentStep: steps.find((s) => s.status === 'RUNNING')?.step ?? null,
+    steps,
+  }
+}
+
+// 5단계 모두 완료한 progress. counts: 단계별 처리 수(MOCK_COLLECT_STEPS 순서)
+export function buildCompletedProgress(counts: number[]): CollectProgress {
+  return buildMockProgress(MOCK_COLLECT_STEPS.map((step, i) => completedStep(step, counts[i] ?? 0)))
+}
+
 /**
  * 수집 실행 이력을 만든다(최근 시작한 순). 성공·중단됨·실패가 있고, 실행 중은 화면에서 접수한 실행으로 생긴다.
  * - 5번 COMPLETED: 오늘 날짜, 40분 전에 시작해 8분 전에 끝남, 변경 0건
@@ -333,6 +411,8 @@ export function buildMockCollectExecutions(
       canRecover: false,
       canRestart: false,
       recalcTargetCount: 12, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
+      // 5단계 모두 완료(단계별 처리 수는 예시. 상세 두 단계의 합이 processedCount와 같다)
+      progress: buildCompletedProgress([1850, 1420, 1900, 1305, 4820]),
     },
     {
       executionId: 4,
@@ -347,6 +427,7 @@ export function buildMockCollectExecutions(
       canRecover: false,
       canRestart: false,
       recalcTargetCount: 8, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
+      progress: buildCompletedProgress([1830, 1400, 1880, 1300, 4790]),
     },
     {
       executionId: 3,
@@ -361,6 +442,14 @@ export function buildMockCollectExecutions(
       canRecover: true, // 중단됨이라 복구할 수 있다
       canRestart: false,
       recalcTargetCount: null,
+      // 드라마 상세에서 서버가 멈췄다. 단계는 차례대로 돌기 때문에(영화 상세 → 드라마 상세) 앞 3단계가 완료이고 판정은 대기다
+      progress: buildMockProgress([
+        completedStep('MOVIE_CANDIDATE', 1810),
+        completedStep('TV_CANDIDATE', 1390),
+        completedStep('MOVIE_DETAIL', 1870),
+        haltedStep('TV_DETAIL', 'STOPPED', 740),
+        pendingStep('AVAILABILITY'),
+      ]),
     },
     {
       executionId: 2,
@@ -375,6 +464,14 @@ export function buildMockCollectExecutions(
       canRecover: false,
       canRestart: true, // 같은 날짜·범위의 최신 실패이고 실행 중인 수집이 없다
       recalcTargetCount: null, // 실패한 수집은 재계산이 돌지 않아 null
+      // 영화 상세에서 TMDB 응답 지연으로 실패했다. 뒤 단계는 시작하지 못해 대기다
+      progress: buildMockProgress([
+        completedStep('MOVIE_CANDIDATE', 1800),
+        completedStep('TV_CANDIDATE', 1380),
+        haltedStep('MOVIE_DETAIL', 'FAILED', 310),
+        pendingStep('TV_DETAIL'),
+        pendingStep('AVAILABILITY'),
+      ]),
     },
     {
       executionId: 1,
@@ -389,6 +486,7 @@ export function buildMockCollectExecutions(
       canRecover: false,
       canRestart: false,
       recalcTargetCount: 7, // 완료된 수집 뒤 이어 돈 재계산의 대상 플랜 수(Task 069·070)
+      progress: buildCompletedProgress([1790, 1370, 1860, 1290, 4750]),
     },
   ]
 }

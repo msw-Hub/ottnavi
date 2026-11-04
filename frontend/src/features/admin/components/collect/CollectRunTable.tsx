@@ -19,6 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  CollectHaltedStep,
+  CollectProgressPanel,
+} from '@/features/admin/components/collect/CollectProgressPanel'
 import { CollectRunDetail } from '@/features/admin/components/collect/CollectRunDetail'
 import { RunStatusBadge } from '@/features/admin/components/RunStatusBadge'
 import { COLLECT_TIER_LABELS } from '@/features/admin/collectRules'
@@ -82,6 +86,44 @@ function FailureReason({ execution, variant }: { execution: CollectExecution; va
         {isOpen ? <ChevronDownIcon aria-hidden="true" /> : <ChevronRightIcon aria-hidden="true" />}
         <span className="sr-only"> (실행 {execution.executionId})</span>
       </Button>
+    </div>
+  )
+}
+
+// 실행 중이고 서버가 진행 정보를 줬는지(진행 띠를 그릴지). progress가 null이면 띠를 숨긴다(계약: 화면은 null이면 진행 표시를 숨긴다)
+function hasProgressPanel(execution: CollectExecution): boolean {
+  return execution.status === 'RUNNING' && execution.progress != null
+}
+
+// 실패·중단된 실행이고 진행 정보가 있는지(멈춘 단계 한 줄을 그릴지). 완료된 실행에는 진행 띠를 그리지 않는다
+function hasHaltedLine(execution: CollectExecution): boolean {
+  return (
+    (execution.status === 'FAILED' || execution.status === 'STOPPED') && execution.progress != null
+  )
+}
+
+// 행 아래에 띠가 하나라도 붙는지(진행 / 멈춘 단계 / 실패 사유)
+function hasStatusBand(execution: CollectExecution): boolean {
+  return (
+    hasProgressPanel(execution) ||
+    hasHaltedLine(execution) ||
+    (execution.status === 'FAILED' && !!execution.failureReason)
+  )
+}
+
+/*
+ * 행 아래 띠 묶음. 표는 서브 행 안에, 카드는 실패 사유가 있던 자리에 놓는다.
+ * 실행 중 → 단계별 진행 띠 / 실패·중단됨 → "n/N 단계에서 멈춤 · 단계 이름" 한 줄, 그 아래 실패 사유 띠(실패이고 사유가 있을 때).
+ */
+function StatusBand({ execution, variant }: { execution: CollectExecution; variant: Variant }) {
+  const { progress } = execution
+  if (hasProgressPanel(execution) && progress) return <CollectProgressPanel progress={progress} />
+  return (
+    <div className="grid gap-2">
+      {hasHaltedLine(execution) && progress && (
+        <CollectHaltedStep progress={progress} isStopped={execution.status === 'STOPPED'} />
+      )}
+      <FailureReason execution={execution} variant={variant} />
     </div>
   )
 }
@@ -220,8 +262,9 @@ export function CollectRunTable({
                   tabIndex={-1}
                   className={cn(
                     'outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
-                    // 아래에 실패 사유 띠가 붙는 행은 사이 구분선을 지워 한 덩어리로 보이게 한다
-                    execution.status === 'FAILED' && execution.failureReason && 'border-b-0',
+                    // 아래에 띠(진행·멈춘 단계·실패 사유)가 붙는 행은 사이 구분선을 지워 한 덩어리로 보이게 한다
+                    // 이전: execution.status === 'FAILED' && execution.failureReason && 'border-b-0'
+                    hasStatusBand(execution) && 'border-b-0',
                   )}
                 >
                   <TableCell className="tabular-nums">{execution.executionId}</TableCell>
@@ -241,10 +284,12 @@ export function CollectRunTable({
                   </TableCell>
                   <TableCell>{changesToggle(execution, 'table')}</TableCell>
                 </TableRow>
-                {execution.status === 'FAILED' && execution.failureReason && (
+                {/* 행 바로 아래 띠: 실행 중이면 단계별 진행, 실패·중단됨이면 멈춘 단계 한 줄 + 실패 사유.
+                    이전: 실패 사유 띠만 있었다({execution.status === 'FAILED' && execution.failureReason && (…FailureReason…)}) */}
+                {hasStatusBand(execution) && (
                   <TableRow data-static-row className="hover:bg-transparent">
                     <TableCell colSpan={7} className="pt-0">
-                      <FailureReason execution={execution} variant="table" />
+                      <StatusBand execution={execution} variant="table" />
                     </TableCell>
                   </TableRow>
                 )}
@@ -289,7 +334,8 @@ export function CollectRunTable({
               <dt className="text-muted-foreground">처리</dt>
               <dd className="tabular-nums">{execution.processedCount.toLocaleString('ko-KR')}건</dd>
             </dl>
-            <FailureReason execution={execution} variant="card" />
+            {/* 이전: <FailureReason execution={execution} variant="card" /> (실패 사유만). 진행·멈춘 단계도 같은 자리에 둔다 */}
+            {hasStatusBand(execution) && <StatusBand execution={execution} variant="card" />}
             <div className="flex flex-wrap items-center gap-2">
               {changesToggle(execution, 'card')}
               {actions(execution, 'card')}
