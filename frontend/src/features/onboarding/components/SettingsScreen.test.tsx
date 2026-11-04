@@ -252,6 +252,36 @@ describe('요금제 이름 선택 상자', () => {
     expect(screen.getByRole('textbox', { name: '요금제 이름 직접 입력' })).toHaveValue('스탠다드')
   })
 
+  it('목록 밖 저장값을 모두 지워도 직접 입력 칸이 사라지지 않고 이어서 쓸 수 있다', async () => {
+    // 리뷰 지적(PR #143): 지우면 값이 ''가 되어 선택 상자로 되돌아가며 칸이 숨던 문제
+    setMockOnboardingDone(true)
+    const user = userEvent.setup()
+    renderSettings()
+
+    const input = await screen.findByRole('textbox', { name: '요금제 이름 직접 입력' })
+    await user.clear(input)
+
+    expect(screen.getByRole('textbox', { name: '요금제 이름 직접 입력' })).toBeVisible()
+    expect(screen.getByRole('combobox', { name: /요금제 이름/ })).toHaveDisplayValue('직접 입력')
+    await user.type(input, '내 요금제')
+    expect(input).toHaveValue('내 요금제')
+  })
+
+  it('요금제를 비운 채 저장하면 선택 상자에 오류가 표시되고 포커스가 간다', async () => {
+    // jsdom에는 scrollIntoView가 없어 오류 칸으로 화면을 옮기는 코드가 실패하므로 빈 함수로 대신한다
+    Element.prototype.scrollIntoView = vi.fn()
+    const user = userEvent.setup()
+    renderSettings()
+    await subscribeFirstService(user)
+    const select = await screen.findByRole('combobox', { name: /요금제 이름/ })
+
+    await user.type(screen.getByLabelText(/월 예산/), '20000')
+    await user.click(screen.getByRole('button', { name: '저장하기' }))
+
+    await waitFor(() => expect(select).toHaveAttribute('aria-invalid', 'true'))
+    await waitFor(() => expect(select).toHaveFocus())
+  })
+
   it('요금제 선택지가 비면 선택 상자 없이 지금처럼 입력 칸만 보인다', async () => {
     let isRequested = false
     server.use(

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import {
   useWatch,
   type Control,
@@ -124,6 +124,20 @@ export function ServiceSubscriptionRow({
     setValue(fieldName, value, { shouldValidate: true })
   }
 
+  // 직접 입력 칸 연결 정보(폼 등록값). onChange만 아래에서 덧붙여 쓰므로 변수로 꺼내 둔다
+  const planNameRegistration = register(`services.${index}.planName`)
+
+  // 직접 입력 칸에 글자를 입력하면 직접 입력 모드로 고정한다(리뷰 지적, PR #143).
+  // 단순한 방법: 모드를 입력값으로만 계산(저장된 이름이 선택지에 없으면 직접 입력, 비면 선택 상자).
+  // 문제점: 목록 밖 저장값(예: 예전에 직접 친 "스탠다드")에서 글자를 모두 지우면 값이 ''가 되어 모드가 선택 상자로 돌아가고,
+  //        고쳐 쓰던 입력 칸이 사라지면서 포커스를 잃는다.
+  // 택한 방식: 입력이 일어난 시점에 isCustomChosen을 true로 둔다. 선택 상자에서 목록 항목을 고르면 handlePlanSelectChange가 다시 false로 되돌린다.
+  // 선택지가 없을 때(입력 칸만 보이는 화면)는 모드 구분이 필요 없어 건드리지 않는다
+  function handleCustomInputChange(event: ChangeEvent<HTMLInputElement>) {
+    if (hasPlanOptions) setIsCustomChosen(true)
+    void planNameRegistration.onChange(event)
+  }
+
   return (
     <div className="grid gap-3 py-4 first:pt-0 last:pb-0">
       <SegmentedRadio
@@ -203,7 +217,8 @@ export function ServiceSubscriptionRow({
               isCustomInputShown && rowErrors?.planName ? planNameErrorId : undefined
             }
             className="h-11"
-            {...register(`services.${index}.planName`)}
+            {...planNameRegistration}
+            onChange={handleCustomInputChange}
           />
           {rowErrors?.planName && (
             <p id={planNameErrorId} role="alert" className="text-sm text-destructive">
