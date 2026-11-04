@@ -20,6 +20,9 @@ import type {
 } from '@/api/generated/model'
 
 // 플랜 유형 이름(PRD 11절 35번)
+// "달별 구독과 볼 작품" 구간 제목(h2)의 id. 구간(PlanDetail)과, 저장 완료 상자의 "이번 달 보기" 이동 링크(PlanScreen)가 같은 값을 쓴다
+export const PLAN_MONTHS_HEADING_ID = 'plan-months-heading'
+
 export const PLAN_TYPE_LABELS: Record<PlanType, string> = {
   RECOMMENDED: '추천형',
   SAVER: '절약형',

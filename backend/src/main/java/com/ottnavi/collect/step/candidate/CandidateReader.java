@@ -39,6 +39,7 @@ public class CandidateReader implements ItemStreamReader<CandidateTitle> {
     private List<DiscoverTarget> targets = List.of(); // 서비스별 discover 대상
     private int targetIndex; // 지금 읽는 서비스
     private int nextPage; // 그 서비스에서 다음에 읽을 쪽(1부터)
+    private int currentLastPage; // 그 서비스의 마지막 쪽(min(totalPages, 500)). 첫 쪽을 받기 전이면 0
     private final Queue<CandidateTitle> buffer = new ArrayDeque<>(); // 읽어 온 쪽의 남은 작품
     private int maxActive; // Step 중 관찰한 최대 사용 연결 수
     private int pageCount; // 호출한 쪽 수
@@ -57,6 +58,7 @@ public class CandidateReader implements ItemStreamReader<CandidateTitle> {
         targets = providerCollectService.findDiscoverTargets();
         targetIndex = 0;
         nextPage = 1;
+        currentLastPage = 0;
         buffer.clear();
         maxActive = 0;
         pageCount = 0;
@@ -99,14 +101,39 @@ public class CandidateReader implements ItemStreamReader<CandidateTitle> {
         maxActive = Math.max(maxActive, poolMonitor.activeConnections());
         // 4. 가져온 작품을 buffer에 채운다
         buffer.addAll(page.items());
-        // 5. 마지막 쪽이면 다음 서비스로, 아니면 다음 쪽으로 옮긴다
-        if (nextPage >= Math.min(page.totalPages(), MAX_PAGE)) {
-            log.info("{} {} discover 끝: {}쪽", label, target.serviceCode(), nextPage);
+        // 5. 마지막 쪽이면 다음 서비스로, 아니면 다음 쪽으로 옮긴다(마지막 쪽 수는 진행 표시도 쓴다)
+        currentLastPage = Math.min(page.totalPages(), MAX_PAGE);
+        if (nextPage >= currentLastPage) {
+            log.info("{} {} discover 끝: {}쪽 (서비스 {}/{}곳)", label, target.serviceCode(), nextPage,
+                    targetIndex + 1, targets.size());
             targetIndex++;
             nextPage = 1;
+            currentLastPage = 0;
         } else {
             nextPage++;
         }
         return true;
+    }
+
+    // 진행 표시용 값(StepProgressListener가 청크마다 읽는다). ExecutionContext에 쓰지 않으므로 "재시작하면 처음부터" 규칙과 무관하다
+
+    /** discover를 끝낸 서비스 수 */
+    public int getCompletedServiceCount() {
+        return targetIndex;
+    }
+
+    /** discover할 서비스 수. open 전이면 0 */
+    public int getServiceCount() {
+        return targets.size();
+    }
+
+    /** 지금 서비스에서 읽은 쪽 수 */
+    public int getCurrentServicePageCount() {
+        return nextPage - 1;
+    }
+
+    /** 지금 서비스의 마지막 쪽. 첫 쪽을 받기 전이면 0 */
+    public int getCurrentServiceLastPage() {
+        return currentLastPage;
     }
 }

@@ -7,6 +7,8 @@ import type {
   CommonResponseAdminProvider,
   CollectExecutionChange,
   CollectExecution,
+  CollectProgress,
+  CollectStepProgress,
   CollectTier,
   CommonResponseCollectExecutionChangePage,
   CommonResponseCollectExecution,
@@ -52,7 +54,12 @@ import {
   buildMockAdminProviders,
   buildMockCollectChanges,
   buildMockCollectExecutions,
+  buildCompletedProgress,
+  buildMockProgress,
+  completedStep,
+  MOCK_COLLECT_STEPS,
   MOCK_PRODUCTS,
+  pendingStep,
 } from '@/mocks/fixtures/admin'
 
 /*
@@ -270,20 +277,88 @@ const SIMULATED_CHANGES: CollectExecutionChange[] = [
   },
 ]
 
-// 시뮬레이션: 이력을 한 번 읽을 때마다 접수한 실행의 읽은 횟수를 올리고, 기준 횟수에 닿으면 성공으로 바꾼다
+// 후보 단계가 discover하는 서비스 수(국내 7곳)
+const SIMULATED_SERVICE_COUNT = 7
+
+/**
+ * 접수한 실행의 단계별 진행을 읽은 횟수로 정한다(결정적 규칙, 화면 확인용 예시 값).
+ * - 0번(접수 직후): 영화 후보 진행 중, 서비스 0/7곳, 0%
+ * - 1번: 영화 후보 진행 중, 서비스 3/7곳, 약 45%(후보 단계는 근사값)
+ * - 2번: 후보 두 단계 완료 뒤 영화 상세 진행 중 620 / 1,000건, 62%
+ * - 3번: 영화 상세 진행 중이지만 퍼센트·전체 수가 아직 없다("처리 n건" 표시 확인용. 서버는 첫 값을 받기 전이면 null을 준다)
+ * - 기준 횟수(SIMULATED_COMPLETE_AFTER_READS) 이상: 5단계 모두 완료
+ * 반환: 그 시점의 progress와 실행 전체의 처리 건수(상세 단계에서 저장한 작품 수, 계약 CollectExecution.processedCount)
+ */
+function simulatedProgress(reads: number): { progress: CollectProgress; processedCount: number } {
+  // 1. 끝까지 읽었으면 5단계 모두 완료다(처리 건수는 예전 완료 값 3,200과 같게 영화 1,900 + 드라마 1,300)
+  if (reads >= SIMULATED_COMPLETE_AFTER_READS) {
+    return {
+      progress: buildCompletedProgress([1820, 1400, 1900, 1300, 4800]),
+      processedCount: 3200,
+    }
+  }
+  // 2. 접수 직후·1번째: 영화 후보를 찾는 중
+  if (reads <= 1) {
+    const isStarted = reads === 1
+    const candidate: CollectStepProgress = {
+      step: 'MOVIE_CANDIDATE',
+      status: 'RUNNING',
+      processedCount: isStarted ? 780 : 0, // 지금까지 발견한 후보 수
+      totalCount: null, // 후보 단계는 전체 수를 미리 알 수 없다
+      percent: isStarted ? 45 : 0,
+      completedServiceCount: isStarted ? 3 : 0,
+      totalServiceCount: SIMULATED_SERVICE_COUNT,
+    }
+    return {
+      progress: buildMockProgress([
+        candidate,
+        ...MOCK_COLLECT_STEPS.slice(1).map((step) => pendingStep(step)),
+      ]),
+      processedCount: 0,
+    }
+  }
+  // 3. 2·3번째: 후보 두 단계가 끝나고 영화 상세를 도는 중(3번째는 퍼센트·전체 수가 아직 없는 상태)
+  const hasFirstValue = reads === 2
+  const detail: CollectStepProgress = {
+    step: 'MOVIE_DETAIL',
+    status: 'RUNNING',
+    processedCount: hasFirstValue ? 620 : 640,
+    totalCount: hasFirstValue ? 1000 : null,
+    percent: hasFirstValue ? 62 : null,
+    completedServiceCount: null,
+    totalServiceCount: null,
+  }
+  return {
+    progress: buildMockProgress([
+      completedStep('MOVIE_CANDIDATE', 1820),
+      completedStep('TV_CANDIDATE', 1400),
+      detail,
+      pendingStep('TV_DETAIL'),
+      pendingStep('AVAILABILITY'),
+    ]),
+    processedCount: detail.processedCount,
+  }
+}
+
+// 시뮬레이션: 이력을 한 번 읽을 때마다 접수한 실행의 읽은 횟수를 올려 단계 진행을 옮기고, 기준 횟수에 닿으면 성공으로 바꾼다
 function advanceSimulatedRuns(): void {
   for (const execution of getAllExecutions()) {
     const key = String(execution.executionId)
     if (execution.status !== 'RUNNING' || !(key in simulatedReads)) continue
     simulatedReads[key] += 1
+    const { progress, processedCount } = simulatedProgress(simulatedReads[key])
     if (simulatedReads[key] >= SIMULATED_COMPLETE_AFTER_READS) {
       changedExecutions.set(execution.executionId, {
         ...execution,
         status: 'COMPLETED',
         endedAt: new Date().toISOString(),
-        processedCount: 3200,
+        processedCount,
         changedCount: SIMULATED_CHANGES.length,
+        progress,
       })
+    } else {
+      // 아직 실행 중: 단계 진행과 처리 건수만 바꾼다
+      changedExecutions.set(execution.executionId, { ...execution, processedCount, progress })
     }
   }
   persistCollect()
@@ -364,6 +439,7 @@ function startRun(request: Request, targetDate: string, tier: CollectTier) {
     canRecover: false, // 버튼 값은 목록을 꺼낼 때 다시 계산한다(getAllExecutions)
     canRestart: false,
     recalcTargetCount: null, // 재계산은 수집이 끝난 뒤에 돈다
+    progress: simulatedProgress(0).progress, // 영화 후보 단계부터 시작한다(서비스 0/7곳)
   }
   simulatedReads[String(execution.executionId)] = 0
   saveExecution(execution)
@@ -1024,9 +1100,17 @@ export const adminHandlers: RequestHandler[] = [
       return HttpResponse.json(empty)
     }
     advanceSimulatedRuns()
+    const executions = sortExecutionsForHistory(getAllExecutions())
     const body: CommonResponseCollectExecutionPage = {
       success: true,
-      data: toPage(sortExecutionsForHistory(getAllExecutions()), pageParams),
+      // ?mockScenario=collect-progress-null: 서버가 진행 정보를 비워 보낸 경우(progress: null). 화면은 진행 띠·멈춘 단계 줄을 숨겨야 한다.
+      // 시뮬레이션은 그대로 진행한다(저장된 값은 바꾸지 않고 응답에서만 지운다)
+      data: toPage(
+        hasMockScenario(request, 'collect-progress-null')
+          ? executions.map((execution) => ({ ...execution, progress: null }))
+          : executions,
+        pageParams,
+      ),
     }
     return HttpResponse.json(body)
   }),

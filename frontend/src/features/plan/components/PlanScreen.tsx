@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useRef, useState, type MouseEvent, type ReactNode, type RefObject } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   CalculatorIcon,
@@ -36,8 +36,9 @@ import { useIsDemo } from '@/hooks/useIsDemo'
 import { useCurrentPlan, usePlanDrafts, useSavePlan } from '@/hooks/usePlanDrafts'
 import { mergeIdenticalDrafts } from '@/features/plan/mergeDrafts'
 import type { ActivePlan, PlanDraft, PlanType } from '@/api/generated/model'
-import { PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
+import { PLAN_MONTHS_HEADING_ID, PLAN_TYPE_LABELS } from '@/features/plan/planDisplay'
 import { useOttServices } from '@/hooks/useOttServices'
+import { useWishlistSummary } from '@/hooks/useWishlistSummary'
 import { formatDateTimeKorean } from '@/lib/format'
 
 // 저장·계산 요청이 실패했을 때 보일 문장. 서버 문장(userMessage)이 있으면 그것을 쓴다
@@ -62,6 +63,10 @@ export function PlanScreen() {
   // const calculate = useCalculatePlan()
   const save = useSavePlan()
   const location = useLocation()
+  // 빈 상태(계산한 플랜 없음)에서 다음 할 일을 고르려고 찜 개수를 읽는다. 기능 폴더끼리 import하지 않아 공유 훅(src/hooks)을 쓴다.
+  // 찜이 0개라고 확실히 읽었을 때만 "작품 찾아보기"로 바꾼다. 불러오는 중·실패면 원래 안내(요금 확인하고 계산하기)를 그대로 보인다
+  const wishlistSummary = useWishlistSummary()
+  const hasNoWishlist = wishlistSummary.isSuccess && wishlistSummary.data.totalCount === 0
 
   // 방금 저장한 플랜의 유형. 값이 있으면 저장 완료 안내를 보인다
   const [savedPlanType, setSavedPlanType] = useState<PlanType | null>(null)
@@ -167,6 +172,22 @@ export function PlanScreen() {
         onOpenMailPreview={openMailPreviewByButton}
       />
     )
+  } else if (hasNoWishlist) {
+    // 찜이 하나도 없으면 요금 확인으로 보내도 계산이 막혀 있다. 먼저 할 일(작품 찜하기)로 바로 보낸다
+    content = (
+      <EmptyState
+        title="아직 계산한 플랜이 없어요"
+        description="보고 싶은 작품을 찜한 뒤 요금을 확인하고 계산해요."
+        action={
+          <Button asChild size="lg" className="mt-1 h-11">
+            <Link to={`/search${location.search}`}>
+              <HeartIcon aria-hidden="true" />
+              작품 찾아보기
+            </Link>
+          </Button>
+        }
+      />
+    )
   } else {
     content = (
       <EmptyState
@@ -237,10 +258,32 @@ function CurrentPlanView({
   // 서비스 화면의 다른 날짜("2026년 10월 9일")와 같은 말투로 맞춘 저장 시각(관리자용 숫자 형식 formatDateTime은 쓰지 않는다)
   const savedAt = formatDateTimeKorean(plan.activatedAt)
 
-  // 알림 켜기 안내를 보일지: 저장 직후 && 일반 회원 && 알림 설정을 읽었고 꺼짐일 때만 true(불러오는 중·실패는 false). 조건은 훅이 정한다
-  const isNudgeAvailable = useNotificationNudge(isJustSaved)
+  // 알림 켜기 안내를 보일지: 저장 직후 && 일반 회원 && 알림 설정을 읽었고 꺼짐일 때만 true(불러오는 중·실패는 false). 조건은 훅이 정한다.
+  // isNotificationEnabled: 켜짐이라고 확실히 읽었을 때만 true. 저장 완료 상자 둘째 줄 문구를 고른다(모르면 메일 안내를 단정하지 않는다)
+  // 이전: const isNudgeAvailable = useNotificationNudge(isJustSaved) (boolean 하나만 받았다)
+  const { isNudgeAvailable, isNotificationEnabled } = useNotificationNudge(isJustSaved)
   // 이 화면에서 X로 닫았는지. 화면 상태로만 두고 서버·저장소에는 남기지 않는다(다음에 플랜을 저장하면 다시 보이는 것이 의도)
   const [isNudgeDismissed, setIsNudgeDismissed] = useState(false)
+
+  /**
+   * "이번 달 보기"를 누르면 같은 화면의 "달별 구독과 볼 작품" 제목으로 내려가고 포커스도 그 제목으로 옮긴다.
+   * 브라우저 기본 #이동만 쓰면 화면은 내려가도 키보드 포커스는 링크에 남아, 다음 Tab이 다시 위쪽 링크들로 간다.
+   * 그래서 기본 동작을 막고(주소에 #도 남기지 않는다) 직접 스크롤·포커스한다.
+   * 제목(h2)은 원래 포커스를 받지 못하므로 tabindex=-1을 붙인다(Tab 순서에는 들어가지 않고 코드로만 포커스를 줄 수 있다).
+   * 링크는 href를 그대로 두어 자바스크립트가 실패해도 기본 #이동으로 동작한다
+   */
+  function moveToMonthsHeading(event: MouseEvent<HTMLAnchorElement>) {
+    // 1. 이동할 제목을 찾는다. 없으면 기본 #이동에 맡긴다
+    const heading = document.getElementById(PLAN_MONTHS_HEADING_ID)
+    if (!heading) return
+    event.preventDefault()
+    // 2. 포커스를 받을 수 있게 하고 옮긴다. 브라우저의 즉시 스크롤은 막고(preventScroll) 아래에서 한 번만 움직인다
+    heading.setAttribute('tabindex', '-1')
+    heading.focus({ preventScroll: true })
+    // 3. 제목이 화면 위쪽에 오게 스크롤한다. 동작 줄이기 설정이면 부드럽게 움직이지 않고 바로 옮긴다(내 설정 화면 #price-mode와 같은 방식)
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    heading.scrollIntoView?.({ block: 'start', behavior: prefersReducedMotion ? 'auto' : 'smooth' })
+  }
 
   return (
     // 저장 완료 안내 → 제목 줄 → 플랜 내용 → 이동 버튼. 제목 줄은 아래 플랜 내용의 머리라 24px(gap-6)로 붙여 둔다.
@@ -253,8 +296,26 @@ function CurrentPlanView({
           <Alert role="status" className="border-primary">
             <CircleCheckIcon aria-hidden="true" />
             <AlertTitle className="text-base font-bold">{typeName} 플랜을 저장했어요</AlertTitle>
+            {/* 이전 설명(한 문장): 저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.
+                "그래서 지금 무엇을 하면 되는지"(이번 달 구독)와 "앞으로 어떻게 되는지"(자동 재계산·알림)가 드러나지 않아 두 줄 목록으로 바꿨다 */}
             <AlertDescription>
-              저장한 플랜은 이 기준으로 안내돼요. 조건이 바뀌면 다시 계산해 저장할 수 있어요.
+              <ul className="grid list-disc gap-1 pl-5">
+                <li>
+                  이번 달에 구독할 서비스는 아래 &lsquo;달별 구독과 볼 작품&rsquo;에서 확인하세요.{' '}
+                  <a
+                    href={`#${PLAN_MONTHS_HEADING_ID}`}
+                    onClick={moveToMonthsHeading}
+                    className="inline-flex min-h-11 items-center rounded-sm font-semibold text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  >
+                    이번 달 보기
+                  </a>
+                </li>
+                <li>
+                  {isNotificationEnabled
+                    ? '수집된 데이터가 바뀌면 이 플랜을 자동으로 다시 계산해요. 월이 바뀌면 새 플랜을 메일로 알려 드리고, 이번 달 작품이 서비스에서 빠지면 바로 알려 드려요.'
+                    : "수집된 데이터가 바뀌면 이 플랜을 자동으로 다시 계산해요. 바뀐 점은 '변경 내역 보기'에서 볼 수 있어요."}
+                </li>
+              </ul>
             </AlertDescription>
           </Alert>
           {/* 알림 켜기 안내(띠형). 이전: 카드형 안이 있었으나 사용자가 띠형을 골라 지웠다 */}

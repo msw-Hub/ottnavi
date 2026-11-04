@@ -40,7 +40,7 @@ function renderLayout() {
 }
 
 describe('푸터 링크', () => {
-  it('비로그인이면 개인정보처리방침 링크는 보이고 회원 탈퇴 링크는 없다', async () => {
+  it('비로그인이면 개인정보처리방침·데이터 정확도 링크는 보이고 회원 탈퇴 링크는 없다', async () => {
     setMockRole('GUEST')
     renderLayout()
     const footer = await screen.findByRole('contentinfo')
@@ -48,6 +48,11 @@ describe('푸터 링크', () => {
     expect(within(footer).getByRole('link', { name: '개인정보처리방침' })).toHaveAttribute(
       'href',
       '/privacy',
+    )
+    // 정확도 안내는 공개 화면이라 로그인과 상관없이 보인다
+    expect(within(footer).getByRole('link', { name: '데이터 정확도' })).toHaveAttribute(
+      'href',
+      '/accuracy',
     )
     expect(within(footer).queryByRole('link', { name: '회원 탈퇴' })).not.toBeInTheDocument()
   })

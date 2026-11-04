@@ -12,6 +12,7 @@ import {
   useListCollectExecutions,
 } from '@/api/generated/admin/admin'
 import type { ApiError } from '@/api/http'
+import { COLLECT_AUTO_REFRESH_MS, hasRunningExecution } from '@/features/admin/collectRules'
 import { getMockScenarioParams } from '@/lib/mockScenario'
 
 /*
@@ -28,7 +29,12 @@ const FIRST_PAGE_PARAMS = { page: 0, size: 100 } as const
 
 /**
  * 수집 실행 이력(페이지 형태: content/page/size/totalElements/totalPages, 대상 날짜 내림차순)을 불러온다(계약 listCollectExecutions).
- * 자동으로 다시 불러오지 않는다: 수집은 몇 분~한 시간 걸리는 일이라, 운영자가 [새로 고침]을 눌러 확인하는 흐름으로 두었다.
+ * 자동 새로고침: 목록에 실행 중(RUNNING)인 실행이 있을 때만 15초마다 다시 불러온다(단계별 진행 표시를 따라가려고).
+ * 실행 중이 없으면 끈다(false): 끝난 이력은 바뀌지 않아 계속 요청할 이유가 없고, 운영자가 [새로 고침]으로 확인하면 된다.
+ * 이전: 자동으로 다시 불러오지 않았다(수집은 몇 분~한 시간 걸리는 일이라 [새로 고침]으로만 확인했다).
+ * 다시 불러오는 동안에도 TanStack Query는 이전 data를 그대로 두므로(isPending은 처음 한 번만 참) 표가 스켈레톤으로 바뀌지 않고 값만 바뀐다.
+ * refetchInterval을 함수로 넘기는 이유: 응답(query.state.data)을 보고 매번 간격을 정해, 실행이 끝나면 다음 응답부터 바로 멈춘다.
+ * query.state.data는 select를 거치기 전의 원래 응답(CommonResponse)이라 .data.content로 꺼낸다.
  * (창으로 돌아올 때 자동으로 다시 불러오는 기본 동작은 켜져 있다.)
  */
 export function useCollectExecutions() {
@@ -36,6 +42,8 @@ export function useCollectExecutions() {
     query: {
       queryKey: [COLLECT_QUERY_KEY, FIRST_PAGE_PARAMS, getMockScenarioParams()],
       select: (res) => res.data,
+      refetchInterval: (query) =>
+        hasRunningExecution(query.state.data?.data.content ?? []) ? COLLECT_AUTO_REFRESH_MS : false,
     },
   })
 }

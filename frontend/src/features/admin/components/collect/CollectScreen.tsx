@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import { RefreshCwIcon } from 'lucide-react'
+import { LoaderCircleIcon, RefreshCwIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { isApiError } from '@/api/http'
 import { EmptyState } from '@/components/common/EmptyState'
@@ -15,7 +15,11 @@ import {
 import { NotificationSummary } from '@/features/admin/components/collect/NotificationSummary'
 import { RecoverRunDialog } from '@/features/admin/components/collect/RecoverRunDialog'
 import { noticeFromError, type RunNotice } from '@/features/admin/components/collect/runNotice'
-import { COLLECT_TIER_LABELS, findLastSuccess } from '@/features/admin/collectRules'
+import {
+  COLLECT_TIER_LABELS,
+  findLastSuccess,
+  formatRunningSummary,
+} from '@/features/admin/collectRules'
 import {
   useCollectExecutions,
   useRecoverCollect,
@@ -72,6 +76,8 @@ export function CollectScreen() {
   const list = executions.data?.content ?? [] // 이력은 페이지 형태라 content가 목록이다
   const serviceNames = new Map((services.data ?? []).map((s) => [s.ottServiceId, s.name]))
   const lastSuccess = findLastSuccess(list)
+  // 지금 실행 중인 수집(수집은 전체에서 한 번에 하나만 돌아 많아야 하나다). 요약 카드와 자동 새로고침 안내에 쓴다
+  const runningExecution = list.find((execution) => execution.status === 'RUNNING') ?? null
 
   function viewRun(executionId: number) {
     focusNonce.current += 1
@@ -213,6 +219,12 @@ export function CollectScreen() {
                 마지막 갱신 {formatDateTime(new Date(executions.dataUpdatedAt)) ?? '-'}
               </span>
             )}
+            {/* 자동 새로고침 안내: 실행 중인 수집이 있어 15초마다 다시 불러오는 동안에만 보인다(useCollectExecutions의 refetchInterval과 같은 조건) */}
+            {runningExecution && (
+              <span className="text-xs text-muted-foreground">
+                실행 중이라 15초마다 자동으로 새로 고쳐요
+              </span>
+            )}
             <Button
               type="button"
               variant="outline"
@@ -228,6 +240,29 @@ export function CollectScreen() {
             </Button>
           </div>
         </div>
+        {/* 실행 중 요약 카드: 실행 중인 행은 대상 날짜 순 정렬 때문에 표 맨 아래에 있을 수도 있어, 제목 바로 아래에서 바로 보이게 한다.
+            [이력에서 보기]는 수동 실행 안내 띠와 같은 동작(viewRun)으로 그 행까지 내려가 포커스를 옮긴다.
+            info 톤(테두리·바탕·글자 모두 info 토큰)이고 아이콘 + 글자로 "수집 중"을 알려 색에 기대지 않는다 */}
+        {runningExecution && (
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-info bg-info-bg px-4 py-3 text-sm text-info">
+            <p className="flex min-w-0 items-center gap-2 font-semibold break-keep">
+              <LoaderCircleIcon
+                aria-hidden="true"
+                className="size-4 shrink-0 animate-spin motion-reduce:animate-none"
+              />
+              {formatRunningSummary(runningExecution)}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => viewRun(runningExecution.executionId)}
+            >
+              이력에서 보기
+              <span className="sr-only"> (실행 {runningExecution.executionId})</span>
+            </Button>
+          </div>
+        )}
         {history}
       </section>
 

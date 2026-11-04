@@ -27,14 +27,22 @@ public class TierReaderParameterListener implements StepExecutionListener {
 
     @Override
     public void beforeStep(StepExecution stepExecution) {
-        // 1. 고정 파라미터를 복사해 새 맵을 만든다
-        Map<String, Object> parameters = new HashMap<>(fixedParameters);
-
-        // 2. 이 실행의 tier가 읽을 refresh_tier 목록을 넣는다
+        // 1. 이 실행의 tier로 쿼리 파라미터를 만든다
         CollectTier tier = CollectJobParameters.tierOf(stepExecution.getJobParameters());
-        parameters.put(REFRESH_TIERS, tier.targetRefreshTiers());
+        Map<String, Object> parameters = parametersOf(fixedParameters, tier);
 
-        // 3. Reader는 첫 페이지를 읽을 때 이 맵으로 쿼리를 만든다
+        // 2. Reader는 첫 페이지를 읽을 때 이 맵으로 쿼리를 만든다
         reader.setParameterValues(parameters);
+    }
+
+    /**
+     * 고정 파라미터에 tier의 refresh_tier 목록을 더한 쿼리 파라미터를 만든다.
+     * Reader와 진행 표시의 전체 대상 count(StepProgressListener)가 같은 값을 쓰도록 이 메서드 하나로 만든다.
+     * 예: ({mediaType=MOVIE}, DAILY) → {mediaType=MOVIE, refreshTiers=[DAILY]}
+     */
+    public static Map<String, Object> parametersOf(Map<String, Object> fixedParameters, CollectTier tier) {
+        Map<String, Object> parameters = new HashMap<>(fixedParameters);
+        parameters.put(REFRESH_TIERS, tier.targetRefreshTiers());
+        return parameters;
     }
 }

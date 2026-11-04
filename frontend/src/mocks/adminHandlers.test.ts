@@ -11,6 +11,7 @@ import type {
   CommonResponseAdminProviderList,
   CommonResponseAdminProductList,
 } from '@/api/generated/model'
+import { SIMULATED_COMPLETE_AFTER_READS } from '@/features/admin/collectRules'
 import { addDays, getTodayDateString } from '@/lib/dateUtils'
 import { formatIsoDate } from '@/lib/format'
 import { resetMockAdminState } from '@/mocks/adminHandlers'
@@ -342,24 +343,49 @@ describe('수집 실행·이력', () => {
     ])
   })
 
+  // 이력을 n번 조회하고 마지막 응답을 돌려준다(시뮬레이션은 조회 횟수로 진행한다)
+  async function listExecutionsTimes(times: number) {
+    let last = await listExecutions()
+    for (let i = 1; i < times; i++) last = await listExecutions()
+    return last
+  }
+
   it('다른 실행이 돌고 있으면 실패 행의 canRestart가 거짓이 되고, 끝나면 다시 참이다(응답마다 다시 계산)', async () => {
     await run(addDays(TODAY, -6)) // 6번 실행 중
     const first = await listExecutions() // 조회 1번째: 6번은 아직 실행 중
     expect(first.find((e) => e.executionId === 6)!.status).toBe('RUNNING')
     expect(first.find((e) => e.executionId === 2)!.canRestart).toBe(false)
-    const second = await listExecutions() // 조회 2번째: 6번 성공
-    expect(second.find((e) => e.executionId === 6)!.status).toBe('COMPLETED')
-    expect(second.find((e) => e.executionId === 2)!.canRestart).toBe(true)
+    // 기준 횟수째 조회: 6번 성공. 이전: 두 번째 조회에서 성공했다(SIMULATED_COMPLETE_AFTER_READS가 2일 때)
+    const done = await listExecutionsTimes(SIMULATED_COMPLETE_AFTER_READS - 1)
+    expect(done.find((e) => e.executionId === 6)!.status).toBe('COMPLETED')
+    expect(done.find((e) => e.executionId === 2)!.canRestart).toBe(true)
   })
 
-  it('실행을 접수하면 이력 두 번째 조회에서 성공으로 바뀐다(조회 횟수로 정하는 결정적 규칙)', async () => {
+  it('실행을 접수하면 조회할 때마다 단계 진행이 옮겨 가고, 기준 횟수째 조회에서 성공으로 바뀐다(조회 횟수로 정하는 결정적 규칙)', async () => {
     const accepted = await run(addDays(TODAY, -6))
     const id = accepted.data.executionId
+    // 1번째: 영화 후보 진행 중(서비스 3/7곳, 근사 45%)
     const first = (await listExecutions()).find((e) => e.executionId === id)!
     expect(first.status).toBe('RUNNING')
+    expect(first.progress).toMatchObject({ completedStepCount: 0, currentStep: 'MOVIE_CANDIDATE' })
+    expect(first.progress?.steps[0]).toMatchObject({ percent: 45, completedServiceCount: 3 })
+    // 2번째: 후보 두 단계 완료 뒤 영화 상세 62%
     const second = (await listExecutions()).find((e) => e.executionId === id)!
-    expect(second.status).toBe('COMPLETED')
-    expect(second.changedCount).toBe(2)
+    expect(second.progress).toMatchObject({ completedStepCount: 2, currentStep: 'MOVIE_DETAIL' })
+    expect(second.progress?.steps[2]).toMatchObject({ percent: 62, totalCount: 1000 })
+    // 3번째: 영화 상세지만 퍼센트·전체 수가 아직 없다
+    const third = (await listExecutions()).find((e) => e.executionId === id)!
+    expect(third.progress?.steps[2]).toMatchObject({
+      status: 'RUNNING',
+      percent: null,
+      totalCount: null,
+    })
+    // 기준 횟수째: 성공, 5단계 모두 완료
+    const done = (await listExecutions()).find((e) => e.executionId === id)!
+    expect(SIMULATED_COMPLETE_AFTER_READS).toBe(4)
+    expect(done.status).toBe('COMPLETED')
+    expect(done.progress).toMatchObject({ completedStepCount: 5, currentStep: null })
+    expect(done.changedCount).toBe(2)
 
     const changes = await customInstance<CommonResponseCollectExecutionChangePage>({
       url: `/admin/collect/executions/${id}/changes`,

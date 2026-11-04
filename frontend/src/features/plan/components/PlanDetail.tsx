@@ -5,7 +5,7 @@ import { SourceAttribution } from '@/components/common/SourceAttribution'
 import { PlanMonthCard } from '@/features/plan/components/PlanMonthCard'
 import { PlanSummary } from '@/features/plan/components/PlanSummary'
 import { UnscheduledList } from '@/features/plan/components/UnscheduledList'
-import { hasSeveralSeasonsOfOneSeries } from '@/features/plan/planDisplay'
+import { hasSeveralSeasonsOfOneSeries, PLAN_MONTHS_HEADING_ID } from '@/features/plan/planDisplay'
 
 interface PlanDetailProps {
   draft: PlanDraft // 보여 줄 플랜. 초안(PlanDraft)과 현재 플랜(ActivePlan은 PlanDraft에 저장 시각을 더한 것)이 모두 들어온다
@@ -34,7 +34,8 @@ export function PlanDetail({ draft, typeNames, serviceNames }: PlanDetailProps) 
       {/* 구간 제목·간격은 공통 PageSection이 맡는다(styles/tokens.css R3·R4). 달 카드 사이 16px는 그대로다.
           이전: <section aria-labelledby="plan-months-heading" className="grid gap-3">
                   <h2 id="plan-months-heading" className="text-lg font-semibold">달별 구독과 볼 작품</h2> */}
-      <PageSection headingId="plan-months-heading" title="달별 구독과 볼 작품">
+      {/* id는 저장 완료 상자의 "이번 달 보기" 링크가 가리키는 곳이라 상수로 함께 쓴다(이전: headingId="plan-months-heading") */}
+      <PageSection headingId={PLAN_MONTHS_HEADING_ID} title="달별 구독과 볼 작품">
         <div className="grid gap-4 lg:grid-cols-3">
           {draft.months.map((month) => (
             <PlanMonthCard

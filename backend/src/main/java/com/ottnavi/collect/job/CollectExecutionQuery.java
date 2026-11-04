@@ -1,5 +1,6 @@
 package com.ottnavi.collect.job;
 
+import com.ottnavi.collect.step.candidate.CandidateStepConfig;
 import com.ottnavi.collect.step.detail.DetailStepConfig;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -182,6 +183,82 @@ public class CollectExecutionQuery {
             }
         }
         return messages;
+    }
+
+    /** 실행별 범위(scope) 파라미터. scope 없이 돈 전체 실행은 Map에 없다 */
+    public Map<Long, CollectScope> findScopes(List<Long> executionIds) {
+        Map<Long, CollectScope> scopes = new HashMap<>();
+        if (executionIds.isEmpty()) {
+            return scopes;
+        }
+        List<Object> args = new ArrayList<>();
+        args.add(CollectJobParameters.SCOPE);
+        args.addAll(executionIds);
+        String sql = "SELECT JOB_EXECUTION_ID AS execution_id, PARAMETER_VALUE AS scope "
+                + "FROM BATCH_JOB_EXECUTION_PARAMS WHERE PARAMETER_NAME = ? AND JOB_EXECUTION_ID IN ("
+                + placeholders(executionIds.size()) + ")";
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+        for (Map<String, Object> row : rows) {
+            long executionId = ((Number) row.get("execution_id")).longValue();
+            scopes.put(executionId, CollectScope.valueOf(row.get("scope").toString()));
+        }
+        return scopes;
+    }
+
+    /**
+     * 실행별 진행 표시 단계의 가장 최근 기록(Step 상태와 READ_COUNT).
+     * 재시작한 실행은 앞선 실행에서 끝낸 Step을 다시 돌지 않아 그 기록이 앞선 실행 쪽에만 있다.
+     * 그래서 같은 인스턴스에서 이 실행까지(ID가 작거나 같은 실행)의 Step 기록을 함께 읽고, 단계마다 가장 나중 기록을 남긴다.
+     * 실행 ID 묶음으로 한 번만 조회한다(목록의 행 수만큼 쿼리가 늘지 않는다).
+     */
+    public Map<Long, Map<CollectStepCode, CollectProgressRules.StepRecord>> findStepRecords(List<Long> executionIds) {
+        // 1. 실행별 결과를 담을 공간
+        Map<Long, Map<CollectStepCode, CollectProgressRules.StepRecord>> records = new HashMap<>();
+        if (executionIds.isEmpty()) {
+            return records;
+        }
+
+        // 2. 진행 표시 단계의 Step 이름으로만 좁혀 같은 인스턴스의 앞선 실행 기록까지 읽는다
+        List<String> stepNames = List.of(CandidateStepConfig.MOVIE_CANDIDATE_STEP, CandidateStepConfig.TV_CANDIDATE_STEP,
+                DetailStepConfig.MOVIE_DETAIL_STEP, DetailStepConfig.TV_DETAIL_STEP, DetailStepConfig.AVAILABILITY_STEP,
+                DetailStepConfig.TV_AVAILABILITY_STEP);
+        List<Object> args = new ArrayList<>(stepNames);
+        args.addAll(executionIds);
+        String sql = "SELECT e.JOB_EXECUTION_ID AS execution_id, s.JOB_EXECUTION_ID AS step_job_execution_id, "
+                + "s.STEP_NAME AS step_name, s.STATUS AS status, s.READ_COUNT AS read_count "
+                + "FROM BATCH_JOB_EXECUTION e "
+                + "JOIN BATCH_JOB_EXECUTION p ON p.JOB_INSTANCE_ID = e.JOB_INSTANCE_ID "
+                + "AND p.JOB_EXECUTION_ID <= e.JOB_EXECUTION_ID "
+                + "JOIN BATCH_STEP_EXECUTION s ON s.JOB_EXECUTION_ID = p.JOB_EXECUTION_ID "
+                + "WHERE s.STEP_NAME IN (" + placeholders(stepNames.size()) + ") "
+                + "AND e.JOB_EXECUTION_ID IN (" + placeholders(executionIds.size()) + ") "
+                + "ORDER BY e.JOB_EXECUTION_ID, s.STEP_EXECUTION_ID";
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, args.toArray());
+
+        // 3. Step 실행 ID 순으로 읽으므로 같은 단계는 나중 기록이 앞 기록을 덮어쓴다
+        for (Map<String, Object> row : rows) {
+            long executionId = ((Number) row.get("execution_id")).longValue();
+            long stepJobExecutionId = ((Number) row.get("step_job_execution_id")).longValue();
+            CollectStepCode step = CollectStepCode.fromStepName(row.get("step_name").toString());
+            BatchStatus batchStatus = BatchStatus.UNKNOWN;
+            Object status = row.get("status");
+            if (status != null) {
+                batchStatus = BatchStatus.valueOf(status.toString());
+            }
+            int readCount = 0;
+            Object read = row.get("read_count");
+            if (read != null) {
+                readCount = ((Number) read).intValue();
+            }
+            Map<CollectStepCode, CollectProgressRules.StepRecord> ofExecution = records.get(executionId);
+            if (ofExecution == null) {
+                ofExecution = new HashMap<>();
+                records.put(executionId, ofExecution);
+            }
+            ofExecution.put(step, new CollectProgressRules.StepRecord(step, batchStatus, readCount,
+                    stepJobExecutionId == executionId));
+        }
+        return records;
     }
 
     private static Optional<CollectExecutionRecord> firstOf(List<CollectExecutionRecord> found) {

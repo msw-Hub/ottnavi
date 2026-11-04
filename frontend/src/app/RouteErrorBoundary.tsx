@@ -1,5 +1,8 @@
-import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
+import { RefreshCwIcon } from 'lucide-react'
+// 이전: Link도 불러왔다(홈 링크). 지금은 페이지를 새로 불러오는 <a href="/">를 쓴다(아래 버튼 주석)
+import { isRouteErrorResponse, useRouteError } from 'react-router'
 import { PageTitle } from '@/components/common/PageTitle'
+import { Button } from '@/components/ui/button'
 
 /**
  * 라우트에서 난 오류를 받아 안내 화면을 그리는 전역 오류 경계다.
@@ -32,10 +35,36 @@ export function RouteErrorBoundary() {
           ? '주소가 바뀌었거나 없는 페이지입니다.'
           : '일시적인 문제일 수 있습니다. 새로고침하거나 잠시 후 다시 시도해 주세요.'}
       </p>
-      {/* 오류 경계 안에서는 레이아웃이 깨졌을 수 있어, 항상 동작하는 홈 링크를 둔다 */}
+      {/* 이전: 글자 링크 하나만 있었다(오류 경계 안에서는 레이아웃이 깨졌을 수 있어, 항상 동작하는 홈 링크를 둔다).
       <Link to="/" className="underline underline-offset-4">
         홈으로 이동
-      </Link>
+      </Link> */}
+      {/*
+        다음 행동 버튼. 화면 오류는 새로고침으로 풀리는 경우가 많아(새 배포 뒤 조각 파일 이름이 바뀐 경우 등) 새로고침을 주 버튼으로,
+        홈 이동을 보조 버튼으로 둔다. Tab 순서 = 보이는 순서(새로고침 → 홈). 좁은 화면에서는 flex-wrap으로 줄을 바꾼다.
+        404는 새로고침해도 같은 결과라 새로고침 없이 홈 이동만 주 버튼으로 둔다.
+
+        홈 이동에 Link 대신 <a href="/">를 쓰는 이유: 이 화면이 보인다는 것은 라우터가 화면을 그리다 실패했다는 뜻이다.
+        Link는 같은 라우터 상태(깨졌을 수 있는 캐시·조각 파일 목록)를 그대로 둔 채 화면만 바꾸므로 같은 오류가 다시 날 수 있다.
+        <a href>는 페이지를 통째로 새로 불러와 새 코드·새 상태로 시작하므로 더 확실하다(404 분기도 같은 이유로 맞췄다)
+      */}
+      <div className="flex flex-wrap gap-2">
+        {isNotFound ? (
+          <Button asChild className="h-11">
+            <a href="/">홈으로 이동</a>
+          </Button>
+        ) : (
+          <>
+            <Button type="button" className="h-11" onClick={() => window.location.reload()}>
+              <RefreshCwIcon aria-hidden="true" />
+              새로고침
+            </Button>
+            <Button asChild variant="outline" className="h-11">
+              <a href="/">홈으로 이동</a>
+            </Button>
+          </>
+        )}
+      </div>
     </section>
   )
 }
