@@ -157,6 +157,24 @@ class AdminCollectHistoryApiTest extends AdminCollectApiTestSupport {
 	}
 
 	@Test
+	void 완료된_실행의_progress는_5단계_모두_완료이고_지금_단계가_없다() throws Exception {
+		// given: 영화 1편과 드라마 1편(방영된 시즌 1개)
+		stubOneMovieAndOneTv();
+
+		// when
+		runToEnd(DAY);
+
+		// then
+		getExecutions(0, 20)
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].progress.totalStepCount").value(5))
+				.andExpect(jsonPath("$.data.content[0].progress.completedStepCount").value(5))
+				.andExpect(jsonPath("$.data.content[0].progress.currentStep").isEmpty())
+				.andExpect(jsonPath("$.data.content[0].progress.steps[2].step").value("MOVIE_DETAIL"))
+				.andExpect(jsonPath("$.data.content[0].progress.steps[2].percent").value(100));
+	}
+
+	@Test
 	void changedCount는_그_실행의_availability_change_건수다() throws Exception {
 		// given: 실행 두 건, 첫 실행에 변경 3건·둘째 실행에 변경 1건
 		long first = runToEnd("2026-03-09");

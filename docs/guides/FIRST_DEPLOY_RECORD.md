@@ -34,7 +34,7 @@
   - 변수를 저장하면 곧바로 재배포된다(저장과 배포가 분리돼 있지 않다)
 - **Vercel** Production = `main`. `vercel.json`의 `/api` rewrite가 Cloudtype 공개 주소로 넘긴다(서비스를 수정만 했으므로 주소 불변). `ORIGIN_SECRET`은 Cloudtype·Vercel·GitHub가 같은 값
 - **GitHub Actions** 시크릿 `ADMIN_BATCH_TOKEN`, `ORIGIN_SECRET`, `BACKEND_BASE_URL`(Cloudtype 공개 주소, 배포 뒤 확인해 등록). 변수 `CRON_ENABLED`는 첫 수집 안정 확인 뒤에 만든다(지금 없음 = 예약 실행은 모두 건너뜀)
-- **Supabase** Session Pooler 5432, PostgreSQL 17.11, Flyway V1~V9
+- **Supabase** Session Pooler 5432, PostgreSQL 17.11, Flyway V1~V9(첫 배포 시점. 2026-11-03 기준 V1~V12)
 - **Redis Cloud** Free 30MB, 버전 8.6, eviction `allkeys-lru`, persistence 없음, TLS 꺼짐(평문), RESP3
 
 ## 3. 겪은 문제와 원인, 해결
@@ -161,7 +161,7 @@
 - [ ] 배포 뒤 확인: 독점 목록이 새 순서로 나오는지(캐시 이름 `exclusiveTitlesV2`), 계산 중 진행 창 모양과 Esc 동작, 진행 창이 열릴 때 낭독이 두 번 읽히지 않는지(검수 지적 6)
 - [x] 문서(홈 개편 PR에서 반영함): 캐시 이름 `exclusiveTitles` → `exclusiveTitlesV2`를 `CLAUDE.md`, `ROADMAP.md`(641·1459·1467행), `TECH.md`, `PACKAGE_MAP.md`에 반영. 인기 순위 의미 변경을 ROADMAP Task 107과 HANDOFF에 반영. 092~095 진행 기록과 `CLAUDE.md` 현황 문구 갱신
 - [x] 개인정보처리방침 화면(`/privacy`, PR #106)과 Google 동의 화면 Branding 입력·프로덕션 게시(2026-10-27 완료, 동의 화면에 방침 링크 표시 확인). 이용약관 `/terms`는 PR #108(열림)
-- [x] `main`에 `v0.1.0` 태그(2026-10-28, `006761e`)
+- [x] `main`에 `v0.1.0` 태그(2026-10-28, `006761e`). 이후 `v0.2.0`(2026-11-02, `ea2d3a1`)과 `v0.2.1`(2026-11-03, `b130818`, 검색 인덱스 Flyway V12: 기동 로그에서 12개 마이그레이션 검증, V12 적용 5.4초, `extensions` 스키마·`pg_trgm` 이미 있음 경고 2줄은 정상)을 달았다. 요청 제한용 Redis 연결 첫 시도 실패 뒤 재시도 성공(기동 약 405초 뒤 15.8초 타임아웃)은 이번에도 나타났고 원인은 아직 조사하지 않았다
 - [ ] 검색 엔진 등록(공개 시점, 태그 뒤에 결정)
 - [ ] 로그 정리: `spring.data.redis.repositories.enabled`, `HV000271` 경고
 - [x] 상품 가격 재확인(2026-10-28, 사용자가 검색 AI로 대조해 변동 없음. 쿠팡플레이 와우 7,890은 여전히 비공식 자료)

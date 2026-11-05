@@ -33,7 +33,9 @@ describe('회원 탈퇴 화면', () => {
     renderScreen()
 
     const list = screen.getByRole('list', { name: '삭제되는 데이터' })
-    expect(within(list).getAllByRole('listitem')).toHaveLength(4)
+    // 서버 삭제 범위(계정·내 설정·찜·고친 요금·플랜·알림)와 같은 6줄이다. 이전: 4줄(알림 공개 전)
+    expect(within(list).getAllByRole('listitem')).toHaveLength(6)
+    expect(within(list).getByText('받은 알림 기록과 대기 중인 알림')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled()
   })
 

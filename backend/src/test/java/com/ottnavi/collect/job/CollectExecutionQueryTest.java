@@ -64,6 +64,9 @@ class CollectExecutionQueryTest extends IntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private CollectProgressRegistry progressRegistry;
+
     @BeforeEach
     void 초기화() {
         wireMock.resetAll();
@@ -158,6 +161,27 @@ class CollectExecutionQueryTest extends IntegrationTestSupport {
 
         // then
         assertThat(sums).containsEntry(executionId, 2);
+    }
+
+    @Test
+    void 완료된_수집의_단계_기록으로_만든_진행은_5단계가_모두_완료다() throws Exception {
+        // given: 영화 1편, 드라마 1편(시즌 1개)이 수집된다
+        long executionId = launcher.start(DAY, CollectTier.ALL);
+        waitUntilFinished(executionId);
+
+        // when
+        Map<CollectStepCode, CollectProgressRules.StepRecord> records =
+                query.findStepRecords(List.of(executionId)).get(executionId);
+        CollectProgressRules.Progress progress = CollectProgressRules.progressOf(CollectTier.ALL,
+                query.findScopes(List.of(executionId)).get(executionId), CollectExecutionStatus.COMPLETED, records,
+                progressRegistry.find(executionId));
+
+        // then
+        assertThat(progress.totalStepCount()).isEqualTo(5);
+        assertThat(progress.completedStepCount()).isEqualTo(5);
+        assertThat(progress.currentStep()).isNull();
+        assertThat(records.get(CollectStepCode.MOVIE_DETAIL).readCount()).isEqualTo(1);
+        assertThat(progressRegistry.find(executionId)).isEmpty(); // 끝난 단계는 메모리에서 지워진다
     }
 
     @Test

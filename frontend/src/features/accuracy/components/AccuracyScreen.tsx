@@ -1,7 +1,12 @@
 import type { ReactNode } from 'react'
-import { CheckIcon, TriangleAlertIcon } from 'lucide-react'
+import { ArrowLeftIcon, CheckIcon, TriangleAlertIcon } from 'lucide-react'
+import { Link } from 'react-router'
 import { DataInsufficientTag } from '@/components/common/DataInsufficientTag'
 import { SourceAttribution } from '@/components/common/SourceAttribution'
+
+// 화면 끝 "다른 안내 보기" 글자 링크 모양. 탈퇴 화면의 "← 내 설정" 링크와 같은 모양(굵은 primary 글자, 높이 44px, 키보드 포커스 링)
+const ACCURACY_NAV_LINK_CLASS =
+  'inline-flex min-h-11 w-fit items-center gap-1.5 rounded-md text-sm font-semibold text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none'
 
 /*
  * 아래 수치는 모두 docs/PRD.md 8.2 "데이터 근거"의 검증 결과를 그대로 옮긴 것이다.
@@ -252,6 +257,22 @@ export function AccuracyScreen() {
 
       {/* 5. 출처. 제공처 정보를 다루는 화면이라 JustWatch 출처를 반드시 둔다 */}
       <SourceAttribution />
+
+      {/* 6. 다른 안내로 가는 길. 긴 글을 다 읽은 뒤 끝에서 막다른 길이 되지 않게 홈과 서비스 소개로 가는 글자 링크를 둔다.
+          위쪽 테두리로 본문과 나눠 "본문이 끝났다"는 것을 보이고, 모양은 탈퇴 화면의 "← 내 설정" 링크와 같다(높이 44px).
+          좁은 화면에서는 flex-wrap으로 줄을 바꾼다 */}
+      <nav
+        aria-label="다른 안내 보기"
+        className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border pt-3"
+      >
+        <Link to="/" className={ACCURACY_NAV_LINK_CLASS}>
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
+          홈으로
+        </Link>
+        <Link to="/about" className={ACCURACY_NAV_LINK_CLASS}>
+          서비스 소개 보기
+        </Link>
+      </nav>
     </div>
   )
 }

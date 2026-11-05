@@ -2,6 +2,7 @@ package com.ottnavi.admin.service;
 
 import com.ottnavi.admin.dto.response.CollectExecutionChangeResponse;
 import com.ottnavi.admin.dto.response.CollectExecutionResponse;
+import com.ottnavi.admin.dto.response.CollectProgressResponse;
 import com.ottnavi.admin.service.model.CollectViewContext;
 import com.ottnavi.catalog.service.AvailabilityChangeQueryService;
 import com.ottnavi.catalog.service.model.ExecutionChange;
@@ -9,7 +10,12 @@ import com.ottnavi.collect.job.CollectExecutionQuery;
 import com.ottnavi.collect.job.CollectExecutionRecord;
 import com.ottnavi.collect.job.CollectExecutionRules;
 import com.ottnavi.collect.job.CollectExecutionStatus;
+import com.ottnavi.collect.job.CollectProgressRegistry;
+import com.ottnavi.collect.job.CollectProgressRegistry.LiveStepProgress;
+import com.ottnavi.collect.job.CollectProgressRules;
 import com.ottnavi.collect.job.CollectProperties;
+import com.ottnavi.collect.job.CollectScope;
+import com.ottnavi.collect.job.CollectStepCode;
 import com.ottnavi.collect.job.ServerBootTime;
 import com.ottnavi.global.common.PageResponse;
 import com.ottnavi.global.error.ResourceNotFoundException;
@@ -17,6 +23,7 @@ import com.ottnavi.plan.batch.PlanRecalcExecutionQuery;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +49,7 @@ public class CollectExecutionQueryService {
 	private final CollectProperties collectProperties;
 	private final ServerBootTime serverBootTime;
 	private final PlanRecalcExecutionQuery planRecalcExecutionQuery;
+	private final CollectProgressRegistry collectProgressRegistry; // 실행 중인 단계의 실시간 진행(메모리)
 
 	/** 실행 한 건을 조회한다. 없거나 수집 Job의 실행이 아니면 404이다 */
 	public CollectExecutionResponse getExecution(long executionId) {
@@ -125,12 +133,43 @@ public class CollectExecutionQueryService {
 		}
 		Map<Long, String> stepMessages = collectExecutionQuery.findFailedStepExitMessages(needStepMessageIds);
 
-		// 5. 한 건씩 응답으로 바꾼다
+		// 5. 단계별 진행에 쓸 scope와 단계 기록도 묶어서 한 번씩 조회한다(대상 수 count는 하지 않는다)
+		Map<Long, CollectScope> scopes = collectExecutionQuery.findScopes(executionIds);
+		Map<Long, Map<CollectStepCode, CollectProgressRules.StepRecord>> stepRecords =
+				collectExecutionQuery.findStepRecords(executionIds);
+
+		// 6. 한 건씩 응답으로 바꾼다
 		List<CollectExecutionResponse> responses = new ArrayList<>();
 		for (CollectExecutionRecord record : records) {
-			responses.add(toResponse(record, writeCounts, changeCounts, recalcCounts, stepMessages, context));
+			CollectProgressResponse progress = progressOf(record, scopes, stepRecords, context);
+			responses.add(toResponse(record, writeCounts, changeCounts, recalcCounts, stepMessages, context, progress));
 		}
 		return responses;
+	}
+
+	/**
+	 * 실행 한 건의 단계별 진행을 만든다.
+	 * 실행 중인 실행만 메모리의 실시간 값(전체 대상 수·서비스 진행)을 더하고, 나머지는 단계 기록(DB)만으로 만든다.
+	 */
+	private CollectProgressResponse progressOf(CollectExecutionRecord record, Map<Long, CollectScope> scopes,
+			Map<Long, Map<CollectStepCode, CollectProgressRules.StepRecord>> stepRecords, CollectViewContext context) {
+		// 1. 화면 상태와 그 실행의 단계 기록
+		CollectExecutionStatus status = CollectExecutionRules.statusOf(record, context.bootedAt());
+		Map<CollectStepCode, CollectProgressRules.StepRecord> records = stepRecords.get(record.executionId());
+		if (records == null) {
+			records = new HashMap<>();
+		}
+
+		// 2. 실행 중일 때만 실시간 값을 읽는다(이 서버 메모리라 조회 비용이 없다)
+		Map<CollectStepCode, LiveStepProgress> live = new HashMap<>();
+		if (status == CollectExecutionStatus.RUNNING) {
+			live = collectProgressRegistry.find(record.executionId());
+		}
+
+		// 3. 규칙으로 단계별 진행을 계산해 응답으로 바꾼다
+		CollectProgressRules.Progress progress = CollectProgressRules.progressOf(record.tier(),
+				scopes.get(record.executionId()), status, records, live);
+		return CollectProgressResponse.from(progress);
 	}
 
 	/** 판정에 쓰는 맥락을 만든다. 실행 중으로 남은 기록 가운데 이 서버에서 실제로 도는 것만 실행 중 목록에 넣는다 */
@@ -152,7 +191,7 @@ public class CollectExecutionQueryService {
 
 	private CollectExecutionResponse toResponse(CollectExecutionRecord record, Map<Long, Integer> writeCounts,
 			Map<Long, Integer> changeCounts, Map<Long, Integer> recalcCounts, Map<Long, String> stepMessages,
-			CollectViewContext context) {
+			CollectViewContext context, CollectProgressResponse progress) {
 		// 1. 화면 상태
 		CollectExecutionStatus status = CollectExecutionRules.statusOf(record, context.bootedAt());
 
@@ -192,7 +231,8 @@ public class CollectExecutionQueryService {
 				failureReason,
 				canRecover,
 				canRestart,
-				recalcCounts.get(record.executionId())); // 이 수집 뒤 이어 돈 재계산이 없거나 끝나지 않았으면 null
+				recalcCounts.get(record.executionId()), // 이 수집 뒤 이어 돈 재계산이 없거나 끝나지 않았으면 null
+				progress);
 	}
 
 	private static int valueOrZero(Map<Long, Integer> counts, long executionId) {

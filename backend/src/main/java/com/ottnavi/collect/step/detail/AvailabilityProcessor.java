@@ -47,25 +47,33 @@ public class AvailabilityProcessor implements ItemProcessor<AvailabilityTarget, 
         return null;
     }
 
-    /** 제공처 조회가 404면 null을 돌려 이 단위만 건너뛴다. 기존 제공 상태는 그대로 둔다(상태를 지어내지 않는다) */
+    /**
+     * 시청 단위 한 건의 KR 제공처를 받아 판정 입력으로 돌려준다.
+     * 제공처 조회가 404면(작품·시즌이 TMDB에서 사라짐) 한국 정보 없음으로 판정해 서비스 7곳이 모름(NO_KR_DATA)이 된다.
+     * 쿠팡플레이 영화는 판정 규칙대로 STRUCTURAL_GAP을 유지한다. 예전처럼 건너뛰면 사라진 작품의 옛 "있음"이 그대로 남기 때문이다.
+     * 인기 작품 채우기(SingleTitleFetcher)도 404를 같은 방식으로 처리한다.
+     */
     @Override
     public UnitProviders process(AvailabilityTarget target) {
+        KrProviders providers;
         try {
             // 1. 시청 단위의 KR 제공처를 구한다(영화·시즌 구분과 시즌→작품 대체 규칙은 fetchProviders가 가진다)
-            KrProviders providers = fetchProviders(target.unitType(), target.tmdbId(), target.seasonNumber());
-            return new UnitProviders(target.watchUnitId(), providers);
+            providers = fetchProviders(target.unitType(), target.tmdbId(), target.seasonNumber());
         } catch (TmdbNotFoundException e) {
-            // 2. TMDB에 제공처 정보가 없으면(404) 이 단위만 건너뛴다
-            log.warn("TMDB에 제공처 정보가 없어 이 단위를 건너뛴다: watchUnitId={}, tmdbId={}, seasonNumber={}",
+            // 2. TMDB에 제공처 정보가 없으면(404) 한국 정보 없음으로 본다(옛 제공 상태를 남기지 않는다)
+            log.warn("TMDB에 제공처 정보가 없어 한국 정보 없음(모름)으로 처리한다: watchUnitId={}, tmdbId={}, seasonNumber={}",
                     target.watchUnitId(), target.tmdbId(), target.seasonNumber());
-            return null;
+            providers = KrProviders.noKrData();
         }
+        // 3. 판정 입력으로 묶어 Writer에 넘긴다
+        return new UnitProviders(target.watchUnitId(), providers);
     }
 
     /**
      * 시청 단위 하나의 KR 제공처를 TMDB에서 받는다. 수집 판정 Step과 인기 작품 채우기가 같은 규칙을 쓰려고 process에서 뺐다.
      * 영화는 영화 제공처를, 시즌은 시즌 단위 제공처를 쓰고 시즌 단위 KR 정보가 비어 있을 때만 작품(시리즈) 단위로 대신한다(PRD 5.4 / FR-02).
-     * 영화·시즌 단위 조회가 404면 TmdbNotFoundException이 올라간다(호출 쪽이 건너뛸지 정한다).
+     * 영화·시즌 단위 조회가 404면 TmdbNotFoundException이 올라간다. 수집 판정(process)과 인기 작품 채우기(SingleTitleFetcher)는
+     * 둘 다 이 예외를 한국 정보 없음(KrProviders.noKrData)으로 바꿔 판정한다. 작품 단위 대체 조회의 404는 여기서 바로 한국 정보 없음으로 본다.
      *
      * @param seasonNumber 시즌 번호. 영화는 쓰지 않는다
      */

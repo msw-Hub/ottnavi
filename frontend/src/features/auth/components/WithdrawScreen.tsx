@@ -16,12 +16,20 @@ import {
 import { Button } from '@/components/ui/button'
 import { useIsDemo } from '@/hooks/useIsDemo'
 
-/** 탈퇴하면 지워지는 데이터 목록(PRD FR-07·SCR-13). 대기 알림은 알림 기능이 공개 뒤라 넣지 않는다(사용자 확정) */
+/**
+ * 탈퇴하면 지워지는 데이터 목록(PRD FR-07·SCR-13, 6줄).
+ * 서버의 실제 삭제 범위와 맞춘다: users 행을 지우면 FK ON DELETE CASCADE로 내 설정(user_setting)·서비스별 구독 상태(user_subscription)·
+ * 직접 고친 요금(user_price_override)·찜(wishlist_item)·플랜과 그 하위 전부·알림 기록과 대기 알림(notification_outbox)이 함께 지워진다(Flyway V5~V7).
+ * 알림은 2026-10-29부터 운영 중이라 마지막 줄에 넣었다.
+ * 이전(알림 공개 전, 4줄): '찜한 작품 목록', '서비스별 구독 상태 설정', '직접 고친 요금', '저장한 플랜(계산 결과·변경 내역 포함)'
+ */
 const DELETED_DATA = [
+  '계정 정보(Google 이메일·이름)',
+  '내 설정(월 예산·월 시청 시간, 서비스별 구독 상태, 알림 수신 설정)',
   '찜한 작품 목록',
-  '서비스별 구독 상태 설정',
   '직접 고친 요금',
   '저장한 플랜(계산 결과·변경 내역 포함)',
+  '받은 알림 기록과 대기 중인 알림',
 ] as const
 
 // 데모 계정에게 탈퇴가 막힌 이유 안내의 id([탈퇴하기]가 aria-describedby로 가리킨다)
@@ -39,7 +47,7 @@ interface WithdrawScreenProps {
  * 위에서 아래 순서와 이유(정보를 줄여 데스크톱 한 화면에 들어오게 했다, 사용자 요청):
  * 1. 내 설정으로 돌아가는 링크·제목: 설정 화면에서 들어오는 하위 화면이라 변경 내역 화면과 같은 모양으로 되돌아갈 길을 둔다.
  * 2. 핵심 경고 한 줄: "바로 삭제·되돌릴 수 없음"을 가장 먼저 읽게 한다. 빨간색만으로 위험을 알리지 않도록 경고 아이콘과 문장을 함께 둔다.
- * 3. 삭제되는 데이터 목록(4줄): 무엇이 사라지는지 짧게만 적는다.
+ * 3. 삭제되는 데이터 목록(6줄, 서버 삭제 범위와 같다): 무엇이 사라지는지 짧게만 적는다.
  * 4. 동의 체크 → [탈퇴하기] → 확인 대화상자: 실수로 누르는 일을 두 번 막는다. 체크하기 전에는 버튼이 잠겨 있다.
  *
  * 버튼 톤: shadcn의 destructive 변형(옅은 빨강 바탕 + 빨강 글자)을 쓴다. 진한 빨강 면은 화면에서 가장 눈에 띄는 버튼이 되어
@@ -171,13 +179,22 @@ export function WithdrawScreen({
                     탈퇴하기
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                {/*
+                  확인창 비율 조정(사용자 피드백: 버튼이 좁고 세로로 길쭉해 보였다). shadcn 원본은 그대로 두고 className으로만 덮는다.
+                  - 너비: 원본 그대로 데스크톱 384px(sm:max-w-sm)·모바일 320px(max-w-xs)다. 384px에서 설명이 2줄로 들어와
+                    세로 간격만 줄여도 가로:세로가 약 2.2:1인 넓은 모양이 되므로 너비는 키우지 않았다.
+                  - 세로 간격: 원본 gap-4(16px) → gap-3(12px). 제목 묶음·오류 안내·버튼 줄 사이를 좁힌다.
+                  이전: <AlertDialogContent> (원본 간격 그대로)
+                */}
+                <AlertDialogContent className="gap-3">
                   <AlertDialogHeader>
                     <AlertDialogTitle className="text-lg font-semibold">
                       정말 탈퇴할까요?
                     </AlertDialogTitle>
                     <AlertDialogDescription className="break-keep">
-                      찜·설정·플랜이 모두 바로 삭제되고 복구할 수 없어요. 탈퇴하면 로그아웃돼요.
+                      {/* 이전: 찜·설정·플랜이 모두 바로 삭제되고 복구할 수 없어요. 탈퇴하면 로그아웃돼요. (계정·알림 기록이 빠져 있었다) */}
+                      계정과 찜·설정·플랜·알림 기록이 모두 바로 삭제되고 복구할 수 없어요. 탈퇴하면
+                      로그아웃돼요.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   {errorMessage ? (
@@ -185,8 +202,14 @@ export function WithdrawScreen({
                       {errorMessage}
                     </p>
                   ) : null}
-                  <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isPending} className="h-11">
+                  {/*
+                    버튼 줄: 원본은 데스크톱에서 버튼을 글자 너비만큼 오른쪽에 모으고(flex, justify-end) 모바일에서 세로로 쌓는다.
+                    두 버튼이 확인창 아래 폭을 반씩 채우도록 같은 너비 2열(grid-cols-2, 간격 10px)로 바꿨다. 모바일에서도 2열이다(한 칸 약 150px라 글자가 넉넉하다).
+                    위아래 안쪽 여백은 16px → 12px(py-3)로 줄였다. 왼쪽 [취소]·오른쪽 [탈퇴] 순서는 그대로이고, 열릴 때 포커스는 Radix가 [취소]에 둔다.
+                    이전: <AlertDialogFooter> (원본 배치 그대로)
+                  */}
+                  <AlertDialogFooter className="grid grid-cols-2 gap-2.5 py-3">
+                    <AlertDialogCancel disabled={isPending} className="h-11 w-full">
                       취소
                     </AlertDialogCancel>
                     {/* AlertDialogAction 대신 일반 버튼을 쓴 이유: Action은 누르는 즉시 대화상자를 닫아 버려
@@ -196,7 +219,7 @@ export function WithdrawScreen({
                       disabled={isPending}
                       aria-busy={isPending}
                       onClick={onWithdraw}
-                      className="h-11 font-semibold"
+                      className="h-11 w-full font-semibold"
                     >
                       {isPending ? '탈퇴하는 중…' : '탈퇴'}
                     </Button>

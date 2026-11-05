@@ -10,6 +10,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CollectExecutionStatus } from './collectExecutionStatus';
+import type { CollectProgress } from './collectProgress';
 import type { CollectTier } from './collectTier';
 
 /**
@@ -47,4 +48,6 @@ export interface CollectExecution {
      * @nullable
      */
   recalcTargetCount: number | null;
+  /** 단계별 진행. 서버는 늘 채우지만 화면은 null이면 진행 표시를 숨긴다 */
+  progress: CollectProgress | null;
 }

@@ -279,7 +279,7 @@ GA 쪽 설정이 코드와 방침에 영향을 주는 점:
 ### 8-1. 결정
 
 - 지표는 Micrometer OTLP, 로그는 Loki4j **2.0.3**(Boot 4.1.1의 Logback 1.5.38과 맞는 계열, 2.1은 Logback 1.6 필요). 켜고 끄기는 `observability` 프로필, 프로필이 없으면 지금과 동일.
-- 097·099용 새 API는 없다(기존 수집 실행·알림 요약·시스템 지표 API + Grafana 링크). DEMO 계정에도 Grafana 링크를 보인다.
+- 097·099용 새 API는 없다(기존 수집 실행·알림 요약·시스템 지표 API + Grafana 링크). DEMO 계정은 Grafana 대시보드 한 장의 읽기 전용 공개 링크만 열 수 있고 로그 탐색·알림 규칙·Cloudtype 콘솔 줄은 "관리자 전용"으로 막혀 보인다(2026-11-03 변경. 이전에는 DEMO도 비공개 링크를 봤지만 Grafana 로그인이 없어 열 수 없었다).
 - 의존성은 `spring-boot-starter-opentelemetry`로 바꿨다(기존 `spring-boot-opentelemetry` 포함. 지표 OTLP 자동 구성에 필요한 클래스를 계속 제공하고 추적 의존성을 더한다). `llm.call`, `llm.call.duration`은 허용 목록에 넣는다(태그 `operation`·`result`는 닫힌 값).
 - Loki에는 `com.ottnavi` INFO 이상 + 라이브러리 WARN 이상만 보내고, 스택 트레이스는 보내지 않으며, 이메일 모양 글자는 가린다. `drainOnStop=true`.
 - 로그 줄이기는 직접 만든 코드(`StoreErrorLog`)를 쓴다. 기동 직후 Redis 미리 연결은 이번에 하지 않는다.

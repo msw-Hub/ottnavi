@@ -26,6 +26,7 @@ interface MonitoringRowBase {
 export interface MonitoringExternalRow extends MonitoringRowBase {
   kind: 'external'
   linkKey: MonitoringLinkKey
+  isAdminOnly: boolean // true면 데모(DEMO) 계정에는 [열기] 대신 비활성 "관리자 전용"을 보인다(로그인이 필요한 비공개 주소라서)
 }
 
 // 앱 안 화면 줄: 같은 탭에서 이동한다(예: 수집 탭)
@@ -44,6 +45,7 @@ export const MONITORING_ROWS: MonitoringRow[] = [
     placeLabel: 'Grafana 대시보드',
     icon: LayoutDashboardIcon,
     linkKey: 'grafanaDashboard',
+    isAdminOnly: false, // 데모에는 읽기 전용 공개 링크로 열린다(2026-11-03)
   },
   {
     kind: 'external',
@@ -51,6 +53,7 @@ export const MONITORING_ROWS: MonitoringRow[] = [
     placeLabel: 'Grafana 로그 탐색',
     icon: ScrollTextIcon,
     linkKey: 'grafanaExplore',
+    isAdminOnly: true,
   },
   {
     kind: 'external',
@@ -58,6 +61,7 @@ export const MONITORING_ROWS: MonitoringRow[] = [
     placeLabel: 'Grafana 알림 규칙',
     icon: BellRingIcon,
     linkKey: 'grafanaAlertRules',
+    isAdminOnly: true,
   },
   {
     kind: 'external',
@@ -65,6 +69,7 @@ export const MONITORING_ROWS: MonitoringRow[] = [
     placeLabel: 'Cloudtype 콘솔',
     icon: ServerIcon,
     linkKey: 'cloudtypeConsole',
+    isAdminOnly: true,
   },
   {
     kind: 'internal',

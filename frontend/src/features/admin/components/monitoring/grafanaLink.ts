@@ -5,7 +5,11 @@
  * 알림 규칙은 2026-11-01에 Grafana에서 규칙(서버 메모리 높음·지표 끊김)을 만들어 그 목록 주소를 넣었다.
  * 주소가 정해지면 해당 상수 한 줄만 바꾸면 된다. 비밀 값이 아니라 브라우저에 그대로 보이는 링크이므로 코드에 둬도 된다.
  * 단, 토큰·비밀번호가 붙은 주소(예: 로그인 없이 열리는 공유 키가 들어간 주소)는 넣지 않는다.
- * 데모(DEMO) 계정에도 같은 링크가 보인다(관측 설계 결정 2026-10-30).
+ * 예외: 대시보드 한 장(ottnavi-overview)의 읽기 전용 공개 링크만 둔다(GRAFANA_PUBLIC_DASHBOARD_URL, 사용자 결정 2026-11-03).
+ * 로그 탐색·알림 규칙·Cloudtype 콘솔 주소는 여전히 공개 링크로 만들지 않는다.
+ * 데모(DEMO) 계정은 Grafana 로그인이 없어 비공개 링크를 열 수 없으므로 대시보드 줄만 공개 링크로 열리고,
+ * 나머지 줄은 "관리자 전용"으로 막아 보인다(DEMO_MONITORING_LINK_URLS, MonitoringLinksCard).
+ * 이전: 관리자와 데모 계정이 같은 비공개 링크를 봤다(관측 설계 결정 2026-10-30). 데모는 열 수 없어 바꿨다.
  */
 
 // 바깥 도구 항목을 구분하는 이름. 화면 표시 정보(보고 싶은 것·이름·아이콘)는 monitoringDestinations.ts의 linkKey가 같은 이름으로 묶는다
@@ -36,4 +40,15 @@ export const MONITORING_LINK_URLS: MonitoringLinkUrls = {
   grafanaExplore: GRAFANA_EXPLORE_URL,
   grafanaAlertRules: GRAFANA_ALERT_RULES_URL,
   cloudtypeConsole: CLOUDTYPE_CONSOLE_URL,
+}
+
+// Grafana 대시보드 "ottnavi-overview"의 읽기 전용 공개 링크(로그인 없이 열린다). 시간 범위 옵션은 꺼 둬 최근 6시간으로 고정이다.
+// 주소 끝 값은 비밀번호가 아니라 이 대시보드 한 장을 읽기 전용으로 공개하기로 사용자가 정한 공개 식별자다(2026-11-03).
+export const GRAFANA_PUBLIC_DASHBOARD_URL =
+  'https://ottnavi.grafana.net/public-dashboards/bd1c942d8a4443f696bdd19b9e795303'
+
+// 데모 계정이 보는 묶음: 대시보드만 공개 링크로 바꾸고 나머지는 관리자와 같다(나머지 줄은 화면에서 "관리자 전용"으로 막혀 주소를 쓰지 않는다)
+export const DEMO_MONITORING_LINK_URLS: MonitoringLinkUrls = {
+  ...MONITORING_LINK_URLS,
+  grafanaDashboard: GRAFANA_PUBLIC_DASHBOARD_URL,
 }

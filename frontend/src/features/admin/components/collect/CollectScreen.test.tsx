@@ -122,16 +122,68 @@ describe('수동 실행', () => {
     expect(ids).toEqual(['5', '4', '3', '2', '1', '6'])
   })
 
-  it('접수한 실행은 이력을 한 번 더 불러오면([새로 고침]) 성공으로 바뀐다', async () => {
+  // 이전 이름: "접수한 실행은 이력을 한 번 더 불러오면([새로 고침]) 성공으로 바뀐다"(완료 기준이 조회 2번째였다)
+  it('실행 중이면 행 아래 진행 띠·위쪽 요약 카드·자동 갱신 안내가 보이고, [새로 고침]마다 단계가 옮겨 가다 성공으로 바뀐다', async () => {
     const user = userEvent.setup()
     renderCollect()
     const table = await findTable()
     await submitRun(user, addDays(TODAY, -5))
     await waitFor(() => expect(within(runRow(table, 6)).getByText('실행 중')).toBeInTheDocument())
 
-    await user.click(screen.getByRole('button', { name: '새로 고침' }))
+    // 조회 1번째: 영화 후보 단계(근사값 "약 45%"와 서비스 3/7곳, 각주)
+    expect(within(table).getByText('0/5 단계 · 지금: 영화 후보 발견')).toBeInTheDocument()
+    expect(within(table).getByText('서비스 3/7곳')).toBeInTheDocument()
+    expect(
+      within(table).getByRole('progressbar', { name: '영화 후보 발견 진행률' }),
+    ).toHaveAttribute('aria-valuenow', '45')
+    expect(within(table).getByText('후보 단계 퍼센트는 근사값이에요')).toBeInTheDocument()
+    expect(screen.getByText('실행 중이라 15초마다 자동으로 새로 고쳐요')).toBeInTheDocument()
+    expect(
+      screen.getByText(/^실행 6 · .* 전체\(ALL\) 수집 중 — 0\/5 단계 · 영화 후보 발견$/),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^이력에서 보기.*실행 6/ })).toBeInTheDocument()
 
+    // 조회 2번째: 영화 상세 62%와 처리 수 / 전체 수
+    await user.click(screen.getByRole('button', { name: '새로 고침' }))
+    expect(await within(table).findByText('2/5 단계 · 지금: 영화 상세')).toBeInTheDocument()
+    expect(within(table).getByText('620 / 1,000건')).toBeInTheDocument()
+    expect(within(table).getByText('62%')).toBeInTheDocument()
+
+    // 조회 3번째: 퍼센트가 아직 없으면 막대 없이 처리 수만
+    await user.click(screen.getByRole('button', { name: '새로 고침' }))
+    expect(await within(table).findByText('처리 640건')).toBeInTheDocument()
+    expect(within(table).queryByRole('progressbar', { name: '영화 상세 진행률' })).toBeNull()
+
+    // 조회 4번째(기준 횟수): 성공. 완료된 실행에는 진행 띠·요약 카드·자동 갱신 안내가 없다
+    await user.click(screen.getByRole('button', { name: '새로 고침' }))
     await waitFor(() => expect(within(runRow(table, 6)).getByText('성공')).toBeInTheDocument())
+    expect(within(table).queryByRole('list', { name: '단계별 진행' })).toBeNull()
+    expect(screen.queryByText('실행 중이라 15초마다 자동으로 새로 고쳐요')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^이력에서 보기.*실행 6/ })).not.toBeInTheDocument()
+  })
+
+  it('실패·중단된 행에는 어느 단계에서 멈췄는지 한 줄이 붙는다', async () => {
+    renderCollect()
+    const table = await findTable()
+
+    expect(within(table).getByText('2/5 단계에서 멈춤 · 영화 상세')).toBeInTheDocument() // 2번 실패
+    expect(within(table).getByText('3/5 단계에서 멈춤 · 드라마 상세')).toBeInTheDocument() // 3번 중단됨
+  })
+
+  it('?mockScenario=collect-progress-null이면 실행 중이어도 진행 띠와 멈춘 단계 줄을 그리지 않는다', async () => {
+    window.history.replaceState({}, '', '/?mockScenario=collect-progress-null')
+    const user = userEvent.setup()
+    renderCollect()
+    const table = await findTable()
+    await submitRun(user, addDays(TODAY, -5))
+    await waitFor(() => expect(within(runRow(table, 6)).getByText('실행 중')).toBeInTheDocument())
+
+    expect(within(table).queryByRole('list', { name: '단계별 진행' })).toBeNull()
+    expect(within(table).queryByText(/단계에서 멈춤/)).toBeNull()
+    // 실패 사유 띠는 진행 정보와 상관없이 그대로다
+    expect(within(table).getByText(/TMDB 응답 지연/)).toBeInTheDocument()
+    // 요약 카드는 단계 부분 없이 "수집 중"까지만 보인다
+    expect(screen.getByText(/^실행 6 · .* 전체\(ALL\) 수집 중$/)).toBeInTheDocument()
   })
 
   it('같은 날짜·범위가 실행 중이면 오류가 아니라 안내 띠(409)가 나온다', async () => {

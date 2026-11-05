@@ -3,7 +3,11 @@ import { MemoryRouter } from 'react-router'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Providers } from '@/app/providers'
-import { MONITORING_LINK_URLS } from '@/features/admin/components/monitoring/grafanaLink'
+import {
+  DEMO_MONITORING_LINK_URLS,
+  GRAFANA_PUBLIC_DASHBOARD_URL,
+  MONITORING_LINK_URLS,
+} from '@/features/admin/components/monitoring/grafanaLink'
 import { MonitoringScreen } from '@/features/admin/components/monitoring/MonitoringScreen'
 import { handlers } from '@/mocks/handlers'
 import { resetMockSession, setMockRole } from '@/mocks/mockSession'
@@ -43,7 +47,10 @@ function renderScreen(scenario?: string) {
 
 describe('모니터링 바로가기 주소', () => {
   it('값이 있는 주소는 https이고 토큰·비밀번호처럼 보이는 값이 붙지 않는다', () => {
-    for (const url of Object.values(MONITORING_LINK_URLS)) {
+    for (const url of [
+      ...Object.values(MONITORING_LINK_URLS),
+      ...Object.values(DEMO_MONITORING_LINK_URLS),
+    ]) {
       if (url === '') continue
       expect(url).toMatch(/^https:\/\//)
       expect(url).not.toMatch(/token|password|passwd|secret|api_?key|auth=/i)
@@ -78,6 +85,41 @@ describe('모니터링 바로가기 주소', () => {
       'href',
       expect.stringContaining('ottnavi.grafana.net/alerting/list'),
     )
+  })
+})
+
+describe('데모 계정의 모니터링 바로가기', () => {
+  it('대시보드는 읽기 전용 공개 주소로 열리고 로그·알림·콘솔은 비활성 "관리자 전용"이다', async () => {
+    setMockRole('DEMO')
+    renderScreen()
+
+    const dashboard = await screen.findByRole('link', { name: /Grafana 대시보드 열기/ })
+    expect(dashboard).toHaveAttribute('href', GRAFANA_PUBLIC_DASHBOARD_URL)
+    expect(dashboard).toHaveAttribute('target', '_blank')
+
+    for (const name of [
+      'Grafana 로그 탐색 관리자 전용',
+      'Grafana 알림 규칙 관리자 전용',
+      'Cloudtype 콘솔 관리자 전용',
+    ]) {
+      const button = screen.getByRole('button', { name })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAccessibleDescription(/데모 계정은 지표 대시보드만 볼 수 있습니다/)
+    }
+    // 비공개 주소가 데모 화면 어디에도 링크로 남지 않는다
+    expect(screen.queryByRole('link', { name: /Grafana 로그 탐색 열기/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Cloudtype 콘솔 열기/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Grafana 알림 규칙 열기/ })).not.toBeInTheDocument()
+    // 앱 안 이동(수집 탭)은 그대로다
+    expect(screen.getByRole('link', { name: '수집 탭' })).toHaveAttribute('href', '/admin/collect')
+  })
+
+  it('관리자에게는 안내 문구와 "관리자 전용" 표시가 없다', async () => {
+    renderScreen()
+
+    expect(await screen.findByRole('link', { name: /Grafana 로그 탐색 열기/ })).toBeInTheDocument()
+    expect(screen.queryByText(/데모 계정은 지표 대시보드만/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/관리자 전용/)).not.toBeInTheDocument()
   })
 })
 

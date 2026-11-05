@@ -7,7 +7,7 @@ import { AboutScreen } from '@/features/about/components/AboutScreen'
  * 제공 상태 3가지가 글자로 설명되는지를 사용자가 보는 글자 기준으로 확인한다.
  */
 describe('About 화면', () => {
-  it('TMDB 고지문 원문과 로고 자리, JustWatch 출처, 비영리 운영 안내가 보인다', () => {
+  it('TMDB 고지문 원문과 로고, JustWatch 출처, 비영리 운영 안내가 보인다', () => {
     render(<AboutScreen />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'OTT내비 소개' })).toBeInTheDocument()
@@ -17,7 +17,8 @@ describe('About 화면', () => {
         'This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.',
       ),
     ).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /TMDB 로고 자리/ })).toBeInTheDocument()
+    // 공식 TMDB 로고 이미지(이전: 자리표시 박스 "TMDB 로고 자리")
+    expect(screen.getByRole('img', { name: 'TMDB' })).toHaveAttribute('src', '/tmdb-logo.svg')
     expect(screen.getByRole('link', { name: /JustWatch/ })).toHaveAttribute(
       'href',
       'https://www.justwatch.com/',
