@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 새로 볼 수 있게 된 작품(Task 107, FR-22). 두 경우를 묶는다.
  * 1. 입고(ARRIVAL): 최근 arrivalDays일 안에 제공 상태가 없음·모름에서 있음으로 바뀐 기록(첫 적재는 입고가 아니다).
  * 2. 공개(RELEASE): 첫 적재(이전 상태 없음)로 바로 있음이 됐지만 공개일이 최근 releaseDays일 이내인 작품. 공개일을 모르면 뺀다.
- * 같은 작품·서비스는 가장 최근 한 건만 남긴다. 날짜는 우리가 확인한 범위의 날짜이지 실제 서비스 입고일이 아니다.
+ * 같은 작품은 서비스가 달라도 대표 한 건만 남긴다(NewArrivalPicker). 날짜는 우리가 확인한 범위의 날짜이지 실제 서비스 입고일이 아니다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -79,7 +79,7 @@ public class NewlyAvailableQueryService {
                     releaseDateOf(change), title.getReleaseDate()));
         }
 
-        // 4. 같은 작품·서비스는 대표 한 건만 남기고 작품 개봉일 그룹·날짜 최신순으로 정렬해 자른다
+        // 4. 같은 작품은 대표 한 건만 남기고 작품 개봉일 그룹·날짜 최신순으로 정렬해 자른다
         List<NewArrivalCandidate> picked = NewArrivalPicker.pick(candidates, limit, today);
 
         // 5. 고른 작품들(중복 없이 등장 순서대로)을 카드로 만든다
