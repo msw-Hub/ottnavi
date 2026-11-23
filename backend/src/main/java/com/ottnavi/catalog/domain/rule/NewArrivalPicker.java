@@ -9,10 +9,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * "새로 볼 수 있게 된 작품" 후보에서 같은 작품·서비스의 대표 한 건만 남기고 최신순으로 자른다(DB·프레임워크 의존 없음).
+ * "새로 볼 수 있게 된 작품" 후보에서 같은 작품의 대표 한 건만 남기고 최신순으로 자른다(DB·프레임워크 의존 없음).
  *
- * <p>예: 같은 작품·서비스에 시즌 1(10월 3일 입고)과 시즌 2(10월 9일 입고) 후보가 있으면 10월 9일 한 건만 남는다.
- * 날짜가 같으면 입고(ARRIVAL)를 공개(RELEASE)보다 앞에 둔다(실제 상태 변화를 확인한 쪽이 더 확실하다).
+ * <p>예: 같은 작품에 시즌 1(10월 3일 입고)과 시즌 2(10월 9일 입고) 후보가 있으면 10월 9일 한 건만 남는다.
+ * 서비스가 달라도 같은 작품이면 한 건만 남긴다: 카드가 볼 수 있는 서비스 로고를 모두 보여 주므로 서비스마다 한 줄씩 두면
+ * 똑같은 카드가 겹쳐 보인다(2026-11-24 운영에서 확인). 서비스 하나로 거른 목록은 원래 서비스가 하나라 결과가 같다.
+ * 대표는 더 최근 날짜 → 날짜가 같으면 입고(ARRIVAL)를 공개(RELEASE)보다 앞(실제 상태 변화를 확인한 쪽이 더 확실하다)
+ * → 그래도 같으면 서비스 ID가 작은 쪽이다(DB가 돌려준 순서와 상관없이 늘 같은 대표가 나오게 한다).
  * 정렬: 작품 개봉일 그룹(최근 6개월 → 그 이전 → 미래·모름) → 날짜 최신순 → 작품 ID 순 → 서비스 ID 순(항상 같은 순서로 나오게 한다).
  * 옛 고전이 입고 날짜만 최근이라고 맨 앞에 오는 것을 막으려고 작품 자체의 개봉일을 먼저 본다.
  */
@@ -21,12 +24,14 @@ public final class NewArrivalPicker {
     private NewArrivalPicker() {
     }
 
-    /** 같은 작품·서비스는 대표 한 건만 남기고, 작품 개봉일 그룹과 날짜 최신순으로 정렬해 최대 limit건을 돌려준다. today는 KST 오늘이다 */
+    /** 같은 작품은 대표 한 건만 남기고, 작품 개봉일 그룹과 날짜 최신순으로 정렬해 최대 limit건을 돌려준다. today는 KST 오늘이다 */
     public static List<NewArrivalCandidate> pick(List<NewArrivalCandidate> candidates, int limit, LocalDate today) {
-        // 1. 작품·서비스마다 대표 한 건(더 최근 날짜, 같으면 ARRIVAL)을 고른다
-        Map<String, NewArrivalCandidate> best = new LinkedHashMap<>();
+        // 1. 작품마다 대표 한 건(더 최근 날짜 → ARRIVAL → 작은 서비스 ID)을 고른다
+        // 이전: 작품·서비스마다 한 건씩 남겨 같은 작품이 서비스 수만큼 겹쳐 나왔다
+        // String key = candidate.titleId() + ":" + candidate.ottServiceId();
+        Map<Long, NewArrivalCandidate> best = new LinkedHashMap<>();
         for (NewArrivalCandidate candidate : candidates) {
-            String key = candidate.titleId() + ":" + candidate.ottServiceId();
+            Long key = candidate.titleId();
             NewArrivalCandidate current = best.get(key);
             if (current == null || isBetter(candidate, current)) {
                 best.put(key, candidate);
@@ -67,6 +72,9 @@ public final class NewArrivalPicker {
         if (byDate != 0) {
             return byDate > 0;
         }
-        return candidate.type() == ArrivalType.ARRIVAL && current.type() == ArrivalType.RELEASE;
+        if (candidate.type() != current.type()) {
+            return candidate.type() == ArrivalType.ARRIVAL;
+        }
+        return candidate.ottServiceId() < current.ottServiceId();
     }
 }
